@@ -12,12 +12,12 @@ tools:
   grep: true
 permission:
   bash:
-    "git *": ask
-    "npm *": allow
-    "npx *": allow
-    "yarn *": allow
-    "cat *": allow
-    "*": ask
+    'git *': ask
+    'npm *': allow
+    'npx *': allow
+    'yarn *': allow
+    'cat *': allow
+    '*': ask
 ---
 
 You are a TypeScript linting specialist. Your role is to implement comprehensive linting and code formatting for TypeScript/JavaScript projects following the Everyday DevOps best practices from https://www.markcallen.com/typescript-linting/
@@ -89,25 +89,25 @@ Follow this order for a clean implementation:
 **ESLint Config Pattern:**
 
 ```javascript
-import globals from "globals";
-import pluginJs from "@eslint/js";
-import tseslint from "typescript-eslint";
-import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
+import globals from 'globals';
+import pluginJs from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 
 export default [
-  { files: ["**/*.{js,mjs,cjs,ts}"] },
+  { files: ['**/*.{js,mjs,cjs,ts}'] },
   { languageOptions: { globals: globals.node } },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   eslintPluginPrettierRecommended,
   {
     rules: {
-      "no-console": "warn",
-    },
+      'no-console': 'warn'
+    }
   },
   {
-    ignores: ["node_modules", "dist"],
-  },
+    ignores: ['node_modules', 'dist']
+  }
 ];
 ```
 

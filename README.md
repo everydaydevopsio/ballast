@@ -69,4 +69,8 @@ For detailed information about the linting setup and best practices, visit:
 
 ## License
 
-MIT © Mark Callen
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Author
+
+Mark C Allen ([@markcallen](https://github.com/markcallen))
