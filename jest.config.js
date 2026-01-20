@@ -1,8 +1,13 @@
 module.exports = {
   testEnvironment: 'node',
-  collectCoverageFrom: ['install.js'],
+  collectCoverageFrom: [
+    'packages/core/index.js',
+    'packages/opencode/install.js',
+    'packages/claude/install.js',
+    'packages/cursor/install.js'
+  ],
   coverageDirectory: 'coverage',
-  testMatch: ['**/*.test.js'],
+  testMatch: ['**/packages/**/*.test.js'],
   verbose: true,
   coverageThreshold: {
     global: {
@@ -11,5 +16,9 @@ module.exports = {
       lines: 80,
       statements: 80
     }
+  },
+  moduleNameMapper: {
+    '^@everydaydevops/typescript-linting-core$':
+      '<rootDir>/packages/core/index.js'
   }
 };

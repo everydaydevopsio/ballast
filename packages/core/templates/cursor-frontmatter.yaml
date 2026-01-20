@@ -1,0 +1,12 @@
+---
+description: 'TypeScript linting specialist - implements comprehensive linting and code formatting for TypeScript/JavaScript projects'
+alwaysApply: false
+globs:
+  - '*.ts'
+  - '*.tsx'
+  - '*.js'
+  - '*.jsx'
+  - 'eslint.config.*'
+  - '.prettierrc'
+  - 'package.json'
+---

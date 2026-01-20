@@ -1,0 +1,35 @@
+{
+  "name": "@everydaydevops/claude-typescript-linting",
+  "version": "2.0.0",
+  "description": "Claude Code rules for implementing TypeScript linting and code formatting following Everyday DevOps best practices",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "typescript",
+    "eslint",
+    "prettier",
+    "linting",
+    "formatting",
+    "ai-agent"
+  ],
+  "author": "Mark C Allen <mark@markcallen.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/everydaydevopsio/opencode-typescript-linting-agent.git",
+    "directory": "packages/claude"
+  },
+  "homepage": "https://github.com/everydaydevopsio/opencode-typescript-linting-agent#readme",
+  "bugs": {
+    "url": "https://github.com/everydaydevopsio/opencode-typescript-linting-agent/issues"
+  },
+  "files": [
+    "install.js"
+  ],
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "dependencies": {
+    "@everydaydevops/typescript-linting-core": "2.0.0"
+  }
+}
