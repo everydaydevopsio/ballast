@@ -10,21 +10,21 @@ This is a monorepo containing TypeScript linting agents for multiple AI coding t
 
 ```bash
 # Install dependencies (all packages)
-npm install
+pnpm install
 
 # Run tests
-npm test
+pnpm test
 
 # Run tests with coverage (80% threshold required)
-npm run test:coverage
+pnpm run test:coverage
 
 # Linting
-npm run lint           # Check for linting errors
-npm run lint:fix       # Auto-fix linting errors
+pnpm run lint           # Check for linting errors
+pnpm run lint:fix       # Auto-fix linting errors
 
 # Formatting
-npm run prettier       # Check formatting
-npm run prettier:fix   # Auto-fix formatting
+pnpm run prettier       # Check formatting
+pnpm run prettier:fix   # Auto-fix formatting
 ```
 
 ## Architecture
@@ -45,7 +45,7 @@ packages/
 
 ## Key Details
 
-- Uses npm workspaces for monorepo management
+- Uses pnpm workspaces for monorepo management
 - Core package is private (not published), only used as internal dependency
 - Each platform package depends on core and has its own install.js
 - OpenCode overwrites existing files; Claude/Cursor preserve user customizations

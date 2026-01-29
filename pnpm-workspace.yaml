@@ -1,4 +1,4 @@
 ignoredBuiltDependencies:
   - opencode-ai
 packages:
-  - '.'
+  - 'packages/*'

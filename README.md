@@ -95,20 +95,20 @@ The agents will:
 
 ## Development
 
-This is a monorepo using npm workspaces.
+This is a monorepo using pnpm workspaces.
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Run tests
-npm test
+pnpm test
 
 # Run tests with coverage
-npm run test:coverage
+pnpm run test:coverage
 
 # Lint
-npm run lint
+pnpm run lint
 ```
 
 ## License
