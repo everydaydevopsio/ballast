@@ -10,7 +10,7 @@ module.exports = [
   ...tseslint.configs.recommended,
   eslintPluginPrettierRecommended,
   {
-    files: ['**/*.test.js', '**/*.spec.js'],
+    files: ['**/*.test.ts', '**/*.test.js', '**/*.spec.ts', '**/*.spec.js'],
     languageOptions: {
       globals: globals.jest
     },
@@ -25,7 +25,7 @@ module.exports = [
     }
   },
   {
-    files: ['install.js'],
+    files: ['src/**/*.ts', 'src/**/*.js', 'bin/**/*.js'],
     rules: {
       'no-console': 'off'
     }

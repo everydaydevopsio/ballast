@@ -1,149 +1,128 @@
-# TypeScript Linting Agents
+# Ballast
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-TypeScript linting agents for **OpenCode**, **Claude Code**, and **Cursor IDE** following Everyday DevOps best practices.
+CLI to install TypeScript AI agent rules for **Cursor**, **Claude Code**, and **OpenCode**. One package, one command—pick your platform and which agents to install.
 
-## Packages
+## Agents
 
-This monorepo contains separate packages for each AI coding tool:
-
-| Package                                                            | npm                                                                                                                                                             | Description       |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| [@everydaydevops/opencode-typescript-linting](./packages/opencode) | [![npm](https://badge.fury.io/js/@everydaydevops%2Fopencode-typescript-linting.svg)](https://www.npmjs.com/package/@everydaydevops/opencode-typescript-linting) | OpenCode agent    |
-| [@everydaydevops/claude-typescript-linting](./packages/claude)     | [![npm](https://badge.fury.io/js/@everydaydevops%2Fclaude-typescript-linting.svg)](https://www.npmjs.com/package/@everydaydevops/claude-typescript-linting)     | Claude Code rules |
-| [@everydaydevops/cursor-typescript-linting](./packages/cursor)     | [![npm](https://badge.fury.io/js/@everydaydevops%2Fcursor-typescript-linting.svg)](https://www.npmjs.com/package/@everydaydevops/cursor-typescript-linting)     | Cursor IDE rules  |
+| Agent             | Description                                                              |
+| ----------------- | ------------------------------------------------------------------------ |
+| **linting**       | ESLint, Prettier, Husky, lint-staged, GitHub Actions (full instructions) |
+| **local-dev**     | Local dev environment setup, DX, documentation (placeholder outline)     |
+| **cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)         |
+| **observability** | Logging, tracing, metrics, SLOs (placeholder outline)                    |
 
 ## Installation
 
-Install only the package for your preferred tool:
+Install as a dev dependency in your project:
 
 ```bash
-# For OpenCode
-npm install @everydaydevops/opencode-typescript-linting
-
-# For Claude Code
-npm install @everydaydevops/claude-typescript-linting
-
-# For Cursor IDE
-npm install @everydaydevops/cursor-typescript-linting
-```
-
-Or install globally:
-
-```bash
-npm install -g @everydaydevops/opencode-typescript-linting
+npm install -D @everydaydevopsio/ballast
+# or
+pnpm add -D @everydaydevopsio/ballast
+# or
+yarn add -D @everydaydevopsio/ballast
 ```
 
 ## Usage
 
-### OpenCode
+### Interactive (recommended first time)
 
-```
-opencode
-> @typescript-linting help me set up linting for this project
-```
+From your project root:
 
-### Claude Code
-
-Rules are automatically loaded when working in the project:
-
-```
-claude
-> Help me set up linting for this project
+```bash
+npx ballast install
 ```
 
-### Cursor
+You’ll be prompted for:
 
-Rules auto-attach when working with TypeScript/JavaScript files, or invoke manually:
+1. **AI platform**: `cursor`, `claude`, or `opencode`
+2. **Agents**: comma-separated (e.g. `linting, local-dev`) or `all`
 
+Your choices are saved to `.rulesrc.json`. Future runs reuse them (non-interactive).
+
+### With options
+
+```bash
+# Install linting agent for Cursor
+npx ballast install --target cursor --agent linting
+
+# Install all agents for Claude
+npx ballast install --target claude --all
+
+# Overwrite existing rule files
+npx ballast install --target cursor --agent linting --force
+
+# Non-interactive (CI): require --target and --agent/--all if no .rulesrc.json
+npx ballast install --yes --target cursor --agent linting
 ```
-@typescript-linting help me set up linting for this project
+
+### CI / non-interactive
+
+In CI (or with `--yes`), if `.rulesrc.json` is not present you **must** pass `--target` and either `--agent` or `--all`:
+
+```bash
+ballast install --yes --target cursor --agent linting
+ballast install --yes --target opencode --all
 ```
 
-## What It Does
+### Help and version
 
-The agents will:
+```bash
+npx ballast --help
+npx ballast --version
+```
 
-- Install and configure ESLint with TypeScript support
-- Set up Prettier for code formatting
-- Configure Husky for Git hooks
-- Set up lint-staged for pre-commit checks
-- Create GitHub Actions workflow for CI linting
-- Add helpful npm scripts for linting and formatting
+## Install locations
 
-## Installation Paths
+Rules are written under your project root:
 
-| Tool        | Global                      | Local            |
-| ----------- | --------------------------- | ---------------- |
-| OpenCode    | `~/.config/opencode/agent/` | `.opencode/`     |
-| Claude Code | `~/.claude/rules/`          | `.claude/rules/` |
-| Cursor      | N/A (Settings UI)           | `.cursor/rules/` |
+| Platform | Path             | File pattern  |
+| -------- | ---------------- | ------------- |
+| Cursor   | `.cursor/rules/` | `<agent>.mdc` |
+| Claude   | `.claude/rules/` | `<agent>.md`  |
+| OpenCode | `.opencode/`     | `<agent>.md`  |
 
-## Overwrite Behavior
+## Overwrite policy
 
-- **OpenCode**: Always overwrites existing agent files
-- **Claude Code**: Never overwrites existing rules (preserves customizations)
-- **Cursor**: Never overwrites existing rules (preserves customizations)
+Existing rule files are **never** overwritten unless you pass `--force`. Same behavior for all platforms.
 
-## Learn More
+## Config file
 
-- [TypeScript Linting Guide](https://www.markcallen.com/typescript-linting/)
-- [OpenCode Documentation](https://opencode.ai/docs)
-- [Claude Code Documentation](https://docs.anthropic.com/en/docs/claude-code)
-- [Cursor Documentation](https://cursor.com/docs)
+After an interactive install, `.rulesrc.json` in the project root stores:
+
+```json
+{
+  "target": "cursor",
+  "agents": ["linting", "local-dev"]
+}
+```
+
+Commit this file to make installs repeatable for your team and in CI (or pass `--yes --target --agent` in CI when the file is not present).
 
 ## Development
 
-This is a monorepo using pnpm workspaces.
+Single package (no workspaces).
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Run tests
 pnpm test
-
-# Run tests with coverage
 pnpm run test:coverage
-
-# Lint
 pnpm run lint
+pnpm run lint:fix
+pnpm run prettier:fix
 ```
 
 ### Publishing
 
-Publish all packages (opencode, claude, cursor) from the root:
+From the repo root:
 
 ```bash
-pnpm -r publish --access public
+pnpm publish --access public
 ```
 
-`--access public` is required for scoped packages (`@everydaydevops/...`). The `core` package is private and is not published.
-
-## Releasing
-
-Releases are done via GitHub Actions. No need to bump versions or publish from your machine.
-
-1. Go to **Actions** → **Publish to npm** → **Run workflow**.
-2. Choose **Release type**:
-   - **patch** (default) — e.g. `2.0.2` → `2.0.3`
-   - **minor** — e.g. `2.0.2` → `2.1.0`
-3. The workflow will:
-   - Bump all `package.json` versions and the lockfile
-   - Commit, create a tag (e.g. `v2.0.3`), and push to the current branch
-   - Run tests, then publish the OpenCode, Claude, and Cursor packages to npm
-
-**Prerequisites**
-
-- **NPM_TOKEN**: a GitHub Actions secret with an npm access token that can publish to `@everydaydevops`. Add it in **Settings** → **Secrets and variables** → **Actions**.
-
-**Local publish (optional)**  
-To publish from your machine instead of CI (e.g. one-off or debugging), run from the repo root:
-
-```bash
-pnpm -r publish --access public
-```
+**Version history:** v1 (OpenCode-only) is [opencode-typescript-linting-agent](https://github.com/everydaydevopsio/opencode-typescript-linting-agent); v2 (multi-platform) is this repo, [typescript-linting-agent](https://github.com/everydaydevopsio/typescript-linting-agent).
 
 ## License
 

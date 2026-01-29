@@ -1,0 +1,10 @@
+---
+description: 'Local development environment specialist - reproducible dev setup, DX, and documentation'
+alwaysApply: false
+globs:
+  - 'package.json'
+  - 'README*'
+  - '.env*'
+  - 'docker-compose*.yml'
+  - 'Dockerfile*'
+---

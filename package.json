@@ -1,13 +1,15 @@
 {
-  "name": "typescript-linting-agent-monorepo",
-  "version": "2.0.6",
-  "private": true,
-  "description": "Monorepo for TypeScript linting agents (OpenCode, Claude Code, Cursor)",
-  "workspaces": [
-    "packages/core",
-    "packages/opencode",
-    "packages/claude",
-    "packages/cursor"
+  "name": "@everydaydevopsio/ballast",
+  "version": "3.0.0",
+  "description": "CLI to install TypeScript AI agent rules (linting, local-dev, CI/CD, observability) for Cursor, Claude Code, and OpenCode",
+  "main": "dist/cli.js",
+  "bin": {
+    "ballast": "./bin/ballast.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "agents"
   ],
   "author": "Mark C Allen <mark@markcallen.com>",
   "license": "MIT",
@@ -20,16 +22,20 @@
     "url": "https://github.com/everydaydevopsio/typescript-linting-agent/issues"
   },
   "scripts": {
+    "build": "tsc",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prettier": "prettier . --check",
     "prettier:fix": "prettier . --write",
-    "prepare": "husky"
+    "prepare": "husky",
+    "prepublishOnly": "pnpm run build"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.1",
     "@typescript-eslint/eslint-plugin": "^8.50.1",
     "@typescript-eslint/parser": "^8.50.1",
     "eslint": "^9.39.2",
@@ -40,6 +46,7 @@
     "jest": "^29.7.0",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
+    "ts-jest": "^29.2.5",
     "tsc-files": "^1.1.4",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.53.1"

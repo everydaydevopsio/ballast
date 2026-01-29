@@ -4,13 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a monorepo containing TypeScript linting agents for multiple AI coding tools: OpenCode, Claude Code, and Cursor IDE. Each platform has its own package that shares core content.
+This is a single-package CLI: **@everydaydevopsio/ballast**. The binary `ballast` installs TypeScript AI agent rules (linting, local-dev, CI/CD, observability) into the correct locations for Cursor, Claude Code, or OpenCode.
 
 ## Commands
 
 ```bash
-# Install dependencies (all packages)
+# Install dependencies
 pnpm install
+
+# Build (compile TypeScript to dist/)
+pnpm run build
 
 # Run tests
 pnpm test
@@ -30,23 +33,33 @@ pnpm run prettier:fix   # Auto-fix formatting
 ## Architecture
 
 ```
-packages/
-├── core/                    # @everydaydevops/typescript-linting-core (shared content)
-│   ├── src/content.md       # Core linting instructions
-│   ├── templates/           # Format-specific frontmatter
-│   └── index.js             # Exports format builders
-├── opencode/                # @everydaydevops/opencode-typescript-linting
-│   └── install.js           # OpenCode-specific installer
-├── claude/                  # @everydaydevops/claude-typescript-linting
-│   └── install.js           # Claude Code-specific installer
-└── cursor/                  # @everydaydevops/cursor-typescript-linting
-    └── install.js           # Cursor-specific installer
+agents/                 # Agent content and per-target templates
+├── linting/            # Full linting instructions
+│   ├── content.md
+│   └── templates/      # cursor, claude, opencode
+├── local-dev/          # Placeholder (short outline)
+├── cicd/               # Placeholder (short outline)
+└── observability/      # Placeholder (short outline)
+
+src/
+├── cli.ts              # CLI entry: install command, --help, --version
+├── install.ts          # Install flow: resolve target/agents, install(), runInstall()
+├── config.ts           # .rulesrc.json load/save, findProjectRoot, isCiMode
+├── agents.ts           # Agent list, getAgentDir, resolveAgents
+├── build.ts            # buildContent(agentId, target), getDestination()
+└── *.test.ts           # Unit tests
+
+dist/                   # Compiled output (from pnpm run build)
+bin/
+└── ballast.js          # Shebang entry; requires dist/cli.js
 ```
+
+See **AGENTS.md** for agent-facing project summary.
 
 ## Key Details
 
-- Uses pnpm workspaces for monorepo management
-- Core package is private (not published), only used as internal dependency
-- Each platform package depends on core and has its own install.js
-- OpenCode overwrites existing files; Claude/Cursor preserve user customizations
-- Cursor global install is skipped (requires Settings UI)
+- Single overwrite policy: do not overwrite existing rule files unless `--force`.
+- Platform first, then agents; user can choose "all" agents.
+- In CI mode (`CI=true` or `--yes`), if `.rulesrc.json` is missing, `--target` and `--agent` (or `--all`) are required.
+- Config is persisted in `.rulesrc.json` so repeat runs are non-interactive.
+- CLI only installs agents that ship inside this package (no external bundle discovery).

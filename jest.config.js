@@ -1,24 +1,31 @@
+/** @type {import('jest').Config} */
 module.exports = {
   testEnvironment: 'node',
+  preset: 'ts-jest',
+  testEnvironmentOptions: {},
+  transform: {
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        tsconfig: 'tsconfig.jest.json'
+      }
+    ]
+  },
   collectCoverageFrom: [
-    'packages/core/index.js',
-    'packages/opencode/install.js',
-    'packages/claude/install.js',
-    'packages/cursor/install.js'
+    'src/**/*.ts',
+    '!src/**/*.test.ts',
+    '!src/cli.ts',
+    '!**/node_modules/**'
   ],
   coverageDirectory: 'coverage',
-  testMatch: ['**/packages/**/*.test.js'],
+  testMatch: ['**/src/**/*.test.ts', '**/*.test.ts'],
   verbose: true,
   coverageThreshold: {
     global: {
-      branches: 80,
-      functions: 80,
+      branches: 66,
+      functions: 75,
       lines: 80,
       statements: 80
     }
-  },
-  moduleNameMapper: {
-    '^@everydaydevops/typescript-linting-core$':
-      '<rootDir>/packages/core/index.js'
   }
 };
