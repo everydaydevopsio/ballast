@@ -1,6 +1,6 @@
 {
   "name": "@everydaydevops/claude-typescript-linting",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Claude Code rules for implementing TypeScript linting and code formatting following Everyday DevOps best practices",
   "keywords": [
     "claude-code",
@@ -30,6 +30,6 @@
     "postinstall": "node install.js"
   },
   "dependencies": {
-    "@everydaydevops/typescript-linting-core": "2.0.0"
+    "@everydaydevops/typescript-linting-core": "^2"
   }
 }
