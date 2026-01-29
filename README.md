@@ -111,6 +111,16 @@ pnpm run test:coverage
 pnpm run lint
 ```
 
+### Publishing
+
+Publish all packages (opencode, claude, cursor) from the root:
+
+```bash
+pnpm -r publish --access public
+```
+
+`--access public` is required for scoped packages (`@everydaydevops/...`). The `core` package is private and is not published.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.

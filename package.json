@@ -1,6 +1,7 @@
 {
   "name": "typescript-linting-agent-monorepo",
   "version": "2.0.0",
+  "private": true,
   "description": "Monorepo for TypeScript linting agents (OpenCode, Claude Code, Cursor)",
   "workspaces": [
     "packages/core",
