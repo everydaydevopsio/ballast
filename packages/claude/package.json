@@ -1,6 +1,6 @@
 {
   "name": "@everydaydevops/claude-typescript-linting",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Claude Code rules for implementing TypeScript linting and code formatting following Everyday DevOps best practices",
   "keywords": [
     "claude-code",

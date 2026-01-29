@@ -1,6 +1,6 @@
 {
   "name": "@everydaydevops/cursor-typescript-linting",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Cursor IDE rules for implementing TypeScript linting and code formatting following Everyday DevOps best practices",
   "keywords": [
     "cursor",
