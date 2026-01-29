@@ -2,8 +2,17 @@
   "name": "@everydaydevops/typescript-linting-core",
   "version": "2.0.0",
   "description": "Shared core content for TypeScript linting agents",
-  "private": true,
   "main": "index.js",
+  "files": [
+    "index.js",
+    "src",
+    "templates"
+  ],
   "author": "Mark C Allen <mark@markcallen.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/everydaydevopsio/typescript-linting-agent.git",
+    "directory": "packages/core"
+  }
 }

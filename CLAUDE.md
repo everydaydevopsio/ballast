@@ -31,7 +31,7 @@ npm run prettier:fix   # Auto-fix formatting
 
 ```
 packages/
-├── core/                    # Shared content (private, not published)
+├── core/                    # @everydaydevops/typescript-linting-core (shared content)
 │   ├── src/content.md       # Core linting instructions
 │   ├── templates/           # Format-specific frontmatter
 │   └── index.js             # Exports format builders
@@ -46,7 +46,7 @@ packages/
 ## Key Details
 
 - Uses npm workspaces for monorepo management
-- Core package is private (not published), only used as internal dependency
+- Core package is published to npm as a dependency for platform packages
 - Each platform package depends on core and has its own install.js
 - OpenCode overwrites existing files; Claude/Cursor preserve user customizations
 - Cursor global install is skipped (requires Settings UI)

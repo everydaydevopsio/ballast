@@ -16,12 +16,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/everydaydevopsio/opencode-typescript-linting-agent.git",
+    "url": "https://github.com/everydaydevopsio/typescript-linting-agent.git",
     "directory": "packages/opencode"
   },
-  "homepage": "https://github.com/everydaydevopsio/opencode-typescript-linting-agent#readme",
+  "homepage": "https://github.com/everydaydevopsio/typescript-linting-agent#readme",
   "bugs": {
-    "url": "https://github.com/everydaydevopsio/opencode-typescript-linting-agent/issues"
+    "url": "https://github.com/everydaydevopsio/typescript-linting-agent/issues"
   },
   "files": [
     "install.js"
