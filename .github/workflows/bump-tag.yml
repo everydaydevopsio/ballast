@@ -1,0 +1,83 @@
+name: Bump tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type (patch/minor)'
+        type: choice
+        options:
+          - patch
+          - minor
+        default: 'patch'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get next version
+        id: semvers
+        uses: WyriHaximus/github-action-next-semvers@v1
+        with:
+          version: ${{ steps.previoustag.outputs.tag }}
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
+            echo "version=${{ steps.semvers.outputs.minor }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20.x'
+          cache: 'pnpm'
+
+      - name: Bump version in all package.json files
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.version }}"
+          echo "Bumping to $NEW_VERSION"
+          for f in package.json packages/*/package.json; do
+            jq --arg v "$NEW_VERSION" '.version = $v' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+          done
+
+      - name: Update lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json packages/*/package.json pnpm-lock.yaml
+          git commit -m "chore: bump ${{ github.event.inputs.release_type }} version to ${{ steps.version.outputs.version }}"
+          git tag "v${{ steps.version.outputs.version }}"
+
+      - name: Push commit and tag
+        run: |
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "v${{ steps.version.outputs.version }}"
