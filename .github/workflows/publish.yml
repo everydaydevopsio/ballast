@@ -121,4 +121,8 @@ jobs:
         run: pnpm test
 
       - name: Publish to npm
-        run: pnpm -r publish --access public --no-git-checks
+        run: |
+          npm publish --workspace=packages/core --access public --no-git-checks
+          npm publish --workspace=packages/opencode --access public --no-git-checks
+          npm publish --workspace=packages/claude --access public --no-git-checks
+          npm publish --workspace=packages/cursor --access public --no-git-checks
