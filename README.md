@@ -121,6 +121,30 @@ pnpm -r publish --access public
 
 `--access public` is required for scoped packages (`@everydaydevops/...`). The `core` package is private and is not published.
 
+## Releasing
+
+Releases are done via GitHub Actions. No need to bump versions or publish from your machine.
+
+1. Go to **Actions** → **Publish to npm** → **Run workflow**.
+2. Choose **Release type**:
+   - **patch** (default) — e.g. `2.0.2` → `2.0.3`
+   - **minor** — e.g. `2.0.2` → `2.1.0`
+3. The workflow will:
+   - Bump all `package.json` versions and the lockfile
+   - Commit, create a tag (e.g. `v2.0.3`), and push to the current branch
+   - Run tests, then publish the OpenCode, Claude, and Cursor packages to npm
+
+**Prerequisites**
+
+- **NPM_TOKEN**: a GitHub Actions secret with an npm access token that can publish to `@everydaydevops`. Add it in **Settings** → **Secrets and variables** → **Actions**.
+
+**Local publish (optional)**  
+To publish from your machine instead of CI (e.g. one-off or debugging), run from the repo root:
+
+```bash
+pnpm -r publish --access public
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
