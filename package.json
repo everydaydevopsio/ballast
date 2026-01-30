@@ -15,11 +15,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/everydaydevopsio/typescript-linting-agent.git"
+    "url": "git+https://github.com/everydaydevopsio/ballast.git"
   },
-  "homepage": "https://github.com/everydaydevopsio/typescript-linting-agent#readme",
+  "homepage": "https://github.com/everydaydevopsio/ballast#readme",
   "bugs": {
-    "url": "https://github.com/everydaydevopsio/typescript-linting-agent/issues"
+    "url": "https://github.com/everydaydevopsio/ballast/issues"
   },
   "scripts": {
     "build": "tsc",
