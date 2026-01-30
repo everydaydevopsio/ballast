@@ -13,6 +13,17 @@ CLI to install TypeScript AI agent rules for **Cursor**, **Claude Code**, and **
 | **cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)         |
 | **observability** | Logging, tracing, metrics, SLOs (placeholder outline)                    |
 
+## Using the agents
+
+Once installed, rule files are loaded automatically by your AI platform (Cursor, Claude Code, or OpenCode). Use an agent by asking the AI for help in that area; the rule gives it the instructions.
+
+| Agent             | How to use it                                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **linting**       | In any session: _"Help me set up linting for this project"_ or _"Fix lint errors per the linting rules."_ The agent will add ESLint, Prettier, Husky, lint-staged, and CI workflows. |
+| **local-dev**     | Ask for help with local dev environment, DX, or documentation (placeholder).                                                                                                         |
+| **cicd**          | Ask for help with CI/CD pipelines, quality gates, or deployment (placeholder).                                                                                                       |
+| **observability** | Ask for help with logging, tracing, metrics, or SLOs (placeholder).                                                                                                                  |
+
 ## Installation
 
 Install as a dev dependency in your project:
