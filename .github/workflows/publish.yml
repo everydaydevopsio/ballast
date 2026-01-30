@@ -76,14 +76,11 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Install ballast globally
-        run: pnpm add -g .
-
       - name: Run ballast (all agents, all targets)
         run: |
-          ballast install --yes --target cursor --all --force
-          ballast install --yes --target claude --all --force
-          ballast install --yes --target opencode --all --force
+          node bin/ballast.js install --yes --target cursor --all --force
+          node bin/ballast.js install --yes --target claude --all --force
+          node bin/ballast.js install --yes --target opencode --all --force
 
       - name: Commit and tag
         run: |
