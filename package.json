@@ -4,7 +4,7 @@
   "description": "CLI to install TypeScript AI agent rules (linting, local-dev, CI/CD, observability) for Cursor, Claude Code, and OpenCode",
   "main": "dist/cli.js",
   "bin": {
-    "ballast": "./bin/ballast.js"
+    "ballast": "bin/ballast.js"
   },
   "files": [
     "bin",
