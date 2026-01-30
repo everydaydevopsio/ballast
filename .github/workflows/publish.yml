@@ -129,4 +129,6 @@ jobs:
         run: pnpm test
 
       - name: Publish to npm
-        run: pnpm publish --access public
+        run: |
+          echo "git-checks=false" >> .npmrc
+          pnpm publish --access public
