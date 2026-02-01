@@ -162,11 +162,56 @@ describe('install', () => {
         fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'linting.mdc'))
       ).toBe(true);
       expect(
-        fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'local-dev.mdc'))
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'local-dev-env.mdc')
+        )
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'local-dev-mcp.mdc')
+        )
       ).toBe(true);
       expect(
         fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'cicd.mdc'))
       ).toBe(true);
+      expect(result.installedRules).toContainEqual({
+        agentId: 'local-dev',
+        ruleSuffix: 'env'
+      });
+      expect(result.installedRules).toContainEqual({
+        agentId: 'local-dev',
+        ruleSuffix: 'mcp'
+      });
+    });
+
+    test('installs all rules for agent with multiple rules (local-dev)', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['local-dev'],
+        force: false,
+        saveConfig: false
+      });
+      expect(result.installed).toEqual(['local-dev']);
+      expect(result.installedRules.length).toBe(2);
+      const envFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'local-dev-env.mdc'
+      );
+      const mcpFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'local-dev-mcp.mdc'
+      );
+      expect(fs.existsSync(envFile)).toBe(true);
+      expect(fs.existsSync(mcpFile)).toBe(true);
+      expect(fs.readFileSync(envFile, 'utf8')).toContain(
+        'Local Development Environment Agent'
+      );
+      expect(fs.readFileSync(mcpFile, 'utf8')).toContain('GitHub MCP');
     });
 
     test('adds to errors for unknown agent and continues with valid ones', () => {

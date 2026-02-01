@@ -2,6 +2,7 @@ import path from 'path';
 import {
   getContent,
   getTemplate,
+  listRuleSuffixes,
   buildCursorFormat,
   buildClaudeFormat,
   buildOpenCodeFormat,
@@ -11,6 +12,22 @@ import {
 } from './build';
 
 describe('build', () => {
+  describe('listRuleSuffixes', () => {
+    test('returns only main rule for linting (no content-*.md)', () => {
+      expect(listRuleSuffixes('linting')).toEqual(['']);
+    });
+
+    test('returns env and mcp for local-dev (content-env.md and content-mcp.md)', () => {
+      expect(listRuleSuffixes('local-dev')).toContain('env');
+      expect(listRuleSuffixes('local-dev')).toContain('mcp');
+      expect(listRuleSuffixes('local-dev').length).toBe(2);
+    });
+
+    test('throws for unknown agent', () => {
+      expect(() => listRuleSuffixes('nonexistent')).toThrow(/content.md/);
+    });
+  });
+
   describe('getContent', () => {
     test('returns content for linting agent', () => {
       const content = getContent('linting');
@@ -18,8 +35,24 @@ describe('build', () => {
       expect(content).toContain('## Your Responsibilities');
     });
 
+    test('returns env content for local-dev with ruleSuffix env', () => {
+      const content = getContent('local-dev', 'env');
+      expect(content).toContain('Local Development Environment Agent');
+    });
+
+    test('returns mcp content for local-dev with ruleSuffix mcp', () => {
+      const content = getContent('local-dev', 'mcp');
+      expect(content).toContain('GitHub MCP');
+      expect(content).toContain('Jira');
+      expect(content).toContain('Linear');
+    });
+
     test('throws for unknown agent', () => {
       expect(() => getContent('nonexistent')).toThrow(/content.md/);
+    });
+
+    test('throws for missing optional rule', () => {
+      expect(() => getContent('linting', 'mcp')).toThrow(/content-mcp.md/);
     });
   });
 
@@ -28,6 +61,12 @@ describe('build', () => {
       const t = getTemplate('linting', 'cursor-frontmatter.yaml');
       expect(t).toContain('alwaysApply: false');
       expect(t).toContain('globs:');
+    });
+
+    test('reads rule-specific cursor frontmatter for local-dev mcp', () => {
+      const t = getTemplate('local-dev', 'cursor-frontmatter.yaml', 'mcp');
+      expect(t).toContain('GitHub MCP');
+      expect(t).toContain('Jira/Linear/GitHub');
     });
 
     test('reads claude header for linting', () => {
@@ -115,6 +154,19 @@ describe('build', () => {
       const { dir, file } = getDestination('linting', 'opencode', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.opencode'));
       expect(file).toBe(path.join(projectRoot, '.opencode', 'linting.md'));
+    });
+
+    test('cursor with ruleSuffix returns .cursor/rules/<agent>-<suffix>.mdc', () => {
+      const { dir, file } = getDestination(
+        'local-dev',
+        'cursor',
+        projectRoot,
+        'env'
+      );
+      expect(dir).toBe(path.join(projectRoot, '.cursor', 'rules'));
+      expect(file).toBe(
+        path.join(projectRoot, '.cursor', 'rules', 'local-dev-env.mdc')
+      );
     });
 
     test('throws for unknown target', () => {

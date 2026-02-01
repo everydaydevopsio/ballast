@@ -36,8 +36,8 @@ When the user wants a Dockerfile and containerized local development for a Node.
 
 3. **Create docker-compose.yml for local development**
    - Use `build: .` for the app service.
-   - For CLI apps, set `tty: true` so the container doesn’t exit immediately.
-   - Use Compose’s `develop.watch` so code changes are reflected without full rebuilds:
+   - For CLI apps, set `tty: true` so the container doesn't exit immediately.
+   - Use Compose's `develop.watch` so code changes are reflected without full rebuilds:
      - `action: sync+restart` for source directories (e.g. `src/`) so edits sync in and the process restarts.
      - `action: rebuild` for `package.json` (and lockfile) so dependency changes trigger an image rebuild.
    - Set `command` to the dev script (e.g. `yarn dev`, `pnpm run dev`, or `tsx src/index.ts`) so the app runs with watch/hot reload inside the container.
@@ -127,7 +127,7 @@ Use `pnpm run dev` or `npm run dev` in `command` if the project uses that packag
 - Keep the Docker build context small: always use a `.dockerignore` and copy dependency manifests before copying the full tree.
 - Use `--frozen-lockfile` (yarn/pnpm) or `npm ci` so production and CI builds are reproducible.
 - For local dev, `develop.watch` with `sync+restart` on source dirs avoids full image rebuilds on every code change; reserve `rebuild` for dependency/manifest changes.
-- For web apps (e.g. Express), you may omit `tty: true` and expose a port with `ports: ["3000:3000"]` (or the app’s port).
+- For web apps (e.g. Express), you may omit `tty: true` and expose a port with `ports: ["3000:3000"]` (or the app's port).
 - If the project has no `dev` script, suggest adding one (e.g. using `tsx`, `ts-node-dev`, or `node --watch`) so `docker compose up --watch` is useful.
 
 ### When Completed
@@ -135,4 +135,4 @@ Use `pnpm run dev` or `npm run dev` in `command` if the project uses that packag
 1. Summarize what was created or updated (Dockerfile, .dockerignore, docker-compose.yml, and any script changes).
 2. Tell the user how to build and run: `docker compose build`, then `docker compose up --watch` for local development.
 3. Mention that editing files under the watched path will sync and restart the service, and changing `package.json` will trigger a rebuild.
-4. Optionally suggest adding a short “Docker” or “Local development” section to the README with these commands.
+4. Optionally suggest adding a short "Docker" or "Local development" section to the README with these commands.

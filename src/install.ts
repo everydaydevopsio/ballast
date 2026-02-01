@@ -1,6 +1,11 @@
 import fs from 'fs';
 import readline from 'readline';
-import { buildContent, getDestination, listTargets } from './build';
+import {
+  buildContent,
+  getDestination,
+  listRuleSuffixes,
+  listTargets
+} from './build';
 import { listAgents, resolveAgents, isValidAgent } from './agents';
 import { findProjectRoot, loadConfig, saveConfig, isCiMode } from './config';
 import type { Target } from './config';
@@ -104,6 +109,8 @@ export interface InstallOptions {
 
 export interface InstallResult {
   installed: string[];
+  /** Per-rule: which (agent, ruleSuffix) files were written (ruleSuffix '' = main) */
+  installedRules: Array<{ agentId: string; ruleSuffix: string }>;
   skipped: string[];
   errors: Array<{ agent: string; error: string }>;
 }
@@ -120,6 +127,7 @@ export function install(options: InstallOptions): InstallResult {
     saveConfig: persist
   } = options;
   const installed: string[] = [];
+  const installedRules: Array<{ agentId: string; ruleSuffix: string }> = [];
   const skipped: string[] = [];
   const errors: Array<{ agent: string; error: string }> = [];
 
@@ -132,18 +140,31 @@ export function install(options: InstallOptions): InstallResult {
       errors.push({ agent: agentId, error: 'Unknown agent' });
       continue;
     }
+    let agentInstalled = false;
+    let agentSkipped = false;
     try {
-      const { dir, file } = getDestination(agentId, target, projectRoot);
-      if (fs.existsSync(file) && !force) {
-        skipped.push(agentId);
-        continue;
+      const suffixes = listRuleSuffixes(agentId);
+      for (const ruleSuffix of suffixes) {
+        const { dir, file } = getDestination(
+          agentId,
+          target,
+          projectRoot,
+          ruleSuffix || undefined
+        );
+        if (fs.existsSync(file) && !force) {
+          agentSkipped = true;
+          continue;
+        }
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        const content = buildContent(agentId, target, ruleSuffix || undefined);
+        fs.writeFileSync(file, content, 'utf8');
+        installedRules.push({ agentId, ruleSuffix: ruleSuffix || '' });
+        agentInstalled = true;
       }
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      const content = buildContent(agentId, target);
-      fs.writeFileSync(file, content, 'utf8');
-      installed.push(agentId);
+      if (agentInstalled) installed.push(agentId);
+      if (agentSkipped && !agentInstalled) skipped.push(agentId);
     } catch (err) {
       errors.push({
         agent: agentId,
@@ -152,7 +173,7 @@ export function install(options: InstallOptions): InstallResult {
     }
   }
 
-  return { installed, skipped, errors };
+  return { installed, installedRules, skipped, errors };
 }
 
 export interface RunInstallOptions {
@@ -207,11 +228,17 @@ export async function runInstall(
     return 1;
   }
 
-  if (result.installed.length > 0) {
+  if (result.installedRules.length > 0) {
     console.log(`Installed for ${target}: ${result.installed.join(', ')}`);
-    result.installed.forEach((agentId) => {
-      const { file } = getDestination(agentId, target, projectRoot);
-      console.log(`  ${agentId} -> ${file}`);
+    result.installedRules.forEach(({ agentId, ruleSuffix }) => {
+      const { file } = getDestination(
+        agentId,
+        target,
+        projectRoot,
+        ruleSuffix || undefined
+      );
+      const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      console.log(`  ${label} -> ${file}`);
     });
   }
   if (result.skipped.length > 0) {
