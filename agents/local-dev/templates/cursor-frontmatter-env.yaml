@@ -4,6 +4,7 @@ alwaysApply: false
 globs:
   - 'package.json'
   - 'README*'
+  - '.nvmrc'
   - '.env*'
   - 'docker-compose*.yml'
   - 'Dockerfile*'

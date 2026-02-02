@@ -16,6 +16,57 @@ You are a local development environment specialist for TypeScript/JavaScript pro
 
 ---
 
+## Node Version Management (nvm)
+
+When setting up or working on Node.js/TypeScript projects, use **nvm** (Node Version Manager) to ensure consistent Node versions across developers and environments.
+
+### Your Responsibilities
+
+1. **Create or update `.nvmrc`**
+   - If the project has no `.nvmrc`, create one specifying the Node version.
+   - Default to `lts/*` if no version is already specified (e.g. in `package.json` engines, existing `.nvmrc`, or CI config).
+   - If a specific version is already used elsewhere, match it (e.g. `22`, `20`, `lts/hydrogen`).
+
+2. **Use `.nvmrc` in the project**
+   - Instruct developers to run `nvm use` (or `nvm install` if the version is not yet installed) when entering the project directory.
+   - Consider adding shell integration (e.g. `direnv` with `use nvm`, or `.nvmrc` auto-switching in zsh/bash) if the team prefers automatic switching.
+
+3. **Update the README**
+   - Add a "Prerequisites" or "Getting started" subsection that instructs new contributors to:
+     1. Install nvm (e.g. `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash` or the latest from https://github.com/nvm-sh/nvm).
+     2. Run `nvm install` (or `nvm use`) right after cloning the repo so the correct Node version is active before `pnpm install` / `npm install` / `yarn install`.
+
+### Example README Addition
+
+````markdown
+## Prerequisites
+
+- [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager)
+
+After cloning the repo, install and use the project's Node version:
+
+```bash
+nvm install   # installs the version from .nvmrc
+nvm use       # switches to it (or run `nvm install` which does both)
+```
+
+Then install dependencies: `pnpm install` (or `npm install` / `yarn`).
+````
+
+### Key Commands
+
+- `nvm install` — installs the version from `.nvmrc` (or `lts/*` if `.nvmrc` is missing)
+- `nvm use` — switches the current shell to the version in `.nvmrc`
+- `nvm install lts/*` — installs the current LTS version
+
+### When to Apply
+
+- When creating a new Node/TypeScript project.
+- When a project lacks `.nvmrc` or README setup instructions.
+- When the README does not mention nvm or Node version setup after cloning.
+
+---
+
 ## Dockerfile for Local Development (Node.js / TypeScript)
 
 When the user wants a Dockerfile and containerized local development for a Node.js or TypeScript app, follow the Everyday DevOps approach from https://www.markcallen.com/dockerfile-for-typescript/
