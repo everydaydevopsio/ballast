@@ -34,6 +34,10 @@ pnpm run prettier:fix     # Auto-fix formatting
 - **CI**: When `CI=true` or `--yes` is set and `.rulesrc.json` is missing, `--target` and `--agent` (or `--all`) are required.
 - **Agents**: Only agents shipped in this repo are installable (no external bundle discovery).
 
+## License
+
+Default license for this project: **MIT**. If you add or modify license setup (LICENSE file, `package.json` license, README reference), use MIT unless this section specifies otherwise. To override, replace MIT with another SPDX identifier (e.g. Apache-2.0, ISC, BSD-3-Clause).
+
 ## Working here
 
 - Prefer TypeScript for all new code in `src/`.

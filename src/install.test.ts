@@ -182,6 +182,10 @@ describe('install', () => {
         agentId: 'local-dev',
         ruleSuffix: 'mcp'
       });
+      expect(result.installedRules).toContainEqual({
+        agentId: 'local-dev',
+        ruleSuffix: 'license'
+      });
     });
 
     test('installs all rules for agent with multiple rules (local-dev)', () => {
@@ -193,7 +197,7 @@ describe('install', () => {
         saveConfig: false
       });
       expect(result.installed).toEqual(['local-dev']);
-      expect(result.installedRules.length).toBe(2);
+      expect(result.installedRules.length).toBe(3);
       const envFile = path.join(
         tmpDir,
         '.cursor',
@@ -206,12 +210,20 @@ describe('install', () => {
         'rules',
         'local-dev-mcp.mdc'
       );
+      const licenseFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'local-dev-license.mdc'
+      );
       expect(fs.existsSync(envFile)).toBe(true);
       expect(fs.existsSync(mcpFile)).toBe(true);
+      expect(fs.existsSync(licenseFile)).toBe(true);
       expect(fs.readFileSync(envFile, 'utf8')).toContain(
         'Local Development Environment Agent'
       );
       expect(fs.readFileSync(mcpFile, 'utf8')).toContain('GitHub MCP');
+      expect(fs.readFileSync(licenseFile, 'utf8')).toContain('LICENSE');
     });
 
     test('adds to errors for unknown agent and continues with valid ones', () => {

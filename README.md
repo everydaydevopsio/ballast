@@ -6,12 +6,12 @@ CLI to install TypeScript AI agent rules for **Cursor**, **Claude Code**, and **
 
 ## Agents
 
-| Agent             | Description                                                              |
-| ----------------- | ------------------------------------------------------------------------ |
-| **linting**       | ESLint, Prettier, Husky, lint-staged, GitHub Actions (full instructions) |
-| **local-dev**     | Local dev environment setup, DX, documentation (placeholder outline)     |
-| **cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)         |
-| **observability** | Logging, tracing, metrics, SLOs (placeholder outline)                    |
+| Agent             | Description                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------- |
+| **linting**       | ESLint, Prettier, Husky, lint-staged, GitHub Actions (full instructions)              |
+| **local-dev**     | Local dev environment (nvm, Docker, env), license setup (MIT default), MCP (optional) |
+| **cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)                      |
+| **observability** | Logging, tracing, metrics, SLOs (placeholder outline)                                 |
 
 ## Using the agents
 
@@ -20,7 +20,7 @@ Once installed, rule files are loaded automatically by your AI platform (Cursor,
 | Agent             | How to use it                                                                                                                                                                        |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **linting**       | In any session: _"Help me set up linting for this project"_ or _"Fix lint errors per the linting rules."_ The agent will add ESLint, Prettier, Husky, lint-staged, and CI workflows. |
-| **local-dev**     | Ask for help with local dev environment, DX, or documentation (placeholder).                                                                                                         |
+| **local-dev**     | Ask for help with local dev environment, license setup (LICENSE, package.json, README), or optional MCP integration.                                                                 |
 | **cicd**          | Ask for help with CI/CD pipelines, quality gates, or deployment (placeholder).                                                                                                       |
 | **observability** | Ask for help with logging, tracing, metrics, or SLOs (placeholder).                                                                                                                  |
 

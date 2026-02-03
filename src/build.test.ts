@@ -17,10 +17,11 @@ describe('build', () => {
       expect(listRuleSuffixes('linting')).toEqual(['']);
     });
 
-    test('returns env and mcp for local-dev (content-env.md and content-mcp.md)', () => {
+    test('returns env, mcp, and license for local-dev (content-env, content-mcp, content-license)', () => {
       expect(listRuleSuffixes('local-dev')).toContain('env');
       expect(listRuleSuffixes('local-dev')).toContain('mcp');
-      expect(listRuleSuffixes('local-dev').length).toBe(2);
+      expect(listRuleSuffixes('local-dev')).toContain('license');
+      expect(listRuleSuffixes('local-dev').length).toBe(3);
     });
 
     test('throws for unknown agent', () => {
