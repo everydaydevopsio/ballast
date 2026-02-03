@@ -17,11 +17,16 @@ describe('build', () => {
       expect(listRuleSuffixes('linting')).toEqual(['']);
     });
 
-    test('returns env, mcp, and license for local-dev (content-env, content-mcp, content-license)', () => {
+    test('returns only main rule for logging', () => {
+      expect(listRuleSuffixes('logging')).toEqual(['']);
+    });
+
+    test('returns env, mcp, license, and badges for local-dev', () => {
       expect(listRuleSuffixes('local-dev')).toContain('env');
       expect(listRuleSuffixes('local-dev')).toContain('mcp');
       expect(listRuleSuffixes('local-dev')).toContain('license');
-      expect(listRuleSuffixes('local-dev').length).toBe(3);
+      expect(listRuleSuffixes('local-dev')).toContain('badges');
+      expect(listRuleSuffixes('local-dev').length).toBe(4);
     });
 
     test('throws for unknown agent', () => {
@@ -34,6 +39,13 @@ describe('build', () => {
       const content = getContent('linting');
       expect(content).toContain('TypeScript linting specialist');
       expect(content).toContain('## Your Responsibilities');
+    });
+
+    test('returns content for logging agent', () => {
+      const content = getContent('logging');
+      expect(content).toContain('Centralized Logging Agent');
+      expect(content).toContain('pino-browser');
+      expect(content).toContain('/api/logs');
     });
 
     test('returns env content for local-dev with ruleSuffix env', () => {

@@ -4,7 +4,7 @@ This file gives AI agents (Cursor, Claude Code, OpenCode, etc.) consistent conte
 
 ## Project
 
-**@everydaydevopsio/ballast** — CLI that installs TypeScript AI agent rules (linting, local-dev, CI/CD, observability) into the right places for Cursor, Claude Code, or OpenCode.
+**@everydaydevopsio/ballast** — CLI that installs TypeScript AI agent rules (linting, local-dev, CI/CD, observability, logging) into the right places for Cursor, Claude Code, or OpenCode.
 
 ## Commands
 

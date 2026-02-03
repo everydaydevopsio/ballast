@@ -6,12 +6,13 @@ CLI to install TypeScript AI agent rules for **Cursor**, **Claude Code**, and **
 
 ## Agents
 
-| Agent             | Description                                                                           |
-| ----------------- | ------------------------------------------------------------------------------------- |
-| **linting**       | ESLint, Prettier, Husky, lint-staged, GitHub Actions (full instructions)              |
-| **local-dev**     | Local dev environment (nvm, Docker, env), license setup (MIT default), MCP (optional) |
-| **cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)                      |
-| **observability** | Logging, tracing, metrics, SLOs (placeholder outline)                                 |
+| Agent             | Description                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| **linting**       | ESLint, Prettier, Husky, lint-staged, GitHub Actions (full instructions)                         |
+| **local-dev**     | Local dev environment (nvm, Docker, env), license setup (MIT default), MCP (optional)            |
+| **cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)                                 |
+| **observability** | Logging, tracing, metrics, SLOs (placeholder outline)                                            |
+| **logging**       | Pino + Fluentd (Node/Next.js API), pino-browser to /api/logs, window.onerror, unhandledrejection |
 
 ## Using the agents
 
@@ -23,6 +24,7 @@ Once installed, rule files are loaded automatically by your AI platform (Cursor,
 | **local-dev**     | Ask for help with local dev environment, license setup (LICENSE, package.json, README), or optional MCP integration.                                                                 |
 | **cicd**          | Ask for help with CI/CD pipelines, quality gates, or deployment (placeholder).                                                                                                       |
 | **observability** | Ask for help with logging, tracing, metrics, or SLOs (placeholder).                                                                                                                  |
+| **logging**       | Ask for help with centralized logging: Pino + Fluentd for server, pino-browser to /api/logs for console, exceptions, window.onerror, unhandledrejection.                             |
 
 ## Installation
 

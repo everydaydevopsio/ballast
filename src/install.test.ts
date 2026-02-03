@@ -45,6 +45,7 @@ describe('install', () => {
       expect(result?.agents).toContain('local-dev');
       expect(result?.agents).toContain('cicd');
       expect(result?.agents).toContain('observability');
+      expect(result?.agents).toContain('logging');
     });
 
     test('with saved config returns config when no flags', async () => {
@@ -186,6 +187,10 @@ describe('install', () => {
         agentId: 'local-dev',
         ruleSuffix: 'license'
       });
+      expect(result.installedRules).toContainEqual({
+        agentId: 'local-dev',
+        ruleSuffix: 'badges'
+      });
     });
 
     test('installs all rules for agent with multiple rules (local-dev)', () => {
@@ -197,7 +202,7 @@ describe('install', () => {
         saveConfig: false
       });
       expect(result.installed).toEqual(['local-dev']);
-      expect(result.installedRules.length).toBe(3);
+      expect(result.installedRules.length).toBe(4);
       const envFile = path.join(
         tmpDir,
         '.cursor',
@@ -216,14 +221,22 @@ describe('install', () => {
         'rules',
         'local-dev-license.mdc'
       );
+      const badgesFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'local-dev-badges.mdc'
+      );
       expect(fs.existsSync(envFile)).toBe(true);
       expect(fs.existsSync(mcpFile)).toBe(true);
       expect(fs.existsSync(licenseFile)).toBe(true);
+      expect(fs.existsSync(badgesFile)).toBe(true);
       expect(fs.readFileSync(envFile, 'utf8')).toContain(
         'Local Development Environment Agent'
       );
       expect(fs.readFileSync(mcpFile, 'utf8')).toContain('GitHub MCP');
       expect(fs.readFileSync(licenseFile, 'utf8')).toContain('LICENSE');
+      expect(fs.readFileSync(badgesFile, 'utf8')).toContain('README Badges');
     });
 
     test('adds to errors for unknown agent and continues with valid ones', () => {

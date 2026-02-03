@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a single-package CLI: **@everydaydevopsio/ballast**. The binary `ballast` installs TypeScript AI agent rules (linting, local-dev, CI/CD, observability) into the correct locations for Cursor, Claude Code, or OpenCode.
+This is a single-package CLI: **@everydaydevopsio/ballast**. The binary `ballast` installs TypeScript AI agent rules (linting, local-dev, CI/CD, observability, logging) into the correct locations for Cursor, Claude Code, or OpenCode.
 
 ## Commands
 
@@ -39,7 +39,8 @@ agents/                 # Agent content and per-target templates
 │   └── templates/      # cursor, claude, opencode
 ├── local-dev/          # Placeholder (short outline)
 ├── cicd/               # Placeholder (short outline)
-└── observability/      # Placeholder (short outline)
+├── observability/      # Placeholder (short outline)
+└── logging/            # Pino + Fluentd, pino-browser to /api/logs
 
 src/
 ├── cli.ts              # CLI entry: install command, --help, --version
