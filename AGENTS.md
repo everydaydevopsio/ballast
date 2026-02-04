@@ -6,6 +6,14 @@ This file gives AI agents (Cursor, Claude Code, OpenCode, etc.) consistent conte
 
 **@everydaydevopsio/ballast** — CLI that installs TypeScript AI agent rules (linting, local-dev, CI/CD, observability, logging) into the right places for Cursor, Claude Code, or OpenCode.
 
+## Package manager
+
+This project uses **pnpm**. Use `pnpm` for all install and run commands.
+
+## Prerequisites
+
+- **Node.js**: Use the version in `.nvmrc`. Run `nvm install` (or `nvm use`) after cloning so the correct Node version is active before `pnpm install`.
+
 ## Commands
 
 ```bash
@@ -28,6 +36,8 @@ pnpm run prettier:fix     # Auto-fix formatting
 
 ## Conventions
 
+- **Package manager**: Use pnpm (not npm or yarn).
+- **Badges**: README badges (CI, Lint, Release, License, GitHub Release, npm) follow the local-dev-badges rule.
 - **Single overwrite policy**: do not overwrite existing rule files unless the user passes `--force`.
 - **Platform first, then agents**: user can choose "all" agents.
 - **Config**: `.rulesrc.json` stores `target` and `agents` so repeat runs can be non-interactive.

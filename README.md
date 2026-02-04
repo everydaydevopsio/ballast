@@ -1,8 +1,27 @@
 # Ballast
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/everydaydevopsio/ballast/actions/workflows/test.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/test.yml)
+[![Lint](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml)
+[![Release](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml)
+[![License](https://img.shields.io/github/license/everydaydevopsio/ballast)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/everydaydevopsio/ballast)](https://github.com/everydaydevopsio/ballast/releases)
+[![npm version](https://img.shields.io/npm/v/@everydaydevopsio/ballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
+[![npm downloads](https://img.shields.io/npm/dm/@everydaydevopsio/ballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
 
 CLI to install TypeScript AI agent rules for **Cursor**, **Claude Code**, and **OpenCode**. One package, one command—pick your platform and which agents to install.
+
+## Prerequisites
+
+- [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager)
+
+After cloning the repo, install and use the project's Node version:
+
+```bash
+nvm install   # installs the version from .nvmrc
+nvm use       # switches to it (or run `nvm install` which does both)
+```
+
+Then install dependencies: `pnpm install` (or `npm install` / `yarn`).
 
 ## Agents
 
