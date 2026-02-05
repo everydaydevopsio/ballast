@@ -81,6 +81,7 @@ jobs:
           node bin/ballast.js install --yes --target cursor --all --force
           node bin/ballast.js install --yes --target claude --all --force
           node bin/ballast.js install --yes --target opencode --all --force
+          node bin/ballast.js install --yes --target codex --all --force
 
       - name: Commit and tag
         run: |
