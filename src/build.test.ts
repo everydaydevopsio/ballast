@@ -6,7 +6,12 @@ import {
   buildCursorFormat,
   buildClaudeFormat,
   buildOpenCodeFormat,
+  buildCodexFormat,
   buildContent,
+  buildCodexAgentsMd,
+  getCodexAgentsMdPath,
+  getCodexRuleDescription,
+  extractDescriptionFromFrontmatter,
   getDestination,
   listTargets
 } from './build';
@@ -120,6 +125,74 @@ describe('build', () => {
     });
   });
 
+  describe('buildCodexFormat', () => {
+    test('combines header with content for linting', () => {
+      const result = buildCodexFormat('linting');
+      expect(result).toContain('# TypeScript Linting Rules');
+      expect(result).toContain('## Your Responsibilities');
+    });
+  });
+
+  describe('getCodexRuleDescription', () => {
+    test('reads description from cursor frontmatter', () => {
+      const description = getCodexRuleDescription('linting');
+      expect(description).toContain('TypeScript linting specialist');
+    });
+  });
+
+  describe('extractDescriptionFromFrontmatter', () => {
+    test('extracts single-line quoted description', () => {
+      const frontmatter = `---
+description: 'TypeScript linting specialist'
+alwaysApply: false
+---`;
+      expect(extractDescriptionFromFrontmatter(frontmatter)).toBe(
+        'TypeScript linting specialist'
+      );
+    });
+
+    test('extracts multi-line literal block (|) description', () => {
+      const frontmatter = `---
+description: |
+  First line
+  Second line
+alwaysApply: false
+---`;
+      expect(extractDescriptionFromFrontmatter(frontmatter)).toBe(
+        'First line\nSecond line'
+      );
+    });
+
+    test('extracts multi-line folded block (>) description', () => {
+      const frontmatter = `---
+description: >
+  This is a folded
+  block scalar
+alwaysApply: false
+---`;
+      expect(extractDescriptionFromFrontmatter(frontmatter)).toBe(
+        'This is a folded block scalar'
+      );
+    });
+
+    test('handles single-quoted string with escaped single quote', () => {
+      const frontmatter = `---
+description: 'It''s great'
+alwaysApply: false
+---`;
+      expect(extractDescriptionFromFrontmatter(frontmatter)).toBe("It's great");
+    });
+  });
+
+  describe('buildCodexAgentsMd', () => {
+    test('lists codex rule files with descriptions', () => {
+      const content = buildCodexAgentsMd(['linting']);
+      expect(content).toContain('# AGENTS.md');
+      expect(content).toContain('`.codex/rules/linting.md`');
+      expect(content).toContain('TypeScript linting specialist');
+    });
+  });
+
   describe('buildContent', () => {
     test('cursor returns mdc-style content', () => {
       const result = buildContent('linting', 'cursor');
@@ -135,6 +208,11 @@ describe('build', () => {
     test('opencode returns yaml frontmatter + content', () => {
       const result = buildContent('linting', 'opencode');
       expect(result).toContain('permission:');
+    });
+
+    test('codex returns header + content', () => {
+      const result = buildContent('linting', 'codex');
+      expect(result).toContain('# TypeScript Linting Rules');
     });
 
     test('throws for unknown target', () => {
@@ -169,6 +247,19 @@ describe('build', () => {
       expect(file).toBe(path.join(projectRoot, '.opencode', 'linting.md'));
     });
 
+    test('codex returns .codex/rules/<agent>.md', () => {
+      const { dir, file } = getDestination('linting', 'codex', projectRoot);
+      expect(dir).toBe(path.join(projectRoot, '.codex', 'rules'));
+      expect(file).toBe(
+        path.join(projectRoot, '.codex', 'rules', 'linting.md')
+      );
+    });
+
+    test('codex agents.md path returns project root AGENTS.md', () => {
+      const agentsMd = getCodexAgentsMdPath(projectRoot);
+      expect(agentsMd).toBe(path.join(projectRoot, 'AGENTS.md'));
+    });
+
     test('cursor with ruleSuffix returns .cursor/rules/<agent>-<suffix>.mdc', () => {
       const { dir, file } = getDestination(
         'local-dev',
@@ -190,8 +281,8 @@ describe('build', () => {
   });
 
   describe('listTargets', () => {
-    test('returns cursor, claude, opencode', () => {
-      expect(listTargets()).toEqual(['cursor', 'claude', 'opencode']);
+    test('returns cursor, claude, opencode, codex', () => {
+      expect(listTargets()).toEqual(['cursor', 'claude', 'opencode', 'codex']);
     });
   });
 });

@@ -298,14 +298,34 @@ describe('install', () => {
         expect(dir).toBe(path.join(tmpDir, '.opencode'));
       });
 
+      test('codex: writes to .codex/rules/<agent>.md and AGENTS.md', () => {
+        install({
+          projectRoot: tmpDir,
+          target: 'codex',
+          agents: ['linting'],
+          force: false,
+          saveConfig: false
+        });
+        const { dir, file } = getDestination('linting', 'codex', tmpDir);
+        expect(fs.existsSync(file)).toBe(true);
+        expect(file).toBe(path.join(tmpDir, '.codex', 'rules', 'linting.md'));
+        expect(dir).toBe(path.join(tmpDir, '.codex', 'rules'));
+        const agentsMd = path.join(tmpDir, 'AGENTS.md');
+        expect(fs.existsSync(agentsMd)).toBe(true);
+        expect(fs.readFileSync(agentsMd, 'utf8')).toContain(
+          '`.codex/rules/linting.md`'
+        );
+      });
+
       test('written path matches getDestination for each target', () => {
         const targets: Array<{
-          target: 'cursor' | 'claude' | 'opencode';
+          target: 'cursor' | 'claude' | 'opencode' | 'codex';
           ext: string;
         }> = [
           { target: 'cursor', ext: 'mdc' },
           { target: 'claude', ext: 'md' },
-          { target: 'opencode', ext: 'md' }
+          { target: 'opencode', ext: 'md' },
+          { target: 'codex', ext: 'md' }
         ];
         for (const { target, ext } of targets) {
           const subDir = path.join(tmpDir, target);

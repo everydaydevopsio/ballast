@@ -8,7 +8,7 @@
 [![npm version](https://img.shields.io/npm/v/@everydaydevopsio/ballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
 [![npm downloads](https://img.shields.io/npm/dm/@everydaydevopsio/ballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
 
-CLI to install TypeScript AI agent rules for **Cursor**, **Claude Code**, and **OpenCode**. One package, one command—pick your platform and which agents to install.
+CLI to install TypeScript AI agent rules for **Cursor**, **Claude Code**, **OpenCode**, and **Codex**. One package, one command—pick your platform and which agents to install.
 
 ## Prerequisites
 
@@ -69,7 +69,7 @@ npx ballast install
 
 You’ll be prompted for:
 
-1. **AI platform**: `cursor`, `claude`, or `opencode`
+1. **AI platform**: `cursor`, `claude`, `opencode`, or `codex`
 2. **Agents**: comma-separated (e.g. `linting, local-dev`) or `all`
 
 Your choices are saved to `.rulesrc.json`. Future runs reuse them (non-interactive).
@@ -88,6 +88,7 @@ npx ballast install --target cursor --agent linting --force
 
 # Non-interactive (CI): require --target and --agent/--all if no .rulesrc.json
 npx ballast install --yes --target cursor --agent linting
+ballast install --yes --target codex --all
 ```
 
 ### CI / non-interactive
@@ -115,6 +116,9 @@ Rules are written under your project root:
 | Cursor   | `.cursor/rules/` | `<agent>.mdc` |
 | Claude   | `.claude/rules/` | `<agent>.md`  |
 | OpenCode | `.opencode/`     | `<agent>.md`  |
+| Codex    | `.codex/rules/`  | `<agent>.md`  |
+
+Codex installs a root `AGENTS.md` that references the `.codex/rules/` files so Codex CLI and Codex app can load the same guidance.
 
 ## Overwrite policy
 

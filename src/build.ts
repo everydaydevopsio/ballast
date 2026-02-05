@@ -1,9 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import YAML from 'yaml';
 import { getAgentDir } from './agents';
 import type { Target } from './config';
 
-const TARGETS: Target[] = ['cursor', 'claude', 'opencode'];
+const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
 
 /** Rule file convention: content.md (main) and content-<suffix>.md (e.g. content-mcp.md) */
 const CONTENT_PREFIX = 'content';
@@ -123,6 +124,98 @@ export function buildOpenCodeFormat(
   return frontmatter + '\n' + content;
 }
 
+function getCodexHeader(agentId: string, ruleSuffix?: string): string {
+  let codexError: unknown;
+  try {
+    return getTemplate(agentId, 'codex-header.md', ruleSuffix);
+  } catch (err) {
+    codexError = err;
+  }
+  try {
+    return getTemplate(agentId, 'claude-header.md', ruleSuffix);
+  } catch (claudeError) {
+    const codexMsg =
+      codexError instanceof Error ? codexError.message : String(codexError);
+    const claudeMsg =
+      claudeError instanceof Error ? claudeError.message : String(claudeError);
+    throw new Error(
+      `Agent "${agentId}" missing Codex header: tried codex-header.md (${codexMsg}) and fallback claude-header.md (${claudeMsg})`,
+      { cause: claudeError }
+    );
+  }
+}
+
+/**
+ * Build content for Codex (header + content)
+ */
+export function buildCodexFormat(agentId: string, ruleSuffix?: string): string {
+  const header = getCodexHeader(agentId, ruleSuffix);
+  const content = getContent(agentId, ruleSuffix);
+  return header + content;
+}
+
+export function extractDescriptionFromFrontmatter(
+  frontmatter: string
+): string | null {
+  try {
+    // Extract content between --- delimiters to avoid multi-document parse error
+    const match = frontmatter.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    const yamlContent = match ? match[1] : frontmatter;
+    const parsed = YAML.parse(yamlContent);
+    const description = parsed?.description;
+    if (typeof description === 'string') {
+      const trimmed = description.trim();
+      return trimmed || null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function getCodexRuleDescription(
+  agentId: string,
+  ruleSuffix?: string
+): string | null {
+  try {
+    const frontmatter = getTemplate(
+      agentId,
+      'cursor-frontmatter.yaml',
+      ruleSuffix
+    );
+    return extractDescriptionFromFrontmatter(frontmatter);
+  } catch {
+    return null;
+  }
+}
+
+export function buildCodexAgentsMd(agents: string[]): string {
+  const lines: string[] = [];
+  lines.push('# AGENTS.md');
+  lines.push('');
+  lines.push(
+    'This file provides guidance to Codex (CLI and app) for working in this repository.'
+  );
+  lines.push('');
+  lines.push('## Installed agent rules');
+  lines.push('');
+  lines.push(
+    'Read and follow these rule files in `.codex/rules/` when they apply:'
+  );
+  lines.push('');
+  for (const agentId of agents) {
+    const suffixes = listRuleSuffixes(agentId);
+    for (const ruleSuffix of suffixes) {
+      const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      const description =
+        getCodexRuleDescription(agentId, ruleSuffix) ?? `Rules for ${basename}`;
+      lines.push(`- \`.codex/rules/${basename}.md\` — ${description}`);
+    }
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
 /**
  * Build content for the given agent, target, and optional rule suffix
  */
@@ -138,6 +231,8 @@ export function buildContent(
       return buildClaudeFormat(agentId, ruleSuffix);
     case 'opencode':
       return buildOpenCodeFormat(agentId, ruleSuffix);
+    case 'codex':
+      return buildCodexFormat(agentId, ruleSuffix);
     default:
       throw new Error(`Unknown target: ${target}`);
   }
@@ -170,9 +265,21 @@ export function getDestination(
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }
+    case 'codex': {
+      const dir = path.join(root, '.codex', 'rules');
+      const file = path.join(dir, `${basename}.md`);
+      return { dir, file };
+    }
     default:
       throw new Error(`Unknown target: ${target}`);
   }
+}
+
+/**
+ * Get destination for Codex AGENTS.md
+ */
+export function getCodexAgentsMdPath(projectRoot: string): string {
+  return path.join(path.resolve(projectRoot), 'AGENTS.md');
 }
 
 /**
