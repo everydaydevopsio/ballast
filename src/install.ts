@@ -136,7 +136,7 @@ export function install(options: InstallOptions): InstallResult {
   const skipped: string[] = [];
   const skippedSupportFiles: string[] = [];
   const errors: Array<{ agent: string; error: string }> = [];
-  const validAgents = new Set<string>();
+  const processedAgentIds = new Set<string>();
 
   if (persist) {
     saveConfig({ target, agents }, projectRoot);
@@ -147,7 +147,7 @@ export function install(options: InstallOptions): InstallResult {
       errors.push({ agent: agentId, error: 'Unknown agent' });
       continue;
     }
-    validAgents.add(agentId);
+    processedAgentIds.add(agentId);
     let agentInstalled = false;
     let agentSkipped = false;
     try {
@@ -186,7 +186,7 @@ export function install(options: InstallOptions): InstallResult {
     if (fs.existsSync(agentsMdPath) && !force) {
       skippedSupportFiles.push(agentsMdPath);
     } else {
-      const content = buildCodexAgentsMd(Array.from(validAgents));
+      const content = buildCodexAgentsMd(Array.from(processedAgentIds));
       fs.writeFileSync(agentsMdPath, content, 'utf8');
       installedSupportFiles.push(agentsMdPath);
     }

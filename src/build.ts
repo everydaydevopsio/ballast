@@ -124,10 +124,23 @@ export function buildOpenCodeFormat(
 }
 
 function getCodexHeader(agentId: string, ruleSuffix?: string): string {
+  let codexError: unknown;
   try {
     return getTemplate(agentId, 'codex-header.md', ruleSuffix);
-  } catch {
+  } catch (err) {
+    codexError = err;
+  }
+  try {
     return getTemplate(agentId, 'claude-header.md', ruleSuffix);
+  } catch (claudeError) {
+    const codexMsg =
+      codexError instanceof Error ? codexError.message : String(codexError);
+    const claudeMsg =
+      claudeError instanceof Error ? claudeError.message : String(claudeError);
+    throw new Error(
+      `Agent "${agentId}" missing Codex header: tried codex-header.md (${codexMsg}) and fallback claude-header.md (${claudeMsg})`,
+      { cause: claudeError }
+    );
   }
 }
 
