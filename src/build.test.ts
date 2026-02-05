@@ -11,6 +11,7 @@ import {
   buildCodexAgentsMd,
   getCodexAgentsMdPath,
   getCodexRuleDescription,
+  extractDescriptionFromFrontmatter,
   getDestination,
   listTargets
 } from './build';
@@ -136,6 +137,50 @@ describe('build', () => {
     test('reads description from cursor frontmatter', () => {
       const description = getCodexRuleDescription('linting');
       expect(description).toContain('TypeScript linting specialist');
+    });
+  });
+
+  describe('extractDescriptionFromFrontmatter', () => {
+    test('extracts single-line quoted description', () => {
+      const frontmatter = `---
+description: 'TypeScript linting specialist'
+alwaysApply: false
+---`;
+      expect(extractDescriptionFromFrontmatter(frontmatter)).toBe(
+        'TypeScript linting specialist'
+      );
+    });
+
+    test('extracts multi-line literal block (|) description', () => {
+      const frontmatter = `---
+description: |
+  First line
+  Second line
+alwaysApply: false
+---`;
+      expect(extractDescriptionFromFrontmatter(frontmatter)).toBe(
+        'First line\nSecond line'
+      );
+    });
+
+    test('extracts multi-line folded block (>) description', () => {
+      const frontmatter = `---
+description: >
+  This is a folded
+  block scalar
+alwaysApply: false
+---`;
+      expect(extractDescriptionFromFrontmatter(frontmatter)).toBe(
+        'This is a folded block scalar'
+      );
+    });
+
+    test('handles single-quoted string with escaped single quote', () => {
+      const frontmatter = `---
+description: 'It''s great'
+alwaysApply: false
+---`;
+      expect(extractDescriptionFromFrontmatter(frontmatter)).toBe("It's great");
     });
   });
 

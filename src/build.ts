@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import YAML from 'yaml';
 import { getAgentDir } from './agents';
 import type { Target } from './config';
 
@@ -153,17 +154,23 @@ export function buildCodexFormat(agentId: string, ruleSuffix?: string): string {
   return header + content;
 }
 
-function extractDescriptionFromFrontmatter(frontmatter: string): string | null {
-  const match = frontmatter.match(/^\s*description:\s*(.+)\s*$/m);
-  if (!match) return null;
-  let value = match[1].trim();
-  if (
-    (value.startsWith("'") && value.endsWith("'")) ||
-    (value.startsWith('"') && value.endsWith('"'))
-  ) {
-    value = value.slice(1, -1);
+export function extractDescriptionFromFrontmatter(
+  frontmatter: string
+): string | null {
+  try {
+    // Extract content between --- delimiters to avoid multi-document parse error
+    const match = frontmatter.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    const yamlContent = match ? match[1] : frontmatter;
+    const parsed = YAML.parse(yamlContent);
+    const description = parsed?.description;
+    if (typeof description === 'string') {
+      const trimmed = description.trim();
+      return trimmed || null;
+    }
+    return null;
+  } catch {
+    return null;
   }
-  return value.trim() || null;
 }
 
 export function getCodexRuleDescription(
