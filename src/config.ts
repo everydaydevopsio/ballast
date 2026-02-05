@@ -3,7 +3,7 @@ import path from 'path';
 
 const RULESRC_FILENAME = '.rulesrc.json';
 
-export type Target = 'cursor' | 'claude' | 'opencode';
+export type Target = 'cursor' | 'claude' | 'opencode' | 'codex';
 
 export interface RulesConfig {
   target: Target;

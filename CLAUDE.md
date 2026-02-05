@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a single-package CLI: **@everydaydevopsio/ballast**. The binary `ballast` installs TypeScript AI agent rules (linting, local-dev, CI/CD, observability, logging) into the correct locations for Cursor, Claude Code, or OpenCode.
+This is a single-package CLI: **@everydaydevopsio/ballast**. The binary `ballast` installs TypeScript AI agent rules (linting, local-dev, CI/CD, observability, logging) into the correct locations for Cursor, Claude Code, OpenCode, or Codex.
 
 ## Commands
 
@@ -36,7 +36,7 @@ pnpm run prettier:fix   # Auto-fix formatting
 agents/                 # Agent content and per-target templates
 ├── linting/            # Full linting instructions
 │   ├── content.md
-│   └── templates/      # cursor, claude, opencode
+│   └── templates/      # cursor, claude, opencode, codex
 ├── local-dev/          # Placeholder (short outline)
 ├── cicd/               # Placeholder (short outline)
 ├── observability/      # Placeholder (short outline)

@@ -1,6 +1,6 @@
 # Ballast Architecture
 
-This document describes the architecture of **@everydaydevopsio/ballast**, a CLI that installs AI agent rules (linting, local-dev, CI/CD, observability) into the correct locations for Cursor, Claude Code, or OpenCode.
+This document describes the architecture of **@everydaydevopsio/ballast**, a CLI that installs AI agent rules (linting, local-dev, CI/CD, observability) into the correct locations for Cursor, Claude Code, OpenCode, or Codex.
 
 ---
 
@@ -48,6 +48,7 @@ Each **agent** is a named set of rules (e.g. linting, local-dev, cicd, observabi
   - **Cursor**: `cursor-frontmatter.yaml` — prepended as frontmatter; output is `.mdc`.
   - **Claude**: `claude-header.md` — prepended to content; output is `.md`.
   - **OpenCode**: `opencode-frontmatter.yaml` — prepended as frontmatter; output is `.md`.
+  - **Codex**: `codex-header.md` if present (falls back to `claude-header.md`) — prepended to content; output is `.md`.
 
 The build layer concatenates template + content per target; there is no merge strategy (e.g. no marker-merge or append). Each install is a single generated file per agent.
 
@@ -55,13 +56,14 @@ The build layer concatenates template + content per target; there is no merge st
 
 ## Targets and Destinations
 
-Supported **targets** are: `cursor`, `claude`, `opencode`.
+Supported **targets** are: `cursor`, `claude`, `opencode`, `codex`.
 
 | Target   | Directory        | File pattern    |
 | -------- | ---------------- | --------------- |
 | cursor   | `.cursor/rules/` | `{agentId}.mdc` |
 | claude   | `.claude/rules/` | `{agentId}.md`  |
 | opencode | `.opencode/`     | `{agentId}.md`  |
+| codex    | `.codex/rules/`  | `{agentId}.md`  |
 
 Paths are relative to the **project root** (see Config and project root).
 
@@ -76,6 +78,7 @@ Paths are relative to the **project root** (see Config and project root).
 
 2. **`getDestination(agentId, target, projectRoot)`** (in `build.ts`):
    - Returns the directory and full file path where the built content should be written.
+   - For Codex, a root `AGENTS.md` is also written to reference the rule files.
 
 Install then writes that content to the destination path (creating the directory if needed).
 
@@ -105,7 +108,7 @@ Install then writes that content to the destination path (creating the directory
 ## Config and Project Root
 
 - **Config file:** `.rulesrc.json` in the project root.
-- **Shape:** `{ "target": "cursor" | "claude" | "opencode", "agents": string[] }`.
+- **Shape:** `{ "target": "cursor" | "claude" | "opencode" | "codex", "agents": string[] }`.
 - **When saved:** When running interactively (or without `--yes`) and the user did not pass `--target` / `--agent` / `--all`, so that the next run can reuse the same choices.
 - **Project root:** First directory (walking up from the cwd) that contains `.rulesrc.json` or `package.json`; if none is found, the starting cwd is used.
 

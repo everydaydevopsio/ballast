@@ -76,7 +76,7 @@ Commands:
   install    Install agent rules for the chosen AI platform (default)
 
 Options:
-  --target, -t <platform>   AI platform: cursor, claude, opencode
+  --target, -t <platform>   AI platform: cursor, claude, opencode, codex
   --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability (comma-separated)
   --all                     Install all agents
   --force, -f               Overwrite existing rule files

@@ -3,7 +3,7 @@ import path from 'path';
 import { getAgentDir } from './agents';
 import type { Target } from './config';
 
-const TARGETS: Target[] = ['cursor', 'claude', 'opencode'];
+const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
 
 /** Rule file convention: content.md (main) and content-<suffix>.md (e.g. content-mcp.md) */
 const CONTENT_PREFIX = 'content';
@@ -123,6 +123,79 @@ export function buildOpenCodeFormat(
   return frontmatter + '\n' + content;
 }
 
+function getCodexHeader(agentId: string, ruleSuffix?: string): string {
+  try {
+    return getTemplate(agentId, 'codex-header.md', ruleSuffix);
+  } catch {
+    return getTemplate(agentId, 'claude-header.md', ruleSuffix);
+  }
+}
+
+/**
+ * Build content for Codex (header + content)
+ */
+export function buildCodexFormat(agentId: string, ruleSuffix?: string): string {
+  const header = getCodexHeader(agentId, ruleSuffix);
+  const content = getContent(agentId, ruleSuffix);
+  return header + content;
+}
+
+function extractDescriptionFromFrontmatter(frontmatter: string): string | null {
+  const match = frontmatter.match(/^\s*description:\s*(.+)\s*$/m);
+  if (!match) return null;
+  let value = match[1].trim();
+  if (
+    (value.startsWith("'") && value.endsWith("'")) ||
+    (value.startsWith('"') && value.endsWith('"'))
+  ) {
+    value = value.slice(1, -1);
+  }
+  return value.trim() || null;
+}
+
+export function getCodexRuleDescription(
+  agentId: string,
+  ruleSuffix?: string
+): string | null {
+  try {
+    const frontmatter = getTemplate(
+      agentId,
+      'cursor-frontmatter.yaml',
+      ruleSuffix
+    );
+    return extractDescriptionFromFrontmatter(frontmatter);
+  } catch {
+    return null;
+  }
+}
+
+export function buildCodexAgentsMd(agents: string[]): string {
+  const lines: string[] = [];
+  lines.push('# AGENTS.md');
+  lines.push('');
+  lines.push(
+    'This file provides guidance to Codex (CLI and app) for working in this repository.'
+  );
+  lines.push('');
+  lines.push('## Installed agent rules');
+  lines.push('');
+  lines.push(
+    'Read and follow these rule files in `.codex/rules/` when they apply:'
+  );
+  lines.push('');
+  for (const agentId of agents) {
+    const suffixes = listRuleSuffixes(agentId);
+    for (const ruleSuffix of suffixes) {
+      const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      const description =
+        getCodexRuleDescription(agentId, ruleSuffix) ?? `Rules for ${basename}`;
+      lines.push(`- \`.codex/rules/${basename}.md\` — ${description}`);
+    }
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
 /**
  * Build content for the given agent, target, and optional rule suffix
  */
@@ -138,6 +211,8 @@ export function buildContent(
       return buildClaudeFormat(agentId, ruleSuffix);
     case 'opencode':
       return buildOpenCodeFormat(agentId, ruleSuffix);
+    case 'codex':
+      return buildCodexFormat(agentId, ruleSuffix);
     default:
       throw new Error(`Unknown target: ${target}`);
   }
@@ -170,9 +245,21 @@ export function getDestination(
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }
+    case 'codex': {
+      const dir = path.join(root, '.codex', 'rules');
+      const file = path.join(dir, `${basename}.md`);
+      return { dir, file };
+    }
     default:
       throw new Error(`Unknown target: ${target}`);
   }
+}
+
+/**
+ * Get destination for Codex AGENTS.md
+ */
+export function getCodexAgentsMdPath(projectRoot: string): string {
+  return path.join(path.resolve(projectRoot), 'AGENTS.md');
 }
 
 /**

@@ -2,6 +2,8 @@ import fs from 'fs';
 import readline from 'readline';
 import {
   buildContent,
+  buildCodexAgentsMd,
+  getCodexAgentsMdPath,
   getDestination,
   listRuleSuffixes,
   listTargets
@@ -24,7 +26,7 @@ function prompt(question: string): Promise<string> {
 }
 
 /**
- * Interactive: ask for target (cursor | claude | opencode)
+ * Interactive: ask for target (cursor | claude | opencode | codex)
  */
 async function promptTarget(): Promise<Target> {
   const targets = listTargets();
@@ -111,7 +113,9 @@ export interface InstallResult {
   installed: string[];
   /** Per-rule: which (agent, ruleSuffix) files were written (ruleSuffix '' = main) */
   installedRules: Array<{ agentId: string; ruleSuffix: string }>;
+  installedSupportFiles: string[];
   skipped: string[];
+  skippedSupportFiles: string[];
   errors: Array<{ agent: string; error: string }>;
 }
 
@@ -128,8 +132,11 @@ export function install(options: InstallOptions): InstallResult {
   } = options;
   const installed: string[] = [];
   const installedRules: Array<{ agentId: string; ruleSuffix: string }> = [];
+  const installedSupportFiles: string[] = [];
   const skipped: string[] = [];
+  const skippedSupportFiles: string[] = [];
   const errors: Array<{ agent: string; error: string }> = [];
+  const validAgents = new Set<string>();
 
   if (persist) {
     saveConfig({ target, agents }, projectRoot);
@@ -140,6 +147,7 @@ export function install(options: InstallOptions): InstallResult {
       errors.push({ agent: agentId, error: 'Unknown agent' });
       continue;
     }
+    validAgents.add(agentId);
     let agentInstalled = false;
     let agentSkipped = false;
     try {
@@ -173,7 +181,25 @@ export function install(options: InstallOptions): InstallResult {
     }
   }
 
-  return { installed, installedRules, skipped, errors };
+  if (target === 'codex') {
+    const agentsMdPath = getCodexAgentsMdPath(projectRoot);
+    if (fs.existsSync(agentsMdPath) && !force) {
+      skippedSupportFiles.push(agentsMdPath);
+    } else {
+      const content = buildCodexAgentsMd(Array.from(validAgents));
+      fs.writeFileSync(agentsMdPath, content, 'utf8');
+      installedSupportFiles.push(agentsMdPath);
+    }
+  }
+
+  return {
+    installed,
+    installedRules,
+    installedSupportFiles,
+    skipped,
+    skippedSupportFiles,
+    errors
+  };
 }
 
 export interface RunInstallOptions {
@@ -241,9 +267,21 @@ export async function runInstall(
       console.log(`  ${label} -> ${file}`);
     });
   }
+  if (result.installedSupportFiles.length > 0) {
+    result.installedSupportFiles.forEach((file) => {
+      console.log(`  AGENTS.md -> ${file}`);
+    });
+  }
   if (result.skipped.length > 0) {
     console.log(
       `Skipped (already present; use --force to overwrite): ${result.skipped.join(', ')}`
+    );
+  }
+  if (result.skippedSupportFiles.length > 0) {
+    console.log(
+      `Skipped support files (already present; use --force to overwrite): ${result.skippedSupportFiles.join(
+        ', '
+      )}`
     );
   }
   if (
