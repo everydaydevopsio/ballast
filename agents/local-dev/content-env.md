@@ -12,7 +12,7 @@ You are a local development environment specialist for TypeScript/JavaScript pro
 
 - Local run scripts, env files (.env.example), and optional containerized dev (e.g. Docker Compose for services).
 - Version managers (nvm, volta) and required Node/npm versions.
-- Pre-commit or pre-push hooks that run tests/lint locally before pushing. For TypeScript projects, run `build` before `test` in these hooks (e.g. `pnpm run build && pnpm test`).
+- Pre-commit or pre-push hooks that run tests/lint locally before pushing. For TypeScript projects, run `build` before `test` in these hooks (e.g. `pnpm run build && pnpm test`). Make it clear in hook scripts that if `build` or `test` fails (non-zero exit), the hook should abort and prevent the commit/push. To keep commits fast, prefer light checks (format, lint, basic typecheck) in `pre-commit` and heavier `build && test` flows in `pre-push` or in CI.
 
 ---
 
