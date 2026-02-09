@@ -76,23 +76,25 @@ After an interactive install, choices are saved to `.rulesrc.json`. Future runs 
 
 ## Install Locations
 
-| Platform | Path             | File pattern  |
-| -------- | ---------------- | ------------- |
-| Cursor   | `.cursor/rules/` | `<agent>.mdc` |
-| Claude   | `.claude/rules/` | `<agent>.md`  |
-| OpenCode | `.opencode/`     | `<agent>.md`  |
-| Codex    | `.codex/rules/`  | `<agent>.md`  |
+<!-- prettier-ignore -->
+Platform | Path             | File pattern
+-------- | ---------------- | -------------
+Cursor   | `.cursor/rules/` | `<agent>.mdc`
+Claude   | `.claude/rules/` | `<agent>.md`
+OpenCode | `.opencode/`     | `<agent>.md`
+Codex    | `.codex/rules/`  | `<agent>.md`
 
 ## Agent Summary
 
-| Agent             | Description                                                                    |
-| ----------------- | ------------------------------------------------------------------------------ |
-| **linting**       | ESLint, Prettier, Husky, lint-staged, GitHub Actions (full instructions)       |
-| **local-dev**     | nvm, Docker, env, license setup (MIT default), MCP (optional), badges          |
-| **cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)               |
-| **observability** | Logging, tracing, metrics, SLOs (placeholder outline)                          |
-| **logging**       | Pino + Fluentd, pino-browser to /api/logs, window.onerror, unhandledrejection  |
-| **testing**       | Jest (default) or Vitest for Vite, 50% coverage, test + test:coverage, CI step |
+<!-- prettier-ignore -->
+Agent             | Description
+----------------- | ------------------------------------------------------------------------------
+**linting**       | ESLint, Prettier, Husky, lint-staged, GitHub Actions (full instructions)
+**local-dev**     | nvm, Docker, env, license setup (MIT default), MCP (optional), badges
+**cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)
+**observability** | Logging, tracing, metrics, SLOs (placeholder outline)
+**logging**       | Pino + Fluentd, pino-browser to /api/logs, window.onerror, unhandledrejection
+**testing**       | Jest (default) or Vitest for Vite, 50% coverage, test + test:coverage, CI step
 
 ## Suggested Install Prompts
 
