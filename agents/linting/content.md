@@ -43,6 +43,7 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
    - Create .github/workflows/lint.yaml
    - Run on pull requests to main branch
    - Set up Node.js environment
+   - **If the project uses pnpm** (e.g. pnpm-lock.yaml present or package.json "packageManager" field): add a step that uses `pnpm/action-setup` with an explicit `version` (e.g. from package.json `packageManager` like `pnpm@9.0.0`, or a sensible default such as `9`). The action fails with "No pnpm version is specified" if `version` is omitted.
    - Install dependencies with frozen lockfile
    - Run linting checks
 
@@ -101,12 +102,36 @@ export default [
 }
 ```
 
+**GitHub Actions (when project uses pnpm):** If the project uses pnpm (pnpm-lock.yaml or package.json "packageManager"), include a pnpm setup step with an explicit version before setup-node:
+
+```yaml
+- name: Setup pnpm
+  uses: pnpm/action-setup@v4
+  with:
+    version: 9 # or read from package.json "packageManager" (e.g. pnpm@9.0.0 → 9)
+
+- name: Setup Node.js
+  uses: actions/setup-node@v6
+  with:
+    node-version: '20'
+    cache: 'pnpm'
+
+- name: Install dependencies
+  run: pnpm install --frozen-lockfile
+
+- name: Lint
+  run: pnpm run lint
+```
+
+Omit the pnpm step only when the project uses npm or yarn.
+
 ## Important Notes
 
 - Always use the flat config format for ESLint (eslint.config.js/mjs), not legacy .eslintrc
 - prettier must be the LAST item in the ESLint config array to override other configs
 - Use tsc-files instead of tsc for faster TypeScript checking of staged files only
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
+- When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
 - The pre-commit hook should run "npx lint-staged"
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
