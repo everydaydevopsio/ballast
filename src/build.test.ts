@@ -26,6 +26,10 @@ describe('build', () => {
       expect(listRuleSuffixes('logging')).toEqual(['']);
     });
 
+    test('returns only main rule for testing', () => {
+      expect(listRuleSuffixes('testing')).toEqual(['']);
+    });
+
     test('returns env, mcp, license, and badges for local-dev', () => {
       expect(listRuleSuffixes('local-dev')).toContain('env');
       expect(listRuleSuffixes('local-dev')).toContain('mcp');

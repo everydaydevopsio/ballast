@@ -7,7 +7,8 @@ export const AGENT_IDS = [
   'local-dev',
   'cicd',
   'observability',
-  'logging'
+  'logging',
+  'testing'
 ] as const;
 export type AgentId = (typeof AGENT_IDS)[number];
 

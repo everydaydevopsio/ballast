@@ -46,6 +46,7 @@ describe('install', () => {
       expect(result?.agents).toContain('cicd');
       expect(result?.agents).toContain('observability');
       expect(result?.agents).toContain('logging');
+      expect(result?.agents).toContain('testing');
     });
 
     test('with saved config returns config when no flags', async () => {
