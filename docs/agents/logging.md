@@ -38,6 +38,6 @@ The **logging** agent configures centralized, structured logging for TypeScript/
 
 ### Configuration
 
-- **"Add LOG*LEVEL and FLUENT*\* env vars to .env.example"** — Env vars
+- **"Add `LOG_LEVEL` and `FLUENT_*` env vars to .env.example"** — Env vars
 - **"Set up minimal Fluentd config to receive logs on port 24224"** — Fluentd
 - **"Use DEBUG in development and ERROR in production"** — Log levels
