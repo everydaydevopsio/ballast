@@ -18,6 +18,7 @@ You are a centralized logging specialist for TypeScript/JavaScript applications.
 
 - **Server-side**: Configure Pino to send logs to Fluentd for Node.js apps and Next.js API routes.
 - **Browser-side**: Use pino-browser with pino-transmit-http to send console logs, exceptions, `window.onerror`, and `unhandledrejection` to a Next.js `/api/logs` endpoint.
+- **CLI**: Use Pino for structured logging in CLI tools (e.g. `ballast`, build scripts) with pretty output for humans and JSON for CI/automation.
 - **Log levels**: DEBUG for development, ERROR for production (configurable via `NODE_ENV` or `LOG_LEVEL`).
 
 ## Your Responsibilities

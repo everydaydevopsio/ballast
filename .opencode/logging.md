@@ -23,7 +23,7 @@ permission:
 
 # Centralized Logging Agent
 
-You are a centralized logging specialist for TypeScript/JavaScript applications. Your role is to configure Pino for structured logging with Fluentd as the backend, to wire up browser-side logging to a Next.js `/api/logs` endpoint, and to add structured logging for CLI tools.
+You are a centralized logging specialist for TypeScript/JavaScript applications. Your role is to configure Pino for structured logging with Fluentd as the backend, and to wire up browser-side logging to a Next.js `/api/logs` endpoint.
 
 ## Goals
 
@@ -47,70 +47,7 @@ pnpm add pino pino-fluentd pino-transmit-http @fluent-org/logger
 - **pino-transmit-http**: Browser transmit to POST logs to an HTTP endpoint
 - **@fluent-org/logger**: Programmatic Fluentd client (for custom transport when piping is not suitable)
 
-For **CLI projects only**, you need just:
-
-```bash
-pnpm add pino pino-pretty
-```
-
-- **pino-pretty**: Pretty-prints logs for human readability in development (optional, devDependency)
-
-### 2. CLI Projects: Pino for Command-Line Tools
-
-For CLI tools (e.g. `ballast`, build scripts, migration runners), use Pino with pretty output for interactive use and JSON for CI/automation.
-
-Create `src/lib/logger.ts` (or `lib/logger.ts`):
-
-```typescript
-import pino from 'pino';
-
-const isProd = process.env.NODE_ENV === 'production';
-const isCi = process.env.CI === 'true' || process.env.CI === '1';
-const logLevel = process.env.LOG_LEVEL ?? (isProd ? 'error' : 'debug');
-
-// Pretty output for humans (TTY or dev), JSON for CI/automation
-const usePretty = !isProd && !isCi && (process.stdout.isTTY ?? false);
-
-export const logger = pino({
-  level: logLevel,
-  ...(usePretty
-    ? {
-        transport: {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'SYS:HH:MM:ss'
-          }
-        }
-      }
-    : {})
-});
-```
-
-**Usage in CLI code:**
-
-```typescript
-import { logger } from './lib/logger';
-
-// Instead of console.log('Installing rules...'):
-logger.info('Installing rules');
-
-// With structured data:
-logger.debug({ target: 'cursor', agents: ['linting'] }, 'Resolved config');
-
-// Errors:
-logger.error({ err }, 'Install failed');
-```
-
-**Pipe to Fluentd when running in CI/CD:**
-
-```bash
-node dist/cli.js install --all 2>&1 | pino-fluentd --host 127.0.0.1 --port 24224 --tag cli
-```
-
-For CLI projects, omit pino-transmit-http, pino-fluentd, and @fluent-org/logger unless you need Fluentd integration. Use `pino-pretty` as a devDependency so production installs stay lean.
-
-### 3. Server-Side: Node.js and Next.js API
+### 2. Server-Side: Node.js and Next.js API
 
 #### Option A: Pipe to pino-fluentd (recommended for Node.js)
 
@@ -192,7 +129,7 @@ export const logger = stream
   : pino({ level: logLevel });
 ```
 
-### 4. Next.js API: `/api/logs` endpoint
+### 3. Next.js API: `/api/logs` endpoint
 
 Create `src/app/api/logs/route.ts` (App Router) or `pages/api/logs.ts` (Pages Router):
 
@@ -255,7 +192,7 @@ export default async function handler(
 }
 ```
 
-### 5. Browser-Side: pino-browser with pino-transmit-http
+### 4. Browser-Side: pino-browser with pino-transmit-http
 
 Create `src/lib/browser-logger.ts` (or `lib/browser-logger.ts`):
 
@@ -279,7 +216,7 @@ export const browserLogger = pino({
 });
 ```
 
-### 6. Wire Up Global Error Handlers (Browser)
+### 5. Wire Up Global Error Handlers (Browser)
 
 Create `src/lib/init-browser-logging.ts` and import it from your root layout or `_app`:
 
@@ -357,7 +294,7 @@ export default function App({ Component, pageProps }) {
 }
 ```
 
-### 7. Use the Browser Logger
+### 6. Use the Browser Logger
 
 Replace `console.log` with the browser logger in client components:
 
@@ -371,7 +308,7 @@ browserLogger.debug({ data }, 'User clicked');
 browserLogger.error({ err }, 'Something failed');
 ```
 
-### 8. Environment Variables
+### 7. Environment Variables
 
 Add to `.env.example`:
 
@@ -390,7 +327,7 @@ FLUENT_ENABLED=false
 
 For production, set `FLUENT_ENABLED=true` and configure `FLUENT_HOST` / `FLUENT_PORT` to point to your Fluentd instance.
 
-### 9. Fluentd Configuration (Reference)
+### 8. Fluentd Configuration (Reference)
 
 Minimal Fluentd config to receive logs on port 24224:
 
@@ -409,15 +346,6 @@ Minimal Fluentd config to receive logs on port 24224:
 Replace `@type stdout` with `@type elasticsearch`, `@type s3`, or another output as needed.
 
 ## Implementation Order
-
-**For CLI projects:**
-
-1. Install pino and pino-pretty (pino-pretty as devDependency)
-2. Create `lib/logger.ts` with pretty output for TTY and JSON for CI
-3. Replace `console.log` / `console.error` with `logger.info` / `logger.error`
-4. Add `LOG_LEVEL` to `.env.example` if using env files
-
-**For server/browser projects:**
 
 1. Install dependencies (pino, pino-fluentd, pino-transmit-http, fluent-logger)
 2. Create server-side logger (`lib/logger.ts`) with level from NODE_ENV
@@ -439,7 +367,6 @@ Override with `LOG_LEVEL` (server) or `NEXT_PUBLIC_LOG_LEVEL` (browser).
 
 ## Important Notes
 
-- **CLI projects**: Use Pino with pino-pretty for human-readable output when running interactively (TTY). In CI (`CI=true`), output stays as JSON for parsing. Omit browser and Fluentd deps unless you need them.
 - Use the **pipe approach** (`node app | pino-fluentd`) when possible; it keeps the app simple and lets pino-fluentd handle Fluentd connection.
 - For Next.js in serverless (Vercel, etc.), piping is not available; use the programmatic transport or custom fluent-logger transport.
 - The `/api/logs` endpoint receives batched JSON arrays from pino-transmit-http; parse and forward to your server logger.

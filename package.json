@@ -1,6 +1,6 @@
 {
   "name": "@everydaydevopsio/ballast",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "CLI to install TypeScript AI agent rules (linting, local-dev, CI/CD, observability, logging) for Cursor, Claude Code, and OpenCode",
   "main": "dist/cli.js",
   "bin": {
