@@ -30,7 +30,9 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
 
 5. **Set Up Git Hooks with Husky**
    - Install and initialize husky
-   - Create pre-commit hook to run lint-staged
+   - Create pre-commit hook with the **standard Husky header**: a shell shebang (`#!/usr/bin/env sh`), then Husky's bootstrap line (`. "$(dirname -- "$0")/_/husky.sh"`) so the hook runs reliably across environments and when `core.hooksPath` is set
+   - After the header, add the command to run (e.g. `npx lint-staged`)
+   - Ensure the hook file is **executable** (e.g. `chmod +x .husky/pre-commit`)
    - Ensure test script exists (even if it's just a placeholder)
 
 6. **Configure lint-staged**
@@ -59,7 +61,7 @@ Follow this order for a clean implementation:
 6. Add NPM scripts to package.json
 7. Set up husky and initialize it
 8. Install and configure lint-staged
-9. Create the pre-commit hook
+9. Create the pre-commit hook (with standard Husky header and make it executable)
 10. Create GitHub Actions workflow
 11. Test the setup
 
@@ -102,6 +104,15 @@ export default [
 }
 ```
 
+**Husky pre-commit hook:** Use the standard Husky header so the hook runs reliably (shebang + bootstrap); then run lint-staged. Ensure the file is executable (`chmod +x .husky/pre-commit`).
+
+```sh
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+npx lint-staged
+```
+
 **GitHub Actions (when project uses pnpm):** If the project uses pnpm (pnpm-lock.yaml or package.json "packageManager"), include a pnpm setup step with an explicit version before setup-node:
 
 ```yaml
@@ -132,7 +143,7 @@ Omit the pnpm step only when the project uses npm or yarn.
 - Use tsc-files instead of tsc for faster TypeScript checking of staged files only
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
 - When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
-- The pre-commit hook should run "npx lint-staged"
+- The pre-commit hook must use the **standard Husky header** (shebang `#!/usr/bin/env sh` and bootstrap `. "$(dirname -- "$0")/_/husky.sh"`) so it runs correctly across environments and when `core.hooksPath` is set; then run `npx lint-staged`. Make the hook file executable (`chmod +x .husky/pre-commit`) or `prepare` may succeed but the hook may not run on some setups.
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
 ## When Completed
