@@ -23,24 +23,26 @@ When setting up or working on Node.js/TypeScript projects, use **nvm** (Node Ver
 ### Your Responsibilities
 
 1. **Create or update `.nvmrc`**
-   - If the project has no `.nvmrc`, create one specifying the Node version.
-   - Default to `lts/*` if no version is already specified (e.g. in `package.json` engines, existing `.nvmrc`, or CI config).
+   - If the project has no `.nvmrc`, create one with the **current Node LTS** version (e.g. `24`). Check [Node.js Releases](https://nodejs.org/en/about/releases/) for the current Active LTS; as of this writing it is Node 24 (Krypton).
    - If a specific version is already used elsewhere, match it (e.g. `22`, `20`, `lts/hydrogen`).
+   - For **package.json** `engines` and **README** prerequisites/support text, use the **previous LTS** (one LTS back) as the minimum supported version (e.g. `22`) so the project documents support for both current and previous LTS. Example `engines`: `"node": ">=22"`. In the README, state e.g. "Node.js 22 (LTS) or 24 (Active LTS)" or "Use the version in `.nvmrc` (Node 24). Supported: Node 22+."
 
 2. **Use `.nvmrc` in the project**
    - Instruct developers to run `nvm use` (or `nvm install` if the version is not yet installed) when entering the project directory.
    - Consider adding shell integration (e.g. `direnv` with `use nvm`, or `.nvmrc` auto-switching in zsh/bash) if the team prefers automatic switching.
 
 3. **Update the README**
-   - Add a "Prerequisites" or "Getting started" subsection that instructs new contributors to:
+   - Add a "Prerequisites" or "Getting started" subsection that states supported Node version (previous LTS and current LTS, e.g. "Node.js 22 (LTS) or 24 (Active LTS)") and instructs new contributors to:
      1. Install nvm (e.g. `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash` or the latest from https://github.com/nvm-sh/nvm).
      2. Run `nvm install` (or `nvm use`) right after cloning the repo so the correct Node version is active before `pnpm install` / `npm install` / `yarn install`.
+   - In **package.json**, add or update `engines` with the previous LTS as minimum, e.g. `"engines": { "node": ">=22" }`.
 
 ### Example README Addition
 
 ````markdown
 ## Prerequisites
 
+- **Node.js**: Use the version in `.nvmrc`. Supported: Node 22 (LTS) or 24 (Active LTS). Run `nvm install` (or `nvm use`) after cloning so the correct Node version is active before `pnpm install`.
 - [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager)
 
 After cloning the repo, install and use the project's Node version:
@@ -52,6 +54,16 @@ nvm use       # switches to it (or run `nvm install` which does both)
 
 Then install dependencies: `pnpm install` (or `npm install` / `yarn`).
 ````
+
+### Example package.json engines
+
+Use the previous LTS as the minimum supported version (one LTS back from `.nvmrc`):
+
+```json
+"engines": {
+  "node": ">=22"
+}
+```
 
 ### Key Commands
 
@@ -74,7 +86,7 @@ When the user wants a Dockerfile and containerized local development for a Node.
 ### Your Responsibilities
 
 1. **Create a production-style Dockerfile**
-   - Use a Node LTS image (e.g. `node:22-bookworm`).
+   - Use a Node LTS image matching `.nvmrc` (e.g. `node:24-bookworm` for current Active LTS).
    - Set `WORKDIR /app`.
    - Copy only `package.json` and lockfile (`yarn.lock`, `pnpm-lock.yaml`, or `package-lock.json`) first.
    - Install dependencies with frozen lockfile and `--ignore-scripts` (e.g. `yarn install --frozen-lockfile --ignore-scripts`, or `pnpm install --frozen-lockfile --ignore-scripts`, or `npm ci --ignore-scripts`).
@@ -113,7 +125,7 @@ When the user wants a Dockerfile and containerized local development for a Node.
 **Dockerfile (yarn example):**
 
 ```dockerfile
-FROM node:22-bookworm
+FROM node:24-bookworm
 
 WORKDIR /app
 
@@ -129,7 +141,7 @@ CMD [ "yarn", "start" ]
 **Dockerfile (pnpm example):**
 
 ```dockerfile
-FROM node:22-bookworm
+FROM node:24-bookworm
 
 WORKDIR /app
 

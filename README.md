@@ -32,6 +32,7 @@ Then install dependencies: `pnpm install` (or `npm install` / `yarn`).
 | **cicd**          | CI/CD pipelines, quality gates, deployment (placeholder outline)                                 |
 | **observability** | Logging, tracing, metrics, SLOs (placeholder outline)                                            |
 | **logging**       | Pino + Fluentd (Node/Next.js API), pino-browser to /api/logs, window.onerror, unhandledrejection |
+| **testing**       | Jest (default) or Vitest for Vite, 50% coverage default, test step in build GitHub Action        |
 
 ## Using the agents
 
@@ -44,6 +45,12 @@ Once installed, rule files are loaded automatically by your AI platform (Cursor,
 | **cicd**          | Ask for help with CI/CD pipelines, quality gates, or deployment (placeholder).                                                                                                       |
 | **observability** | Ask for help with logging, tracing, metrics, or SLOs (placeholder).                                                                                                                  |
 | **logging**       | Ask for help with centralized logging: Pino + Fluentd for server, pino-browser to /api/logs for console, exceptions, window.onerror, unhandledrejection.                             |
+| **testing**       | Ask for help setting up Jest or Vitest, coverage (default 50%), and a test step in the build GitHub Action.                                                                          |
+
+## Documentation
+
+- **[Installation guide](docs/installation.md)** — For AI coding agents: install ballast from within Cursor, Claude Code, OpenCode, or Codex using a prompt.
+- **[Agent guides](docs/README.md)** — Per-agent docs: what each agent sets up, what it provides, and prompts to improve your app.
 
 ## Installation
 

@@ -77,7 +77,7 @@ Commands:
 
 Options:
   --target, -t <platform>   AI platform: cursor, claude, opencode, codex
-  --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability (comma-separated)
+  --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
   --all                     Install all agents
   --force, -f               Overwrite existing rule files
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
