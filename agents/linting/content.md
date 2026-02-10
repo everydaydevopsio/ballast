@@ -30,7 +30,10 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
 
 5. **Set Up Git Hooks with Husky**
    - Install and initialize husky
-   - Create pre-commit hook with the **standard Husky header**: a shell shebang (`#!/usr/bin/env sh`), then Husky's bootstrap line (`. "$(dirname -- "$0")/_/husky.sh"`) so the hook runs reliably across environments and when `core.hooksPath` is set
+   - Create a pre-commit hook with the **standard Husky header**:
+     - First line: shell shebang (`#!/usr/bin/env sh`)
+     - Second line: Husky's bootstrap line (`. "$(dirname -- "$0")/_/husky.sh"`)
+     - This ensures the hook runs reliably across environments and when `core.hooksPath` is set
    - After the header, add the command to run (e.g. `npx lint-staged`)
    - Ensure the hook file is **executable** (e.g. `chmod +x .husky/pre-commit`)
    - Ensure test script exists (even if it's just a placeholder)
