@@ -146,7 +146,7 @@ Omit the pnpm step only when the project uses npm or yarn.
 - Use tsc-files instead of tsc for faster TypeScript checking of staged files only
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
 - When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
-- The pre-commit hook must use the **standard Husky header** (shebang `#!/usr/bin/env sh` and bootstrap `. "$(dirname -- "$0")/_/husky.sh"`) so it runs correctly across environments and when `core.hooksPath` is set; then run `npx lint-staged`. Make the hook file executable (`chmod +x .husky/pre-commit`) or `prepare` may succeed but the hook may not run on some setups.
+- The pre-commit hook must use the **standard Husky header** (shebang `#!/usr/bin/env sh` and bootstrap `. "$(dirname -- "$0")/_/husky.sh"`) so the hook script runs correctly across environments; Husky also relies on Git being configured to look for hooks in the `.husky` directory (for example via `core.hooksPath=.husky`) so that Git will execute the hook. Then run `npx lint-staged`. Make the hook file executable (`chmod +x .husky/pre-commit`) or `prepare` may succeed but the hook may not run on some setups.
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
 ## When Completed
