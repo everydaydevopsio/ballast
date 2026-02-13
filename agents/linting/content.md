@@ -30,11 +30,7 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
 
 5. **Set Up Git Hooks with Husky**
    - Install and initialize husky
-   - Create a pre-commit hook with the **standard Husky header**:
-     - First line: shell shebang (`#!/usr/bin/env sh`)
-     - Second line: Husky's bootstrap line (`. "$(dirname -- "$0")/_/husky.sh"`)
-     - This ensures the hook runs reliably across environments and when `core.hooksPath` is set
-   - After the header, add the command to run (e.g. `npx lint-staged`)
+   - Create a pre-commit hook with the command to run (e.g. `npx lint-staged`). Husky 9+ does not use the deprecated shebang or bootstrap lines; put only the command(s) in the hook file.
    - Ensure the hook file is **executable** (e.g. `chmod +x .husky/pre-commit`)
    - Ensure test script exists (even if it's just a placeholder)
 
@@ -64,7 +60,7 @@ Follow this order for a clean implementation:
 6. Add NPM scripts to package.json
 7. Set up husky and initialize it
 8. Install and configure lint-staged
-9. Create the pre-commit hook (with standard Husky header and make it executable)
+9. Create the pre-commit hook (command only, no deprecated header; make it executable)
 10. Create GitHub Actions workflow
 11. Test the setup
 
@@ -107,12 +103,9 @@ export default [
 }
 ```
 
-**Husky pre-commit hook:** Use the standard Husky header so the hook runs reliably (shebang + bootstrap); then run lint-staged. Ensure the file is executable (`chmod +x .husky/pre-commit`).
+**Husky pre-commit hook (Husky 9+):** Put only the command in the hook file (no shebang or bootstrap lines; those are deprecated). Ensure the file is executable (`chmod +x .husky/pre-commit`).
 
 ```sh
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 npx lint-staged
 ```
 
@@ -146,7 +139,7 @@ Omit the pnpm step only when the project uses npm or yarn.
 - Use tsc-files instead of tsc for faster TypeScript checking of staged files only
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
 - When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
-- The pre-commit hook must use the **standard Husky header** (shebang `#!/usr/bin/env sh` and bootstrap `. "$(dirname -- "$0")/_/husky.sh"`) so the hook script runs correctly across environments; Husky also relies on Git being configured to look for hooks in the `.husky` directory (for example via `core.hooksPath=.husky`) so that Git will execute the hook. Then run `npx lint-staged`. Make the hook file executable (`chmod +x .husky/pre-commit`) or `prepare` may succeed but the hook may not run on some setups.
+- The pre-commit hook must contain only the command(s) to run (e.g. `npx lint-staged`). Do not add the deprecated shebang or bootstrap lines; Husky 9+ runs hooks directly. Git must be configured to look for hooks in the `.husky` directory (e.g. `core.hooksPath=.husky`). Make the hook file executable (`chmod +x .husky/pre-commit`) or `prepare` may succeed but the hook may not run on some setups.
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
 ## When Completed
