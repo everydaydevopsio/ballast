@@ -29,6 +29,7 @@ export function getAgentDir(
  * Get list of available agent ids
  */
 export function listAgents(_language: Language = 'typescript'): string[] {
+  void _language;
   return AGENT_IDS.slice();
 }
 
@@ -39,6 +40,7 @@ export function isValidAgent(
   agentId: string,
   _language: Language = 'typescript'
 ): boolean {
+  void _language;
   return (AGENT_IDS as readonly string[]).includes(agentId);
 }
 
