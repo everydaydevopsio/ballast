@@ -3,6 +3,7 @@ import path from 'path';
 import YAML from 'yaml';
 import { getAgentDir } from './agents';
 import type { Target } from './config';
+import type { Language } from './agents';
 
 const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
 
@@ -14,8 +15,11 @@ const CONTENT_MAIN = `${CONTENT_PREFIX}.md`;
  * List rule suffixes for an agent. content.md → suffix ''; content-<suffix>.md → suffix.
  * At least one of content.md or content-*.md must exist.
  */
-export function listRuleSuffixes(agentId: string): string[] {
-  const dir = getAgentDir(agentId);
+export function listRuleSuffixes(
+  agentId: string,
+  language: Language = 'typescript'
+): string[] {
+  const dir = getAgentDir(agentId, language);
   if (!fs.existsSync(dir)) {
     throw new Error(`Agent "${agentId}" has no content.md or content-*.md`);
   }
@@ -44,8 +48,12 @@ export function listRuleSuffixes(agentId: string): string[] {
 /**
  * Read agent content for a rule. ruleSuffix '' or undefined = content.md; else content-<suffix>.md.
  */
-export function getContent(agentId: string, ruleSuffix?: string): string {
-  const dir = getAgentDir(agentId);
+export function getContent(
+  agentId: string,
+  ruleSuffix?: string,
+  language: Language = 'typescript'
+): string {
+  const dir = getAgentDir(agentId, language);
   const basename = ruleSuffix
     ? `${CONTENT_PREFIX}-${ruleSuffix}.md`
     : CONTENT_MAIN;
@@ -62,9 +70,10 @@ export function getContent(agentId: string, ruleSuffix?: string): string {
 export function getTemplate(
   agentId: string,
   filename: string,
-  ruleSuffix?: string
+  ruleSuffix?: string,
+  language: Language = 'typescript'
 ): string {
-  const dir = getAgentDir(agentId);
+  const dir = getAgentDir(agentId, language);
   const base = filename.replace(/\.[^.]+$/, '');
   const ext = path.extname(filename);
   if (ruleSuffix) {
@@ -85,14 +94,16 @@ export function getTemplate(
  */
 export function buildCursorFormat(
   agentId: string,
-  ruleSuffix?: string
+  ruleSuffix?: string,
+  language: Language = 'typescript'
 ): string {
   const frontmatter = getTemplate(
     agentId,
     'cursor-frontmatter.yaml',
-    ruleSuffix
+    ruleSuffix,
+    language
   );
-  const content = getContent(agentId, ruleSuffix);
+  const content = getContent(agentId, ruleSuffix, language);
   return frontmatter + '\n' + content;
 }
 
@@ -101,10 +112,11 @@ export function buildCursorFormat(
  */
 export function buildClaudeFormat(
   agentId: string,
-  ruleSuffix?: string
+  ruleSuffix?: string,
+  language: Language = 'typescript'
 ): string {
-  const header = getTemplate(agentId, 'claude-header.md', ruleSuffix);
-  const content = getContent(agentId, ruleSuffix);
+  const header = getTemplate(agentId, 'claude-header.md', ruleSuffix, language);
+  const content = getContent(agentId, ruleSuffix, language);
   return header + content;
 }
 
@@ -113,26 +125,32 @@ export function buildClaudeFormat(
  */
 export function buildOpenCodeFormat(
   agentId: string,
-  ruleSuffix?: string
+  ruleSuffix?: string,
+  language: Language = 'typescript'
 ): string {
   const frontmatter = getTemplate(
     agentId,
     'opencode-frontmatter.yaml',
-    ruleSuffix
+    ruleSuffix,
+    language
   );
-  const content = getContent(agentId, ruleSuffix);
+  const content = getContent(agentId, ruleSuffix, language);
   return frontmatter + '\n' + content;
 }
 
-function getCodexHeader(agentId: string, ruleSuffix?: string): string {
+function getCodexHeader(
+  agentId: string,
+  ruleSuffix?: string,
+  language: Language = 'typescript'
+): string {
   let codexError: unknown;
   try {
-    return getTemplate(agentId, 'codex-header.md', ruleSuffix);
+    return getTemplate(agentId, 'codex-header.md', ruleSuffix, language);
   } catch (err) {
     codexError = err;
   }
   try {
-    return getTemplate(agentId, 'claude-header.md', ruleSuffix);
+    return getTemplate(agentId, 'claude-header.md', ruleSuffix, language);
   } catch (claudeError) {
     const codexMsg =
       codexError instanceof Error ? codexError.message : String(codexError);
@@ -148,9 +166,13 @@ function getCodexHeader(agentId: string, ruleSuffix?: string): string {
 /**
  * Build content for Codex (header + content)
  */
-export function buildCodexFormat(agentId: string, ruleSuffix?: string): string {
-  const header = getCodexHeader(agentId, ruleSuffix);
-  const content = getContent(agentId, ruleSuffix);
+export function buildCodexFormat(
+  agentId: string,
+  ruleSuffix?: string,
+  language: Language = 'typescript'
+): string {
+  const header = getCodexHeader(agentId, ruleSuffix, language);
+  const content = getContent(agentId, ruleSuffix, language);
   return header + content;
 }
 
@@ -175,13 +197,15 @@ export function extractDescriptionFromFrontmatter(
 
 export function getCodexRuleDescription(
   agentId: string,
-  ruleSuffix?: string
+  ruleSuffix?: string,
+  language: Language = 'typescript'
 ): string | null {
   try {
     const frontmatter = getTemplate(
       agentId,
       'cursor-frontmatter.yaml',
-      ruleSuffix
+      ruleSuffix,
+      language
     );
     return extractDescriptionFromFrontmatter(frontmatter);
   } catch {
@@ -189,7 +213,10 @@ export function getCodexRuleDescription(
   }
 }
 
-export function buildCodexAgentsMd(agents: string[]): string {
+export function buildCodexAgentsMd(
+  agents: string[],
+  language: Language = 'typescript'
+): string {
   const lines: string[] = [];
   lines.push('# AGENTS.md');
   lines.push('');
@@ -204,11 +231,12 @@ export function buildCodexAgentsMd(agents: string[]): string {
   );
   lines.push('');
   for (const agentId of agents) {
-    const suffixes = listRuleSuffixes(agentId);
+    const suffixes = listRuleSuffixes(agentId, language);
     for (const ruleSuffix of suffixes) {
       const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
       const description =
-        getCodexRuleDescription(agentId, ruleSuffix) ?? `Rules for ${basename}`;
+        getCodexRuleDescription(agentId, ruleSuffix, language) ??
+        `Rules for ${basename}`;
       lines.push(`- \`.codex/rules/${basename}.md\` — ${description}`);
     }
   }
@@ -222,17 +250,18 @@ export function buildCodexAgentsMd(agents: string[]): string {
 export function buildContent(
   agentId: string,
   target: Target,
-  ruleSuffix?: string
+  ruleSuffix?: string,
+  language: Language = 'typescript'
 ): string {
   switch (target) {
     case 'cursor':
-      return buildCursorFormat(agentId, ruleSuffix);
+      return buildCursorFormat(agentId, ruleSuffix, language);
     case 'claude':
-      return buildClaudeFormat(agentId, ruleSuffix);
+      return buildClaudeFormat(agentId, ruleSuffix, language);
     case 'opencode':
-      return buildOpenCodeFormat(agentId, ruleSuffix);
+      return buildOpenCodeFormat(agentId, ruleSuffix, language);
     case 'codex':
-      return buildCodexFormat(agentId, ruleSuffix);
+      return buildCodexFormat(agentId, ruleSuffix, language);
     default:
       throw new Error(`Unknown target: ${target}`);
   }

@@ -76,6 +76,18 @@ describe('build', () => {
     test('throws for missing optional rule', () => {
       expect(() => getContent('linting', 'mcp')).toThrow(/content-mcp.md/);
     });
+
+    test('returns python-specific linting content when language is python', () => {
+      const content = getContent('linting', undefined, 'python');
+      expect(content).toContain('Python linting specialist');
+      expect(content).toContain('Ruff');
+    });
+
+    test('returns go-specific testing content when language is go', () => {
+      const content = getContent('testing', undefined, 'go');
+      expect(content).toContain('Go testing specialist');
+      expect(content).toContain('go test ./...');
+    });
   });
 
   describe('getTemplate', () => {

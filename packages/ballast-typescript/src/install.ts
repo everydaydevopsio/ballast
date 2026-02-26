@@ -8,7 +8,12 @@ import {
   listRuleSuffixes,
   listTargets
 } from './build';
-import { listAgents, resolveAgents, isValidAgent } from './agents';
+import {
+  listAgents,
+  resolveAgents,
+  isValidAgent,
+  type Language
+} from './agents';
 import { findProjectRoot, loadConfig, saveConfig, isCiMode } from './config';
 import type { Target } from './config';
 
@@ -40,8 +45,10 @@ async function promptTarget(): Promise<Target> {
 /**
  * Interactive: ask for agents (comma-separated or "all")
  */
-async function promptAgents(): Promise<string[]> {
-  const agents = listAgents();
+async function promptAgents(
+  language: Language = 'typescript'
+): Promise<string[]> {
+  const agents = listAgents(language);
   const line = await prompt(
     `Agents (comma-separated or "all") [${agents.join(', ')}]: `
   );
@@ -50,12 +57,12 @@ async function promptAgents(): Promise<string[]> {
     line.toLowerCase() === 'all'
       ? ['all']
       : line.split(',').map((s) => s.trim());
-  const resolved = resolveAgents(list);
+  const resolved = resolveAgents(list, language);
   if (resolved.length === 0) {
     console.error(
       `Invalid agents. Use "all" or comma-separated: ${agents.join(', ')}`
     );
-    return promptAgents();
+    return promptAgents(language);
   }
   return resolved;
 }
@@ -65,6 +72,7 @@ export interface ResolveTargetAndAgentsOptions {
   target?: string;
   agents?: string | string[];
   yes?: boolean;
+  language?: Language;
 }
 
 /**
@@ -74,7 +82,8 @@ export async function resolveTargetAndAgents(
   options: ResolveTargetAndAgentsOptions = {}
 ): Promise<{ target: Target; agents: string[] } | null> {
   const projectRoot = options.projectRoot ?? findProjectRoot();
-  const config = loadConfig(projectRoot);
+  const language = options.language ?? 'typescript';
+  const config = loadConfig(projectRoot, language);
   const ci = isCiMode() || options.yes;
 
   const targetFromFlag = options.target;
@@ -86,7 +95,9 @@ export async function resolveTargetAndAgents(
 
   const target = targetFromFlag ?? config?.target;
   const agents =
-    agentsFromFlag != null ? resolveAgents(agentsFromFlag) : config?.agents;
+    agentsFromFlag != null
+      ? resolveAgents(agentsFromFlag, language)
+      : config?.agents;
 
   if (target && agents && agents.length > 0) {
     return { target: target as Target, agents };
@@ -97,7 +108,7 @@ export async function resolveTargetAndAgents(
   }
 
   const resolvedTarget = (target ?? (await promptTarget())) as Target;
-  const resolvedAgents = agents?.length ? agents : await promptAgents();
+  const resolvedAgents = agents?.length ? agents : await promptAgents(language);
   return { target: resolvedTarget, agents: resolvedAgents };
 }
 
@@ -105,6 +116,7 @@ export interface InstallOptions {
   projectRoot: string;
   target: Target;
   agents: string[];
+  language?: Language;
   force?: boolean;
   saveConfig?: boolean;
 }
@@ -127,6 +139,7 @@ export function install(options: InstallOptions): InstallResult {
     projectRoot,
     target,
     agents,
+    language = 'typescript',
     force = false,
     saveConfig: persist
   } = options;
@@ -139,11 +152,11 @@ export function install(options: InstallOptions): InstallResult {
   const processedAgentIds = new Set<string>();
 
   if (persist) {
-    saveConfig({ target, agents }, projectRoot);
+    saveConfig({ target, agents }, projectRoot, language);
   }
 
   for (const agentId of agents) {
-    if (!isValidAgent(agentId)) {
+    if (!isValidAgent(agentId, language)) {
       errors.push({ agent: agentId, error: 'Unknown agent' });
       continue;
     }
@@ -151,7 +164,7 @@ export function install(options: InstallOptions): InstallResult {
     let agentInstalled = false;
     let agentSkipped = false;
     try {
-      const suffixes = listRuleSuffixes(agentId);
+      const suffixes = listRuleSuffixes(agentId, language);
       for (const ruleSuffix of suffixes) {
         const { dir, file } = getDestination(
           agentId,
@@ -166,7 +179,12 @@ export function install(options: InstallOptions): InstallResult {
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
-        const content = buildContent(agentId, target, ruleSuffix || undefined);
+        const content = buildContent(
+          agentId,
+          target,
+          ruleSuffix || undefined,
+          language
+        );
         fs.writeFileSync(file, content, 'utf8');
         installedRules.push({ agentId, ruleSuffix: ruleSuffix || '' });
         agentInstalled = true;
@@ -186,7 +204,10 @@ export function install(options: InstallOptions): InstallResult {
     if (fs.existsSync(agentsMdPath) && !force) {
       skippedSupportFiles.push(agentsMdPath);
     } else {
-      const content = buildCodexAgentsMd(Array.from(processedAgentIds));
+      const content = buildCodexAgentsMd(
+        Array.from(processedAgentIds),
+        language
+      );
       fs.writeFileSync(agentsMdPath, content, 'utf8');
       installedSupportFiles.push(agentsMdPath);
     }
@@ -207,6 +228,7 @@ export interface RunInstallOptions {
   target?: string;
   agents?: string[];
   all?: boolean;
+  language?: Language;
   force?: boolean;
   yes?: boolean;
 }
@@ -219,12 +241,14 @@ export async function runInstall(
   options: RunInstallOptions = {}
 ): Promise<number> {
   const projectRoot = options.projectRoot ?? findProjectRoot();
+  const language = options.language ?? 'typescript';
   const agentsFromFlag = options.all ? 'all' : options.agents;
   const resolved = await resolveTargetAndAgents({
     projectRoot,
     target: options.target,
     agents: agentsFromFlag,
-    yes: options.yes
+    yes: options.yes,
+    language
   });
 
   if (!resolved) {
@@ -243,6 +267,7 @@ export async function runInstall(
     projectRoot,
     target,
     agents,
+    language,
     force: options.force ?? false,
     saveConfig: persist
   });

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
 import { runInstall } from './install';
+import { LANGUAGES } from './agents';
 
 export interface CliOptions {
   target?: string;
   agents: string[];
+  language: string;
   all: boolean;
   force: boolean;
   yes: boolean;
@@ -17,6 +19,7 @@ function parseArgs(argv: string[]): ParseArgsResult {
   const options: CliOptions = {
     target: undefined,
     agents: [],
+    language: 'typescript',
     all: false,
     force: false,
     yes: false
@@ -36,6 +39,12 @@ function parseArgs(argv: string[]): ParseArgsResult {
           value.split(',').map((s) => s.trim())
         );
       }
+      i++;
+      continue;
+    }
+    if (arg === '--language' || arg === '-l') {
+      const value = args[++i];
+      if (value) options.language = value.trim().toLowerCase();
       i++;
       continue;
     }
@@ -77,6 +86,7 @@ Commands:
 
 Options:
   --target, -t <platform>   AI platform: cursor, claude, opencode, codex
+  --language, -l <lang>     Language profile: ${LANGUAGES.join(', ')} (default: typescript)
   --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
   --all                     Install all agents
   --force, -f               Overwrite existing rule files
@@ -87,6 +97,7 @@ Options:
 Examples:
   ballast install
   ballast install --target cursor --agent linting
+  ballast install --language python --target cursor --all
   ballast install --target claude --all --force
   ballast install --yes --target cursor --all
 `);
@@ -126,9 +137,16 @@ async function main(): Promise<void> {
     printVersion();
     process.exit(0);
   }
+  const cliOptions = options as CliOptions;
+  if (!LANGUAGES.includes(cliOptions.language as (typeof LANGUAGES)[number])) {
+    console.error(
+      `Invalid language: ${cliOptions.language}. Choose one of: ${LANGUAGES.join(', ')}`
+    );
+    process.exit(1);
+  }
 
   const exitCode = await runInstall(
-    options as Parameters<typeof runInstall>[0]
+    cliOptions as Parameters<typeof runInstall>[0]
   );
   process.exit(exitCode);
 }

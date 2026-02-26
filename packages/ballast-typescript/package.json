@@ -1,0 +1,71 @@
+{
+  "name": "@everydaydevopsio/ballast",
+  "version": "3.2.1",
+  "description": "CLI to install TypeScript AI agent rules (linting, local-dev, CI/CD, observability, logging) for Cursor, Claude Code, and OpenCode",
+  "main": "dist/cli.js",
+  "bin": {
+    "ballast": "bin/ballast.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "agents"
+  ],
+  "author": "Mark C Allen <mark@markcallen.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/everydaydevopsio/ballast.git"
+  },
+  "homepage": "https://github.com/everydaydevopsio/ballast#readme",
+  "bugs": {
+    "url": "https://github.com/everydaydevopsio/ballast/issues"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prettier": "prettier . --check",
+    "prettier:fix": "prettier . --write",
+    "prepare": "husky",
+    "prepublishOnly": "pnpm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^17.3.0",
+    "husky": "^9.1.7",
+    "jest": "^30.2.0",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
+    "ts-jest": "^29.2.5",
+    "tsc-files": "^1.1.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  },
+  "lint-staged": {
+    "**/*.js": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "**/*.ts": [
+      "tsc-files --noEmit",
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "**/*.{json,md,yaml,yml}": [
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "yaml": "^2.8.2"
+  }
+}

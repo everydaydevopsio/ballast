@@ -1,6 +1,6 @@
 # Logging Agent
 
-The **logging** agent configures centralized, structured logging for TypeScript/JavaScript applications using Pino and Fluentd.
+The **logging** agent configures centralized, structured logging for language-specific applications using Pino and Fluentd.
 
 ## What It Sets Up
 

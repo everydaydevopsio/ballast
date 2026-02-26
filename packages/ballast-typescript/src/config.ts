@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { LANGUAGES } from './agents';
 
 const RULESRC_FILENAME = '.rulesrc.json';
 
@@ -10,6 +11,18 @@ export interface RulesConfig {
   agents: string[];
 }
 
+export function getRulesrcFilename(language: string = 'typescript'): string {
+  if (language === 'typescript') return RULESRC_FILENAME;
+  return `.rulesrc.${language}.json`;
+}
+
+function hasConfigFile(dir: string): boolean {
+  if (fs.existsSync(path.join(dir, RULESRC_FILENAME))) return true;
+  return LANGUAGES.some((language) =>
+    fs.existsSync(path.join(dir, getRulesrcFilename(language)))
+  );
+}
+
 /**
  * Find project root (directory containing .rulesrc.json or package.json)
  */
@@ -17,10 +30,7 @@ export function findProjectRoot(cwd: string = process.cwd()): string {
   let dir = path.resolve(cwd);
   const root = path.parse(dir).root;
   while (dir !== root) {
-    if (
-      fs.existsSync(path.join(dir, RULESRC_FILENAME)) ||
-      fs.existsSync(path.join(dir, 'package.json'))
-    ) {
+    if (hasConfigFile(dir) || fs.existsSync(path.join(dir, 'package.json'))) {
       return dir;
     }
     dir = path.dirname(dir);
@@ -31,9 +41,12 @@ export function findProjectRoot(cwd: string = process.cwd()): string {
 /**
  * Load .rulesrc.json from project root
  */
-export function loadConfig(projectRoot?: string): RulesConfig | null {
+export function loadConfig(
+  projectRoot?: string,
+  language: string = 'typescript'
+): RulesConfig | null {
   const root = projectRoot ?? findProjectRoot();
-  const filePath = path.join(root, RULESRC_FILENAME);
+  const filePath = path.join(root, getRulesrcFilename(language));
   if (!fs.existsSync(filePath)) return null;
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
@@ -57,9 +70,13 @@ export function loadConfig(projectRoot?: string): RulesConfig | null {
 /**
  * Save .rulesrc.json to project root
  */
-export function saveConfig(config: RulesConfig, projectRoot?: string): void {
+export function saveConfig(
+  config: RulesConfig,
+  projectRoot?: string,
+  language: string = 'typescript'
+): void {
   const root = projectRoot ?? findProjectRoot();
-  const filePath = path.join(root, RULESRC_FILENAME);
+  const filePath = path.join(root, getRulesrcFilename(language));
   fs.writeFileSync(
     filePath,
     JSON.stringify({ target: config.target, agents: config.agents }, null, 2),

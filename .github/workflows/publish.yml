@@ -68,26 +68,26 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.version.outputs.version }}"
           echo "Bumping to $NEW_VERSION"
-          jq --arg v "$NEW_VERSION" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
+          jq --arg v "$NEW_VERSION" '.version = $v' packages/ballast-typescript/package.json > packages/ballast-typescript/package.json.tmp && mv packages/ballast-typescript/package.json.tmp packages/ballast-typescript/package.json
 
       - name: Update lockfile
         run: pnpm install --no-frozen-lockfile
 
       - name: Build
-        run: pnpm run build
+        run: pnpm --filter @everydaydevopsio/ballast run build
 
       - name: Run ballast (all agents, all targets)
         run: |
-          node bin/ballast.js install --yes --target cursor --all --force
-          node bin/ballast.js install --yes --target claude --all --force
-          node bin/ballast.js install --yes --target opencode --all --force
-          node bin/ballast.js install --yes --target codex --all --force
+          node packages/ballast-typescript/bin/ballast.js install --yes --target cursor --all --force
+          node packages/ballast-typescript/bin/ballast.js install --yes --target claude --all --force
+          node packages/ballast-typescript/bin/ballast.js install --yes --target opencode --all --force
+          node packages/ballast-typescript/bin/ballast.js install --yes --target codex --all --force
 
       - name: Commit and tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json pnpm-lock.yaml
+          git add packages/ballast-typescript/package.json pnpm-lock.yaml
           git add -f .cursor/ .claude/ .opencode/
           git commit -m "chore: bump ${{ github.event.inputs.release_type }} version to ${{ steps.version.outputs.version }} and update agent rules [skip ci]"
           git tag "v${{ steps.version.outputs.version }}"
@@ -127,9 +127,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm test
+        run: pnpm --filter @everydaydevopsio/ballast run test
 
       - name: Publish to npm
         run: |
           echo "git-checks=false" >> .npmrc
-          pnpm publish --access public
+          pnpm --dir packages/ballast-typescript publish --access public

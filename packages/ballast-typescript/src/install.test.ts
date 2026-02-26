@@ -99,6 +99,23 @@ describe('install', () => {
       );
     });
 
+    test('writes python language files and uses python-specific content', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        language: 'python',
+        agents: ['linting'],
+        force: false,
+        saveConfig: false
+      });
+      expect(result.installed).toContain('linting');
+      const cursorFile = path.join(tmpDir, '.cursor', 'rules', 'linting.mdc');
+      expect(fs.existsSync(cursorFile)).toBe(true);
+      expect(fs.readFileSync(cursorFile, 'utf8')).toContain(
+        'Python linting specialist'
+      );
+    });
+
     test('skips when file exists and force is false', () => {
       const cursorDir = path.join(tmpDir, '.cursor', 'rules');
       fs.mkdirSync(cursorDir, { recursive: true });
@@ -143,6 +160,22 @@ describe('install', () => {
         saveConfig: true
       });
       const config = loadConfig(tmpDir);
+      expect(config).toEqual({
+        target: 'claude',
+        agents: ['linting', 'local-dev']
+      });
+    });
+
+    test('saves language-specific config file for go', () => {
+      install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        language: 'go',
+        agents: ['linting', 'local-dev'],
+        force: false,
+        saveConfig: true
+      });
+      const config = loadConfig(tmpDir, 'go');
       expect(config).toEqual({
         target: 'claude',
         agents: ['linting', 'local-dev']

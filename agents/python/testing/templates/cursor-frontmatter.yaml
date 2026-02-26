@@ -1,0 +1,6 @@
+---
+description: 'Python testing specialist for pytest and coverage setup'
+alwaysApply: false
+globs:
+  - '*.py'\n  - 'pytest.ini'\n  - 'pyproject.toml'
+---

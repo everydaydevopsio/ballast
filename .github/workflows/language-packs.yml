@@ -1,0 +1,44 @@
+name: Language Packs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Validate package imports
+        run: |
+          python -m py_compile packages/ballast-python/ballast/cli.py
+          python -m py_compile packages/ballast-python/ballast/__main__.py
+
+  go-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Build ballast-go
+        run: |
+          cd packages/ballast-go
+          go build ./cmd/ballast

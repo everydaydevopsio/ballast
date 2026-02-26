@@ -6,7 +6,8 @@ import {
   loadConfig,
   saveConfig,
   isCiMode,
-  RULESRC_FILENAME
+  RULESRC_FILENAME,
+  getRulesrcFilename
 } from './config';
 
 describe('config', () => {
@@ -89,6 +90,16 @@ describe('config', () => {
       expect(fs.existsSync(file)).toBe(true);
       const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
       expect(parsed).toEqual(config);
+    });
+
+    test('writes language-specific rulesrc for python', () => {
+      const config = { target: 'opencode' as const, agents: ['linting'] };
+      saveConfig(config, tmpDir, 'python');
+      const file = path.join(tmpDir, getRulesrcFilename('python'));
+      expect(fs.existsSync(file)).toBe(true);
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+      expect(parsed).toEqual(config);
+      expect(loadConfig(tmpDir, 'python')).toEqual(config);
     });
   });
 

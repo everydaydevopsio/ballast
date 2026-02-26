@@ -1,6 +1,6 @@
 # Observability Agent
 
-The **observability** agent helps add logging, tracing, metrics, and SLOs to TypeScript/JavaScript applications.
+The **observability** agent helps add logging, tracing, metrics, and SLOs to language-specific applications.
 
 ## What It Sets Up
 

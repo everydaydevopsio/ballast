@@ -22,8 +22,13 @@ describe('agents', () => {
   describe('getAgentDir', () => {
     test('returns path to agent directory', () => {
       const dir = getAgentDir('linting');
-      expect(dir).toMatch(/agents[/\\]linting$/);
+      expect(dir).toMatch(/agents[/\\]typescript[/\\]linting$/);
       expect(path.isAbsolute(dir) || dir.includes('agents')).toBe(true);
+    });
+
+    test('returns common path for common agents', () => {
+      const dir = getAgentDir('local-dev', 'python');
+      expect(dir).toMatch(/agents[/\\]common[/\\]local-dev$/);
     });
   });
 
@@ -68,6 +73,18 @@ describe('agents', () => {
         'linting',
         'cicd'
       ]);
+    });
+  });
+
+  describe('language profiles', () => {
+    test('python profile uses same public agent ids', () => {
+      expect(listAgents('python')).toEqual([...AGENT_IDS]);
+      expect(isValidAgent('testing', 'python')).toBe(true);
+    });
+
+    test('go profile uses same public agent ids', () => {
+      expect(listAgents('go')).toEqual([...AGENT_IDS]);
+      expect(isValidAgent('logging', 'go')).toBe(true);
     });
   });
 });
