@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Enable version updates for pnpm
+  # Enable version updates for root pnpm workspace dependencies
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
@@ -33,6 +33,55 @@ updates:
           - 'jest*'
           - '@jest/*'
           - '@types/jest'
+
+  # Enable version updates for TypeScript package dependencies
+  - package-ecosystem: 'npm'
+    directory: '/packages/ballast-typescript'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'America/Los_Angeles'
+    open-pull-requests-limit: 10
+    labels:
+      - 'dependencies'
+      - 'pnpm'
+      - 'typescript'
+    commit-message:
+      prefix: 'chore(deps)'
+      include: 'scope'
+
+  # Enable version updates for Python package dependencies
+  - package-ecosystem: 'pip'
+    directory: '/packages/ballast-python'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'America/Los_Angeles'
+    open-pull-requests-limit: 10
+    labels:
+      - 'dependencies'
+      - 'python'
+    commit-message:
+      prefix: 'chore(deps)'
+      include: 'scope'
+
+  # Enable version updates for Go package dependencies
+  - package-ecosystem: 'gomod'
+    directory: '/packages/ballast-go'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'America/Los_Angeles'
+    open-pull-requests-limit: 10
+    labels:
+      - 'dependencies'
+      - 'go'
+    commit-message:
+      prefix: 'chore(deps)'
+      include: 'scope'
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'
