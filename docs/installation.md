@@ -25,10 +25,10 @@ npx ballast install --language go --target codex --agent linting
 ## Python Package (`ballast-python`)
 
 ```bash
-pip install ballast-python
+uv tool install ballast-python
 ballast install --target cursor --all
 # or
-python -m ballast install --target codex --agent linting
+uvx --from ballast-python ballast install --target codex --agent linting
 ```
 
 ## Go Package (`ballast-go`)

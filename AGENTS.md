@@ -9,6 +9,7 @@ This file gives AI agents (Cursor, Claude Code, OpenCode, etc.) consistent conte
 ## Package manager
 
 This project uses **pnpm**. Use `pnpm` for all install and run commands.
+For Python package workflows, use **uv** instead of pip.
 
 ## Prerequisites
 

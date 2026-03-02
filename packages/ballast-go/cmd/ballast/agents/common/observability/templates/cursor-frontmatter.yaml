@@ -1,0 +1,9 @@
+---
+description: 'Observability specialist - logging, tracing, metrics, and SLOs'
+alwaysApply: false
+globs:
+  - '*.ts'
+  - '*.js'
+  - 'package.json'
+  - '**/instrumentation*'
+---

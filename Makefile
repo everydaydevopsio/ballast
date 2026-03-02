@@ -6,7 +6,8 @@ PY_DIR := packages/ballast-python
 GO_DIR := packages/ballast-go
 GO_BIN := $(GO_DIR)/ballast
 GO_GOCACHE ?= /tmp/go-build
-PY_RUN_ENV := BALLAST_REPO_ROOT=$(ROOT) PYTHONPATH=$(ROOT)/$(PY_DIR)
+UV_CACHE_DIR ?= /tmp/uv-cache
+PY_RUN_ENV := UV_CACHE_DIR=$(UV_CACHE_DIR) BALLAST_REPO_ROOT=$(ROOT) PYTHONPATH=$(ROOT)/$(PY_DIR) uv run --python 3.12
 
 .PHONY: help build build-all build-typescript build-python build-go
 
@@ -33,10 +34,10 @@ build-typescript:
 
 build-python:
 	@echo "==> Validating Python package (ballast-python)"
-	python3 -m py_compile $(PY_DIR)/ballast/cli.py $(PY_DIR)/ballast/__main__.py
+	UV_CACHE_DIR=$(UV_CACHE_DIR) uv run --python 3.12 python -m py_compile $(PY_DIR)/ballast/cli.py $(PY_DIR)/ballast/__main__.py
 	@echo ""
 	@echo "Run it from any repo directory with:"
-	@echo "  $(PY_RUN_ENV) python3 -m ballast install --target cursor --all"
+	@echo "  $(PY_RUN_ENV) python -m ballast install --target cursor --all"
 
 build-go:
 	@echo "==> Building Go program (ballast-go)"

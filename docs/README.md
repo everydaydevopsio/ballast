@@ -31,5 +31,5 @@ Agent | TypeScript | Python | Go | Guide
 See [installation.md](installation.md) for package-specific commands:
 
 - npm (`@everydaydevopsio/ballast`)
-- pip (`ballast-python`)
+- uv (`ballast-python`)
 - go install (`ballast-go`)

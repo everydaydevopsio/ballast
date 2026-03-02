@@ -160,9 +160,9 @@ export function install(options: InstallOptions): InstallResult {
       errors.push({ agent: agentId, error: 'Unknown agent' });
       continue;
     }
-    processedAgentIds.add(agentId);
     let agentInstalled = false;
     let agentSkipped = false;
+    let agentProcessed = false;
     try {
       const suffixes = listRuleSuffixes(agentId, language);
       for (const ruleSuffix of suffixes) {
@@ -174,6 +174,7 @@ export function install(options: InstallOptions): InstallResult {
         );
         if (fs.existsSync(file) && !force) {
           agentSkipped = true;
+          agentProcessed = true;
           continue;
         }
         if (!fs.existsSync(dir)) {
@@ -188,7 +189,9 @@ export function install(options: InstallOptions): InstallResult {
         fs.writeFileSync(file, content, 'utf8');
         installedRules.push({ agentId, ruleSuffix: ruleSuffix || '' });
         agentInstalled = true;
+        agentProcessed = true;
       }
+      if (agentProcessed) processedAgentIds.add(agentId);
       if (agentInstalled) installed.push(agentId);
       if (agentSkipped && !agentInstalled) skipped.push(agentId);
     } catch (err) {
@@ -204,12 +207,19 @@ export function install(options: InstallOptions): InstallResult {
     if (fs.existsSync(agentsMdPath) && !force) {
       skippedSupportFiles.push(agentsMdPath);
     } else {
-      const content = buildCodexAgentsMd(
-        Array.from(processedAgentIds),
-        language
-      );
-      fs.writeFileSync(agentsMdPath, content, 'utf8');
-      installedSupportFiles.push(agentsMdPath);
+      try {
+        const content = buildCodexAgentsMd(
+          Array.from(processedAgentIds),
+          language
+        );
+        fs.writeFileSync(agentsMdPath, content, 'utf8');
+        installedSupportFiles.push(agentsMdPath);
+      } catch (err) {
+        errors.push({
+          agent: 'codex',
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
     }
   }
 

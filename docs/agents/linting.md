@@ -1,6 +1,6 @@
 # Linting Agent
 
-The **linting** agent provides comprehensive language-specific linting and code formatting for your project and language profile.
+The **linting** agent provides comprehensive TypeScript/JavaScript linting and code formatting for your project.
 
 ## What It Sets Up
 

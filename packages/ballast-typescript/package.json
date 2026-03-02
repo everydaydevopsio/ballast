@@ -22,7 +22,8 @@
     "url": "https://github.com/everydaydevopsio/ballast/issues"
   },
   "scripts": {
-    "build": "tsc",
+    "sync:agents": "node ./scripts/sync-agents.mjs",
+    "build": "pnpm run sync:agents && tsc",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint .",

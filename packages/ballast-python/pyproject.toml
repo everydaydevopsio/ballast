@@ -23,4 +23,4 @@ ballast = "ballast.cli:main"
 packages = ["ballast"]
 
 [tool.setuptools.package-data]
-ballast = []
+ballast = ["agents/**/*"]

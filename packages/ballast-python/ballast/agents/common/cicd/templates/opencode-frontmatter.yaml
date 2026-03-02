@@ -1,0 +1,21 @@
+---
+description: CI/CD specialist - pipelines, quality gates, and deployment
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.2
+tools:
+  write: true
+  edit: true
+  bash: true
+  read: true
+  glob: true
+  grep: true
+permission:
+  bash:
+    'git *': ask
+    'npm *': allow
+    'npx *': allow
+    'yarn *': allow
+    'cat *': allow
+    '*': ask
+---

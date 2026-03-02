@@ -1,8 +1,38 @@
+import fs from 'fs';
 import path from 'path';
 
-// In monorepo layout this package lives at packages/ballast-typescript.
-// Resolve to repository root so shared agent content can be loaded from /agents.
-const PACKAGE_ROOT = path.join(__dirname, '..', '..', '..');
+const PACKAGE_ROOT = path.resolve(__dirname, '..');
+
+function hasAgents(root: string): boolean {
+  return fs.existsSync(path.join(root, 'agents', 'common'));
+}
+
+function resolveAgentsRoot(): string {
+  const repoRootOverride = process.env.BALLAST_REPO_ROOT;
+  if (repoRootOverride) {
+    const resolved = path.resolve(repoRootOverride);
+    if (!hasAgents(resolved)) {
+      throw new Error(
+        `BALLAST_REPO_ROOT does not contain agents/: ${resolved}`
+      );
+    }
+    return resolved;
+  }
+
+  if (hasAgents(PACKAGE_ROOT)) {
+    return PACKAGE_ROOT;
+  }
+
+  // Monorepo fallback for local development and tests.
+  const monorepoRoot = path.resolve(PACKAGE_ROOT, '..', '..');
+  if (hasAgents(monorepoRoot)) {
+    return monorepoRoot;
+  }
+
+  return PACKAGE_ROOT;
+}
+
+const AGENTS_ROOT = resolveAgentsRoot();
 
 export const LANGUAGES = ['typescript', 'python', 'go'] as const;
 export type Language = (typeof LANGUAGES)[number];
@@ -20,9 +50,9 @@ export function getAgentDir(
   language: Language = 'typescript'
 ): string {
   if ((COMMON_AGENT_IDS as readonly string[]).includes(agentId)) {
-    return path.join(PACKAGE_ROOT, 'agents', 'common', agentId);
+    return path.join(AGENTS_ROOT, 'agents', 'common', agentId);
   }
-  return path.join(PACKAGE_ROOT, 'agents', language, agentId);
+  return path.join(AGENTS_ROOT, 'agents', language, agentId);
 }
 
 /**

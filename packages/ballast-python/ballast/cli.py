@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+from functools import lru_cache
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,9 +33,26 @@ def package_root() -> Path:
     repo_root = os.environ.get("BALLAST_REPO_ROOT")
     if repo_root:
         root = Path(repo_root).resolve()
-        if root.exists():
+        if (root / "agents").exists():
             return root
-    return Path(__file__).resolve().parents[3]
+        raise FileNotFoundError(f"BALLAST_REPO_ROOT does not contain agents/: {root}")
+    return Path(__file__).resolve().parent
+
+
+@lru_cache(maxsize=1)
+def resolve_agents_root() -> Path:
+    root = package_root()
+    packaged = root / "agents"
+    if packaged.exists():
+        return packaged
+
+    legacy_repo_agents = Path(__file__).resolve().parents[3] / "agents"
+    if legacy_repo_agents.exists():
+        return legacy_repo_agents
+
+    raise FileNotFoundError(
+        "Unable to locate Ballast agents content. Reinstall ballast-python or set BALLAST_REPO_ROOT to a ballast repo checkout."
+    )
 
 
 def rulesrc_filename(language: str) -> str:
@@ -44,10 +62,9 @@ def rulesrc_filename(language: str) -> str:
 
 
 def agent_dir(agent: str, language: str) -> Path:
-    root = package_root() / "agents"
     if agent in COMMON_AGENTS:
-        return root / "common" / agent
-    return root / language / agent
+        return resolve_agents_root() / "common" / agent
+    return resolve_agents_root() / language / agent
 
 
 def resolve_project_root(cwd: Path) -> Path:
@@ -260,9 +277,9 @@ def install(root: Path, target: str, agents: list[str], language: str, force: bo
             result.errors.append((agent, "Unknown agent"))
             continue
 
-        processed_agents.append(agent)
         agent_installed = False
         agent_skipped = False
+        agent_processed = False
 
         try:
             for suffix in list_rule_suffixes(agent, language):
@@ -270,11 +287,15 @@ def install(root: Path, target: str, agents: list[str], language: str, force: bo
                 dst = destination(root, target, basename)
                 if dst.exists() and not force:
                     agent_skipped = True
+                    agent_processed = True
                     continue
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 dst.write_text(build_content(agent, target, language, suffix), encoding="utf-8")
                 result.installed_rules.append((agent, suffix))
                 agent_installed = True
+                agent_processed = True
+            if agent_processed:
+                processed_agents.append(agent)
             if agent_installed:
                 result.installed.append(agent)
             if agent_skipped and not agent_installed:
@@ -287,8 +308,11 @@ def install(root: Path, target: str, agents: list[str], language: str, force: bo
         if agents_md.exists() and not force:
             result.skipped_support_files.append(str(agents_md))
         else:
-            agents_md.write_text(build_codex_agents_md(processed_agents, language), encoding="utf-8")
-            result.installed_support_files.append(str(agents_md))
+            try:
+                agents_md.write_text(build_codex_agents_md(processed_agents, language), encoding="utf-8")
+                result.installed_support_files.append(str(agents_md))
+            except Exception as err:
+                result.errors.append(("codex", str(err)))
 
     return result
 

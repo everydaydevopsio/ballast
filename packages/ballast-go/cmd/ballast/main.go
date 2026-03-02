@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
+	"embed"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -20,6 +23,9 @@ var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
+
+//go:embed agents/**
+var embeddedAgentsFS embed.FS
 
 type rulesConfig struct {
 	Target string   `json:"target"`
@@ -89,6 +95,11 @@ func runInstall(args []string) int {
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	if err := fs.Parse(trimCommand(args)); err != nil {
+		return 1
+	}
+
+	if err := validateRepoRootOverride(); err != nil {
+		fmt.Println(err)
 		return 1
 	}
 
@@ -238,7 +249,6 @@ func install(opts installOptions) installResult {
 			result.errors = append(result.errors, agentError{agent: agentID, err: "Unknown agent"})
 			continue
 		}
-		processed[agentID] = struct{}{}
 
 		suffixes, err := listRuleSuffixes(agentID, opts.language)
 		if err != nil {
@@ -248,6 +258,7 @@ func install(opts installOptions) installResult {
 
 		agentInstalled := false
 		agentSkipped := false
+		agentProcessed := false
 		for _, suffix := range suffixes {
 			base := agentID
 			if suffix != "" {
@@ -256,6 +267,7 @@ func install(opts installOptions) installResult {
 			dir, file := destination(opts.projectRoot, opts.target, base)
 			if exists(file) && !opts.force {
 				agentSkipped = true
+				agentProcessed = true
 				continue
 			}
 			if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -273,6 +285,10 @@ func install(opts installOptions) installResult {
 			}
 			result.installedRules = append(result.installedRules, installedRule{agentID: agentID, ruleSuffix: suffix})
 			agentInstalled = true
+			agentProcessed = true
+		}
+		if agentProcessed {
+			processed[agentID] = struct{}{}
 		}
 		if agentInstalled {
 			result.installed = append(result.installed, agentID)
@@ -386,12 +402,12 @@ func buildContent(agentID, target, language, suffix string) (string, error) {
 
 func listRuleSuffixes(agentID, language string) ([]string, error) {
 	dir := agentDir(agentID, language)
-	entries, err := os.ReadDir(dir)
+	entries, err := readDirEntries(dir)
 	if err != nil {
 		return nil, fmt.Errorf("agent %q has no content.md or content-*.md", agentID)
 	}
 	suffixes := make([]string, 0)
-	if exists(filepath.Join(dir, "content.md")) {
+	if existsAgentFile(path.Join(dir, "content.md")) {
 		suffixes = append(suffixes, "")
 	}
 	for _, entry := range entries {
@@ -416,7 +432,7 @@ func readContent(agentID, language, suffix string) (string, error) {
 	if suffix != "" {
 		name = "content-" + suffix + ".md"
 	}
-	bytes, err := os.ReadFile(filepath.Join(agentDir(agentID, language), name))
+	bytes, err := readAgentFile(path.Join(agentDir(agentID, language), name))
 	if err != nil {
 		return "", fmt.Errorf("agent %q has no %s", agentID, name)
 	}
@@ -424,21 +440,21 @@ func readContent(agentID, language, suffix string) (string, error) {
 }
 
 func readTemplate(agentID, language, filename, suffix string) (string, error) {
-	dir := filepath.Join(agentDir(agentID, language), "templates")
+	dir := path.Join(agentDir(agentID, language), "templates")
 	if suffix != "" {
-		ext := filepath.Ext(filename)
+		ext := path.Ext(filename)
 		base := strings.TrimSuffix(filename, ext)
-		ruleFile := filepath.Join(dir, base+"-"+suffix+ext)
-		if exists(ruleFile) {
-			bytes, err := os.ReadFile(ruleFile)
+		ruleFile := path.Join(dir, base+"-"+suffix+ext)
+		if existsAgentFile(ruleFile) {
+			bytes, err := readAgentFile(ruleFile)
 			if err != nil {
 				return "", err
 			}
 			return string(bytes), nil
 		}
 	}
-	main := filepath.Join(dir, filename)
-	bytes, err := os.ReadFile(main)
+	main := path.Join(dir, filename)
+	bytes, err := readAgentFile(main)
 	if err != nil {
 		return "", fmt.Errorf("agent %q missing template: %s", agentID, filename)
 	}
@@ -616,45 +632,71 @@ func isValidAgent(agentID, language string) bool {
 }
 
 func agentDir(agentID, language string) string {
-	root := filepath.Join(repoRoot(), "agents")
 	if contains(commonAgents, agentID) {
-		return filepath.Join(root, "common", agentID)
+		return path.Join("agents", "common", agentID)
 	}
-	return filepath.Join(root, language, agentID)
+	return path.Join("agents", language, agentID)
 }
 
-func repoRoot() string {
-	if value := strings.TrimSpace(os.Getenv("BALLAST_REPO_ROOT")); value != "" {
-		if abs, err := filepath.Abs(value); err == nil {
-			return abs
+func readDirEntries(relativeDir string) ([]fs.DirEntry, error) {
+	if overrideRoot := repoRootOverride(); overrideRoot != "" {
+		entries, err := os.ReadDir(filepath.Join(overrideRoot, filepath.FromSlash(relativeDir)))
+		if err != nil {
+			return nil, err
 		}
-	}
-	if cwd, err := os.Getwd(); err == nil {
-		if root, err := findRepoRootFrom(cwd); err == nil {
-			return root
+		out := make([]fs.DirEntry, 0, len(entries))
+		for _, entry := range entries {
+			out = append(out, entry)
 		}
+		return out, nil
 	}
-	if exe, err := os.Executable(); err == nil {
-		if root, err := findRepoRootFrom(filepath.Dir(exe)); err == nil {
-			return root
-		}
-	}
-	return "."
+	return fs.ReadDir(embeddedAgentsFS, relativeDir)
 }
 
-func findRepoRootFrom(start string) (string, error) {
-	dir := start
-	for {
-		if exists(filepath.Join(dir, "agents")) && exists(filepath.Join(dir, "README.md")) {
-			return dir, nil
-		}
-		next := filepath.Dir(dir)
-		if next == dir {
-			break
-		}
-		dir = next
+func readAgentFile(relativePath string) ([]byte, error) {
+	if overrideRoot := repoRootOverride(); overrideRoot != "" {
+		return os.ReadFile(filepath.Join(overrideRoot, filepath.FromSlash(relativePath)))
 	}
-	return "", fmt.Errorf("repository root not found from %s", start)
+	return fs.ReadFile(embeddedAgentsFS, relativePath)
+}
+
+func existsAgentFile(relativePath string) bool {
+	if overrideRoot := repoRootOverride(); overrideRoot != "" {
+		return exists(filepath.Join(overrideRoot, filepath.FromSlash(relativePath)))
+	}
+	_, err := fs.Stat(embeddedAgentsFS, relativePath)
+	return err == nil
+}
+
+func repoRootOverride() string {
+	value := strings.TrimSpace(os.Getenv("BALLAST_REPO_ROOT"))
+	if value == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(value)
+	if err != nil {
+		return ""
+	}
+	agentsPath := filepath.Join(abs, "agents")
+	if !exists(agentsPath) {
+		return ""
+	}
+	return abs
+}
+
+func validateRepoRootOverride() error {
+	value := strings.TrimSpace(os.Getenv("BALLAST_REPO_ROOT"))
+	if value == "" {
+		return nil
+	}
+	abs, err := filepath.Abs(value)
+	if err != nil {
+		return fmt.Errorf("invalid BALLAST_REPO_ROOT: %w", err)
+	}
+	if !exists(filepath.Join(abs, "agents")) {
+		return fmt.Errorf("BALLAST_REPO_ROOT does not contain agents/: %s", abs)
+	}
+	return nil
 }
 
 func destination(projectRoot, target, basename string) (string, string) {
