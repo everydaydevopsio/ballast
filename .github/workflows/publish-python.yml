@@ -113,7 +113,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/ballast-python/v${{ inputs.version }}
+          ref: refs/tags/v${{ inputs.version }}
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v7

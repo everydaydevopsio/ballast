@@ -27,8 +27,7 @@ jobs:
       contents: write
 
     outputs:
-      typescript_version: ${{ steps.ts_version.outputs.version }}
-      python_version: ${{ steps.py_version.outputs.version }}
+      version: ${{ steps.unified_version.outputs.version }}
 
     steps:
       - name: Checkout
@@ -45,71 +44,75 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v7
 
+      - name: Verify versions are in sync before bump
+        run: |
+          set -euo pipefail
+          TS_VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
+          PY_VERSION="$(uv version --directory packages/ballast-python --short)"
+          if [ "$TS_VERSION" != "$PY_VERSION" ]; then
+            echo "Version mismatch before bump: TS=$TS_VERSION Python=$PY_VERSION"
+            echo "Align versions in package.json and pyproject.toml before running publish.yml."
+            exit 1
+          fi
+
       - name: Bump TypeScript package version
         run: |
           set -euo pipefail
           npm --prefix packages/ballast-typescript version "${{ github.event.inputs.release_type }}" --no-git-tag-version
-
-      - name: Capture TypeScript version
-        id: ts_version
-        run: |
-          set -euo pipefail
-          VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Bump Python package version
         run: |
           set -euo pipefail
           uv version --directory packages/ballast-python --bump "${{ github.event.inputs.release_type }}" --frozen
 
-      - name: Capture Python version
-        id: py_version
+      - name: Capture and verify unified version
+        id: unified_version
         run: |
           set -euo pipefail
-          VERSION="$(uv version --directory packages/ballast-python --short)"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          TS_VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
+          PY_VERSION="$(uv version --directory packages/ballast-python --short)"
+          if [ "$TS_VERSION" != "$PY_VERSION" ]; then
+            echo "Version mismatch after bump: TS=$TS_VERSION Python=$PY_VERSION"
+            exit 1
+          fi
+          echo "version=$TS_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Commit and create tags
         run: |
           set -euo pipefail
-          TS_VERSION="${{ steps.ts_version.outputs.version }}"
-          PY_VERSION="${{ steps.py_version.outputs.version }}"
+          VERSION="${{ steps.unified_version.outputs.version }}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add packages/ballast-typescript/package.json packages/ballast-python/pyproject.toml
-          git commit -m "chore(release): bump TS to ${TS_VERSION} and Python to ${PY_VERSION} [skip ci]"
+          git commit -m "chore(release): bump version to ${VERSION} [skip ci]"
 
-          git tag "v${TS_VERSION}"
-          git tag "ballast-python/v${PY_VERSION}"
-          git tag "ballast-go/v${TS_VERSION}"
+          git tag "v${VERSION}"
 
       - name: Push commit and tags
         run: |
           set -euo pipefail
           git push origin HEAD:${{ github.ref_name }}
-          git push origin "v${{ steps.ts_version.outputs.version }}"
-          git push origin "ballast-python/v${{ steps.py_version.outputs.version }}"
-          git push origin "ballast-go/v${{ steps.ts_version.outputs.version }}"
+          git push origin "v${{ steps.unified_version.outputs.version }}"
 
   publish_typescript:
     needs: bump_and_tag
     uses: ./.github/workflows/publish.typescript.yml
     with:
-      version: ${{ needs.bump_and_tag.outputs.typescript_version }}
+      version: ${{ needs.bump_and_tag.outputs.version }}
     secrets: inherit
 
   publish_python:
     needs: bump_and_tag
     uses: ./.github/workflows/publish-python.yml
     with:
-      version: ${{ needs.bump_and_tag.outputs.python_version }}
+      version: ${{ needs.bump_and_tag.outputs.version }}
     secrets: inherit
 
   publish_go:
     needs: bump_and_tag
     uses: ./.github/workflows/publish-go.yml
     with:
-      version: ${{ needs.bump_and_tag.outputs.typescript_version }}
+      version: ${{ needs.bump_and_tag.outputs.version }}
     secrets: inherit

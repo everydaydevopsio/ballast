@@ -116,7 +116,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/ballast-go/v${{ inputs.version }}
+          ref: refs/tags/v${{ inputs.version }}
           fetch-depth: 0
 
       - name: Setup Go
@@ -142,7 +142,7 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ballast-go/v${{ inputs.version }}
+          tag_name: v${{ inputs.version }}
           name: ballast-go v${{ inputs.version }}
           files: |
             packages/ballast-go/dist/**
