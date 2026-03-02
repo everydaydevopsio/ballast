@@ -19,7 +19,7 @@ on:
         required: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: publish-go-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
