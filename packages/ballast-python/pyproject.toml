@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ballast-python"
+version = "0.1.0"
+description = "Install Ballast AI agent rules for Python projects"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Everyday DevOps" }]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only"
+]
+
+[project.urls]
+Homepage = "https://github.com/everydaydevopsio/ballast"
+Repository = "https://github.com/everydaydevopsio/ballast"
+Issues = "https://github.com/everydaydevopsio/ballast/issues"
+
+[project.scripts]
+ballast = "ballast.cli:main"
+
+[tool.setuptools]
+packages = ["ballast"]
+
+[tool.setuptools.package-data]
+ballast = ["agents/**/*"]

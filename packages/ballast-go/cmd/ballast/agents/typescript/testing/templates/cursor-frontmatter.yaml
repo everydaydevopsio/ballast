@@ -1,0 +1,15 @@
+---
+description: 'Testing specialist - sets up Jest (default) or Vitest for Vite projects, 50% coverage, and test step in build GitHub Action'
+alwaysApply: false
+globs:
+  - '*.ts'
+  - '*.tsx'
+  - '*.js'
+  - '*.jsx'
+  - 'jest.config.*'
+  - 'vitest.config.*'
+  - 'vite.config.*'
+  - 'package.json'
+  - '.github/workflows/*.yml'
+  - '.github/workflows/*.yaml'
+---

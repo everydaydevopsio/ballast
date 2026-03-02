@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New agent types: CI/CD, local-dev, and observability (alongside existing linting)
 - TypeScript source code in `src/` with full type safety
 - Interactive CLI with `--target`, `--agent`, `--all`, `--force`, and `--yes` options
-- Configuration persistence via `.rulesrc.json` for non-interactive repeat runs
+- Configuration persistence via `.rulesrc.ts.json` for non-interactive repeat runs
 - CI mode support (`CI=true` or `--yes`) for automated pipelines
 - Comprehensive test suite with Jest and 80% coverage threshold
 - ARCHITECTURE.md and AGENTS.md documentation

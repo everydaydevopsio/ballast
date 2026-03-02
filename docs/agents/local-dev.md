@@ -1,6 +1,6 @@
 # Local Development Agent
 
-The **local-dev** agent helps set up and maintain a consistent local development environment for TypeScript/JavaScript projects.
+The **local-dev** agent helps set up and maintain a consistent local development environment for language-specific projects.
 
 ## What It Sets Up
 

@@ -1,36 +1,35 @@
 # Ballast Documentation
 
-Documentation for users of **@everydaydevopsio/ballast**—the CLI that installs TypeScript AI agent rules for Cursor, Claude Code, OpenCode, and Codex.
+## Agent Families
 
-## Quick Start
+Common agents (all language packs):
 
-**[Installation Guide](installation.md)** — Install ballast from within your AI coding agent using a prompt.
+- `local-dev`
+- `cicd`
+- `observability`
 
-## Agent Guides
+Language-specific agents:
+
+- `linting`
+- `logging`
+- `testing`
+
+## Agent Guide Index
 
 <!-- prettier-ignore -->
-Agent                                    | Description                                              | Guide
----------------------------------------- | -------------------------------------------------------- | ---------------------------------------------
-[linting](agents/linting.md)             | ESLint, Prettier, Husky, lint-staged, GitHub Actions     | [→ linting.md](agents/linting.md)
-[local-dev](agents/local-dev.md)         | nvm, Docker, env, license, badges, MCP (optional)        | [→ local-dev.md](agents/local-dev.md)
-[cicd](agents/cicd.md)                   | CI/CD pipelines, quality gates, deployment (placeholder) | [→ cicd.md](agents/cicd.md)
-[observability](agents/observability.md) | Logging, tracing, metrics, SLOs (placeholder)            | [→ observability.md](agents/observability.md)
-[logging](agents/logging.md)             | Pino + Fluentd, pino-browser to /api/logs                | [→ logging.md](agents/logging.md)
-[testing](agents/testing.md)             | Jest (default) or Vitest for Vite, 50% coverage, CI step | [→ testing.md](agents/testing.md)
+Agent | TypeScript | Python | Go | Guide
+----- | ---------- | ------ | -- | -----
+`local-dev` | Yes | Yes | Yes | [agents/local-dev.md](agents/local-dev.md)
+`cicd` | Yes | Yes | Yes | [agents/cicd.md](agents/cicd.md)
+`observability` | Yes | Yes | Yes | [agents/observability.md](agents/observability.md)
+`linting` | Yes | Yes | Yes | [agents/linting.md](agents/linting.md)
+`logging` | Yes | Yes | Yes | [agents/logging.md](agents/logging.md)
+`testing` | Yes | Yes | Yes | [agents/testing.md](agents/testing.md)
 
-Each guide includes:
+## Installation
 
-- What the agent sets up
-- What it provides
-- Prompts you can use to improve your app
+See [installation.md](installation.md) for package-specific commands:
 
-## Installation Prompt
-
-Paste this into Cursor, Claude Code, OpenCode, or Codex to install ballast:
-
-```
-Install and configure ballast by following the instructions here:
-https://raw.githubusercontent.com/everydaydevopsio/ballast/refs/heads/master/docs/installation.md
-```
-
-Replace `master` with `main` if your repo uses that branch.
+- npm (`@everydaydevopsio/ballast`)
+- uv (`ballast-python`)
+- go install (`ballast-go`)

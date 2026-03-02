@@ -1,6 +1,6 @@
 # CI/CD Agent
 
-The **cicd** agent helps design and maintain CI/CD pipelines for TypeScript/JavaScript projects.
+The **cicd** agent helps design and maintain CI/CD pipelines for language-specific projects.
 
 ## What It Sets Up
 

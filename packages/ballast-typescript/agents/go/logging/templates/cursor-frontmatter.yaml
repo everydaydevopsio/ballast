@@ -1,0 +1,6 @@
+---
+description: 'Go logging specialist for structured logging patterns'
+alwaysApply: false
+globs:
+  - '*.go'
+---
