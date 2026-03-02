@@ -11,6 +11,12 @@ on:
           - minor
         default: 'patch'
         required: true
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to publish (without tag prefix)'
+        type: string
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,6 +24,7 @@ concurrency:
 
 jobs:
   bump:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -58,6 +65,7 @@ jobs:
           git push origin "$TAG"
 
   release:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     needs: bump
     permissions:
@@ -95,5 +103,46 @@ jobs:
         with:
           tag_name: ballast-go/v${{ needs.bump.outputs.version }}
           name: ballast-go v${{ needs.bump.outputs.version }}
+          files: |
+            packages/ballast-go/dist/**
+
+  release_from_version:
+    if: ${{ github.event_name == 'workflow_call' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/ballast-go/v${{ inputs.version }}
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Verify build
+        run: |
+          cd packages/ballast-go
+          go build ./cmd/ballast
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          workdir: packages/ballast-go
+          args: build --snapshot --clean --config .goreleaser.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ballast-go/v${{ inputs.version }}
+          name: ballast-go v${{ inputs.version }}
           files: |
             packages/ballast-go/dist/**
