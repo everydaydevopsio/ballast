@@ -94,7 +94,10 @@ describe('config', () => {
 
     test('loads legacy .rulesrc.json for typescript', () => {
       const config = { target: 'cursor' as const, agents: ['linting'] };
-      fs.writeFileSync(path.join(tmpDir, '.rulesrc.json'), JSON.stringify(config));
+      fs.writeFileSync(
+        path.join(tmpDir, '.rulesrc.json'),
+        JSON.stringify(config)
+      );
       expect(loadConfig(tmpDir)).toEqual(config);
     });
 
