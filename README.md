@@ -8,11 +8,17 @@
 
 Ballast installs AI agent rules for Cursor, Claude Code, OpenCode, and Codex.
 
+Release `v4.0.0` supports three first-class language profiles in this repository:
+
+- TypeScript
+- Python
+- Go
+
 ## Packages
 
-- `@everydaydevopsio/ballast` (npm): TypeScript profile (backward compatible)
-- `ballast-python` (PyPI): Python profile
-- `ballast-go` (Go): Go profile
+- `@everydaydevopsio/ballast` (npm)
+- `ballast-python` (PyPI)
+- `ballast-go` (Go)
 
 ## Agent Model
 
@@ -35,20 +41,13 @@ Agent sources in this repo:
 - `agents/python/*`
 - `agents/go/*`
 
-## Install
+## Install and Use (Single Language)
 
 ### TypeScript (npm)
 
 ```bash
 pnpm add -D @everydaydevopsio/ballast
 npx ballast install --target cursor --all
-```
-
-Optional language override in the npm CLI:
-
-```bash
-npx ballast install --language python --target cursor --all
-npx ballast install --language go --target codex --agent linting
 ```
 
 ### Python
@@ -67,7 +66,37 @@ go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast@l
 ballast install --target cursor --all
 ```
 
-## CLI flags
+## Monorepo: Install and Use by Language
+
+In a monorepo that contains TypeScript, Python, and Go projects, run Ballast once per language profile.
+
+### 1. TypeScript rules in a monorepo
+
+```bash
+npx ballast install --target cursor --all
+```
+
+### 2. Python rules in a monorepo
+
+```bash
+uvx --from ballast-python ballast install --target cursor --all
+```
+
+### 3. Go rules in a monorepo
+
+```bash
+go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast@latest install --target cursor --all
+```
+
+Recommended order for one repository that uses all three languages:
+
+1. Run the TypeScript command.
+2. Run the Python command.
+3. Run the Go command.
+
+Ballast only installs shipped agents and follows the single overwrite policy (existing rule files are preserved unless `--force` is passed).
+
+## CLI Flags
 
 - `--target, -t`: `cursor`, `claude`, `opencode`, `codex`
 - `--agent, -a`: comma-separated agent list

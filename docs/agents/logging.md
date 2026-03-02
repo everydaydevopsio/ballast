@@ -1,43 +1,42 @@
 # Logging Agent
 
-The **logging** agent configures centralized, structured logging for TypeScript/JavaScript applications using Pino and Fluentd.
+The **logging** agent sets up structured, production-safe logging patterns for TypeScript, Python, and Go applications.
 
-## What It Sets Up
+## What It Sets Up by Language
 
-- **Server-side** — Pino to Fluentd for Node.js apps and Next.js API routes
-- **Browser-side** — pino-browser with pino-transmit-http to send logs to `/api/logs`
-- **CLI** — Pino for CLI tools with pretty output (dev) and JSON (CI)
-- **Error capture** — `window.onerror` and `unhandledrejection` in the browser
+- **TypeScript/JavaScript**
+  - Pino-based structured logging
+  - Fluentd-oriented aggregation patterns
+  - Browser and API logging guidance for web apps
+- **Python**
+  - Structured logging with `structlog` or JSON-capable standard logging
+  - Environment-aware handlers and levels
+- **Go**
+  - Structured logging with `log/slog` (or `zerolog` if already adopted)
+  - Standardized fields for request and error context
 
 ## What It Provides
 
-- Structured JSON logs for easier parsing and aggregation
-- Centralized log ingestion via Fluentd (Elasticsearch, S3, etc.)
-- Browser logs and errors forwarded to your backend
-- Configurable log levels (DEBUG in dev, ERROR in prod)
+- Structured logs that are easy to aggregate and query
+- Guidance for environment-based log levels
+- Patterns that reduce sensitive-data leakage in logs
+
+## Monorepo Usage
+
+For monorepos, apply a shared logging schema across all services (field names, trace/request IDs, severity mapping) while keeping language-native logging libraries.
+
+Common baseline fields:
+
+- `service`
+- `env`
+- `request_id`
+- `trace_id`
+- `user_id` (when available)
+- `error_code`
 
 ## Prompts to Improve Your App
 
-### Server-Side
-
-- **"Help me set up Pino logging with Fluentd for our Node.js app"** — Full server setup
-- **"Create a custom Fluentd transport for Next.js serverless (no piping)"** — Serverless
-- **"Add structured logging to our API routes with request ID propagation"** — Request context
-
-### Browser-Side
-
-- **"Wire up pino-browser to post logs to /api/logs"** — Browser logging
-- **"Capture window.onerror and unhandledrejection and send to our backend"** — Error capture
-- **"Replace console.log with the browser logger in our React components"** — Migration
-
-### Next.js
-
-- **"Create the /api/logs endpoint for App Router"** — API route
-- **"Create the /api/logs endpoint for Pages Router"** — API route
-- **"Import initBrowserLogging in our root layout"** — Wire-up
-
-### Configuration
-
-- **"Add `LOG_LEVEL` and `FLUENT_*` env vars to .env.example"** — Env vars
-- **"Set up minimal Fluentd config to receive logs on port 24224"** — Fluentd
-- **"Use DEBUG in development and ERROR in production"** — Log levels
+- **"Standardize logging fields across TypeScript, Python, and Go services"** — Cross-language schema
+- **"Set log levels so development is verbose and production is noise-controlled"** — Environment policy
+- **"Add request/trace propagation to logs in this service"** — Correlation
+- **"Review our logs for secrets and high-cardinality fields"** — Safety check

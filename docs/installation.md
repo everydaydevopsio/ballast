@@ -2,27 +2,29 @@
 
 This guide is for AI coding agents setting up Ballast in a repository.
 
-## Pick the Right Package
+## Supported Language Profiles (v4.0.0)
 
-- TypeScript/JavaScript projects: `@everydaydevopsio/ballast`
-- Python projects: `ballast-python`
-- Go projects: `ballast-go`
+- TypeScript/JavaScript: `@everydaydevopsio/ballast`
+- Python: `ballast-python`
+- Go: `ballast-go`
 
-## TypeScript Package (`@everydaydevopsio/ballast`)
+## Package Commands
+
+### TypeScript Package (`@everydaydevopsio/ballast`)
 
 ```bash
 pnpm add -D @everydaydevopsio/ballast
 npx ballast install --target cursor --all
 ```
 
-Language override is supported:
+Language override is supported in the npm CLI:
 
 ```bash
 npx ballast install --language python --target cursor --all
 npx ballast install --language go --target codex --agent linting
 ```
 
-## Python Package (`ballast-python`)
+### Python Package (`ballast-python`)
 
 ```bash
 uv tool install ballast-python
@@ -31,12 +33,42 @@ ballast install --target cursor --all
 uvx --from ballast-python ballast install --target codex --agent linting
 ```
 
-## Go Package (`ballast-go`)
+### Go Package (`ballast-go`)
 
 ```bash
 go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast@latest
 ballast install --target cursor --all
 ```
+
+## Monorepo Setup: TypeScript + Python + Go
+
+For monorepos, apply Ballast per language profile.
+
+### TypeScript in a monorepo
+
+```bash
+npx ballast install --target cursor --all
+```
+
+### Python in a monorepo
+
+```bash
+uvx --from ballast-python ballast install --target cursor --all
+```
+
+### Go in a monorepo
+
+```bash
+go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast@latest install --target cursor --all
+```
+
+Suggested sequence:
+
+1. Run TypeScript profile.
+2. Run Python profile.
+3. Run Go profile.
+
+Ballast preserves existing rule files unless `--force` is provided.
 
 ## Common CLI Options
 

@@ -1,38 +1,39 @@
 # Testing Agent
 
-The **testing** agent sets up and maintains a test suite for TypeScript and JavaScript projects with sensible defaults and CI integration.
+The **testing** agent sets up and maintains test workflows for TypeScript, Python, and Go projects with sensible defaults and CI integration.
 
-## What It Sets Up
+## What It Sets Up by Language
 
-- **Test runner** — Jest by default for TS/JS; Vitest for Vite projects
-- **Coverage** — Default 50% threshold (lines, functions, branches, statements)
-- **NPM scripts** — `test` and `test:coverage`
-- **GitHub Actions** — A testing step in the build (or main CI) workflow
+- **TypeScript/JavaScript**
+  - Jest by default
+  - Vitest for Vite-based projects
+  - Coverage thresholds and CI test steps
+- **Python**
+  - pytest for test execution
+  - pytest-cov for coverage reporting
+- **Go**
+  - `go test ./...` baseline
+  - Coverage checks via `go test ./... -cover`
 
 ## What It Provides
 
-- Consistent test and coverage setup across the team
-- CI that runs tests (and optionally coverage) on every push/PR
-- Fail CI when coverage drops below the configured threshold (default 50%)
+- Repeatable test commands for local development
+- CI checks for each language profile
+- Coverage visibility with configurable thresholds
+
+## Monorepo Usage
+
+In multi-language monorepos, run tests per language package and report failures independently.
+
+Recommended baseline commands:
+
+- TypeScript: `pnpm test`
+- Python: `pytest`
+- Go: `go test ./...`
 
 ## Prompts to Improve Your App
 
-Use these prompts with your AI coding agent after installing the testing agent:
-
-### Setup and Configuration
-
-- **"Help me set up testing for this project"** — Full setup (Jest or Vitest, coverage, CI step)
-- **"Add a test step to our build workflow"** — Ensure CI runs tests
-- **"We use Vite—switch to Vitest"** — Use Vitest instead of Jest
-- **"Raise coverage threshold to 80%"** — Stricter coverage
-
-### Writing and Running Tests
-
-- **"Write unit tests for this module"** — Add tests following project conventions
-- **"Run tests with coverage and fix any failures"** — Run and fix
-- **"Our test workflow is failing—help debug"** — CI troubleshooting
-
-### General
-
-- **"Show me how to run tests and coverage locally"** — Explain scripts
-- **"Add coverage reporting to our existing GitHub Action"** — Add or update coverage step
+- **"Set up tests for TypeScript, Python, and Go packages in this monorepo"** — Full multi-language setup
+- **"Add separate CI jobs for each language test suite"** — Better isolation
+- **"Raise coverage thresholds and make CI fail when they drop"** — Quality gate
+- **"Find and fix flaky tests in this package"** — Stability
