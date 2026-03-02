@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { LANGUAGES } from './agents';
 
-const RULESRC_FILENAME = '.rulesrc.json';
+const RULESRC_FILENAME = '.rulesrc.ts.json';
+const LEGACY_RULESRC_FILENAME = '.rulesrc.json';
 
 export type Target = 'cursor' | 'claude' | 'opencode' | 'codex';
 
@@ -17,14 +18,18 @@ export function getRulesrcFilename(language: string = 'typescript'): string {
 }
 
 function hasConfigFile(dir: string): boolean {
-  if (fs.existsSync(path.join(dir, RULESRC_FILENAME))) return true;
+  if (
+    fs.existsSync(path.join(dir, RULESRC_FILENAME)) ||
+    fs.existsSync(path.join(dir, LEGACY_RULESRC_FILENAME))
+  )
+    return true;
   return LANGUAGES.some((language) =>
     fs.existsSync(path.join(dir, getRulesrcFilename(language)))
   );
 }
 
 /**
- * Find project root (directory containing .rulesrc.json or package.json)
+ * Find project root (directory containing rules config or package.json)
  */
 export function findProjectRoot(cwd: string = process.cwd()): string {
   let dir = path.resolve(cwd);
@@ -39,15 +44,21 @@ export function findProjectRoot(cwd: string = process.cwd()): string {
 }
 
 /**
- * Load .rulesrc.json from project root
+ * Load rules config from project root
  */
 export function loadConfig(
   projectRoot?: string,
   language: string = 'typescript'
 ): RulesConfig | null {
   const root = projectRoot ?? findProjectRoot();
-  const filePath = path.join(root, getRulesrcFilename(language));
-  if (!fs.existsSync(filePath)) return null;
+  const fileCandidates =
+    language === 'typescript'
+      ? [getRulesrcFilename(language), LEGACY_RULESRC_FILENAME]
+      : [getRulesrcFilename(language)];
+  const filePath = fileCandidates
+    .map((name) => path.join(root, name))
+    .find((candidate) => fs.existsSync(candidate));
+  if (!filePath) return null;
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
     const data = JSON.parse(raw) as unknown;
@@ -68,7 +79,7 @@ export function loadConfig(
 }
 
 /**
- * Save .rulesrc.json to project root
+ * Save rules config to project root
  */
 export function saveConfig(
   config: RulesConfig,

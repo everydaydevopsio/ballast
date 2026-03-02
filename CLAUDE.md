@@ -46,7 +46,7 @@ packages/
 - Shared public agent IDs: `linting`, `local-dev`, `cicd`, `observability`, `logging`, `testing`.
 - Common agents come from `agents/common/*`; language-specific agents come from `agents/<language>/*`.
 - Config files:
-  - TypeScript CLI: `.rulesrc.json`
+  - TypeScript CLI: `.rulesrc.ts.json`
   - Python CLI: `.rulesrc.python.json`
   - Go CLI: `.rulesrc.go.json`
 - In CI mode (`CI=true` or `--yes`), if config is missing, `--target` and `--agent` (or `--all`) are required.

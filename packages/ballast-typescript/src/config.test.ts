@@ -37,7 +37,7 @@ describe('config', () => {
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
     });
 
-    test('returns dir containing .rulesrc.json', () => {
+    test('returns dir containing .rulesrc.ts.json', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),
         JSON.stringify({ target: 'cursor', agents: ['linting'] })
@@ -83,13 +83,19 @@ describe('config', () => {
   });
 
   describe('saveConfig', () => {
-    test('writes .rulesrc.json', () => {
+    test('writes .rulesrc.ts.json', () => {
       const config = { target: 'opencode' as const, agents: ['cicd'] };
       saveConfig(config, tmpDir);
       const file = path.join(tmpDir, RULESRC_FILENAME);
       expect(fs.existsSync(file)).toBe(true);
       const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
       expect(parsed).toEqual(config);
+    });
+
+    test('loads legacy .rulesrc.json for typescript', () => {
+      const config = { target: 'cursor' as const, agents: ['linting'] };
+      fs.writeFileSync(path.join(tmpDir, '.rulesrc.json'), JSON.stringify(config));
+      expect(loadConfig(tmpDir)).toEqual(config);
     });
 
     test('writes language-specific rulesrc for python', () => {

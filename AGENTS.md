@@ -44,8 +44,8 @@ pnpm run prettier:fix     # Auto-fix formatting
 - **Badges**: README badges (CI, Lint, Release, License, GitHub Release, npm) follow the local-dev-badges rule.
 - **Single overwrite policy**: do not overwrite existing rule files unless the user passes `--force`.
 - **Platform first, then agents**: user can choose "all" agents.
-- **Config**: `.rulesrc.json` stores `target` and `agents` so repeat runs can be non-interactive.
-- **CI**: When `CI=true` or `--yes` is set and `.rulesrc.json` is missing, `--target` and `--agent` (or `--all`) are required.
+- **Config**: `.rulesrc.ts.json` stores `target` and `agents` so repeat runs can be non-interactive.
+- **CI**: When `CI=true` or `--yes` is set and `.rulesrc.ts.json` is missing, `--target` and `--agent` (or `--all`) are required.
 - **Agents**: Only agents shipped in this repo are installable (no external bundle discovery).
 - **Docs sync**: When you add or update an agent, update the docs in `docs/` so they stay in sync: add or update `docs/agents/<id>.md` for that agent, and update the agent table in `docs/README.md` (and any other references, e.g. `docs/installation.md` if needed).
 

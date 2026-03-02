@@ -27,7 +27,7 @@ ballast/
 ├── src/                       # TypeScript source
 │   ├── cli.ts                 # Entry: install command, --help, --version
 │   ├── install.ts             # Install flow: resolve target/agents, install()
-│   ├── config.ts              # .rulesrc.json load/save, findProjectRoot, isCiMode
+│   ├── config.ts              # .rulesrc.ts.json load/save, findProjectRoot, isCiMode
 │   ├── agents.ts              # Agent list, getAgentDir, resolveAgents
 │   ├── build.ts               # buildContent(agentId, target), getDestination()
 │   └── *.test.ts
@@ -86,15 +86,15 @@ Install then writes that content to the destination path (creating the directory
 
 ## Install Flow
 
-1. **Resolve project root** — `findProjectRoot()` walks up from the current working directory until it finds a directory containing `.rulesrc.json` or `package.json`; that directory is the project root.
+1. **Resolve project root** — `findProjectRoot()` walks up from the current working directory until it finds a directory containing `.rulesrc.ts.json` or `package.json`; that directory is the project root.
 
 2. **Resolve target and agents** — `resolveTargetAndAgents()`:
-   - Loads `.rulesrc.json` from the project root (if present).
+   - Loads `.rulesrc.ts.json` from the project root (if present).
    - Uses CLI flags: `--target`, `--agent` / `--all`, `--yes`.
    - In **interactive** mode (no `--yes`, not CI): prompts for target and agents if not fully determined.
-   - In **CI/non-interactive** mode (`CI=true` or `--yes`): if `.rulesrc.json` is missing, **requires** `--target` and `--agent` (or `--all`); otherwise exits with an error and usage hint.
+   - In **CI/non-interactive** mode (`CI=true` or `--yes`): if `.rulesrc.ts.json` is missing, **requires** `--target` and `--agent` (or `--all`); otherwise exits with an error and usage hint.
 
-3. **Persist config (optional)** — If the user did not pass target/agent flags, the resolved `target` and `agents` are saved to `.rulesrc.json` so future runs can be non-interactive.
+3. **Persist config (optional)** — If the user did not pass target/agent flags, the resolved `target` and `agents` are saved to `.rulesrc.ts.json` so future runs can be non-interactive.
 
 4. **Install** — For each resolved agent:
    - Compute destination via `getDestination(agentId, target, projectRoot)`.
@@ -107,17 +107,17 @@ Install then writes that content to the destination path (creating the directory
 
 ## Config and Project Root
 
-- **Config file:** `.rulesrc.json` in the project root.
+- **Config file:** `.rulesrc.ts.json` in the project root.
 - **Shape:** `{ "target": "cursor" | "claude" | "opencode" | "codex", "agents": string[] }`.
 - **When saved:** When running interactively (or without `--yes`) and the user did not pass `--target` / `--agent` / `--all`, so that the next run can reuse the same choices.
-- **Project root:** First directory (walking up from the cwd) that contains `.rulesrc.json` or `package.json`; if none is found, the starting cwd is used.
+- **Project root:** First directory (walking up from the cwd) that contains `.rulesrc.ts.json` or `package.json`; if none is found, the starting cwd is used.
 
 ---
 
 ## CI / Non-Interactive Mode
 
 - **CI detection:** `isCiMode()` is true when `CI`, `TF_BUILD`, `GITHUB_ACTIONS`, or `GITLAB_CI` is set to a truthy value, or when the user passes `--yes`.
-- **Requirement:** In CI/non-interactive mode, if `.rulesrc.json` is missing, the CLI **requires** `--target` and `--agent` (or `--all`). If they are missing, it prints an error and exits with code 1.
+- **Requirement:** In CI/non-interactive mode, if `.rulesrc.ts.json` is missing, the CLI **requires** `--target` and `--agent` (or `--all`). If they are missing, it prints an error and exits with code 1.
 
 ---
 
@@ -134,4 +134,4 @@ Install then writes that content to the destination path (creating the directory
 - **Copy only:** Files are always copied into the repo; there is no symlink mode.
 - **No external bundles:** Only agents under `agents/` in this package are installed; the CLI does not scan dependencies for rule packages or manifests.
 - **Platform first, then agents:** The user chooses target (platform), then which agents to install (or “all”).
-- **Repeatability:** Storing `target` and `agents` in `.rulesrc.json` makes repeat runs (e.g. in CI or after `pnpm install`) non-interactive when config is present.
+- **Repeatability:** Storing `target` and `agents` in `.rulesrc.ts.json` makes repeat runs (e.g. in CI or after `pnpm install`) non-interactive when config is present.

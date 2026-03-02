@@ -90,7 +90,7 @@ Options:
   --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
   --all                     Install all agents
   --force, -f               Overwrite existing rule files
-  --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
+  --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.ts.json
   --help, -h                Show this help
   --version, -v             Show version
 

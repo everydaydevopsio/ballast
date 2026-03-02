@@ -48,7 +48,7 @@ ballast install --target cursor --all
 
 ## Config Persistence
 
-- TypeScript CLI: `.rulesrc.json`
+- TypeScript CLI: `.rulesrc.ts.json`
 - Python CLI: `.rulesrc.python.json`
 - Go CLI: `.rulesrc.go.json`
 
