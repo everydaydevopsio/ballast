@@ -29,6 +29,7 @@ Thumbs.db
 # Build outputs
 dist/
 build/
+packages/ballast-go/ballast
 
 # Environment variables
 .env
