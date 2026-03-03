@@ -27,7 +27,7 @@ jobs:
       contents: write
 
     outputs:
-      version: ${{ steps.unified_version.outputs.version }}
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - name: Checkout
@@ -56,32 +56,29 @@ jobs:
         with:
           version: ${{ steps.previoustag.outputs.tag }}
 
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
+            echo "version=${{ steps.semvers.outputs.minor }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Bump TypeScript package version
         run: |
           set -euo pipefail
-          npm --prefix packages/ballast-typescript version "${{ github.event.inputs.release_type }}" --no-git-tag-version
+          npm --prefix packages/ballast-typescript version "${{ steps.version.outputs.version }}" --no-git-tag-version
 
       - name: Bump Python package version
         run: |
           set -euo pipefail
-          uv version --directory packages/ballast-python --bump "${{ github.event.inputs.release_type }}" --frozen
-
-      - name: Capture and verify unified version
-        id: unified_version
-        run: |
-          set -euo pipefail
-          TS_VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
-          PY_VERSION="$(uv version --directory packages/ballast-python --short)"
-          if [ "$TS_VERSION" != "$PY_VERSION" ]; then
-            echo "Version mismatch after bump: TS=$TS_VERSION Python=$PY_VERSION"
-            exit 1
-          fi
-          echo "version=$TS_VERSION" >> "$GITHUB_OUTPUT"
+          uv version --directory packages/ballast-python "${{ steps.version.outputs.version }}" --frozen
 
       - name: Commit and create tags
         run: |
           set -euo pipefail
-          VERSION="${{ steps.unified_version.outputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -95,7 +92,7 @@ jobs:
         run: |
           set -euo pipefail
           git push origin HEAD:${{ github.ref_name }}
-          git push origin "v${{ steps.unified_version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
 
   publish_typescript:
     needs: bump_and_tag
