@@ -35,3 +35,7 @@ See [installation.md](installation.md) for package-specific commands and monorep
 - npm (`@everydaydevopsio/ballast`)
 - uv/uvx (`ballast-python`)
 - go install/go run (`ballast-go`)
+
+## Publishing
+
+See [publish.md](publish.md) for npmjs, PyPI, and Go release publishing setup.
