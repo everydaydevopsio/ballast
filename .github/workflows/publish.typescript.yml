@@ -29,9 +29,6 @@ jobs:
     permissions:
       contents: write
 
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
