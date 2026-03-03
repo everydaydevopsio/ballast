@@ -88,9 +88,7 @@ jobs:
         run: pnpm --filter @everydaydevopsio/ballast run test
 
       - name: Publish to npm
-        run: |
-          echo "git-checks=false" >> .npmrc
-          pnpm --dir packages/ballast-typescript publish --access public
+        run: pnpm --dir packages/ballast-typescript publish --access public --no-git-checks
 
   publish_from_version:
     if: ${{ github.event_name == 'workflow_call' }}
@@ -123,6 +121,4 @@ jobs:
         run: pnpm --filter @everydaydevopsio/ballast run test
 
       - name: Publish to npm
-        run: |
-          echo "git-checks=false" >> .npmrc
-          pnpm --dir packages/ballast-typescript publish --access public
+        run: pnpm --dir packages/ballast-typescript publish --access public --no-git-checks
