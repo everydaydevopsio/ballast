@@ -88,7 +88,8 @@ jobs:
         run: pnpm --filter @everydaydevopsio/ballast run test
 
       - name: Publish to npm
-        run: pnpm --dir packages/ballast-typescript publish --access public --no-git-checks
+        working-directory: packages/ballast-typescript
+        run: npm publish --access public --provenance
 
   publish_from_version:
     if: ${{ github.event_name == 'workflow_call' }}
@@ -121,4 +122,5 @@ jobs:
         run: pnpm --filter @everydaydevopsio/ballast run test
 
       - name: Publish to npm
-        run: pnpm --dir packages/ballast-typescript publish --access public --no-git-checks
+        working-directory: packages/ballast-typescript
+        run: npm publish --access public --provenance
