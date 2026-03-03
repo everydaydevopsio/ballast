@@ -3,13 +3,9 @@ name: Publish Go CLI
 on:
   workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Release type (patch/minor)'
-        type: choice
-        options:
-          - patch
-          - minor
-        default: 'patch'
+      version:
+        description: 'Version to publish (without tag prefix)'
+        type: string
         required: true
   workflow_call:
     inputs:
@@ -23,47 +19,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  bump:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
-      - name: Compute next version
-        id: version
-        run: |
-          set -euo pipefail
-          LAST_TAG="$(git tag -l 'ballast-go/v*' | sed 's#^ballast-go/v##' | sort -V | tail -n1)"
-          if [ -z "$LAST_TAG" ]; then
-            LAST_TAG="0.1.0"
-          fi
-          IFS=. read -r MAJOR MINOR PATCH <<< "$LAST_TAG"
-          if [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
-            MINOR=$((MINOR + 1))
-            PATCH=0
-          else
-            PATCH=$((PATCH + 1))
-          fi
-          VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Create and push tag
-        run: |
-          set -euo pipefail
-          TAG="ballast-go/v${{ steps.version.outputs.version }}"
-          git tag "$TAG"
-          git push origin "$TAG"
-
   release:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
@@ -75,7 +30,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/ballast-go/v${{ needs.bump.outputs.version }}
+          ref: refs/tags/v${{ inputs.version }}
           fetch-depth: 0
 
       - name: Setup Go
