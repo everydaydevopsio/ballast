@@ -39,27 +39,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Get Previous tag
-        id: previoustag
-        uses: WyriHaximus/github-action-get-previous-tag@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get next version
-        id: semvers
-        uses: WyriHaximus/github-action-next-semvers@v1
-        with:
-          version: ${{ steps.previoustag.outputs.tag }}
-
-      - name: Set version
-        id: version
-        run: |
-          if [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
-            echo "version=${{ steps.semvers.outputs.minor }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -69,38 +48,18 @@ jobs:
           node-version: '20.x'
           cache: 'pnpm'
 
-      - name: Bump version in package.json
-        run: |
-          NEW_VERSION="${{ steps.version.outputs.version }}"
-          echo "Bumping to $NEW_VERSION"
-          jq --arg v "$NEW_VERSION" '.version = $v' packages/ballast-typescript/package.json > packages/ballast-typescript/package.json.tmp && mv packages/ballast-typescript/package.json.tmp packages/ballast-typescript/package.json
-
       - name: Update lockfile
         run: pnpm install --no-frozen-lockfile
 
       - name: Build
         run: pnpm --filter @everydaydevopsio/ballast run build
 
-      - name: Run ballast (all agents, all targets)
-        run: |
-          node packages/ballast-typescript/bin/ballast.js install --yes --target cursor --all --force
-          node packages/ballast-typescript/bin/ballast.js install --yes --target claude --all --force
-          node packages/ballast-typescript/bin/ballast.js install --yes --target opencode --all --force
-          node packages/ballast-typescript/bin/ballast.js install --yes --target codex --all --force
-
-      - name: Commit and tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add packages/ballast-typescript/package.json pnpm-lock.yaml
-          git add -f .cursor/ .claude/ .opencode/
-          git commit -m "chore: bump ${{ github.event.inputs.release_type }} version to ${{ steps.version.outputs.version }} and update agent rules [skip ci]"
-          git tag "v${{ steps.version.outputs.version }}"
-
-      - name: Push commit and tag
-        run: |
-          git push origin HEAD:${{ github.ref_name }}
-          git push origin "v${{ steps.version.outputs.version }}"
+#      - name: Run ballast (all agents, all targets)
+#        run: |
+#          node packages/ballast-typescript/bin/ballast.js install --yes --target cursor --all --force
+#          node packages/ballast-typescript/bin/ballast.js install --yes --target claude --all --force
+#          node packages/ballast-typescript/bin/ballast.js install --yes --target opencode --all --force
+#          node packages/ballast-typescript/bin/ballast.js install --yes --target codex --all --force
 
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
