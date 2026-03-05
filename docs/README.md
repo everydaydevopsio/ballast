@@ -33,9 +33,9 @@ Agent | TypeScript | Python | Go | Guide
 See [installation.md](installation.md) for package-specific commands and monorepo workflows for each language:
 
 - npm (`@everydaydevopsio/ballast`)
-- uv/uvx (`ballast-python`)
+- uv/uvx from GitHub Releases wheel (`ballast-python`)
 - go install/go run (`ballast-go`)
 
 ## Publishing
 
-See [publish.md](publish.md) for npmjs, PyPI, and Go release publishing setup.
+See [publish.md](publish.md) for npmjs, Python GitHub release assets, and Go release publishing setup.

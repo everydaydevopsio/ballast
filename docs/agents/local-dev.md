@@ -7,7 +7,7 @@ The **local-dev** agent helps set up and maintain a consistent local development
 The local-dev agent installs multiple rules:
 
 - **Base** — Reproducible environments, nvm, Docker Compose, env files, dev scripts
-- **Badges** — README badges (CI, Release, License, GitHub Release, npm/PyPI/Go as applicable)
+- **Badges** — README badges (CI, Release, License, GitHub Release, npm/Python/Go as applicable)
 - **License** — `LICENSE` file, `package.json` license field, README reference (MIT default)
 - **MCP** — Optional integration with GitHub MCP and issues MCP (Jira, Linear, GitHub Issues)
 

@@ -4,7 +4,7 @@
 [![Lint](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml)
 [![Release (npm)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.typescript.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.typescript.yml)
 [![Release (Go)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-go.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-go.yml)
-[![Release (PyPI)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-python.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-python.yml)
+[![Release (Python)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-python.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-python.yml)
 
 Ballast installs AI agent rules for Cursor, Claude Code, OpenCode, and Codex.
 
@@ -17,7 +17,7 @@ Release `v4.0.0` supports three first-class language profiles in this repository
 ## Packages
 
 - `@everydaydevopsio/ballast` (npm)
-- `ballast-python` (PyPI)
+- `ballast-python` (GitHub Releases artifact)
 - `ballast-go` (Go)
 
 ## Agent Model
@@ -53,10 +53,11 @@ npx ballast install --target cursor --all
 ### Python
 
 ```bash
-uv tool install ballast-python
+VERSION=4.0.0
+uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast
 ballast install --target cursor --all
 # or
-uvx --from ballast-python ballast install --target codex --agent linting
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target codex --agent linting
 ```
 
 ### Go
@@ -79,7 +80,8 @@ npx ballast install --target cursor --all
 ### 2. Python rules in a monorepo
 
 ```bash
-uvx --from ballast-python ballast install --target cursor --all
+VERSION=4.0.0
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target cursor --all
 ```
 
 ### 3. Go rules in a monorepo

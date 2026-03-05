@@ -5,7 +5,7 @@ This guide is for AI coding agents setting up Ballast in a repository.
 ## Supported Language Profiles (v4.0.0)
 
 - TypeScript/JavaScript: `@everydaydevopsio/ballast`
-- Python: `ballast-python`
+- Python: `ballast-python` (GitHub Releases artifact)
 - Go: `ballast-go`
 
 ## Package Commands
@@ -27,10 +27,11 @@ npx ballast install --language go --target codex --agent linting
 ### Python Package (`ballast-python`)
 
 ```bash
-uv tool install ballast-python
+VERSION=4.0.0
+uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast
 ballast install --target cursor --all
 # or
-uvx --from ballast-python ballast install --target codex --agent linting
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target codex --agent linting
 ```
 
 ### Go Package (`ballast-go`)
@@ -53,7 +54,8 @@ npx ballast install --target cursor --all
 ### Python in a monorepo
 
 ```bash
-uvx --from ballast-python ballast install --target cursor --all
+VERSION=4.0.0
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target cursor --all
 ```
 
 ### Go in a monorepo

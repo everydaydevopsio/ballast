@@ -3,7 +3,7 @@
 This guide explains how to configure GitHub Actions publishing for:
 
 - npm (`@everydaydevopsio/ballast`)
-- PyPI (`ballast-python`)
+- Python artifacts on GitHub Releases (`ballast-python`)
 - Go CLI release assets (`ballast-go`)
 
 ## Workflow Map
@@ -17,57 +17,53 @@ This guide explains how to configure GitHub Actions publishing for:
 
 ### 1. Configure npm trusted publisher
 
-In npm package settings for `@everydaydevopsio/ballast`, add a trusted publisher for this GitHub repository.
-
-Use:
+In npm package settings for `@everydaydevopsio/ballast`, add a trusted publisher for:
 
 - GitHub owner: `everydaydevopsio`
 - Repository: `ballast`
 - Workflow file: `.github/workflows/publish.typescript.yml`
 - Branch: `main`
 
-If you publish TypeScript via `.github/workflows/publish.yml`, also add that workflow as a trusted publisher.
+If you publish TypeScript via `.github/workflows/publish.yml`, add that workflow as a trusted publisher too.
 
 ### 2. Required workflow permissions
-
-The publish job must include:
 
 - `id-token: write`
 
 ### 3. Publish command
 
-Use `npm publish --provenance` from `packages/ballast-typescript`.
+- `npm publish --access public --provenance`
 
-This repository already does that in `publish.typescript.yml`.
+## Python (GitHub Releases Artifacts)
 
-## PyPI (Trusted Publishing)
+Python is published as wheel/sdist assets on the GitHub Release tag (not PyPI Trusted Publishing).
 
-### 1. Configure PyPI trusted publisher
+### 1. Required workflow permissions
 
-In PyPI project settings for `ballast-python`, add a trusted publisher:
+- `contents: write`
 
-- Owner: `everydaydevopsio`
-- Repository: `ballast`
-- Workflow: `.github/workflows/publish-python.yml`
-- Environment: leave empty unless your workflow job uses a GitHub environment
+### 2. Publish behavior
 
-### 2. Important limitation: reusable workflows
+`.github/workflows/publish-python.yml` builds:
 
-PyPI Trusted Publishing currently does not officially support reusable workflow calls (`workflow_call`) and may fail with:
+- `packages/ballast-python/dist/*.whl`
+- `packages/ballast-python/dist/*.tar.gz`
 
-- `invalid-publisher`
-- claim mismatch warnings showing `workflow_ref` and `job_workflow_ref`
+Then uploads them to release tag `v<version>`.
 
-### 3. Recommended approach for this repo
+### 3. Install from GitHub Releases
 
-For PyPI trusted publishing reliability:
+```bash
+VERSION=4.0.0
+uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast
+```
 
-1. Trigger `.github/workflows/publish-python.yml` directly (standalone `workflow_dispatch`).
-2. Do not rely on Python publish through reusable workflow calls from `publish.yml` if using Trusted Publishing.
+Or run once without global install:
 
-### 4. Alternative if you must publish via reusable workflow
-
-Use a PyPI API token secret instead of Trusted Publishing for that path.
+```bash
+VERSION=4.0.0
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target cursor --all
+```
 
 ## Go (GitHub Releases)
 
@@ -81,18 +77,16 @@ Go publishing in this repository is release-asset publishing (GitHub Releases), 
 
 ### 2. Release assets
 
-Upload unique archive artifacts to avoid duplicate-name collisions:
+Upload unique archive artifacts:
 
 - `*.tar.gz`
 - `*.zip`
 - `checksums.txt`
 
-This repository already limits uploaded files in `publish-go.yml`.
-
 ## Quick Checklist
 
-- npm trusted publisher configured for this repo and publish workflow.
-- PyPI trusted publisher configured for `publish-python.yml`.
-- PyPI publish triggered from standalone Python workflow when using Trusted Publishing.
-- `id-token: write` enabled for npm/PyPI trusted publishing jobs.
-- `contents: write` enabled for tag/release creation jobs.
+- npm trusted publisher configured for this repo/workflow.
+- Python workflow uploads wheel/sdist assets to GitHub Release tag `v<version>`.
+- Go workflow uploads archives/checksums to GitHub Release.
+- `id-token: write` enabled for npm trusted publish jobs.
+- `contents: write` enabled for release asset upload jobs.
