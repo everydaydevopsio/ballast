@@ -55,8 +55,8 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ballast-go/v${{ needs.bump.outputs.version }}
-          name: ballast-go v${{ needs.bump.outputs.version }}
+          tag_name: v${{ inputs.version }}
+          name: ballast-go v${{ inputs.version }}
           files: |
             packages/ballast-go/dist/*.tar.gz
             packages/ballast-go/dist/*.zip

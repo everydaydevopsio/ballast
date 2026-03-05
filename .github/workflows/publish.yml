@@ -75,7 +75,7 @@ jobs:
           set -euo pipefail
           uv version --directory packages/ballast-python "${{ steps.version.outputs.version }}" --frozen
 
-      - name: Commit and create tags
+      - name: Commit and create tag
         run: |
           set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
@@ -88,7 +88,7 @@ jobs:
 
           git tag "v${VERSION}"
 
-      - name: Push commit and tags
+      - name: Push commit and tag
         run: |
           set -euo pipefail
           git push origin HEAD:${{ github.ref_name }}
@@ -96,21 +96,111 @@ jobs:
 
   publish_typescript:
     needs: bump_and_tag
-    uses: ./.github/workflows/publish.typescript.yml
-    with:
-      version: ${{ needs.bump_and_tag.outputs.version }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/v${{ needs.bump_and_tag.outputs.version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm --filter @everydaydevopsio/ballast run test
+
+      - name: Publish to npm
+        working-directory: packages/ballast-typescript
+        run: npm publish --access public --provenance
 
   publish_python:
     needs: bump_and_tag
-    uses: ./.github/workflows/publish-python.yml
-    with:
-      version: ${{ needs.bump_and_tag.outputs.version }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/v${{ needs.bump_and_tag.outputs.version }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Build package
+        run: env UV_CACHE_DIR=/tmp/uv-cache uvx --from build pyproject-build --sdist --wheel packages/ballast-python
+
+      - name: Publish Python artifacts to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.bump_and_tag.outputs.version }}
+          name: ballast-python v${{ needs.bump_and_tag.outputs.version }}
+          overwrite_files: true
+          files: |
+            packages/ballast-python/dist/*.whl
+            packages/ballast-python/dist/*.tar.gz
 
   publish_go:
-    needs: bump_and_tag
-    uses: ./.github/workflows/publish-go.yml
-    with:
-      version: ${{ needs.bump_and_tag.outputs.version }}
-    secrets: inherit
+    needs:
+      - bump_and_tag
+      - publish_python
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: refs/tags/v${{ needs.bump_and_tag.outputs.version }}
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Verify build
+        run: |
+          cd packages/ballast-go
+          go build ./cmd/ballast
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          workdir: packages/ballast-go
+          args: build --snapshot --clean --config .goreleaser.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.bump_and_tag.outputs.version }}
+          name: ballast-go v${{ needs.bump_and_tag.outputs.version }}
+          files: |
+            packages/ballast-go/dist/*.tar.gz
+            packages/ballast-go/dist/*.zip
+            packages/ballast-go/dist/checksums.txt
