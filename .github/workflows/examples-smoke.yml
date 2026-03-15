@@ -37,7 +37,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version-file: .nvmrc
+          node-version: "24.x"
 
       - name: Setup Python
         uses: actions/setup-python@v5
