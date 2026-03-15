@@ -60,7 +60,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
 
-          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast" ./cmd/ballast-go
+          go build -C cli/ballast -o "$GITHUB_WORKSPACE/.ci/bin/ballast" .
           go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
 
           pnpm install --frozen-lockfile
