@@ -1,0 +1,10 @@
+---
+description: 'Optional: use GitHub MCP and issues MCP (Jira/Linear/GitHub) for local-dev context'
+alwaysApply: false
+globs:
+  - 'package.json'
+  - 'README*'
+  - '.env*'
+  - '**/CLAUDE.md'
+  - '**/AGENTS.md'
+---

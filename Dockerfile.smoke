@@ -1,0 +1,46 @@
+FROM golang:1.24-bookworm
+
+ARG PREINSTALL_ALL_BINARIES=1
+ARG BALLAST_REMOTE_REPO_URL=https://github.com/everydaydevopsio/ballast.git
+ARG BALLAST_REMOTE_REF=main
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/root/.local/bin:/usr/local/go/bin:${PATH}"
+ENV BALLAST_REMOTE_REPO_URL=${BALLAST_REMOTE_REPO_URL}
+ENV BALLAST_REMOTE_REF=${BALLAST_REMOTE_REF}
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    nodejs \
+    npm \
+    python3 \
+    python3-venv \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN npm install -g pnpm@10
+
+WORKDIR /opt/ballast
+COPY . /opt/ballast
+
+RUN go build -C /opt/ballast/cli/ballast -o /usr/local/bin/ballast .
+
+COPY scripts/smoke/bootstrap-language-binaries.sh /usr/local/bin/bootstrap-language-binaries
+RUN chmod +x /usr/local/bin/bootstrap-language-binaries
+COPY scripts/smoke/shims/ /usr/local/lib/ballast/shims/
+RUN chmod +x /usr/local/lib/ballast/shims/ballast-typescript /usr/local/lib/ballast/shims/ballast-python /usr/local/lib/ballast/shims/ballast-go
+
+RUN if [ "$PREINSTALL_ALL_BINARIES" = "1" ]; then \
+    /usr/local/bin/bootstrap-language-binaries --from-local /opt/ballast; \
+  else \
+    cp /usr/local/lib/ballast/shims/ballast-typescript /usr/local/bin/ballast-typescript; \
+    cp /usr/local/lib/ballast/shims/ballast-python /usr/local/bin/ballast-python; \
+    cp /usr/local/lib/ballast/shims/ballast-go /usr/local/bin/ballast-go; \
+  fi
+
+WORKDIR /workspace
+
+CMD ["bash"]

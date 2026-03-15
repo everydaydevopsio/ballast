@@ -43,28 +43,30 @@ Agent sources in this repo:
 
 ## Install and Use (Single Language)
 
+`ballast` is the wrapper command (intended for Homebrew) that detects repo language and dispatches to the matching language CLI.
+
 ### TypeScript (npm)
 
 ```bash
 pnpm add -D @everydaydevopsio/ballast
-npx ballast install --target cursor --all
+pnpm exec ballast-typescript install --target cursor --all
 ```
 
 ### Python
 
 ```bash
 VERSION=4.0.0
-uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast
-ballast install --target cursor --all
+uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
+ballast-python install --target cursor --all
 # or
-uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target codex --agent linting
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target codex --agent linting
 ```
 
 ### Go
 
 ```bash
-go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast@latest
-ballast install --target cursor --all
+go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest
+ballast-go install --target cursor --all
 ```
 
 ## Monorepo: Install and Use by Language
@@ -74,20 +76,20 @@ In a monorepo that contains TypeScript, Python, and Go projects, run Ballast onc
 ### 1. TypeScript rules in a monorepo
 
 ```bash
-npx ballast install --target cursor --all
+pnpm exec ballast-typescript install --target cursor --all
 ```
 
 ### 2. Python rules in a monorepo
 
 ```bash
 VERSION=4.0.0
-uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target cursor --all
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ```
 
 ### 3. Go rules in a monorepo
 
 ```bash
-go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast@latest install --target cursor --all
+go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest install --target cursor --all
 ```
 
 Recommended order for one repository that uses all three languages:
@@ -127,6 +129,24 @@ pnpm install
 pnpm test
 pnpm run lint
 pnpm run build
+```
+
+## Smoke Testing Container
+
+Use `Dockerfile.smoke` to test wrapper + language CLIs.
+
+Default (all binaries preinstalled from local checkout):
+
+```bash
+docker build -f Dockerfile.smoke -t ballast-smoke .
+docker run --rm -it ballast-smoke
+```
+
+On-demand mode (start with `ballast` wrapper and lazy-download language CLIs from GitHub):
+
+```bash
+docker build -f Dockerfile.smoke --build-arg PREINSTALL_ALL_BINARIES=0 -t ballast-smoke-lazy .
+docker run --rm -it ballast-smoke-lazy
 ```
 
 ## License

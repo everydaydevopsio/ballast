@@ -78,7 +78,7 @@ func run(args []string) int {
 		return runInstall(args)
 	}
 	fmt.Printf("Unknown command: %s\n", args[0])
-	fmt.Println("Run ballast --help for usage.")
+	fmt.Println("Run ballast-go --help for usage.")
 	return 1
 }
 
@@ -129,7 +129,7 @@ func runInstall(args []string) int {
 	}
 	if resolved == nil {
 		fmt.Println("In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when config is missing.")
-		fmt.Println("Example: ballast install --yes --target cursor --agent linting")
+		fmt.Println("Example: ballast-go install --yes --target cursor --agent linting")
 		return 1
 	}
 
@@ -472,7 +472,10 @@ func findProjectRoot(cwd string) (string, error) {
 	}
 	dir := start
 	for {
-		if exists(filepath.Join(dir, "package.json")) || hasAnyRulesConfig(dir) {
+		if exists(filepath.Join(dir, "package.json")) ||
+			exists(filepath.Join(dir, "go.mod")) ||
+			exists(filepath.Join(dir, "pyproject.toml")) ||
+			hasAnyRulesConfig(dir) {
 			return dir, nil
 		}
 		next := filepath.Dir(dir)

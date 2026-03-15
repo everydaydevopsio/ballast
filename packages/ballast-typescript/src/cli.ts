@@ -79,7 +79,7 @@ function printHelp(): void {
   console.log(`
 ${pkg.name} v${pkg.version}
 
-Usage: ballast install [options]
+Usage: ballast-typescript install [options]
 
 Commands:
   install    Install agent rules for the chosen AI platform (default)
@@ -95,11 +95,11 @@ Options:
   --version, -v             Show version
 
 Examples:
-  ballast install
-  ballast install --target cursor --agent linting
-  ballast install --language python --target cursor --all
-  ballast install --target claude --all --force
-  ballast install --yes --target cursor --all
+  ballast-typescript install
+  ballast-typescript install --target cursor --agent linting
+  ballast-typescript install --language python --target cursor --all
+  ballast-typescript install --target claude --all --force
+  ballast-typescript install --yes --target cursor --all
 `);
 }
 
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
 
   if (!isInstall) {
     console.error(`Unknown command: ${command}`);
-    console.error('Run ballast --help for usage.');
+    console.error('Run ballast-typescript --help for usage.');
     process.exit(1);
   }
 

@@ -1,0 +1,54 @@
+name: Examples Smoke Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: ${{ matrix.sample }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sample: go-sample
+            language: go
+          - sample: python-sample
+            language: python
+          - sample: typescript-sample
+            language: typescript
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: packages/ballast-go/go.mod
+
+      - name: Build ballast-go CLI
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
+
+          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+          echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
+
+      - name: Run smoke install
+        run: |
+          set -euo pipefail
+          cd "examples/smoke/${{ matrix.sample }}"
+          ballast-go install --language "${{ matrix.language }}" --target cursor --agent linting --yes
+
+      - name: Verify outputs
+        run: |
+          set -euo pipefail
+          test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/linting.mdc"

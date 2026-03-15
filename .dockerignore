@@ -1,0 +1,9 @@
+.git
+.github
+node_modules
+.pnpm-store
+packages/ballast-typescript/node_modules
+packages/ballast-typescript/dist
+packages/ballast-go/ballast
+packages/ballast-go/ballast-go
+.tmp

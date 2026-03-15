@@ -70,10 +70,12 @@ def agent_dir(agent: str, language: str) -> Path:
 def resolve_project_root(cwd: Path) -> Path:
     for directory in [cwd, *cwd.parents]:
         has_pkg = (directory / "package.json").exists()
+        has_go = (directory / "go.mod").exists()
+        has_pyproject = (directory / "pyproject.toml").exists()
         has_any_cfg = (directory / ".rulesrc.ts.json").exists() or (directory / ".rulesrc.json").exists() or any(
             (directory / rulesrc_filename(lang)).exists() for lang in LANGUAGES
         )
-        if has_pkg or has_any_cfg:
+        if has_pkg or has_go or has_pyproject or has_any_cfg:
             return directory
     return cwd
 
@@ -331,7 +333,7 @@ def run_install(args: argparse.Namespace) -> int:
         print(
             "In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when config is missing."
         )
-        print("Example: ballast install --yes --target cursor --agent linting")
+        print("Example: ballast-python install --yes --target cursor --agent linting")
         return 1
 
     target, agents = resolved
@@ -369,7 +371,7 @@ def run_install(args: argparse.Namespace) -> int:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ballast", description="Install Ballast rules for Python projects")
+    p = argparse.ArgumentParser(prog="ballast-python", description="Install Ballast rules for Python projects")
     sub = p.add_subparsers(dest="command")
     install_cmd = sub.add_parser("install", help="Install rule files")
     install_cmd.add_argument("--target", "-t")

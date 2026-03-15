@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [ ! -x /usr/local/lib/ballast/bin/ballast-typescript ]; then
+  /usr/local/bin/bootstrap-language-binaries --from-remote --only typescript
+fi
+exec /usr/local/bin/ballast-typescript "$@"

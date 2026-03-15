@@ -36,7 +36,12 @@ jobs:
         with:
           go-version: '1.24.x'
 
-      - name: Build ballast-go
+      - name: Build ballast wrapper
+        run: |
+          cd cli/ballast
+          go build .
+
+      - name: Build ballast-go language pack
         run: |
           cd packages/ballast-go
-          go build ./cmd/ballast
+          go build ./cmd/ballast-go

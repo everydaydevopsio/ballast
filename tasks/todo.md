@@ -30,6 +30,6 @@
   - `pnpm --filter @everydaydevopsio/ballast run test`
   - `pnpm --filter @everydaydevopsio/ballast run build`
   - `python3 -m py_compile packages/ballast-python/ballast/cli.py packages/ballast-python/ballast/__main__.py`
-  - `cd packages/ballast-go && env GOCACHE=/tmp/go-build go build ./cmd/ballast`
+  - `cd cli/ballast && env GOCACHE=/tmp/go-build go build .`
   - `cd packages/ballast-typescript && pnpm pack --pack-destination /tmp` (tarball includes `agents/**`)
   - Runtime smoke checks from temp dirs for TypeScript, Python, and Go installers

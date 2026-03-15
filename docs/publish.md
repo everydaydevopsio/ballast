@@ -55,14 +55,14 @@ Then uploads them to release tag `v<version>`.
 
 ```bash
 VERSION=4.0.0
-uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast
+uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
 ```
 
 Or run once without global install:
 
 ```bash
 VERSION=4.0.0
-uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target cursor --all
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ```
 
 ## Go (GitHub Releases)
@@ -73,7 +73,7 @@ Go publishing in this repository is release-asset publishing (GitHub Releases), 
 
 - Workflow permission: `contents: write`
 - Go toolchain in workflow (`actions/setup-go`)
-- GoReleaser config in `packages/ballast-go/.goreleaser.yaml`
+- GoReleaser config in `cli/ballast/.goreleaser.yaml`
 
 ### 2. Release assets
 

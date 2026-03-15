@@ -1,0 +1,8 @@
+---
+description: 'Add standard badges (CI, Release, License, GitHub Release, npm) to the top of README.md'
+alwaysApply: false
+globs:
+  - 'README*'
+  - '.github/workflows/*.yml'
+  - 'package.json'
+---
