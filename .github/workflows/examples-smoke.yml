@@ -29,12 +29,6 @@ jobs:
       - name: Checkout ballast repo
         uses: actions/checkout@v6
 
-      - name: Checkout ballast-examples repo
-        uses: actions/checkout@v6
-        with:
-          repository: everydaydevopsio/ballast-examples
-          path: ballast-examples
-
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -85,10 +79,10 @@ jobs:
       - name: Run smoke install
         run: |
           set -euo pipefail
-          cd "ballast-examples/${{ matrix.sample }}"
+          cd "examples/smoke/${{ matrix.sample }}"
           ballast install --language "${{ matrix.language }}" --target cursor --agent linting --yes
 
       - name: Verify outputs
         run: |
           set -euo pipefail
-          test -f "ballast-examples/${{ matrix.sample }}/.cursor/rules/linting.mdc"
+          test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/linting.mdc"

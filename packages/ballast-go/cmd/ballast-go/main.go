@@ -472,7 +472,10 @@ func findProjectRoot(cwd string) (string, error) {
 	}
 	dir := start
 	for {
-		if exists(filepath.Join(dir, "package.json")) || hasAnyRulesConfig(dir) {
+		if exists(filepath.Join(dir, "package.json")) ||
+			exists(filepath.Join(dir, "go.mod")) ||
+			exists(filepath.Join(dir, "pyproject.toml")) ||
+			hasAnyRulesConfig(dir) {
 			return dir, nil
 		}
 		next := filepath.Dir(dir)

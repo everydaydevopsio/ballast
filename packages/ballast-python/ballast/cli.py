@@ -70,10 +70,12 @@ def agent_dir(agent: str, language: str) -> Path:
 def resolve_project_root(cwd: Path) -> Path:
     for directory in [cwd, *cwd.parents]:
         has_pkg = (directory / "package.json").exists()
+        has_go = (directory / "go.mod").exists()
+        has_pyproject = (directory / "pyproject.toml").exists()
         has_any_cfg = (directory / ".rulesrc.ts.json").exists() or (directory / ".rulesrc.json").exists() or any(
             (directory / rulesrc_filename(lang)).exists() for lang in LANGUAGES
         )
-        if has_pkg or has_any_cfg:
+        if has_pkg or has_go or has_pyproject or has_any_cfg:
             return directory
     return cwd
 
