@@ -8,37 +8,41 @@ This guide is for AI coding agents setting up Ballast in a repository.
 - Python: `ballast-python` (GitHub Releases artifact)
 - Go: `ballast-go`
 
+Wrapper command:
+
+- `ballast` (Homebrew-installed Go wrapper that auto-detects language and dispatches)
+
 ## Package Commands
 
 ### TypeScript Package (`@everydaydevopsio/ballast`)
 
 ```bash
 pnpm add -D @everydaydevopsio/ballast
-npx ballast install --target cursor --all
+pnpm exec ballast-typescript install --target cursor --all
 ```
 
 Language override is supported in the npm CLI:
 
 ```bash
-npx ballast install --language python --target cursor --all
-npx ballast install --language go --target codex --agent linting
+pnpm exec ballast-typescript install --language python --target cursor --all
+pnpm exec ballast-typescript install --language go --target codex --agent linting
 ```
 
 ### Python Package (`ballast-python`)
 
 ```bash
 VERSION=4.0.0
-uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast
-ballast install --target cursor --all
+uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
+ballast-python install --target cursor --all
 # or
-uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target codex --agent linting
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target codex --agent linting
 ```
 
 ### Go Package (`ballast-go`)
 
 ```bash
-go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast@latest
-ballast install --target cursor --all
+go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest
+ballast-go install --target cursor --all
 ```
 
 ## Monorepo Setup: TypeScript + Python + Go
@@ -48,20 +52,20 @@ For monorepos, apply Ballast per language profile.
 ### TypeScript in a monorepo
 
 ```bash
-npx ballast install --target cursor --all
+pnpm exec ballast-typescript install --target cursor --all
 ```
 
 ### Python in a monorepo
 
 ```bash
 VERSION=4.0.0
-uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast install --target cursor --all
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ```
 
 ### Go in a monorepo
 
 ```bash
-go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast@latest install --target cursor --all
+go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest install --target cursor --all
 ```
 
 Suggested sequence:

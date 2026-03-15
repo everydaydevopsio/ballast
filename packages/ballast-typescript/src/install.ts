@@ -266,7 +266,7 @@ export async function runInstall(
       'In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when .rulesrc.ts.json is missing.'
     );
     console.error(
-      'Example: ballast install --yes --target cursor --agent linting'
+      'Example: ballast-typescript install --yes --target cursor --agent linting'
     );
     return 1;
   }

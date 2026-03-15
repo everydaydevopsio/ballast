@@ -5,6 +5,6 @@ Go CLI package for installing Ballast agent rules.
 ## Usage
 
 ```bash
-ballast install --target cursor --all
-ballast install --target codex --agent linting
+ballast-go install --target cursor --all
+ballast-go install --target codex --agent linting
 ```

@@ -331,7 +331,7 @@ def run_install(args: argparse.Namespace) -> int:
         print(
             "In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when config is missing."
         )
-        print("Example: ballast install --yes --target cursor --agent linting")
+        print("Example: ballast-python install --yes --target cursor --agent linting")
         return 1
 
     target, agents = resolved
@@ -369,7 +369,7 @@ def run_install(args: argparse.Namespace) -> int:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ballast", description="Install Ballast rules for Python projects")
+    p = argparse.ArgumentParser(prog="ballast-python", description="Install Ballast rules for Python projects")
     sub = p.add_subparsers(dest="command")
     install_cmd = sub.add_parser("install", help="Install rule files")
     install_cmd.add_argument("--target", "-t")

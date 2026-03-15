@@ -1,0 +1,9 @@
+---
+description: 'CI/CD specialist - pipeline design, quality gates, and deployment'
+alwaysApply: false
+globs:
+  - '.github/**'
+  - '.gitlab-ci.yml'
+  - 'Jenkinsfile'
+  - 'package.json'
+---

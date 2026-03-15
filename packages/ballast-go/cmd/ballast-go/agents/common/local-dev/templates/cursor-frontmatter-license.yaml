@@ -1,0 +1,10 @@
+---
+description: 'License setup - ensure LICENSE file, package.json license field, and README reference (default MIT; overridable in AGENTS.md/CLAUDE.md)'
+alwaysApply: false
+globs:
+  - 'LICENSE'
+  - 'package.json'
+  - 'README*'
+  - '**/AGENTS.md'
+  - '**/CLAUDE.md'
+---

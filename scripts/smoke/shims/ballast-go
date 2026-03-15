@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [ ! -x /usr/local/lib/ballast/bin/ballast-go ]; then
+  /usr/local/bin/bootstrap-language-binaries --from-remote --only go
+fi
+exec /usr/local/bin/ballast-go "$@"

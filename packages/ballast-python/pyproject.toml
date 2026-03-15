@@ -21,7 +21,7 @@ Repository = "https://github.com/everydaydevopsio/ballast"
 Issues = "https://github.com/everydaydevopsio/ballast/issues"
 
 [project.scripts]
-ballast = "ballast.cli:main"
+ballast-python = "ballast.cli:main"
 
 [tool.setuptools]
 packages = ["ballast"]
