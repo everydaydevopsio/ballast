@@ -38,5 +38,5 @@ jobs:
 
       - name: Build ballast-go
         run: |
-          cd packages/ballast-go
-          go build ./cmd/ballast
+          cd cli/ballast
+          go build .

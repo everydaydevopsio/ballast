@@ -5,7 +5,7 @@ project_name: ballast-go
 builds:
   - id: ballast
     binary: ballast
-    main: ./cmd/ballast
+    main: .
     env:
       - CGO_ENABLED=0
     goos:
