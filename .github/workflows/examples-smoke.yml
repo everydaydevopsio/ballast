@@ -34,53 +34,19 @@ jobs:
         with:
           go-version-file: packages/ballast-go/go.mod
 
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24.x"
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Build Ballast CLIs
+      - name: Build ballast-go CLI
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
 
-          go build -C cli/ballast -o "$GITHUB_WORKSPACE/.ci/bin/ballast" .
           go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
-
-          pnpm install --frozen-lockfile
-          pnpm --filter @everydaydevopsio/ballast run build
-
-          cat > "$GITHUB_WORKSPACE/.ci/bin/ballast-typescript" <<'SCRIPT'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          node "$GITHUB_WORKSPACE/packages/ballast-typescript/dist/cli.js" "$@"
-          SCRIPT
-
-          cat > "$GITHUB_WORKSPACE/.ci/bin/ballast-python" <<'SCRIPT'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          PYTHONPATH="$GITHUB_WORKSPACE/packages/ballast-python:${PYTHONPATH:-}" \
-            python3 -c "from ballast.cli import main; import sys; raise SystemExit(main(sys.argv[1:]))" "$@"
-          SCRIPT
-
-          chmod +x "$GITHUB_WORKSPACE/.ci/bin/ballast-typescript" "$GITHUB_WORKSPACE/.ci/bin/ballast-python"
           echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
 
       - name: Run smoke install
         run: |
           set -euo pipefail
           cd "examples/smoke/${{ matrix.sample }}"
-          ballast install --language "${{ matrix.language }}" --target cursor --agent linting --yes
+          ballast-go install --language "${{ matrix.language }}" --target cursor --agent linting --yes
 
       - name: Verify outputs
         run: |
