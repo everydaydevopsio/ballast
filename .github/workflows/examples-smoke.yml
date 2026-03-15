@@ -1,0 +1,94 @@
+name: Examples Smoke Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: ${{ matrix.sample }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sample: go-sample
+            language: go
+          - sample: python-sample
+            language: python
+          - sample: typescript-sample
+            language: typescript
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v6
+
+      - name: Checkout ballast-examples repo
+        uses: actions/checkout@v6
+        with:
+          repository: everydaydevopsio/ballast-examples
+          path: ballast-examples
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: packages/ballast-go/go.mod
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Build Ballast CLIs
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
+
+          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast" ./cmd/ballast-go
+          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+
+          pnpm install --frozen-lockfile
+          pnpm --filter @everydaydevopsio/ballast run build
+
+          cat > "$GITHUB_WORKSPACE/.ci/bin/ballast-typescript" <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/packages/ballast-typescript/dist/cli.js" "$@"
+          SCRIPT
+
+          cat > "$GITHUB_WORKSPACE/.ci/bin/ballast-python" <<'SCRIPT'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/packages/ballast-python:${PYTHONPATH:-}" \
+            python3 -c "from ballast.cli import main; import sys; raise SystemExit(main(sys.argv[1:]))" "$@"
+          SCRIPT
+
+          chmod +x "$GITHUB_WORKSPACE/.ci/bin/ballast-typescript" "$GITHUB_WORKSPACE/.ci/bin/ballast-python"
+          echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
+
+      - name: Run smoke install
+        run: |
+          set -euo pipefail
+          cd "ballast-examples/${{ matrix.sample }}"
+          ballast install --language "${{ matrix.language }}" --target cursor --agent linting --yes
+
+      - name: Verify outputs
+        run: |
+          set -euo pipefail
+          test -f "ballast-examples/${{ matrix.sample }}/.cursor/rules/linting.mdc"
