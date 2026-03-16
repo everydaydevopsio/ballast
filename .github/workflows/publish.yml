@@ -186,6 +186,41 @@ jobs:
 
       - name: Verify build
         run: |
+          cd packages/ballast-go
+          go build -o /tmp/ballast-go-verify ./cmd/ballast-go
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          workdir: packages/ballast-go
+          args: release --clean --config .goreleaser.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish_cli:
+    if: ${{ github.event_name == 'push' }}
+    needs:
+      - publish_python
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Verify build
+        run: |
           cd cli/ballast
           go build -o /tmp/ballast-verify .
 

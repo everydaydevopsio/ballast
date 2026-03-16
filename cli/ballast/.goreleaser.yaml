@@ -1,9 +1,9 @@
 version: 2
 
-project_name: ballast-go
+project_name: ballast
 
 release:
-  name_template: "ballast-go v{{ .Version }}"
+  name_template: "ballast v{{ .Version }}"
 
 builds:
   - id: ballast
