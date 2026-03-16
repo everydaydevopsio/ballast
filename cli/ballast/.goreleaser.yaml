@@ -34,6 +34,25 @@ archives:
 checksum:
   name_template: checksums.txt
 
+brews:
+  - name: ballast
+    ids:
+      - ballast
+    homepage: https://github.com/everydaydevopsio/ballast
+    description: CLI that installs AI agent rules for Cursor, Claude Code, OpenCode, and Codex
+    license: MIT
+    repository:
+      owner: everydaydevopsio
+      name: homebrew-ballast
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: github-actions[bot]
+      email: github-actions[bot]@users.noreply.github.com
+    directory: Formula
+    test: |
+      system "#{bin}/ballast", "--help"
+
 homebrew_casks:
   - name: ballast
     ids:

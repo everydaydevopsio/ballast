@@ -5,6 +5,7 @@ This guide explains how to configure GitHub Actions publishing for:
 - npm (`@everydaydevopsio/ballast`)
 - Python artifacts on GitHub Releases (`ballast-python`)
 - Go CLI release assets (`ballast-go`)
+- Homebrew formula publishing for Linux `brew install ballast`
 - Homebrew cask publishing for the `ballast` wrapper CLI
 
 ## Workflow Map
@@ -90,9 +91,10 @@ Upload unique archive artifacts:
 
 Create a separate tap repository named `homebrew-ballast` under the `everydaydevopsio` GitHub org or user. The repository should contain a `Casks/` directory and allow pushes from a token stored as the `HOMEBREW_TAP_GITHUB_TOKEN` Actions secret in this repo.
 
-`cli/ballast/.goreleaser.yaml` publishes a cask named `ballast` into that tap:
+`cli/ballast/.goreleaser.yaml` publishes both a formula and a cask named `ballast` into that tap:
 
 - Homebrew tap repo: `everydaydevopsio/homebrew-ballast`
+- Formula path: `Formula/ballast.rb`
 - Cask path: `Casks/ballast.rb`
 - Cask test: `ballast --help`
 
@@ -106,11 +108,21 @@ That single GoReleaser release step:
 
 - builds the `ballast` archives
 - uploads release artifacts to GitHub Releases
+- writes or updates `Formula/ballast.rb` in the tap repository
 - writes or updates `Casks/ballast.rb` in the tap repository
 
-### 4. Homebrew install command
+### 4. Homebrew install commands
 
 After the tap repo exists and the release workflow has run for a tagged version:
+
+Linux:
+
+```bash
+brew tap everydaydevopsio/ballast
+brew install ballast
+```
+
+macOS:
 
 ```bash
 brew tap everydaydevopsio/ballast
@@ -121,7 +133,7 @@ brew install --cask ballast
 
 - npm trusted publisher configured for this repo/workflow.
 - Python workflow uploads wheel/sdist assets to GitHub Release tag `v<version>`.
-- Go workflow uploads archives/checksums to GitHub Release and updates the Homebrew tap cask.
+- CLI workflow uploads archives/checksums to GitHub Release and updates the Homebrew tap formula and cask.
 - `id-token: write` enabled for npm trusted publish jobs.
 - `contents: write` enabled for release asset upload jobs.
 - `HOMEBREW_TAP_GITHUB_TOKEN` configured for tap repository pushes.
