@@ -8,6 +8,7 @@ release:
 builds:
   - id: ballast
     binary: ballast
+    dir: cli/ballast
     main: .
     env:
       - CGO_ENABLED=0
@@ -23,7 +24,7 @@ builds:
         goarch: arm64
 
 archives:
-  - id: default
+  - id: ballast
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
