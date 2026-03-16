@@ -172,7 +172,6 @@ jobs:
     if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
     needs:
       - bump_and_tag
-      - publish_python
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -208,7 +207,6 @@ jobs:
     if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
     needs:
       - bump_and_tag
-      - publish_python
     runs-on: ubuntu-latest
     permissions:
       contents: write
