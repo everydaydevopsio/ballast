@@ -40,7 +40,7 @@ jobs:
       - name: Verify build
         run: |
           cd cli/ballast
-          go build .
+          go build -o /tmp/ballast-verify .
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
@@ -73,7 +73,7 @@ jobs:
       - name: Verify build
         run: |
           cd cli/ballast
-          go build .
+          go build -o /tmp/ballast-verify .
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
