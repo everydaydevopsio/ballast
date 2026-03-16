@@ -11,6 +11,9 @@ on:
           - minor
         default: 'patch'
         required: true
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -22,6 +25,7 @@ concurrency:
 
 jobs:
   bump_and_tag:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -95,7 +99,7 @@ jobs:
           git push origin "v${{ steps.version.outputs.version }}"
 
   publish_typescript:
-    needs: bump_and_tag
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -105,7 +109,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/v${{ needs.bump_and_tag.outputs.version }}
+          ref: ${{ github.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -128,7 +132,7 @@ jobs:
         run: npm publish --access public --provenance
 
   publish_python:
-    needs: bump_and_tag
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -137,7 +141,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/v${{ needs.bump_and_tag.outputs.version }}
+          ref: ${{ github.ref }}
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v7
@@ -153,16 +157,16 @@ jobs:
       - name: Publish Python artifacts to GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.bump_and_tag.outputs.version }}
-          name: ballast-python v${{ needs.bump_and_tag.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          name: ballast-python ${{ github.ref_name }}
           overwrite_files: true
           files: |
             packages/ballast-python/dist/*.whl
             packages/ballast-python/dist/*.tar.gz
 
   publish_go:
+    if: ${{ github.event_name == 'push' }}
     needs:
-      - bump_and_tag
       - publish_python
     runs-on: ubuntu-latest
     permissions:
@@ -172,7 +176,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/v${{ needs.bump_and_tag.outputs.version }}
+          ref: ${{ github.ref }}
           fetch-depth: 0
 
       - name: Setup Go

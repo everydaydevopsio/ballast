@@ -3,7 +3,7 @@
 [![CI](https://github.com/everydaydevopsio/ballast/actions/workflows/test.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/test.yml)
 [![Lint](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml)
 [![Release (npm)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.typescript.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.typescript.yml)
-[![Release (Go)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-go.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-go.yml)
+[![Release (Go)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml)
 [![Release (Python)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-python.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish-python.yml)
 
 Ballast installs AI agent rules for Cursor, Claude Code, OpenCode, and Codex.

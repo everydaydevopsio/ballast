@@ -12,7 +12,7 @@ This guide explains how to configure GitHub Actions publishing for:
 - Unified release workflow: `.github/workflows/publish.yml`
 - TypeScript publish workflow: `.github/workflows/publish.typescript.yml`
 - Python publish workflow: `.github/workflows/publish-python.yml`
-- Go publish workflow: `.github/workflows/publish-go.yml`
+- Go CLI publishing is handled inside `.github/workflows/publish.yml` on tag pushes
 
 ## npmjs (OIDC Trusted Publishing)
 
