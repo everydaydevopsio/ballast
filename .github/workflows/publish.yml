@@ -191,16 +191,7 @@ jobs:
           distribution: goreleaser
           version: '~> v2'
           workdir: cli/ballast
-          args: build --snapshot --clean --config .goreleaser.yaml
+          args: release --clean --config .goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.bump_and_tag.outputs.version }}
-          name: ballast-go v${{ needs.bump_and_tag.outputs.version }}
-          files: |
-            cli/ballast/dist/*.tar.gz
-            cli/ballast/dist/*.zip
-            cli/ballast/dist/checksums.txt
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

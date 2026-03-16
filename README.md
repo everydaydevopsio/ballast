@@ -19,6 +19,7 @@ Release `v4.0.0` supports three first-class language profiles in this repository
 - `@everydaydevopsio/ballast` (npm)
 - `ballast-python` (GitHub Releases artifact)
 - `ballast-go` (Go)
+- `ballast` (Homebrew cask for the wrapper CLI on macOS)
 
 ## Agent Model
 
@@ -44,6 +45,14 @@ Agent sources in this repo:
 ## Install and Use (Single Language)
 
 `ballast` is the wrapper command (intended for Homebrew) that detects repo language and dispatches to the matching language CLI.
+
+### Homebrew wrapper
+
+```bash
+brew tap everydaydevopsio/ballast
+brew install --cask ballast
+ballast install --target cursor --all
+```
 
 ### TypeScript (npm)
 

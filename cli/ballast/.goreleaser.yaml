@@ -2,6 +2,9 @@ version: 2
 
 project_name: ballast-go
 
+release:
+  name_template: "ballast-go v{{ .Version }}"
+
 builds:
   - id: ballast
     binary: ballast
@@ -29,6 +32,27 @@ archives:
 
 checksum:
   name_template: checksums.txt
+
+homebrew_casks:
+  - name: ballast
+    ids:
+      - ballast
+    binaries:
+      - ballast
+    homepage: https://github.com/everydaydevopsio/ballast
+    description: CLI that installs AI agent rules for Cursor, Claude Code, OpenCode, and Codex
+    license: MIT
+    repository:
+      owner: everydaydevopsio
+      name: homebrew-ballast
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: github-actions[bot]
+      email: github-actions[bot]@users.noreply.github.com
+    directory: Casks
+    test: |
+      system "#{bin}/ballast", "--help"
 
 changelog:
   sort: asc

@@ -5,6 +5,7 @@ This guide explains how to configure GitHub Actions publishing for:
 - npm (`@everydaydevopsio/ballast`)
 - Python artifacts on GitHub Releases (`ballast-python`)
 - Go CLI release assets (`ballast-go`)
+- Homebrew cask publishing for the `ballast` wrapper CLI
 
 ## Workflow Map
 
@@ -74,6 +75,7 @@ Go publishing in this repository is release-asset publishing (GitHub Releases), 
 - Workflow permission: `contents: write`
 - Go toolchain in workflow (`actions/setup-go`)
 - GoReleaser config in `cli/ballast/.goreleaser.yaml`
+- Repository secret: `HOMEBREW_TAP_GITHUB_TOKEN`
 
 ### 2. Release assets
 
@@ -83,10 +85,42 @@ Upload unique archive artifacts:
 - `*.zip`
 - `checksums.txt`
 
+### 3. Homebrew tap setup with GoReleaser
+
+Create a separate tap repository named `homebrew-ballast` under the `everydaydevopsio` GitHub org or user. The repository should contain a `Casks/` directory and allow pushes from a token stored as the `HOMEBREW_TAP_GITHUB_TOKEN` Actions secret in this repo.
+
+`cli/ballast/.goreleaser.yaml` publishes a cask named `ballast` into that tap:
+
+- Homebrew tap repo: `everydaydevopsio/homebrew-ballast`
+- Cask path: `Casks/ballast.rb`
+- Cask test: `ballast --help`
+
+The Go publish workflows run:
+
+```bash
+goreleaser release --clean --config .goreleaser.yaml
+```
+
+That single GoReleaser release step:
+
+- builds the `ballast` archives
+- uploads release artifacts to GitHub Releases
+- writes or updates `Casks/ballast.rb` in the tap repository
+
+### 4. Homebrew install command
+
+After the tap repo exists and the release workflow has run for a tagged version:
+
+```bash
+brew tap everydaydevopsio/ballast
+brew install --cask ballast
+```
+
 ## Quick Checklist
 
 - npm trusted publisher configured for this repo/workflow.
 - Python workflow uploads wheel/sdist assets to GitHub Release tag `v<version>`.
-- Go workflow uploads archives/checksums to GitHub Release.
+- Go workflow uploads archives/checksums to GitHub Release and updates the Homebrew tap cask.
 - `id-token: write` enabled for npm trusted publish jobs.
 - `contents: write` enabled for release asset upload jobs.
+- `HOMEBREW_TAP_GITHUB_TOKEN` configured for tap repository pushes.
