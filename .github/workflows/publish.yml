@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: 'Release type (patch/minor)'
+        description: 'Release type (patch/minor/major)'
         type: choice
         options:
+          - major
           - patch
           - minor
         default: 'patch'
@@ -63,7 +64,9 @@ jobs:
       - name: Set version
         id: version
         run: |
-          if [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
+          if [ "${{ github.event.inputs.release_type }}" = "major" ]; then
+            echo "version=${{ steps.semvers.outputs.major }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.release_type }}" = "minor" ]; then
             echo "version=${{ steps.semvers.outputs.minor }}" >> $GITHUB_OUTPUT
           else
             echo "version=${{ steps.semvers.outputs.patch }}" >> $GITHUB_OUTPUT
