@@ -51,8 +51,6 @@ homebrew_casks:
       name: github-actions[bot]
       email: github-actions[bot]@users.noreply.github.com
     directory: Casks
-    test: |
-      system "#{bin}/ballast", "--help"
 
 changelog:
   sort: asc
