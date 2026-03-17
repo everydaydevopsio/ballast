@@ -119,6 +119,8 @@ This file provides guidance to Codex (CLI and app) for working in this repositor
 
 ## Installed agent rules
 
+Created by Ballast v9.9.9-test. Do not edit this section.
+
 Read and follow these rule files in \`.codex/rules/\` when they apply:
 
 - \`.codex/rules/linting.md\` — Linting rule
@@ -129,6 +131,9 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(merged).toContain('Keep this note.');
       expect(merged).toContain('## Local Notes');
       expect(merged).toContain('Keep this too.');
+      expect(merged).toMatch(
+        /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
+      );
       expect(merged).toContain('`.codex/rules/linting.md`');
       expect(merged).not.toContain('`.codex/rules/old.md`');
     });

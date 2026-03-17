@@ -4,6 +4,7 @@ import YAML from 'yaml';
 import { getAgentDir } from './agents';
 import type { Target } from './config';
 import type { Language } from './agents';
+import pkg from '../package.json';
 
 const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
 
@@ -225,6 +226,8 @@ export function buildCodexAgentsMd(
   );
   lines.push('');
   lines.push('## Installed agent rules');
+  lines.push('');
+  lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
   lines.push('');
   lines.push(
     'Read and follow these rule files in `.codex/rules/` when they apply:'

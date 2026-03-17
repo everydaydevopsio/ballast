@@ -17,6 +17,7 @@ AGENTS_BY_LANGUAGE = {
     "python": COMMON_AGENTS + LANGUAGE_AGENTS,
     "go": COMMON_AGENTS + LANGUAGE_AGENTS,
 }
+BALLAST_VERSION = "4.1.7"
 
 
 @dataclass
@@ -207,6 +208,8 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
         "This file provides guidance to Codex (CLI and app) for working in this repository.",
         "",
         "## Installed agent rules",
+        "",
+        f"Created by Ballast v{BALLAST_VERSION}. Do not edit this section.",
         "",
         "Read and follow these rule files in `.codex/rules/` when they apply:",
         "",

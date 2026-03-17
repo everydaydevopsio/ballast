@@ -80,6 +80,10 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 
             agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("## Team Notes", agents_md)
+            self.assertRegex(
+                agents_md,
+                r"Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.",
+            )
             self.assertIn("`.codex/rules/linting.md`", agents_md)
             self.assertNotIn("`.codex/rules/old.md`", agents_md)
 

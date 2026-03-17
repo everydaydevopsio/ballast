@@ -23,6 +23,7 @@ var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
+const ballastVersion = "4.1.7"
 
 //go:embed agents/**
 var embeddedAgentsFS embed.FS
@@ -354,6 +355,8 @@ func buildCodexAgentsMD(agents []string, language string) (string, error) {
 		"This file provides guidance to Codex (CLI and app) for working in this repository.",
 		"",
 		"## Installed agent rules",
+		"",
+		"Created by Ballast v" + ballastVersion + ". Do not edit this section.",
 		"",
 		"Read and follow these rule files in `.codex/rules/` when they apply:",
 		"",

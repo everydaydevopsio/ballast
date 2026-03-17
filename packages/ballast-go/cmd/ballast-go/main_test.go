@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -95,6 +96,9 @@ Keep my custom rule text.
 	text := string(content)
 	if !strings.Contains(text, "## Team Notes") {
 		t.Fatalf("expected user notes to remain: %s", text)
+	}
+	if !regexp.MustCompile(`Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
+		t.Fatalf("expected ballast notice to be present: %s", text)
 	}
 	if !strings.Contains(text, "`.codex/rules/linting.md`") {
 		t.Fatalf("expected linting rule to be installed: %s", text)
