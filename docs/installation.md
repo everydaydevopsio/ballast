@@ -67,32 +67,43 @@ ballast-go install --target cursor --all
 
 ## Monorepo Setup: TypeScript + Python + Go
 
-For monorepos, apply Ballast per language profile.
+For mixed-language monorepos, prefer the unified `ballast` wrapper from the repository root. It auto-detects TypeScript, Python, and Go subprojects, installs common agents once at the root, installs language-specific agents in each matching directory, and writes a root `.rulesrc.json` with detected languages and paths.
 
-### TypeScript in a monorepo
+```bash
+ballast install --target cursor --all --yes
+```
+
+Generated behavior:
+
+- Root common rules in `.cursor/rules/` for `local-dev`, `cicd`, and `observability`
+- Per-directory language rules in each detected TypeScript, Python, and Go project
+- Root `.rulesrc.json` containing `target`, `agents`, `languages`, and `paths`
+
+Example root config:
+
+```json
+{
+  "target": "cursor",
+  "agents": ["local-dev", "cicd", "observability", "linting", "logging", "testing"],
+  "languages": ["typescript", "python", "go"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"],
+    "go": ["tools/worker"]
+  }
+}
+```
+
+Manual path overrides are supported by editing the root `.rulesrc.json` before the next `ballast install`.
+
+### Per-language fallback
 
 ```bash
 pnpm exec ballast-typescript install --target cursor --all
-```
-
-### Python in a monorepo
-
-```bash
 VERSION=4.0.0
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
-```
-
-### Go in a monorepo
-
-```bash
 go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest install --target cursor --all
 ```
-
-Suggested sequence:
-
-1. Run TypeScript profile.
-2. Run Python profile.
-3. Run Go profile.
 
 Ballast preserves existing rule files unless `--force` is provided. Use `--patch` to merge upstream Ballast updates into an existing rule file while preserving the user's edited sections.
 
@@ -107,6 +118,7 @@ Ballast preserves existing rule files unless `--force` is provided. Use `--patch
 
 ## Config Persistence
 
+- Wrapper monorepo config: `.rulesrc.json`
 - TypeScript CLI: `.rulesrc.ts.json`
 - Python CLI: `.rulesrc.python.json`
 - Go CLI: `.rulesrc.go.json`

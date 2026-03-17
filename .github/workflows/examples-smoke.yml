@@ -72,6 +72,14 @@ jobs:
         with:
           version: 10.27.0
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -95,5 +103,32 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
           go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
 
+      - name: Build ballast wrapper
+        run: |
+          set -euo pipefail
+          go build -C cli/ballast -o "$GITHUB_WORKSPACE/.ci/bin/ballast" .
+
+      - name: Create local backend shims
+        run: |
+          set -euo pipefail
+          cat > "$GITHUB_WORKSPACE/.ci/bin/ballast-typescript" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/packages/ballast-typescript/dist/cli.js" "$@"
+          EOF
+          chmod +x "$GITHUB_WORKSPACE/.ci/bin/ballast-typescript"
+
+          cat > "$GITHUB_WORKSPACE/.ci/bin/ballast-python" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/packages/ballast-python${PYTHONPATH:+:$PYTHONPATH}" python3 -m ballast "$@"
+          EOF
+          chmod +x "$GITHUB_WORKSPACE/.ci/bin/ballast-python"
+
       - name: Run monorepo patch smoke test
         run: ./scripts/smoke-monorepo-patch.sh "$GITHUB_WORKSPACE/.ci/ballast-examples"
+
+      - name: Run wrapper monorepo smoke test
+        env:
+          PATH: ${{ github.workspace }}/.ci/bin:${{ env.PATH }}
+        run: ./scripts/smoke-wrapper-monorepo.sh

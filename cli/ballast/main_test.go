@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -85,6 +87,173 @@ func TestRunHelpAndVersionCommands(t *testing.T) {
 			t.Fatalf("expected version output %q, got %q", version, got)
 		}
 	})
+}
+
+func TestDetectRepoProfilesFindsMultiLanguageMonorepo(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, "tools", "worker", "go.mod"), "module example.com/worker\n\ngo 1.24\n")
+
+	profiles := detectRepoProfiles(root)
+
+	if len(profiles) != 3 {
+		t.Fatalf("expected 3 profiles, got %d: %#v", len(profiles), profiles)
+	}
+
+	want := []repoProfile{
+		{Language: langTypeScript, Paths: []string{filepath.Join(root, "apps", "frontend")}},
+		{Language: langPython, Paths: []string{filepath.Join(root, "services", "api")}},
+		{Language: langGo, Paths: []string{filepath.Join(root, "tools", "worker")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected profiles %#v, got %#v", want, profiles)
+	}
+}
+
+func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "cursor",
+  "agents": ["local-dev", "linting", "testing"],
+  "languages": ["typescript", "python", "go"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"],
+    "go": ["tools/worker"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+
+	if len(plan) != 4 {
+		t.Fatalf("expected 4 backend invocations, got %d: %#v", len(plan), plan)
+	}
+
+	if plan[0].Language != langTypeScript || plan[0].Dir != root {
+		t.Fatalf("expected common install at repo root via TypeScript backend, got %#v", plan[0])
+	}
+	if got := strings.Join(plan[0].Args, " "); !strings.Contains(got, "--agent local-dev") {
+		t.Fatalf("expected common agent selection, got %q", got)
+	}
+
+	wantDirs := []string{
+		filepath.Join(root, "apps", "frontend"),
+		filepath.Join(root, "services", "api"),
+		filepath.Join(root, "tools", "worker"),
+	}
+	for i, wantDir := range wantDirs {
+		if plan[i+1].Dir != wantDir {
+			t.Fatalf("expected plan[%d] dir %q, got %#v", i+1, wantDir, plan[i+1])
+		}
+		if got := strings.Join(plan[i+1].Args, " "); strings.Contains(got, "local-dev") {
+			t.Fatalf("expected language-only agent selection for %q, got %q", wantDir, got)
+		}
+		if got := strings.Join(plan[i+1].Args, " "); !strings.Contains(got, "--agent linting,testing") {
+			t.Fatalf("expected language agent selection for %q, got %q", wantDir, got)
+		}
+	}
+}
+
+func TestRunMonorepoInstallExecutesEachBackendInScopedDirectory(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, "tools", "worker", "go.mod"), "module example.com/worker\n\ngo 1.24\n")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	var invocations []backendInvocation
+	execToolFunc = func(binary string, args []string, dir string) (int, error) {
+		invocations = append(invocations, backendInvocation{
+			Binary: binary,
+			Args:   append([]string(nil), args...),
+			Dir:    dir,
+		})
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--target", "cursor", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(invocations) != 4 {
+		t.Fatalf("expected 4 invocations, got %d: %#v", len(invocations), invocations)
+	}
+
+	if invocations[0].Dir != root {
+		t.Fatalf("expected root common install, got %#v", invocations[0])
+	}
+	if got := strings.Join(invocations[0].Args, " "); !strings.Contains(got, "--agent local-dev,cicd,observability") {
+		t.Fatalf("expected common agents in first invocation, got %q", got)
+	}
+
+	wantDirs := map[string]bool{
+		filepath.Join(root, "apps", "frontend"): true,
+		filepath.Join(root, "services", "api"):  true,
+		filepath.Join(root, "tools", "worker"):  true,
+	}
+	for _, invocation := range invocations[1:] {
+		if !wantDirs[invocation.Dir] {
+			t.Fatalf("unexpected invocation dir: %#v", invocation)
+		}
+		got := strings.Join(invocation.Args, " ")
+		if !strings.Contains(got, "--agent linting,logging,testing") {
+			t.Fatalf("expected language agents for scoped install, got %q", got)
+		}
+	}
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved monorepo config: %v", err)
+	}
+	configText := string(config)
+	if strings.Contains(configText, root) {
+		t.Fatalf("expected saved monorepo config to use relative paths, got %q", configText)
+	}
+	if !strings.Contains(configText, `"apps/frontend"`) {
+		t.Fatalf("expected saved monorepo config to include relative TypeScript path, got %q", configText)
+	}
+}
+
+func mustWriteFile(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func withWorkingDir(t *testing.T, dir string, fn func()) {
+	t.Helper()
+	previous, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir %s: %v", dir, err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(previous); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+	fn()
 }
 
 func captureStdout(t *testing.T, fn func()) string {
