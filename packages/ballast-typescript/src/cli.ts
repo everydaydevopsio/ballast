@@ -9,6 +9,7 @@ export interface CliOptions {
   language: string;
   all: boolean;
   force: boolean;
+  patch: boolean;
   yes: boolean;
 }
 
@@ -22,6 +23,7 @@ function parseArgs(argv: string[]): ParseArgsResult {
     language: 'typescript',
     all: false,
     force: false,
+    patch: false,
     yes: false
   };
   let i = 0;
@@ -58,6 +60,11 @@ function parseArgs(argv: string[]): ParseArgsResult {
       i++;
       continue;
     }
+    if (arg === '--patch' || arg === '-p') {
+      options.patch = true;
+      i++;
+      continue;
+    }
     if (arg === '--yes' || arg === '-y') {
       options.yes = true;
       i++;
@@ -90,6 +97,7 @@ Options:
   --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
   --all                     Install all agents
   --force, -f               Overwrite existing rule files
+  --patch, -p               Merge upstream rule updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.ts.json
   --help, -h                Show this help
   --version, -v             Show version
@@ -99,6 +107,7 @@ Examples:
   ballast-typescript install --target cursor --agent linting
   ballast-typescript install --language python --target cursor --all
   ballast-typescript install --target claude --all --force
+  ballast-typescript install --target cursor --agent linting --patch
   ballast-typescript install --yes --target cursor --all
 `);
 }

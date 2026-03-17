@@ -151,6 +151,85 @@ describe('install', () => {
       ).toContain('TypeScript linting specialist');
     });
 
+    test('patches an existing rule file when patch is true', () => {
+      const cursorDir = path.join(tmpDir, '.cursor', 'rules');
+      fs.mkdirSync(cursorDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(cursorDir, 'linting.mdc'),
+        `---
+description: Team customized linting rules
+alwaysApply: true
+---
+
+User intro.
+
+## Your Responsibilities
+
+Keep my custom responsibilities.
+
+## Team Overrides
+
+Do not remove this note.
+`
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        patch: true,
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installed).toContain('linting');
+      const content = fs.readFileSync(
+        path.join(cursorDir, 'linting.mdc'),
+        'utf8'
+      );
+      expect(content).toContain('description: Team customized linting rules');
+      expect(content).toContain('alwaysApply: true');
+      expect(content).toContain('Keep my custom responsibilities.');
+      expect(content).toContain('## Team Overrides');
+      expect(content).toContain('## When Completed');
+    });
+
+    test('force wins over patch when both flags are true', () => {
+      const cursorDir = path.join(tmpDir, '.cursor', 'rules');
+      fs.mkdirSync(cursorDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(cursorDir, 'linting.mdc'),
+        `---
+description: Team customized linting rules
+alwaysApply: true
+---
+
+User intro.
+
+## Your Responsibilities
+
+Keep my custom responsibilities.
+`
+      );
+
+      install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        patch: true,
+        force: true,
+        saveConfig: false
+      });
+
+      const content = fs.readFileSync(
+        path.join(cursorDir, 'linting.mdc'),
+        'utf8'
+      );
+      expect(content).toContain('TypeScript linting specialist');
+      expect(content).toContain('alwaysApply: false');
+      expect(content).not.toContain('Keep my custom responsibilities.');
+    });
+
     test('saves config when saveConfig is true', () => {
       install({
         projectRoot: tmpDir,
@@ -349,6 +428,62 @@ describe('install', () => {
         expect(fs.readFileSync(agentsMd, 'utf8')).toContain(
           '`.codex/rules/linting.md`'
         );
+      });
+
+      test('codex patch updates installed rules section without removing user notes', () => {
+        const codexDir = path.join(tmpDir, '.codex', 'rules');
+        fs.mkdirSync(codexDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(codexDir, 'linting.md'),
+          `# TypeScript Linting Rules
+
+Team intro.
+
+## Your Responsibilities
+
+Keep my custom rule text.
+`
+        );
+        fs.writeFileSync(
+          path.join(tmpDir, 'AGENTS.md'),
+          `# AGENTS.md
+
+## Team Notes
+
+Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in \`.codex/rules/\` when they apply:
+
+- \`.codex/rules/old.md\` — Old rule
+`
+        );
+
+        install({
+          projectRoot: tmpDir,
+          target: 'codex',
+          agents: ['linting'],
+          patch: true,
+          force: false,
+          saveConfig: false
+        });
+
+        const codexRule = fs.readFileSync(
+          path.join(codexDir, 'linting.md'),
+          'utf8'
+        );
+        expect(codexRule).toContain('Keep my custom rule text.');
+        expect(codexRule).toContain('## When Completed');
+
+        const agentsMd = fs.readFileSync(
+          path.join(tmpDir, 'AGENTS.md'),
+          'utf8'
+        );
+        expect(agentsMd).toContain('## Team Notes');
+        expect(agentsMd).toContain('Keep this section.');
+        expect(agentsMd).toContain('`.codex/rules/linting.md`');
+        expect(agentsMd).not.toContain('`.codex/rules/old.md`');
       });
 
       test('written path matches getDestination for each target', () => {

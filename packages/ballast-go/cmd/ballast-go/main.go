@@ -66,7 +66,13 @@ type installOptions struct {
 	agents      []string
 	language    string
 	force       bool
+	patch       bool
 	saveConfig  bool
+}
+
+type markdownSection struct {
+	heading string
+	text    string
 }
 
 func main() {
@@ -92,6 +98,8 @@ func runInstall(args []string) int {
 	fs.StringVar(agent, "a", "", "comma-separated list")
 	all := fs.Bool("all", false, "install all agents")
 	force := fs.Bool("force", false, "overwrite files")
+	patch := fs.Bool("patch", false, "merge upstream updates into existing files")
+	fs.BoolVar(patch, "p", false, "merge upstream updates into existing files")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	if err := fs.Parse(trimCommand(args)); err != nil {
@@ -140,6 +148,7 @@ func runInstall(args []string) int {
 		agents:      resolved.Agents,
 		language:    lang,
 		force:       *force,
+		patch:       *patch,
 		saveConfig:  persist,
 	})
 
@@ -265,7 +274,12 @@ func install(opts installOptions) installResult {
 				base = agentID + "-" + suffix
 			}
 			dir, file := destination(opts.projectRoot, opts.target, base)
-			if exists(file) && !opts.force {
+			content, err := buildContent(agentID, opts.target, opts.language, suffix)
+			if err != nil {
+				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
+				continue
+			}
+			if exists(file) && !opts.force && !opts.patch {
 				agentSkipped = true
 				agentProcessed = true
 				continue
@@ -274,12 +288,16 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 				continue
 			}
-			content, err := buildContent(agentID, opts.target, opts.language, suffix)
-			if err != nil {
-				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
-				continue
+			nextContent := content
+			if exists(file) && !opts.force && opts.patch {
+				existing, err := os.ReadFile(file)
+				if err != nil {
+					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
+					continue
+				}
+				nextContent = patchRuleContent(string(existing), content, opts.target)
 			}
-			if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+			if err := os.WriteFile(file, []byte(nextContent), 0o644); err != nil {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 				continue
 			}
@@ -300,17 +318,28 @@ func install(opts installOptions) installResult {
 
 	if opts.target == "codex" {
 		agentsPath := codexAgentsMDPath(opts.projectRoot)
-		if exists(agentsPath) && !opts.force {
+		if exists(agentsPath) && !opts.force && !opts.patch {
 			result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
 		} else {
 			ids := sortedKeys(processed)
 			content, err := buildCodexAgentsMD(ids, opts.language)
 			if err != nil {
 				result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
-			} else if err := os.WriteFile(agentsPath, []byte(content), 0o644); err != nil {
-				result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 			} else {
-				result.installedSupport = append(result.installedSupport, agentsPath)
+				nextContent := content
+				if exists(agentsPath) && !opts.force && opts.patch {
+					existing, readErr := os.ReadFile(agentsPath)
+					if readErr != nil {
+						result.errors = append(result.errors, agentError{agent: "codex", err: readErr.Error()})
+					} else {
+						nextContent = patchCodexAgentsMD(string(existing), content)
+					}
+				}
+				if err := os.WriteFile(agentsPath, []byte(nextContent), 0o644); err != nil {
+					result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
+				} else {
+					result.installedSupport = append(result.installedSupport, agentsPath)
+				}
 			}
 		}
 	}
@@ -360,6 +389,138 @@ func codexRuleDescription(agentID, language, suffix string) (string, error) {
 		return "", nil
 	}
 	return strings.TrimSpace(match[1]), nil
+}
+
+func splitFrontmatterDocument(content string) (string, string) {
+	if !strings.HasPrefix(content, "---\n") {
+		return "", strings.TrimLeft(content, "\r\n\t ")
+	}
+	end := strings.Index(content[4:], "\n---")
+	if end < 0 {
+		return "", strings.TrimLeft(content, "\r\n\t ")
+	}
+	blockEnd := 4 + end + len("\n---")
+	frontmatter := strings.TrimRight(content[:blockEnd], "\r\n")
+	body := strings.TrimLeft(content[blockEnd:], "\r\n\t ")
+	return frontmatter, body
+}
+
+func parseMarkdownBody(content string) (string, []markdownSection) {
+	lines := strings.Split(content, "\n")
+	type pos struct {
+		index   int
+		heading string
+	}
+	var headings []pos
+	for i, line := range lines {
+		if strings.HasPrefix(line, "## ") {
+			headings = append(headings, pos{index: i, heading: line})
+		}
+	}
+	if len(headings) == 0 {
+		return strings.TrimSpace(content), nil
+	}
+	intro := strings.TrimSpace(strings.Join(lines[:headings[0].index], "\n"))
+	sections := make([]markdownSection, 0, len(headings))
+	for i, item := range headings {
+		end := len(lines)
+		if i+1 < len(headings) {
+			end = headings[i+1].index
+		}
+		text := strings.TrimSpace(strings.Join(lines[item.index:end], "\n"))
+		sections = append(sections, markdownSection{heading: item.heading, text: text})
+	}
+	return intro, sections
+}
+
+func mergeMarkdownBodies(existing, canonical string) string {
+	if strings.TrimSpace(existing) == "" {
+		return canonical
+	}
+	existingIntro, existingSections := parseMarkdownBody(existing)
+	canonicalIntro, canonicalSections := parseMarkdownBody(canonical)
+	existingByHeading := make(map[string]string, len(existingSections))
+	canonicalHeadings := make(map[string]struct{}, len(canonicalSections))
+	for _, section := range existingSections {
+		existingByHeading[section.heading] = section.text
+	}
+	for _, section := range canonicalSections {
+		canonicalHeadings[section.heading] = struct{}{}
+	}
+	parts := make([]string, 0, len(existingSections)+len(canonicalSections)+1)
+	intro := existingIntro
+	if intro == "" {
+		intro = canonicalIntro
+	}
+	if intro != "" {
+		parts = append(parts, intro)
+	}
+	for _, section := range canonicalSections {
+		if existingText, ok := existingByHeading[section.heading]; ok {
+			parts = append(parts, existingText)
+		} else {
+			parts = append(parts, section.text)
+		}
+	}
+	for _, section := range existingSections {
+		if _, ok := canonicalHeadings[section.heading]; !ok {
+			parts = append(parts, section.text)
+		}
+	}
+	return strings.TrimRight(strings.Join(parts, "\n\n"), "\n") + "\n"
+}
+
+func patchRuleContent(existing, canonical, target string) string {
+	if strings.TrimSpace(existing) == "" {
+		return canonical
+	}
+	if target == "cursor" || target == "opencode" {
+		existingFrontmatter, existingBody := splitFrontmatterDocument(existing)
+		canonicalFrontmatter, canonicalBody := splitFrontmatterDocument(canonical)
+		body := mergeMarkdownBodies(existingBody, canonicalBody)
+		switch {
+		case existingFrontmatter != "":
+			return existingFrontmatter + "\n\n" + body
+		case canonicalFrontmatter != "":
+			return canonicalFrontmatter + "\n\n" + body
+		default:
+			return body
+		}
+	}
+	return mergeMarkdownBodies(existing, canonical)
+}
+
+func findSectionRange(content, heading string) (int, int, bool) {
+	marker := "## " + heading
+	start := strings.Index(content, marker)
+	if start < 0 {
+		return 0, 0, false
+	}
+	next := strings.Index(content[start+len(marker):], "\n## ")
+	if next < 0 {
+		return start, len(content), true
+	}
+	return start, start + len(marker) + next + 1, true
+}
+
+func patchCodexAgentsMD(existing, canonical string) string {
+	if strings.TrimSpace(existing) == "" {
+		return canonical
+	}
+	canonicalStart, canonicalEnd, ok := findSectionRange(canonical, "Installed agent rules")
+	if !ok {
+		return existing
+	}
+	canonicalSection := strings.TrimRight(canonical[canonicalStart:canonicalEnd], "\n")
+	existingStart, existingEnd, ok := findSectionRange(existing, "Installed agent rules")
+	if !ok {
+		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
+	}
+	return strings.TrimRight(existing[:existingStart], "\n") +
+		"\n\n" +
+		canonicalSection +
+		"\n\n" +
+		strings.TrimLeft(existing[existingEnd:], "\n") + "\n"
 }
 
 func buildContent(agentID, target, language, suffix string) (string, error) {

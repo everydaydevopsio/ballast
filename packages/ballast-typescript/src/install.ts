@@ -8,6 +8,7 @@ import {
   listRuleSuffixes,
   listTargets
 } from './build';
+import { patchCodexAgentsMd, patchRuleContent } from './patch';
 import {
   listAgents,
   resolveAgents,
@@ -118,6 +119,7 @@ export interface InstallOptions {
   agents: string[];
   language?: Language;
   force?: boolean;
+  patch?: boolean;
   saveConfig?: boolean;
 }
 
@@ -141,6 +143,7 @@ export function install(options: InstallOptions): InstallResult {
     agents,
     language = 'typescript',
     force = false,
+    patch = false,
     saveConfig: persist
   } = options;
   const installed: string[] = [];
@@ -172,11 +175,7 @@ export function install(options: InstallOptions): InstallResult {
           projectRoot,
           ruleSuffix || undefined
         );
-        if (fs.existsSync(file) && !force) {
-          agentSkipped = true;
-          agentProcessed = true;
-          continue;
-        }
+        const fileExists = fs.existsSync(file);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
@@ -186,7 +185,16 @@ export function install(options: InstallOptions): InstallResult {
           ruleSuffix || undefined,
           language
         );
-        fs.writeFileSync(file, content, 'utf8');
+        if (fileExists && !force && !patch) {
+          agentSkipped = true;
+          agentProcessed = true;
+          continue;
+        }
+        const nextContent =
+          fileExists && !force && patch
+            ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
+            : content;
+        fs.writeFileSync(file, nextContent, 'utf8');
         installedRules.push({ agentId, ruleSuffix: ruleSuffix || '' });
         agentInstalled = true;
         agentProcessed = true;
@@ -204,7 +212,7 @@ export function install(options: InstallOptions): InstallResult {
 
   if (target === 'codex') {
     const agentsMdPath = getCodexAgentsMdPath(projectRoot);
-    if (fs.existsSync(agentsMdPath) && !force) {
+    if (fs.existsSync(agentsMdPath) && !force && !patch) {
       skippedSupportFiles.push(agentsMdPath);
     } else {
       try {
@@ -212,7 +220,11 @@ export function install(options: InstallOptions): InstallResult {
           Array.from(processedAgentIds),
           language
         );
-        fs.writeFileSync(agentsMdPath, content, 'utf8');
+        const nextContent =
+          fs.existsSync(agentsMdPath) && !force && patch
+            ? patchCodexAgentsMd(fs.readFileSync(agentsMdPath, 'utf8'), content)
+            : content;
+        fs.writeFileSync(agentsMdPath, nextContent, 'utf8');
         installedSupportFiles.push(agentsMdPath);
       } catch (err) {
         errors.push({
@@ -240,6 +252,7 @@ export interface RunInstallOptions {
   all?: boolean;
   language?: Language;
   force?: boolean;
+  patch?: boolean;
   yes?: boolean;
 }
 
@@ -279,6 +292,7 @@ export async function runInstall(
     agents,
     language,
     force: options.force ?? false,
+    patch: options.patch ?? false,
     saveConfig: persist
   });
 

@@ -220,6 +220,100 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
     return "\n".join(lines)
 
 
+def split_frontmatter_document(content: str) -> tuple[str | None, str]:
+    match = re.match(r"^---\r?\n([\s\S]*?)\r?\n---\r?\n?", content)
+    if not match:
+        return None, content.lstrip()
+    return match.group(0).rstrip(), content[match.end() :].lstrip()
+
+
+def parse_markdown_body(content: str) -> tuple[str, list[tuple[str, str]]]:
+    matches = list(re.finditer(r"^## .*(?:\r?\n|$)", content, re.MULTILINE))
+    if not matches:
+        return content.strip(), []
+
+    intro = content[: matches[0].start()].strip()
+    sections: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+        section_text = content[match.start() : end].strip()
+        heading = section_text.splitlines()[0]
+        sections.append((heading, section_text))
+    return intro, sections
+
+
+def merge_markdown_bodies(existing: str, canonical: str) -> str:
+    if not existing.strip():
+        return canonical
+
+    existing_intro, existing_sections = parse_markdown_body(existing)
+    canonical_intro, canonical_sections = parse_markdown_body(canonical)
+    existing_by_heading = {heading: text for heading, text in existing_sections}
+    canonical_headings = {heading for heading, _ in canonical_sections}
+
+    parts: list[str] = []
+    intro = existing_intro or canonical_intro
+    if intro:
+        parts.append(intro)
+
+    for heading, text in canonical_sections:
+        parts.append(existing_by_heading.get(heading, text))
+
+    for heading, text in existing_sections:
+        if heading not in canonical_headings:
+            parts.append(text)
+
+    return "\n\n".join(parts).rstrip() + "\n"
+
+
+def patch_rule_content(existing: str, canonical: str, target: str) -> str:
+    if not existing.strip():
+        return canonical
+
+    if target in {"cursor", "opencode"}:
+        existing_frontmatter, existing_body = split_frontmatter_document(existing)
+        canonical_frontmatter, canonical_body = split_frontmatter_document(canonical)
+        body = merge_markdown_bodies(existing_body, canonical_body)
+        if existing_frontmatter:
+            return f"{existing_frontmatter}\n\n{body}"
+        if canonical_frontmatter:
+            return f"{canonical_frontmatter}\n\n{body}"
+        return body
+
+    return merge_markdown_bodies(existing, canonical)
+
+
+def find_markdown_section_range(content: str, heading: str) -> tuple[int, int] | None:
+    match = re.search(rf"^## {re.escape(heading)}$", content, re.MULTILINE)
+    if not match:
+        return None
+    next_heading = re.search(r"\n## .*", content[match.end() :])
+    end = match.end() + next_heading.start() + 1 if next_heading else len(content)
+    return match.start(), end
+
+
+def patch_codex_agents_md(existing: str, canonical: str) -> str:
+    if not existing.strip():
+        return canonical
+
+    canonical_range = find_markdown_section_range(canonical, "Installed agent rules")
+    if not canonical_range:
+        return existing
+    canonical_section = canonical[canonical_range[0] : canonical_range[1]].rstrip()
+
+    existing_range = find_markdown_section_range(existing, "Installed agent rules")
+    if not existing_range:
+        return existing.rstrip() + "\n\n" + canonical_section + "\n"
+
+    return (
+        existing[: existing_range[0]].rstrip()
+        + "\n\n"
+        + canonical_section
+        + "\n\n"
+        + existing[existing_range[1] :].lstrip()
+    ).rstrip() + "\n"
+
+
 def prompt(question: str) -> str:
     return input(question).strip()
 
@@ -269,7 +363,9 @@ def resolve_target_and_agents(args: argparse.Namespace, root: Path, language: st
     return resolved_target, resolved_agents
 
 
-def install(root: Path, target: str, agents: list[str], language: str, force: bool, persist: bool) -> InstallResult:
+def install(
+    root: Path, target: str, agents: list[str], language: str, force: bool, patch: bool, persist: bool
+) -> InstallResult:
     result = InstallResult()
     processed_agents: list[str] = []
 
@@ -289,12 +385,18 @@ def install(root: Path, target: str, agents: list[str], language: str, force: bo
             for suffix in list_rule_suffixes(agent, language):
                 basename = agent if suffix == "" else f"{agent}-{suffix}"
                 dst = destination(root, target, basename)
-                if dst.exists() and not force:
+                content = build_content(agent, target, language, suffix)
+                if dst.exists() and not force and not patch:
                     agent_skipped = True
                     agent_processed = True
                     continue
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_text(build_content(agent, target, language, suffix), encoding="utf-8")
+                next_content = (
+                    patch_rule_content(dst.read_text(encoding="utf-8"), content, target)
+                    if dst.exists() and not force and patch
+                    else content
+                )
+                dst.write_text(next_content, encoding="utf-8")
                 result.installed_rules.append((agent, suffix))
                 agent_installed = True
                 agent_processed = True
@@ -309,11 +411,17 @@ def install(root: Path, target: str, agents: list[str], language: str, force: bo
 
     if target == "codex":
         agents_md = root / "AGENTS.md"
-        if agents_md.exists() and not force:
+        if agents_md.exists() and not force and not patch:
             result.skipped_support_files.append(str(agents_md))
         else:
             try:
-                agents_md.write_text(build_codex_agents_md(processed_agents, language), encoding="utf-8")
+                content = build_codex_agents_md(processed_agents, language)
+                next_content = (
+                    patch_codex_agents_md(agents_md.read_text(encoding="utf-8"), content)
+                    if agents_md.exists() and not force and patch
+                    else content
+                )
+                agents_md.write_text(next_content, encoding="utf-8")
                 result.installed_support_files.append(str(agents_md))
             except Exception as err:
                 result.errors.append(("codex", str(err)))
@@ -342,7 +450,7 @@ def run_install(args: argparse.Namespace) -> int:
         return 1
 
     persist = not args.target and not args.agent and not args.all
-    result = install(root, target, agents, language, bool(args.force), persist)
+    result = install(root, target, agents, language, bool(args.force), bool(args.patch), persist)
 
     if result.errors:
         for agent, error in result.errors:
@@ -379,6 +487,7 @@ def parser() -> argparse.ArgumentParser:
     install_cmd.add_argument("--agent", "-a")
     install_cmd.add_argument("--all", action="store_true")
     install_cmd.add_argument("--force", "-f", action="store_true")
+    install_cmd.add_argument("--patch", "-p", action="store_true")
     install_cmd.add_argument("--yes", "-y", action="store_true")
     return p
 
