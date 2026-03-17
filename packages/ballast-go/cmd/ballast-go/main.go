@@ -23,6 +23,9 @@ var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
+var ballastVersion = "dev"
+var frontmatterRegex = regexp.MustCompile(`(?s)^\s*---\n(.*?)\n---\n?`)
+var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
 
 //go:embed agents/**
 var embeddedAgentsFS embed.FS
@@ -66,7 +69,18 @@ type installOptions struct {
 	agents      []string
 	language    string
 	force       bool
+	patch       bool
 	saveConfig  bool
+}
+
+type markdownSection struct {
+	heading string
+	text    string
+}
+
+type yamlBlock struct {
+	key  string
+	text string
 }
 
 func main() {
@@ -92,6 +106,8 @@ func runInstall(args []string) int {
 	fs.StringVar(agent, "a", "", "comma-separated list")
 	all := fs.Bool("all", false, "install all agents")
 	force := fs.Bool("force", false, "overwrite files")
+	patch := fs.Bool("patch", false, "merge upstream updates into existing files")
+	fs.BoolVar(patch, "p", false, "merge upstream updates into existing files")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	if err := fs.Parse(trimCommand(args)); err != nil {
@@ -140,6 +156,7 @@ func runInstall(args []string) int {
 		agents:      resolved.Agents,
 		language:    lang,
 		force:       *force,
+		patch:       *patch,
 		saveConfig:  persist,
 	})
 
@@ -265,7 +282,12 @@ func install(opts installOptions) installResult {
 				base = agentID + "-" + suffix
 			}
 			dir, file := destination(opts.projectRoot, opts.target, base)
-			if exists(file) && !opts.force {
+			content, err := buildContent(agentID, opts.target, opts.language, suffix)
+			if err != nil {
+				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
+				continue
+			}
+			if exists(file) && !opts.force && !opts.patch {
 				agentSkipped = true
 				agentProcessed = true
 				continue
@@ -274,12 +296,16 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 				continue
 			}
-			content, err := buildContent(agentID, opts.target, opts.language, suffix)
-			if err != nil {
-				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
-				continue
+			nextContent := content
+			if exists(file) && !opts.force && opts.patch {
+				existing, err := os.ReadFile(file)
+				if err != nil {
+					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
+					continue
+				}
+				nextContent = patchRuleContent(string(existing), content, opts.target)
 			}
-			if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
+			if err := os.WriteFile(file, []byte(nextContent), 0o644); err != nil {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 				continue
 			}
@@ -300,17 +326,28 @@ func install(opts installOptions) installResult {
 
 	if opts.target == "codex" {
 		agentsPath := codexAgentsMDPath(opts.projectRoot)
-		if exists(agentsPath) && !opts.force {
+		if exists(agentsPath) && !opts.force && !opts.patch {
 			result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
 		} else {
 			ids := sortedKeys(processed)
 			content, err := buildCodexAgentsMD(ids, opts.language)
 			if err != nil {
 				result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
-			} else if err := os.WriteFile(agentsPath, []byte(content), 0o644); err != nil {
-				result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 			} else {
-				result.installedSupport = append(result.installedSupport, agentsPath)
+				nextContent := content
+				if exists(agentsPath) && !opts.force && opts.patch {
+					existing, readErr := os.ReadFile(agentsPath)
+					if readErr != nil {
+						result.errors = append(result.errors, agentError{agent: "codex", err: readErr.Error()})
+					} else {
+						nextContent = patchCodexAgentsMD(string(existing), content)
+					}
+				}
+				if err := os.WriteFile(agentsPath, []byte(nextContent), 0o644); err != nil {
+					result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
+				} else {
+					result.installedSupport = append(result.installedSupport, agentsPath)
+				}
 			}
 		}
 	}
@@ -325,6 +362,8 @@ func buildCodexAgentsMD(agents []string, language string) (string, error) {
 		"This file provides guidance to Codex (CLI and app) for working in this repository.",
 		"",
 		"## Installed agent rules",
+		"",
+		"Created by Ballast v" + ballastVersion + ". Do not edit this section.",
 		"",
 		"Read and follow these rule files in `.codex/rules/` when they apply:",
 		"",
@@ -360,6 +399,319 @@ func codexRuleDescription(agentID, language, suffix string) (string, error) {
 		return "", nil
 	}
 	return strings.TrimSpace(match[1]), nil
+}
+
+func normalizeLineEndings(content string) string {
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	return strings.ReplaceAll(content, "\r", "\n")
+}
+
+func splitFrontmatterDocument(content string) (string, string) {
+	normalized := normalizeLineEndings(content)
+	match := frontmatterRegex.FindStringSubmatchIndex(normalized)
+	if match == nil || match[0] != 0 {
+		return "", strings.TrimLeft(normalized, "\n\t ")
+	}
+	frontmatter := strings.TrimRight(normalized[match[0]:match[1]], "\n")
+	body := strings.TrimLeft(normalized[match[1]:], "\n\t ")
+	return frontmatter, body
+}
+
+func extractFrontmatterYAML(frontmatter string) string {
+	match := frontmatterRegex.FindStringSubmatch(frontmatter)
+	if len(match) < 2 {
+		return ""
+	}
+	return match[1]
+}
+
+func parseTopLevelYAMLBlocks(yamlContent string) (string, []yamlBlock) {
+	lines := strings.Split(normalizeLineEndings(yamlContent), "\n")
+	blocks := make([]yamlBlock, 0)
+	preamble := make([]string, 0)
+	currentKey := ""
+	currentLines := make([]string, 0)
+	flush := func() {
+		if currentKey != "" {
+			blocks = append(blocks, yamlBlock{
+				key:  currentKey,
+				text: strings.TrimRight(strings.Join(currentLines, "\n"), "\n"),
+			})
+		}
+		currentKey = ""
+		currentLines = currentLines[:0]
+	}
+
+	for _, line := range lines {
+		if match := topLevelYAMLKeyRegex.FindStringSubmatch(line); len(match) == 3 {
+			flush()
+			currentKey = match[1]
+			currentLines = append(currentLines, line)
+			continue
+		}
+		if currentKey == "" {
+			preamble = append(preamble, line)
+			continue
+		}
+		currentLines = append(currentLines, line)
+	}
+	flush()
+
+	return strings.TrimSpace(strings.Join(preamble, "\n")), blocks
+}
+
+func splitNestedYAMLBlock(block string) (string, string, int, bool) {
+	lines := strings.Split(block, "\n")
+	if len(lines) < 2 {
+		return "", "", 0, false
+	}
+	bodyLines := lines[1:]
+	nonEmpty := make([]string, 0, len(bodyLines))
+	for _, line := range bodyLines {
+		if strings.TrimSpace(line) != "" {
+			nonEmpty = append(nonEmpty, line)
+		}
+	}
+	if len(nonEmpty) == 0 {
+		return "", "", 0, false
+	}
+	indent := -1
+	for _, line := range nonEmpty {
+		currentIndent := len(line) - len(strings.TrimLeft(line, " "))
+		if indent < 0 || currentIndent < indent {
+			indent = currentIndent
+		}
+	}
+	if indent <= 0 {
+		return "", "", 0, false
+	}
+	dedented := make([]string, 0, len(bodyLines))
+	for _, line := range bodyLines {
+		if strings.TrimSpace(line) == "" {
+			dedented = append(dedented, "")
+			continue
+		}
+		dedented = append(dedented, line[indent:])
+	}
+	for _, line := range dedented {
+		if strings.HasPrefix(line, "- ") {
+			return "", "", 0, false
+		}
+	}
+	return lines[0], strings.TrimRight(strings.Join(dedented, "\n"), "\n"), indent, true
+}
+
+func mergeYAMLBlocks(existingBlock, canonicalBlock string) string {
+	existingHeader, existingBody, _, existingOK := splitNestedYAMLBlock(existingBlock)
+	_, canonicalBody, canonicalIndent, canonicalOK := splitNestedYAMLBlock(canonicalBlock)
+	if !existingOK || !canonicalOK {
+		return existingBlock
+	}
+	mergedBody, ok := mergeYAMLMappingContent(existingBody, canonicalBody)
+	if !ok {
+		return existingBlock
+	}
+	lines := []string{existingHeader}
+	for _, line := range strings.Split(mergedBody, "\n") {
+		if line == "" {
+			lines = append(lines, "")
+			continue
+		}
+		lines = append(lines, strings.Repeat(" ", canonicalIndent)+line)
+	}
+	return strings.TrimRight(strings.Join(lines, "\n"), "\n")
+}
+
+func mergeYAMLMappingContent(existingYAML, canonicalYAML string) (string, bool) {
+	existingPreamble, existingBlocks := parseTopLevelYAMLBlocks(existingYAML)
+	canonicalPreamble, canonicalBlocks := parseTopLevelYAMLBlocks(canonicalYAML)
+	if len(canonicalBlocks) == 0 {
+		return "", false
+	}
+	existingByKey := make(map[string]string, len(existingBlocks))
+	canonicalKeys := make(map[string]struct{}, len(canonicalBlocks))
+	for _, block := range existingBlocks {
+		existingByKey[block.key] = block.text
+	}
+
+	parts := make([]string, 0, len(existingBlocks)+len(canonicalBlocks)+1)
+	preamble := canonicalPreamble
+	if preamble == "" {
+		preamble = existingPreamble
+	}
+	if preamble != "" {
+		parts = append(parts, preamble)
+	}
+	for _, block := range canonicalBlocks {
+		canonicalKeys[block.key] = struct{}{}
+		if existing, ok := existingByKey[block.key]; ok {
+			parts = append(parts, mergeYAMLBlocks(existing, block.text))
+		} else {
+			parts = append(parts, block.text)
+		}
+	}
+	for _, block := range existingBlocks {
+		if _, ok := canonicalKeys[block.key]; !ok {
+			parts = append(parts, block.text)
+		}
+	}
+	return strings.TrimRight(strings.Join(parts, "\n"), "\n"), true
+}
+
+func mergeFrontmatter(existingFrontmatter, canonicalFrontmatter string) string {
+	switch {
+	case canonicalFrontmatter == "":
+		return existingFrontmatter
+	case existingFrontmatter == "":
+		return canonicalFrontmatter
+	}
+
+	existingYAML := extractFrontmatterYAML(existingFrontmatter)
+	canonicalYAML := extractFrontmatterYAML(canonicalFrontmatter)
+	if existingYAML == "" || canonicalYAML == "" {
+		return existingFrontmatter
+	}
+	mergedYAML, ok := mergeYAMLMappingContent(existingYAML, canonicalYAML)
+	if !ok {
+		return existingFrontmatter
+	}
+	return "---\n" + mergedYAML + "\n---"
+}
+
+func parseMarkdownBody(content string) (string, []markdownSection) {
+	lines := strings.Split(normalizeLineEndings(content), "\n")
+	type pos struct {
+		index   int
+		heading string
+	}
+	var headings []pos
+	for i, line := range lines {
+		if strings.HasPrefix(line, "## ") {
+			headings = append(headings, pos{index: i, heading: line})
+		}
+	}
+	if len(headings) == 0 {
+		return strings.TrimSpace(content), nil
+	}
+	intro := strings.TrimSpace(strings.Join(lines[:headings[0].index], "\n"))
+	sections := make([]markdownSection, 0, len(headings))
+	for i, item := range headings {
+		end := len(lines)
+		if i+1 < len(headings) {
+			end = headings[i+1].index
+		}
+		text := strings.TrimSpace(strings.Join(lines[item.index:end], "\n"))
+		sections = append(sections, markdownSection{heading: item.heading, text: text})
+	}
+	return intro, sections
+}
+
+func mergeMarkdownBodies(existing, canonical string) string {
+	if strings.TrimSpace(existing) == "" {
+		return normalizeLineEndings(canonical)
+	}
+	existingIntro, existingSections := parseMarkdownBody(existing)
+	canonicalIntro, canonicalSections := parseMarkdownBody(canonical)
+	existingByHeading := make(map[string]string, len(existingSections))
+	canonicalHeadings := make(map[string]struct{}, len(canonicalSections))
+	for _, section := range existingSections {
+		existingByHeading[section.heading] = section.text
+	}
+	for _, section := range canonicalSections {
+		canonicalHeadings[section.heading] = struct{}{}
+	}
+	parts := make([]string, 0, len(existingSections)+len(canonicalSections)+1)
+	intro := existingIntro
+	if intro == "" {
+		intro = canonicalIntro
+	}
+	if intro != "" {
+		parts = append(parts, intro)
+	}
+	for _, section := range canonicalSections {
+		if existingText, ok := existingByHeading[section.heading]; ok {
+			parts = append(parts, existingText)
+		} else {
+			parts = append(parts, section.text)
+		}
+	}
+	for _, section := range existingSections {
+		if _, ok := canonicalHeadings[section.heading]; !ok {
+			parts = append(parts, section.text)
+		}
+	}
+	return strings.TrimRight(strings.Join(parts, "\n\n"), "\n") + "\n"
+}
+
+func patchRuleContent(existing, canonical, target string) string {
+	if strings.TrimSpace(existing) == "" {
+		return normalizeLineEndings(canonical)
+	}
+	if target == "cursor" || target == "opencode" {
+		existingFrontmatter, existingBody := splitFrontmatterDocument(existing)
+		canonicalFrontmatter, canonicalBody := splitFrontmatterDocument(canonical)
+		frontmatter := mergeFrontmatter(existingFrontmatter, canonicalFrontmatter)
+		body := mergeMarkdownBodies(existingBody, canonicalBody)
+		switch {
+		case frontmatter != "":
+			return frontmatter + "\n\n" + body
+		default:
+			return body
+		}
+	}
+	return mergeMarkdownBodies(existing, canonical)
+}
+
+func findSectionRange(content, heading string) (int, int, bool) {
+	normalized := normalizeLineEndings(content)
+	lines := strings.SplitAfter(normalized, "\n")
+	position := 0
+	start := -1
+	end := len(normalized)
+	marker := "## " + heading
+	inCodeFence := false
+
+	for index, line := range lines {
+		trimmed := strings.TrimSuffix(line, "\n")
+		if strings.HasPrefix(strings.TrimSpace(trimmed), "```") {
+			inCodeFence = !inCodeFence
+		}
+		if !inCodeFence && start < 0 {
+			if trimmed == marker {
+				start = position
+			}
+		} else if !inCodeFence && strings.HasPrefix(trimmed, "## ") {
+			end = position
+			return start, end, true
+		}
+		position += len(line)
+		if index == len(lines)-1 && start >= 0 {
+			return start, end, true
+		}
+	}
+	return 0, 0, false
+}
+
+func patchCodexAgentsMD(existing, canonical string) string {
+	if strings.TrimSpace(existing) == "" {
+		return normalizeLineEndings(canonical)
+	}
+	existing = normalizeLineEndings(existing)
+	canonical = normalizeLineEndings(canonical)
+	canonicalStart, canonicalEnd, ok := findSectionRange(canonical, "Installed agent rules")
+	if !ok {
+		return existing
+	}
+	canonicalSection := strings.TrimRight(canonical[canonicalStart:canonicalEnd], "\n")
+	existingStart, existingEnd, ok := findSectionRange(existing, "Installed agent rules")
+	if !ok {
+		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
+	}
+	return strings.TrimRight(existing[:existingStart], "\n") +
+		"\n\n" +
+		canonicalSection +
+		"\n\n" +
+		strings.TrimLeft(existing[existingEnd:], "\n") + "\n"
 }
 
 func buildContent(agentID, target, language, suffix string) (string, error) {

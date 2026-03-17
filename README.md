@@ -115,7 +115,7 @@ Recommended order for one repository that uses all three languages:
 2. Run the Python command.
 3. Run the Go command.
 
-Ballast only installs shipped agents and follows the single overwrite policy (existing rule files are preserved unless `--force` is passed).
+Ballast only installs shipped agents and follows the single overwrite policy (existing rule files are preserved unless `--force` is passed). Use `--patch` to merge new Ballast content into an existing rule file while preserving the user's version of edited sections.
 
 ## CLI Flags
 
@@ -123,6 +123,7 @@ Ballast only installs shipped agents and follows the single overwrite policy (ex
 - `--agent, -a`: comma-separated agent list
 - `--all`: install all agents for the selected language
 - `--force, -f`: overwrite existing rule files
+- `--patch, -p`: merge upstream rule updates into existing rule files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
 
 ## Config Files

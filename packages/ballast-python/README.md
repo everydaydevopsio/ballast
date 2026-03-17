@@ -13,4 +13,5 @@ uv tool install ballast-python
 ```bash
 ballast-python install --target cursor --all
 uvx --from ballast-python ballast-python install --target codex --agent linting
+ballast-python install --target cursor --agent linting --patch
 ```

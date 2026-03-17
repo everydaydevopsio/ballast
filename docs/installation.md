@@ -94,7 +94,7 @@ Suggested sequence:
 2. Run Python profile.
 3. Run Go profile.
 
-Ballast preserves existing rule files unless `--force` is provided.
+Ballast preserves existing rule files unless `--force` is provided. Use `--patch` to merge upstream Ballast updates into an existing rule file while preserving the user's edited sections.
 
 ## Common CLI Options
 
@@ -102,6 +102,7 @@ Ballast preserves existing rule files unless `--force` is provided.
 - `--agent, -a`: comma-separated list (or `all`)
 - `--all`: install all available agents
 - `--force, -f`: overwrite existing files
+- `--patch, -p`: merge upstream rule updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
 
 ## Config Persistence

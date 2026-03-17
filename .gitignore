@@ -31,6 +31,21 @@ dist/
 build/
 packages/ballast-go/ballast
 
+# Python caches and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+htmlcov/
+*.egg-info/
+
 # Environment variables
 .env
 .env.local

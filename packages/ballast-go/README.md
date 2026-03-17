@@ -7,4 +7,5 @@ Go CLI package for installing Ballast agent rules.
 ```bash
 ballast-go install --target cursor --all
 ballast-go install --target codex --agent linting
+ballast-go install --target cursor --agent linting --patch
 ```

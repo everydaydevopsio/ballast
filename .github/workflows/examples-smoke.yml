@@ -52,3 +52,48 @@ jobs:
         run: |
           set -euo pipefail
           test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/linting.mdc"
+
+  monorepo-patch-smoke:
+    name: monorepo-patch-smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v6
+
+      - name: Checkout ballast-examples repo
+        uses: actions/checkout@v6
+        with:
+          repository: everydaydevopsio/ballast-examples
+          path: .ci/ballast-examples
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: packages/ballast-go/go.mod
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ballast-typescript
+        run: pnpm run build
+
+      - name: Build ballast-go
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
+          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+
+      - name: Run monorepo patch smoke test
+        run: ./scripts/smoke-monorepo-patch.sh "$GITHUB_WORKSPACE/.ci/ballast-examples"

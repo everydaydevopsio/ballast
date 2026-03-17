@@ -204,6 +204,9 @@ alwaysApply: false
     test('lists codex rule files with descriptions', () => {
       const content = buildCodexAgentsMd(['linting']);
       expect(content).toContain('# AGENTS.md');
+      expect(content).toMatch(
+        /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
+      );
       expect(content).toContain('`.codex/rules/linting.md`');
       expect(content).toContain('TypeScript linting specialist');
     });

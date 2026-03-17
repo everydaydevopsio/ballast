@@ -4,8 +4,9 @@ import argparse
 import json
 import os
 import re
-from functools import lru_cache
 from dataclasses import dataclass, field
+from functools import lru_cache
+from importlib import metadata
 from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex"]
@@ -59,6 +60,19 @@ def rulesrc_filename(language: str) -> str:
     if language == "typescript":
         return ".rulesrc.ts.json"
     return f".rulesrc.{language}.json"
+
+
+@lru_cache(maxsize=1)
+def ballast_version() -> str:
+    try:
+        return metadata.version("ballast-python")
+    except metadata.PackageNotFoundError:
+        pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        if pyproject.exists():
+            match = re.search(r'(?m)^version = "([^"]+)"$', pyproject.read_text(encoding="utf-8"))
+            if match:
+                return match.group(1)
+    return "dev"
 
 
 def agent_dir(agent: str, language: str) -> Path:
@@ -208,6 +222,8 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
         "",
         "## Installed agent rules",
         "",
+        f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+        "",
         "Read and follow these rule files in `.codex/rules/` when they apply:",
         "",
     ]
@@ -218,6 +234,230 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
             lines.append(f"- `.codex/rules/{basename}.md` — {description}")
     lines.append("")
     return "\n".join(lines)
+
+
+def normalize_line_endings(content: str) -> str:
+    return content.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def split_frontmatter_document(content: str) -> tuple[str | None, str]:
+    normalized = normalize_line_endings(content)
+    match = re.match(r"^\s*---\n([\s\S]*?)\n---\n?", normalized)
+    if not match:
+        return None, normalized.lstrip()
+    return match.group(0).rstrip(), normalized[match.end() :].lstrip()
+
+
+def extract_frontmatter_yaml(frontmatter: str) -> str | None:
+    match = re.match(r"^---\n([\s\S]*?)\n---$", frontmatter)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def parse_top_level_yaml_blocks(yaml_content: str) -> tuple[str, list[tuple[str, str]]]:
+    lines = normalize_line_endings(yaml_content).split("\n")
+    blocks: list[tuple[str, str]] = []
+    preamble_lines: list[str] = []
+    current_key: str | None = None
+    current_lines: list[str] = []
+
+    def flush_current() -> None:
+        nonlocal current_key, current_lines
+        if current_key is not None:
+            blocks.append((current_key, "\n".join(current_lines).rstrip()))
+        current_key = None
+        current_lines = []
+
+    for line in lines:
+        key_match = re.match(r"^([A-Za-z0-9_-]+):(.*)$", line)
+        if key_match:
+            flush_current()
+            current_key = key_match.group(1)
+            current_lines = [line]
+            continue
+        if current_key is None:
+            preamble_lines.append(line)
+        else:
+            current_lines.append(line)
+
+    flush_current()
+    return "\n".join(preamble_lines).strip(), blocks
+
+
+def split_nested_yaml_block(block: str) -> tuple[str, str, int] | None:
+    lines = block.split("\n")
+    if len(lines) < 2:
+        return None
+
+    body_lines = lines[1:]
+    non_empty = [line for line in body_lines if line.strip()]
+    if not non_empty:
+        return None
+
+    indent = min(len(line) - len(line.lstrip(" ")) for line in non_empty)
+    if indent == 0:
+        return None
+
+    dedented_lines = []
+    for line in body_lines:
+        if not line.strip():
+            dedented_lines.append("")
+            continue
+        dedented_lines.append(line[indent:])
+
+    if any(line.startswith("- ") for line in dedented_lines if line):
+        return None
+
+    return lines[0], "\n".join(dedented_lines).rstrip(), indent
+
+
+def merge_yaml_blocks(existing_block: str, canonical_block: str) -> str:
+    existing_nested = split_nested_yaml_block(existing_block)
+    canonical_nested = split_nested_yaml_block(canonical_block)
+    if existing_nested is None or canonical_nested is None:
+        return existing_block
+
+    merged_body = merge_yaml_mapping_content(existing_nested[1], canonical_nested[1])
+    if merged_body is None:
+        return existing_block
+
+    header = existing_nested[0]
+    indent = canonical_nested[2]
+    lines = [header]
+    for line in merged_body.split("\n"):
+        lines.append((" " * indent + line) if line else "")
+    return "\n".join(lines).rstrip()
+
+
+def merge_yaml_mapping_content(existing_yaml: str, canonical_yaml: str) -> str | None:
+    existing_preamble, existing_blocks = parse_top_level_yaml_blocks(existing_yaml)
+    canonical_preamble, canonical_blocks = parse_top_level_yaml_blocks(canonical_yaml)
+    if not canonical_blocks:
+        return None
+
+    existing_by_key = {key: block for key, block in existing_blocks}
+    canonical_keys = {key for key, _ in canonical_blocks}
+    merged_blocks: list[str] = []
+
+    for key, block in canonical_blocks:
+        if key in existing_by_key:
+            merged_blocks.append(merge_yaml_blocks(existing_by_key[key], block))
+        else:
+            merged_blocks.append(block)
+
+    for key, block in existing_blocks:
+        if key not in canonical_keys:
+            merged_blocks.append(block)
+
+    preamble = canonical_preamble or existing_preamble
+    parts = [part for part in [preamble, *merged_blocks] if part]
+    return "\n".join(parts).rstrip()
+
+
+def merge_frontmatter(existing_frontmatter: str | None, canonical_frontmatter: str | None) -> str | None:
+    if not canonical_frontmatter:
+        return existing_frontmatter
+    if not existing_frontmatter:
+        return canonical_frontmatter
+
+    existing_yaml = extract_frontmatter_yaml(existing_frontmatter)
+    canonical_yaml = extract_frontmatter_yaml(canonical_frontmatter)
+    if existing_yaml is None or canonical_yaml is None:
+        return existing_frontmatter
+
+    merged_yaml = merge_yaml_mapping_content(existing_yaml, canonical_yaml)
+    if merged_yaml is None:
+        return existing_frontmatter
+    return f"---\n{merged_yaml}\n---"
+
+
+def parse_markdown_body(content: str) -> tuple[str, list[tuple[str, str]]]:
+    normalized = normalize_line_endings(content)
+    matches = list(re.finditer(r"^## .*(?:\n|$)", normalized, re.MULTILINE))
+    if not matches:
+        return normalized.strip(), []
+
+    intro = normalized[: matches[0].start()].strip()
+    sections: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(normalized)
+        section_text = normalized[match.start() : end].strip()
+        heading = section_text.splitlines()[0]
+        sections.append((heading, section_text))
+    return intro, sections
+
+
+def merge_markdown_bodies(existing: str, canonical: str) -> str:
+    if not existing.strip():
+        return canonical
+
+    existing_intro, existing_sections = parse_markdown_body(existing)
+    canonical_intro, canonical_sections = parse_markdown_body(canonical)
+    existing_by_heading = {heading: text for heading, text in existing_sections}
+    canonical_headings = {heading for heading, _ in canonical_sections}
+
+    parts: list[str] = []
+    intro = existing_intro or canonical_intro
+    if intro:
+        parts.append(intro)
+
+    for heading, text in canonical_sections:
+        parts.append(existing_by_heading.get(heading, text))
+
+    for heading, text in existing_sections:
+        if heading not in canonical_headings:
+            parts.append(text)
+
+    return "\n\n".join(parts).rstrip() + "\n"
+
+
+def patch_rule_content(existing: str, canonical: str, target: str) -> str:
+    if not existing.strip():
+        return canonical
+
+    if target in {"cursor", "opencode"}:
+        existing_frontmatter, existing_body = split_frontmatter_document(existing)
+        canonical_frontmatter, canonical_body = split_frontmatter_document(canonical)
+        frontmatter = merge_frontmatter(existing_frontmatter, canonical_frontmatter)
+        body = merge_markdown_bodies(existing_body, canonical_body)
+        if frontmatter:
+            return f"{frontmatter}\n\n{body}"
+        return body
+
+    return merge_markdown_bodies(existing, canonical)
+
+
+def find_markdown_section_range(content: str, heading: str) -> tuple[int, int] | None:
+    normalized = normalize_line_endings(content)
+    match = re.search(rf"^## {re.escape(heading)}$", normalized, re.MULTILINE)
+    if not match:
+        return None
+    next_heading = re.search(r"\n## .*", normalized[match.end() :])
+    end = match.end() + next_heading.start() + 1 if next_heading else len(normalized)
+    return match.start(), end
+
+
+def patch_codex_agents_md(existing: str, canonical: str) -> str:
+    if not existing.strip():
+        return canonical
+
+    canonical_range = find_markdown_section_range(canonical, "Installed agent rules")
+    if not canonical_range:
+        return existing
+    canonical_section = canonical[canonical_range[0] : canonical_range[1]].rstrip()
+
+    existing_range = find_markdown_section_range(existing, "Installed agent rules")
+    if not existing_range:
+        return existing.rstrip() + "\n\n" + canonical_section + "\n"
+
+    return (
+        existing[: existing_range[0]].rstrip()
+        + "\n\n"
+        + canonical_section
+        + "\n\n"
+        + existing[existing_range[1] :].lstrip()
+    ).rstrip() + "\n"
 
 
 def prompt(question: str) -> str:
@@ -269,7 +509,9 @@ def resolve_target_and_agents(args: argparse.Namespace, root: Path, language: st
     return resolved_target, resolved_agents
 
 
-def install(root: Path, target: str, agents: list[str], language: str, force: bool, persist: bool) -> InstallResult:
+def install(
+    root: Path, target: str, agents: list[str], language: str, force: bool, patch: bool, persist: bool
+) -> InstallResult:
     result = InstallResult()
     processed_agents: list[str] = []
 
@@ -289,12 +531,18 @@ def install(root: Path, target: str, agents: list[str], language: str, force: bo
             for suffix in list_rule_suffixes(agent, language):
                 basename = agent if suffix == "" else f"{agent}-{suffix}"
                 dst = destination(root, target, basename)
-                if dst.exists() and not force:
+                content = build_content(agent, target, language, suffix)
+                if dst.exists() and not force and not patch:
                     agent_skipped = True
                     agent_processed = True
                     continue
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                dst.write_text(build_content(agent, target, language, suffix), encoding="utf-8")
+                next_content = (
+                    patch_rule_content(dst.read_text(encoding="utf-8"), content, target)
+                    if dst.exists() and not force and patch
+                    else content
+                )
+                dst.write_text(next_content, encoding="utf-8")
                 result.installed_rules.append((agent, suffix))
                 agent_installed = True
                 agent_processed = True
@@ -309,11 +557,17 @@ def install(root: Path, target: str, agents: list[str], language: str, force: bo
 
     if target == "codex":
         agents_md = root / "AGENTS.md"
-        if agents_md.exists() and not force:
+        if agents_md.exists() and not force and not patch:
             result.skipped_support_files.append(str(agents_md))
         else:
             try:
-                agents_md.write_text(build_codex_agents_md(processed_agents, language), encoding="utf-8")
+                content = build_codex_agents_md(processed_agents, language)
+                next_content = (
+                    patch_codex_agents_md(agents_md.read_text(encoding="utf-8"), content)
+                    if agents_md.exists() and not force and patch
+                    else content
+                )
+                agents_md.write_text(next_content, encoding="utf-8")
                 result.installed_support_files.append(str(agents_md))
             except Exception as err:
                 result.errors.append(("codex", str(err)))
@@ -342,7 +596,7 @@ def run_install(args: argparse.Namespace) -> int:
         return 1
 
     persist = not args.target and not args.agent and not args.all
-    result = install(root, target, agents, language, bool(args.force), persist)
+    result = install(root, target, agents, language, bool(args.force), bool(args.patch), persist)
 
     if result.errors:
         for agent, error in result.errors:
@@ -379,6 +633,7 @@ def parser() -> argparse.ArgumentParser:
     install_cmd.add_argument("--agent", "-a")
     install_cmd.add_argument("--all", action="store_true")
     install_cmd.add_argument("--force", "-f", action="store_true")
+    install_cmd.add_argument("--patch", "-p", action="store_true")
     install_cmd.add_argument("--yes", "-y", action="store_true")
     return p
 
