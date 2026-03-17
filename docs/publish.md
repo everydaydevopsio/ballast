@@ -85,7 +85,7 @@ Upload unique archive artifacts:
 
 - `*.tar.gz`
 - `*.zip`
-- `checksums.txt`
+- `ballast-go_checksums.txt`
 
 ### 3. Homebrew tap setup with GoReleaser
 

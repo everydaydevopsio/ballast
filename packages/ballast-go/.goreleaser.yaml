@@ -30,7 +30,7 @@ archives:
         formats: [zip]
 
 checksum:
-  name_template: checksums.txt
+  name_template: ballast-go_checksums.txt
 
 changelog:
   sort: asc
