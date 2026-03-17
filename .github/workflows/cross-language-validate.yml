@@ -53,6 +53,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
           go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
           go build -C cli/ballast -o "$GITHUB_WORKSPACE/.ci/bin/ballast" .
+          echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
 
       - name: Create local backend shims
         run: |
@@ -72,6 +73,4 @@ jobs:
           chmod +x "$GITHUB_WORKSPACE/.ci/bin/ballast-python"
 
       - name: Run cross-language validation
-        env:
-          PATH: ${{ github.workspace }}/.ci/bin:${{ env.PATH }}
         run: ./scripts/release-cross-language-check.sh

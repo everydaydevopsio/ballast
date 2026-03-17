@@ -102,6 +102,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
           go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+          echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
 
       - name: Build ballast wrapper
         run: |
@@ -129,6 +130,4 @@ jobs:
         run: ./scripts/smoke-monorepo-patch.sh "$GITHUB_WORKSPACE/.ci/ballast-examples"
 
       - name: Run wrapper monorepo smoke test
-        env:
-          PATH: ${{ github.workspace }}/.ci/bin:${{ env.PATH }}
         run: ./scripts/smoke-wrapper-monorepo.sh
