@@ -18,7 +18,9 @@ function readGoReleaserConfig(relativePath: string): GoReleaserConfig {
 
 describe('release config', () => {
   test('Go and CLI releases publish distinct checksum asset names', () => {
-    const goConfig = readGoReleaserConfig('packages/ballast-go/.goreleaser.yaml');
+    const goConfig = readGoReleaserConfig(
+      'packages/ballast-go/.goreleaser.yaml'
+    );
     const cliConfig = readGoReleaserConfig('cli/ballast/.goreleaser.yaml');
 
     expect(goConfig.checksum?.name_template).toBeTruthy();
