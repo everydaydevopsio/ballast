@@ -59,7 +59,17 @@ func run(args []string) int {
 		return 0
 	}
 
+	if isVersionCommand(forwardedArgs) {
+		printVersion()
+		return 0
+	}
+
 	if len(forwardedArgs) == 0 {
+		printUsage()
+		return 0
+	}
+
+	if isHelpCommand(forwardedArgs) {
 		printUsage()
 		return 0
 	}
@@ -68,7 +78,10 @@ func run(args []string) int {
 		root := findProjectRoot("")
 		selectedLanguage = detectLanguage(root)
 		if selectedLanguage == "" {
-			fmt.Println("Could not detect repository language. Use --language typescript|python|go.")
+			fmt.Printf(
+				"Could not detect repository language. Use --language %s.\n",
+				strings.Join(languageNames(), "|"),
+			)
 			return 1
 		}
 	}
@@ -181,6 +194,14 @@ func hasVersionFlag(args []string) bool {
 		}
 	}
 	return false
+}
+
+func isVersionCommand(args []string) bool {
+	return len(args) == 1 && args[0] == "version"
+}
+
+func isHelpCommand(args []string) bool {
+	return len(args) == 1 && args[0] == "help"
 }
 
 func isSupportedLanguage(lang language) bool {
