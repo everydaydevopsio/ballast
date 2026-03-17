@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -95,7 +97,10 @@ func TestDetectRepoProfilesFindsMultiLanguageMonorepo(t *testing.T) {
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, "tools", "worker", "go.mod"), "module example.com/worker\n\ngo 1.24\n")
 
-	profiles := detectRepoProfiles(root)
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
 
 	if len(profiles) != 3 {
 		t.Fatalf("expected 3 profiles, got %d: %#v", len(profiles), profiles)
@@ -128,15 +133,18 @@ func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testi
 	if err != nil {
 		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
 	}
-
-	if len(plan) != 4 {
-		t.Fatalf("expected 4 backend invocations, got %d: %#v", len(plan), plan)
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
 	}
 
-	if plan[0].Language != langTypeScript || plan[0].Dir != root {
-		t.Fatalf("expected common install at repo root via TypeScript backend, got %#v", plan[0])
+	if len(plan.Invocations) != 4 {
+		t.Fatalf("expected 4 backend invocations, got %d: %#v", len(plan.Invocations), plan.Invocations)
 	}
-	if got := strings.Join(plan[0].Args, " "); !strings.Contains(got, "--agent local-dev") {
+
+	if plan.Invocations[0].Language != langTypeScript || plan.Invocations[0].Dir != root {
+		t.Fatalf("expected common install at repo root via TypeScript backend, got %#v", plan.Invocations[0])
+	}
+	if got := strings.Join(plan.Invocations[0].Args, " "); !strings.Contains(got, "--agent local-dev") {
 		t.Fatalf("expected common agent selection, got %q", got)
 	}
 
@@ -146,13 +154,13 @@ func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testi
 		filepath.Join(root, "tools", "worker"),
 	}
 	for i, wantDir := range wantDirs {
-		if plan[i+1].Dir != wantDir {
-			t.Fatalf("expected plan[%d] dir %q, got %#v", i+1, wantDir, plan[i+1])
+		if plan.Invocations[i+1].Dir != wantDir {
+			t.Fatalf("expected plan[%d] dir %q, got %#v", i+1, wantDir, plan.Invocations[i+1])
 		}
-		if got := strings.Join(plan[i+1].Args, " "); strings.Contains(got, "local-dev") {
+		if got := strings.Join(plan.Invocations[i+1].Args, " "); strings.Contains(got, "local-dev") {
 			t.Fatalf("expected language-only agent selection for %q, got %q", wantDir, got)
 		}
-		if got := strings.Join(plan[i+1].Args, " "); !strings.Contains(got, "--agent linting,testing") {
+		if got := strings.Join(plan.Invocations[i+1].Args, " "); !strings.Contains(got, "--agent linting,testing") {
 			t.Fatalf("expected language agent selection for %q, got %q", wantDir, got)
 		}
 	}
@@ -226,6 +234,102 @@ func TestRunMonorepoInstallExecutesEachBackendInScopedDirectory(t *testing.T) {
 	}
 	if !strings.Contains(configText, `"apps/frontend"`) {
 		t.Fatalf("expected saved monorepo config to include relative TypeScript path, got %q", configText)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsEscapingPathsFromConfig(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "cursor",
+  "agents": ["linting"],
+  "languages": ["python", "go"],
+  "paths": {
+    "python": ["../escape"],
+    "go": ["tools/worker"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install"})
+	if err == nil {
+		t.Fatalf("expected path validation error, got plan %#v", plan)
+	}
+	if !strings.Contains(err.Error(), "escapes repository root") {
+		t.Fatalf("expected escape error, got %v", err)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsUnsupportedAgents(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "cursor",
+  "agents": ["not-an-agent"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install"})
+	if err == nil {
+		t.Fatalf("expected unsupported agent error, got plan %#v", plan)
+	}
+	if !strings.Contains(err.Error(), "unsupported agent selection") {
+		t.Fatalf("expected unsupported agent error, got %v", err)
+	}
+}
+
+func TestRunMonorepoInstallDoesNotPersistConfigOnFailure(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	callCount := 0
+	execToolFunc = func(binary string, args []string, dir string) (int, error) {
+		callCount++
+		if callCount == 2 {
+			return 1, nil
+		}
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--target", "cursor", "--all", "--yes"})
+		if exitCode == 0 {
+			t.Fatal("expected failing monorepo install")
+		}
+	})
+
+	if _, err := os.Stat(filepath.Join(root, ".rulesrc.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected no persisted monorepo config after failure, got err=%v", err)
+	}
+}
+
+func TestDetectRepoProfilesPropagatesWalkErrors(t *testing.T) {
+	originalWalk := walkDirFunc
+	t.Cleanup(func() {
+		walkDirFunc = originalWalk
+	})
+
+	walkDirFunc = func(root string, fn fs.WalkDirFunc) error {
+		return errors.New("walk failed")
+	}
+
+	profiles, err := detectRepoProfiles(t.TempDir())
+	if err == nil {
+		t.Fatalf("expected walk error, got profiles %#v", profiles)
+	}
+	if !strings.Contains(err.Error(), "scan repo for language profiles") {
+		t.Fatalf("expected wrapped walk error, got %v", err)
 	}
 }
 

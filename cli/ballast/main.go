@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,9 +47,11 @@ var version = "dev"
 
 var ensureInstalledFunc = ensureInstalled
 var execToolFunc = execTool
+var walkDirFunc = filepath.WalkDir
 
 var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
+var supportedAgents = append(slices.Clone(commonAgents), languageAgents...)
 
 type monorepoConfig struct {
 	Target    string              `json:"target,omitempty"`
@@ -67,6 +70,11 @@ type backendInvocation struct {
 	Binary   string
 	Dir      string
 	Args     []string
+}
+
+type monorepoPlan struct {
+	Invocations []backendInvocation
+	Config      monorepoConfig
 }
 
 func main() {
@@ -109,7 +117,7 @@ func run(args []string) int {
 			return 1
 		}
 		if plan != nil {
-			for _, invocation := range plan {
+			for _, invocation := range plan.Invocations {
 				tool, ok := toolsByLanguage[invocation.Language]
 				if !ok {
 					fmt.Printf("Unsupported language: %s\n", invocation.Language)
@@ -127,6 +135,10 @@ func run(args []string) int {
 				if exitCode != 0 {
 					return exitCode
 				}
+			}
+			if err := saveMonorepoConfig(root, plan.Config); err != nil {
+				fmt.Println(err)
+				return 1
 			}
 			return 0
 		}
@@ -321,7 +333,7 @@ func execTool(binary string, args []string, dir string) (int, error) {
 	return 0, nil
 }
 
-func resolveMonorepoPlan(root string, args []string) ([]backendInvocation, error) {
+func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if len(args) == 0 || args[0] != "install" {
 		return nil, nil
 	}
@@ -331,9 +343,15 @@ func resolveMonorepoPlan(root string, args []string) ([]backendInvocation, error
 		return nil, err
 	}
 
-	profiles := detectRepoProfiles(root)
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		return nil, err
+	}
 	if config != nil && len(config.Languages) > 0 {
-		profiles = profilesFromConfig(root, *config)
+		profiles, err = profilesFromConfig(root, *config)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if len(profiles) < 2 {
@@ -356,6 +374,9 @@ func resolveMonorepoPlan(root string, args []string) ([]backendInvocation, error
 	if installAll {
 		selectedAgents = append(slices.Clone(commonAgents), languageAgents...)
 	}
+	if err := validateSelectedAgents(selectedAgents); err != nil {
+		return nil, err
+	}
 
 	configToSave := monorepoConfig{
 		Target:    installTarget,
@@ -366,9 +387,6 @@ func resolveMonorepoPlan(root string, args []string) ([]backendInvocation, error
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
-	}
-	if err := saveMonorepoConfig(root, configToSave); err != nil {
-		return nil, err
 	}
 
 	commonSelection := filterAgents(selectedAgents, commonAgents)
@@ -404,7 +422,17 @@ func resolveMonorepoPlan(root string, args []string) ([]backendInvocation, error
 		}
 	}
 
-	return plan, nil
+	if len(plan) == 0 {
+		return nil, fmt.Errorf(
+			"no supported agents selected for monorepo install; supported agents: %s",
+			strings.Join(supportedAgents, ", "),
+		)
+	}
+
+	return &monorepoPlan{
+		Invocations: plan,
+		Config:      configToSave,
+	}, nil
 }
 
 func loadMonorepoConfig(root string) (*monorepoConfig, error) {
@@ -435,7 +463,7 @@ func saveMonorepoConfig(root string, config monorepoConfig) error {
 	return os.WriteFile(filepath.Join(root, ".rulesrc.json"), append(bytes, '\n'), 0o644)
 }
 
-func profilesFromConfig(root string, config monorepoConfig) []repoProfile {
+func profilesFromConfig(root string, config monorepoConfig) ([]repoProfile, error) {
 	profiles := make([]repoProfile, 0, len(config.Languages))
 	for _, rawLanguage := range config.Languages {
 		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
@@ -448,24 +476,28 @@ func profilesFromConfig(root string, config monorepoConfig) []repoProfile {
 			if strings.TrimSpace(rawPath) == "" {
 				continue
 			}
-			paths = append(paths, filepath.Clean(filepath.Join(root, rawPath)))
+			safePath, err := resolveScopedPath(root, rawPath)
+			if err != nil {
+				return nil, fmt.Errorf("invalid %s path %q in .rulesrc.json: %w", lang, rawPath, err)
+			}
+			paths = append(paths, safePath)
 		}
 		if len(paths) == 0 {
 			continue
 		}
 		profiles = append(profiles, repoProfile{Language: lang, Paths: uniqueStrings(paths)})
 	}
-	return profiles
+	return profiles, nil
 }
 
-func detectRepoProfiles(root string) []repoProfile {
+func detectRepoProfiles(root string) ([]repoProfile, error) {
 	pathsByLanguage := map[language][]string{
 		langTypeScript: {},
 		langPython:     {},
 		langGo:         {},
 	}
 
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	if err := walkDirFunc(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -487,7 +519,9 @@ func detectRepoProfiles(root string) []repoProfile {
 			pathsByLanguage[langGo] = append(pathsByLanguage[langGo], dir)
 		}
 		return nil
-	})
+	}); err != nil {
+		return nil, fmt.Errorf("scan repo for language profiles: %w", err)
+	}
 
 	profiles := make([]repoProfile, 0, len(pathsByLanguage))
 	for _, lang := range supportedLanguages {
@@ -497,7 +531,7 @@ func detectRepoProfiles(root string) []repoProfile {
 		}
 		profiles = append(profiles, repoProfile{Language: lang, Paths: paths})
 	}
-	return profiles
+	return profiles, nil
 }
 
 func parseInstallSelection(args []string) ([]string, bool) {
@@ -636,6 +670,39 @@ func relativePaths(root string, paths []string) []string {
 		relative = append(relative, filepath.Clean(rel))
 	}
 	return uniqueStrings(relative)
+}
+
+func validateSelectedAgents(agents []string) error {
+	invalid := []string{}
+	for _, agent := range uniqueStrings(agents) {
+		if !slices.Contains(supportedAgents, agent) {
+			invalid = append(invalid, agent)
+		}
+	}
+	if len(invalid) > 0 {
+		return fmt.Errorf(
+			"unsupported agent selection: %s (supported agents: %s)",
+			strings.Join(invalid, ", "),
+			strings.Join(supportedAgents, ", "),
+		)
+	}
+	return nil
+}
+
+func resolveScopedPath(root string, rawPath string) (string, error) {
+	if filepath.IsAbs(rawPath) {
+		return "", errors.New("absolute paths are not allowed")
+	}
+
+	candidate := filepath.Clean(filepath.Join(root, rawPath))
+	rel, err := filepath.Rel(root, candidate)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", errors.New("path escapes repository root")
+	}
+	return candidate, nil
 }
 
 func findProjectRoot(cwd string) string {
