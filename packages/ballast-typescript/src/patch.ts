@@ -16,6 +16,8 @@ interface ParsedMarkdownBody {
   sections: MarkdownSection[];
 }
 
+const DANGEROUS_YAML_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function splitFrontmatterDocument(content: string): ParsedFrontmatterDocument {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
   if (!match || match.index !== 0) {
@@ -37,12 +39,27 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function createSafeRecord(): Record<string, unknown> {
+  return Object.create(null) as Record<string, unknown>;
+}
+
 function mergeYamlValues(
   canonical: Record<string, unknown>,
   existing: Record<string, unknown>
 ): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...canonical };
+  const merged = createSafeRecord();
+
+  for (const [key, canonicalValue] of Object.entries(canonical)) {
+    if (DANGEROUS_YAML_KEYS.has(key)) {
+      continue;
+    }
+    merged[key] = canonicalValue;
+  }
+
   for (const [key, existingValue] of Object.entries(existing)) {
+    if (DANGEROUS_YAML_KEYS.has(key)) {
+      continue;
+    }
     const canonicalValue = merged[key];
     merged[key] =
       isPlainObject(canonicalValue) && isPlainObject(existingValue)

@@ -43,6 +43,7 @@ Keep this note.
             self.assertIn("Keep team-specific wording.", content)
             self.assertIn("## Team Overrides", content)
             self.assertIn("## Baseline Tooling", content)
+            self.assertIn("globs:", content)
 
     def test_patch_updates_codex_agents_md_section_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -86,6 +87,41 @@ Read and follow these rule files in `.codex/rules/` when they apply:
             )
             self.assertIn("`.codex/rules/linting.md`", agents_md)
             self.assertNotIn("`.codex/rules/old.md`", agents_md)
+
+    def test_patch_merges_frontmatter_keys(self) -> None:
+        existing = """---
+description: Team customized linting rules
+alwaysApply: true
+tools:
+  read: false
+---
+
+## Existing
+
+User content.
+"""
+        canonical = """---
+description: Canonical description
+alwaysApply: false
+globs:
+  - '*.py'
+tools:
+  read: true
+  write: true
+---
+
+## Existing
+
+Canonical content.
+"""
+
+        merged = cli.patch_rule_content(existing, canonical, "cursor")
+
+        self.assertIn("description: Team customized linting rules", merged)
+        self.assertIn("alwaysApply: true", merged)
+        self.assertIn("globs:", merged)
+        self.assertIn("  read: false", merged)
+        self.assertIn("  write: true", merged)
 
 
 if __name__ == "__main__":

@@ -80,6 +80,43 @@ Canonical content.
       expect(merged).toContain('User content.');
     });
 
+    test('ignores dangerous yaml keys while merging frontmatter', () => {
+      const existing = `---
+description: User description
+__proto__:
+  polluted: yes
+tools:
+  read: false
+---
+
+## Existing
+
+User content.
+`;
+
+      const canonical = `---
+description: Canonical description
+tools:
+  read: true
+  write: true
+---
+
+## Existing
+
+Canonical content.
+`;
+
+      const merged = patchRuleContent(existing, canonical, 'cursor');
+      expect(merged).toContain('description: User description');
+      expect(merged).not.toContain('__proto__');
+      expect(merged).toContain('  read: false');
+      expect(merged).toContain('  write: true');
+      expect(
+        Object.prototype.hasOwnProperty.call(Object.prototype, 'polluted')
+      ).toBe(false);
+      expect(({} as { polluted?: string }).polluted).toBeUndefined();
+    });
+
     test('falls back to canonical content when existing file is empty', () => {
       const canonical = `# Rule
 

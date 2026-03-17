@@ -8,6 +8,8 @@ builds:
     main: ./cmd/ballast-go
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -X main.ballastVersion={{ .Version }}
     goos:
       - linux
       - darwin

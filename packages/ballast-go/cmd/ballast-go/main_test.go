@@ -55,6 +55,28 @@ Canonical completion checklist.
 	}
 }
 
+func TestPatchRuleContentMergesFrontmatterAndHandlesCRLF(t *testing.T) {
+	existing := "---\r\ndescription: Team customized linting rules\r\nalwaysApply: true\r\ntools:\r\n  read: false\r\n---\r\n\r\n## Your Responsibilities\r\n\r\nKeep team-specific wording.\r\n"
+	canonical := "---\ndescription: Canonical description\nglobs:\n  - '*.go'\ntools:\n  read: true\n  write: true\n---\n\n## Your Responsibilities\n\nCanonical responsibilities.\n\n## Commands\n\nCanonical commands.\n"
+
+	merged := patchRuleContent(existing, canonical, "cursor")
+	if !strings.Contains(merged, "description: Team customized linting rules") {
+		t.Fatalf("expected user frontmatter to win: %s", merged)
+	}
+	if !strings.Contains(merged, "globs:") {
+		t.Fatalf("expected canonical frontmatter keys to be retained: %s", merged)
+	}
+	if !strings.Contains(merged, "  read: false") || !strings.Contains(merged, "  write: true") {
+		t.Fatalf("expected nested frontmatter blocks to merge: %s", merged)
+	}
+	if !strings.Contains(merged, "Keep team-specific wording.") {
+		t.Fatalf("expected user section text to be preserved: %s", merged)
+	}
+	if !strings.Contains(merged, "## Commands") {
+		t.Fatalf("expected canonical section to be appended: %s", merged)
+	}
+}
+
 func TestInstallPatchUpdatesCodexAgentsMDSectionOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	rulePath := filepath.Join(tmpDir, ".codex", "rules", "linting.md")
@@ -105,5 +127,18 @@ Keep my custom rule text.
 	}
 	if strings.Contains(text, "`.codex/rules/old.md`") {
 		t.Fatalf("expected old installed-rules entry to be replaced: %s", text)
+	}
+}
+
+func TestPatchCodexAgentsMDIgnoresHeadingInsideCodeFence(t *testing.T) {
+	existing := "# AGENTS.md\n\n```md\n## Installed agent rules\n```\n\n## Installed agent rules\n\nOld rules\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast v9.9.9-test. Do not edit this section.\n\nNew rules\n"
+
+	merged := patchCodexAgentsMD(existing, canonical)
+	if !strings.Contains(merged, "Created by Ballast v9.9.9-test. Do not edit this section.") {
+		t.Fatalf("expected canonical installed rules section to be inserted: %s", merged)
+	}
+	if !strings.Contains(merged, "```md\n## Installed agent rules\n```") {
+		t.Fatalf("expected fenced code block to be preserved without matching: %s", merged)
 	}
 }
