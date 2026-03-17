@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 )
 
@@ -39,6 +40,8 @@ var toolsByLanguage = map[language]toolConfig{
 	},
 }
 
+var version = "dev"
+
 func main() {
 	os.Exit(run(os.Args[1:]))
 }
@@ -51,11 +54,34 @@ func run(args []string) int {
 		return 1
 	}
 
+	if hasVersionFlag(forwardedArgs) {
+		printVersion()
+		return 0
+	}
+
+	if isVersionCommand(forwardedArgs) {
+		printVersion()
+		return 0
+	}
+
+	if len(forwardedArgs) == 0 {
+		printUsage()
+		return 0
+	}
+
+	if isHelpCommand(forwardedArgs) {
+		printUsage()
+		return 0
+	}
+
 	if selectedLanguage == "" {
 		root := findProjectRoot("")
 		selectedLanguage = detectLanguage(root)
 		if selectedLanguage == "" {
-			fmt.Println("Could not detect repository language. Use --language typescript|python|go.")
+			fmt.Printf(
+				"Could not detect repository language. Use --language %s.\n",
+				strings.Join(languageNames(), "|"),
+			)
 			return 1
 		}
 	}
@@ -118,10 +144,64 @@ func parseLanguageArg(args []string) (language, []string, error) {
 }
 
 func printUsage() {
-	fmt.Println("Usage: ballast [--language typescript|python|go] <command> [args]")
+	fmt.Println("ballast installs AI agent rules for Cursor, Claude Code, OpenCode, and Codex.")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  ballast [flags] <command> [command flags]")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  install     Install agent rules for the detected or selected language")
+	fmt.Println("  help        Show help for ballast")
+	fmt.Println("  version     Print the ballast wrapper version")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Printf("  -l, --language string   Force the language backend (%s)\n", strings.Join(languageNames(), "|"))
+	fmt.Println("  -h, --help              Show help")
+	fmt.Println("  -v, --version           Print version")
+	fmt.Println()
 	fmt.Println("Examples:")
+	fmt.Println("  ballast")
 	fmt.Println("  ballast install --target cursor --all")
 	fmt.Println("  ballast --language python install --target codex --agent linting")
+	fmt.Println("  ballast --version")
+	fmt.Println()
+	fmt.Println("When --language is omitted, ballast attempts to detect the repository language and forwards the command to the matching backend CLI.")
+}
+
+func printVersion() {
+	fmt.Println(resolveVersion())
+}
+
+func resolveVersion() string {
+	if strings.TrimSpace(version) != "" && version != "dev" {
+		return version
+	}
+
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		if strings.TrimSpace(info.Main.Version) != "" && info.Main.Version != "(devel)" {
+			return info.Main.Version
+		}
+	}
+
+	return version
+}
+
+func hasVersionFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--version" || arg == "-v" {
+			return true
+		}
+	}
+	return false
+}
+
+func isVersionCommand(args []string) bool {
+	return len(args) == 1 && args[0] == "version"
+}
+
+func isHelpCommand(args []string) bool {
+	return len(args) == 1 && args[0] == "help"
 }
 
 func isSupportedLanguage(lang language) bool {
@@ -131,6 +211,14 @@ func isSupportedLanguage(lang language) bool {
 		}
 	}
 	return false
+}
+
+func languageNames() []string {
+	names := make([]string, 0, len(supportedLanguages))
+	for _, lang := range supportedLanguages {
+		names = append(names, string(lang))
+	}
+	return names
 }
 
 func ensureInstalled(tool toolConfig) error {

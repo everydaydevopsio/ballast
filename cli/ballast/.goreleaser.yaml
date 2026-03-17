@@ -10,6 +10,8 @@ builds:
     binary: ballast
     dir: cli/ballast
     main: .
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
     env:
       - CGO_ENABLED=0
     goos:
