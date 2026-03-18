@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { install, resolveTargetAndAgents, runInstall } from './install';
-import { getDestination } from './build';
+import { getClaudeMdPath, getDestination } from './build';
 import { findProjectRoot, saveConfig, loadConfig } from './config';
 
 describe('install', () => {
@@ -395,6 +395,82 @@ Keep my custom responsibilities.
         expect(fs.existsSync(file)).toBe(true);
         expect(file).toBe(path.join(tmpDir, '.claude', 'rules', 'linting.md'));
         expect(dir).toBe(path.join(tmpDir, '.claude', 'rules'));
+        const claudeMd = getClaudeMdPath(tmpDir);
+        expect(fs.existsSync(claudeMd)).toBe(true);
+        expect(fs.readFileSync(claudeMd, 'utf8')).toContain(
+          '`.claude/rules/linting.md`'
+        );
+      });
+
+      test('claude skips existing CLAUDE.md unless patch is approved', () => {
+        fs.writeFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          `# CLAUDE.md
+
+## Team Notes
+
+Keep this section.
+`
+        );
+
+        const result = install({
+          projectRoot: tmpDir,
+          target: 'claude',
+          agents: ['linting'],
+          force: false,
+          saveConfig: false
+        });
+
+        expect(result.skippedSupportFiles).toContain(path.join(tmpDir, 'CLAUDE.md'));
+        expect(fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')).toContain(
+          '## Team Notes'
+        );
+      });
+
+      test('claude patch updates installed rules section without removing user notes', () => {
+        const claudeRulesDir = path.join(tmpDir, '.claude', 'rules');
+        fs.mkdirSync(claudeRulesDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(claudeRulesDir, 'linting.md'),
+          `# TypeScript Linting Rules
+
+Team intro.
+
+## Your Responsibilities
+
+Keep my custom rule text.
+`
+        );
+        fs.writeFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          `# CLAUDE.md
+
+## Team Notes
+
+Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in \`.claude/rules/\` when they apply:
+
+- \`.claude/rules/old.md\` — Old rule
+`
+        );
+
+        install({
+          projectRoot: tmpDir,
+          target: 'claude',
+          agents: ['linting'],
+          patchClaudeMd: true,
+          force: false,
+          saveConfig: false
+        });
+
+        const claudeMd = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8');
+        expect(claudeMd).toContain('## Team Notes');
+        expect(claudeMd).toContain('Keep this section.');
+        expect(claudeMd).toContain('`.claude/rules/linting.md`');
+        expect(claudeMd).not.toContain('`.claude/rules/old.md`');
       });
 
       test('opencode: writes to .opencode/<agent>.md', () => {

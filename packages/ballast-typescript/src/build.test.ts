@@ -8,7 +8,9 @@ import {
   buildOpenCodeFormat,
   buildCodexFormat,
   buildContent,
+  buildClaudeMd,
   buildCodexAgentsMd,
+  getClaudeMdPath,
   getCodexAgentsMdPath,
   getCodexRuleDescription,
   extractDescriptionFromFrontmatter,
@@ -212,6 +214,18 @@ alwaysApply: false
     });
   });
 
+  describe('buildClaudeMd', () => {
+    test('lists claude rule files with descriptions', () => {
+      const content = buildClaudeMd(['linting']);
+      expect(content).toContain('# CLAUDE.md');
+      expect(content).toMatch(
+        /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
+      );
+      expect(content).toContain('`.claude/rules/linting.md`');
+      expect(content).toContain('TypeScript linting specialist');
+    });
+  });
+
   describe('buildContent', () => {
     test('cursor returns mdc-style content', () => {
       const result = buildContent('linting', 'cursor');
@@ -277,6 +291,11 @@ alwaysApply: false
     test('codex agents.md path returns project root AGENTS.md', () => {
       const agentsMd = getCodexAgentsMdPath(projectRoot);
       expect(agentsMd).toBe(path.join(projectRoot, 'AGENTS.md'));
+    });
+
+    test('claude md path returns project root CLAUDE.md', () => {
+      const claudeMd = getClaudeMdPath(projectRoot);
+      expect(claudeMd).toBe(path.join(projectRoot, 'CLAUDE.md'));
     });
 
     test('cursor with ruleSuffix returns .cursor/rules/<agent>-<suffix>.mdc', () => {

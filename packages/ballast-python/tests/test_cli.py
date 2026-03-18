@@ -88,6 +88,49 @@ Read and follow these rule files in `.codex/rules/` when they apply:
             self.assertIn("`.codex/rules/linting.md`", agents_md)
             self.assertNotIn("`.codex/rules/old.md`", agents_md)
 
+    def test_patch_updates_claude_md_section_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rule = root / ".claude" / "rules" / "linting.md"
+            rule.parent.mkdir(parents=True, exist_ok=True)
+            rule.write_text(
+                """# Python Linting Rules
+
+Team intro.
+
+## Your Responsibilities
+
+Keep my custom rule text.
+""",
+                encoding="utf-8",
+            )
+            (root / "CLAUDE.md").write_text(
+                """# CLAUDE.md
+
+## Team Notes
+
+Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in `.claude/rules/` when they apply:
+
+- `.claude/rules/old.md` - Old rule
+""",
+                encoding="utf-8",
+            )
+
+            cli.install(root, "claude", ["linting"], "python", False, False, False, True)
+
+            claude_md = (root / "CLAUDE.md").read_text(encoding="utf-8")
+            self.assertIn("## Team Notes", claude_md)
+            self.assertRegex(
+                claude_md,
+                r"Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.",
+            )
+            self.assertIn("`.claude/rules/linting.md`", claude_md)
+            self.assertNotIn("`.claude/rules/old.md`", claude_md)
+
     def test_patch_merges_frontmatter_keys(self) -> None:
         existing = """---
 description: Team customized linting rules

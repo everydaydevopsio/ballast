@@ -236,6 +236,28 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
     return "\n".join(lines)
 
 
+def build_claude_md(agents: list[str], language: str) -> str:
+    lines = [
+        "# CLAUDE.md",
+        "",
+        "This file provides guidance to Claude Code for working in this repository.",
+        "",
+        "## Installed agent rules",
+        "",
+        f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+        "",
+        "Read and follow these rule files in `.claude/rules/` when they apply:",
+        "",
+    ]
+    for agent in agents:
+        for suffix in list_rule_suffixes(agent, language):
+            basename = agent if suffix == "" else f"{agent}-{suffix}"
+            description = get_codex_rule_description(agent, language, suffix) or f"Rules for {basename}"
+            lines.append(f"- `.claude/rules/{basename}.md` — {description}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def normalize_line_endings(content: str) -> str:
     return content.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -464,6 +486,14 @@ def prompt(question: str) -> str:
     return input(question).strip()
 
 
+def prompt_yes_no(question: str, default: bool = False) -> bool:
+    suffix = " [Y/n]: " if default else " [y/N]: "
+    value = prompt(question + suffix).lower()
+    if not value:
+        return default
+    return value in {"y", "yes"}
+
+
 def prompt_target() -> str:
     value = prompt(f"AI platform ({', '.join(TARGETS)}): ").lower()
     if value in TARGETS:
@@ -510,7 +540,14 @@ def resolve_target_and_agents(args: argparse.Namespace, root: Path, language: st
 
 
 def install(
-    root: Path, target: str, agents: list[str], language: str, force: bool, patch: bool, persist: bool
+    root: Path,
+    target: str,
+    agents: list[str],
+    language: str,
+    force: bool,
+    patch: bool,
+    persist: bool,
+    patch_claude_md: bool = False,
 ) -> InstallResult:
     result = InstallResult()
     processed_agents: list[str] = []
@@ -572,6 +609,23 @@ def install(
             except Exception as err:
                 result.errors.append(("codex", str(err)))
 
+    if target == "claude":
+        claude_md = root / "CLAUDE.md"
+        if claude_md.exists() and not force and not patch_claude_md:
+            result.skipped_support_files.append(str(claude_md))
+        else:
+            try:
+                content = build_claude_md(processed_agents, language)
+                next_content = (
+                    patch_codex_agents_md(claude_md.read_text(encoding="utf-8"), content)
+                    if claude_md.exists() and not force and patch_claude_md
+                    else content
+                )
+                claude_md.write_text(next_content, encoding="utf-8")
+                result.installed_support_files.append(str(claude_md))
+            except Exception as err:
+                result.errors.append(("claude", str(err)))
+
     return result
 
 
@@ -596,7 +650,16 @@ def run_install(args: argparse.Namespace) -> int:
         return 1
 
     persist = not args.target and not args.agent and not args.all
-    result = install(root, target, agents, language, bool(args.force), bool(args.patch), persist)
+    patch_claude_md = (
+        target == "claude"
+        and not is_ci_mode()
+        and not bool(args.yes)
+        and not bool(args.force)
+        and not bool(args.patch)
+        and (root / "CLAUDE.md").exists()
+        and prompt_yes_no(f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?")
+    )
+    result = install(root, target, agents, language, bool(args.force), bool(args.patch), persist, patch_claude_md)
 
     if result.errors:
         for agent, error in result.errors:
@@ -610,7 +673,8 @@ def run_install(args: argparse.Namespace) -> int:
             print(f"  {basename} -> {destination(root, target, basename)}")
     if result.installed_support_files:
         for file in result.installed_support_files:
-            print(f"  AGENTS.md -> {file}")
+            label = "CLAUDE.md" if file.endswith("CLAUDE.md") else "AGENTS.md"
+            print(f"  {label} -> {file}")
     if result.skipped:
         print("Skipped (already present; use --force to overwrite): " + ", ".join(result.skipped))
     if result.skipped_support_files:

@@ -130,6 +130,60 @@ Keep my custom rule text.
 	}
 }
 
+func TestInstallPatchUpdatesClaudeMDSectionOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	rulePath := filepath.Join(tmpDir, ".claude", "rules", "linting.md")
+	if err := os.MkdirAll(filepath.Dir(rulePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rulePath, []byte(`# Go Linting Rules
+
+Team intro.
+
+## Your Responsibilities
+
+Keep my custom rule text.
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	claudeMD := filepath.Join(tmpDir, "CLAUDE.md")
+	if err := os.WriteFile(claudeMD, []byte("# CLAUDE.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nRead and follow these rule files in `.claude/rules/` when they apply:\n\n- `.claude/rules/old.md` - Old rule\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "claude",
+		agents:      []string{"linting"},
+		language:    "go",
+		force:       false,
+		patch:       false,
+		patchClaude: true,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	content, err := os.ReadFile(claudeMD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "## Team Notes") {
+		t.Fatalf("expected user notes to remain: %s", text)
+	}
+	if !regexp.MustCompile(`Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
+		t.Fatalf("expected ballast notice to be present: %s", text)
+	}
+	if !strings.Contains(text, "`.claude/rules/linting.md`") {
+		t.Fatalf("expected linting rule to be installed: %s", text)
+	}
+	if strings.Contains(text, "`.claude/rules/old.md`") {
+		t.Fatalf("expected old installed-rules entry to be replaced: %s", text)
+	}
+}
+
 func TestPatchCodexAgentsMDIgnoresHeadingInsideCodeFence(t *testing.T) {
 	existing := "# AGENTS.md\n\n```md\n## Installed agent rules\n```\n\n## Installed agent rules\n\nOld rules\n"
 	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast v9.9.9-test. Do not edit this section.\n\nNew rules\n"

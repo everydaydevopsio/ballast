@@ -70,6 +70,7 @@ type installOptions struct {
 	language    string
 	force       bool
 	patch       bool
+	patchClaude bool
 	saveConfig  bool
 }
 
@@ -150,6 +151,21 @@ func runInstall(args []string) int {
 	}
 
 	persist := strings.TrimSpace(*target) == "" && strings.TrimSpace(*agent) == "" && !*all
+	patchClaude := false
+	if resolved.Target == "claude" && !*yes && !isCIMode() && !*force && !*patch && exists(claudeMDPath(root)) {
+		approved, promptErr := promptYesNo(
+			fmt.Sprintf(
+				"Existing CLAUDE.md found at %s. Patch the Installed agent rules section?",
+				claudeMDPath(root),
+			),
+			false,
+		)
+		if promptErr != nil {
+			fmt.Println(promptErr)
+			return 1
+		}
+		patchClaude = approved
+	}
 	result := install(installOptions{
 		projectRoot: root,
 		target:      resolved.Target,
@@ -157,6 +173,7 @@ func runInstall(args []string) int {
 		language:    lang,
 		force:       *force,
 		patch:       *patch,
+		patchClaude: patchClaude,
 		saveConfig:  persist,
 	})
 
@@ -180,7 +197,11 @@ func runInstall(args []string) int {
 	}
 	if len(result.installedSupport) > 0 {
 		for _, file := range result.installedSupport {
-			fmt.Printf("  AGENTS.md -> %s\n", file)
+			label := "AGENTS.md"
+			if strings.HasSuffix(file, "CLAUDE.md") {
+				label = "CLAUDE.md"
+			}
+			fmt.Printf("  %s -> %s\n", label, file)
 		}
 	}
 	if len(result.skipped) > 0 {
@@ -352,6 +373,34 @@ func install(opts installOptions) installResult {
 		}
 	}
 
+	if opts.target == "claude" {
+		claudePath := claudeMDPath(opts.projectRoot)
+		if exists(claudePath) && !opts.force && !opts.patchClaude {
+			result.skippedSupportFiles = append(result.skippedSupportFiles, claudePath)
+		} else {
+			ids := sortedKeys(processed)
+			content, err := buildClaudeMD(ids, opts.language)
+			if err != nil {
+				result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
+			} else {
+				nextContent := content
+				if exists(claudePath) && !opts.force && opts.patchClaude {
+					existing, readErr := os.ReadFile(claudePath)
+					if readErr != nil {
+						result.errors = append(result.errors, agentError{agent: "claude", err: readErr.Error()})
+					} else {
+						nextContent = patchCodexAgentsMD(string(existing), content)
+					}
+				}
+				if err := os.WriteFile(claudePath, []byte(nextContent), 0o644); err != nil {
+					result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
+				} else {
+					result.installedSupport = append(result.installedSupport, claudePath)
+				}
+			}
+		}
+	}
+
 	return result
 }
 
@@ -383,6 +432,40 @@ func buildCodexAgentsMD(agents []string, language string) (string, error) {
 				description = "Rules for " + base
 			}
 			lines = append(lines, fmt.Sprintf("- `.codex/rules/%s.md` — %s", base, description))
+		}
+	}
+	lines = append(lines, "")
+	return strings.Join(lines, "\n"), nil
+}
+
+func buildClaudeMD(agents []string, language string) (string, error) {
+	lines := []string{
+		"# CLAUDE.md",
+		"",
+		"This file provides guidance to Claude Code for working in this repository.",
+		"",
+		"## Installed agent rules",
+		"",
+		"Created by Ballast v" + ballastVersion + ". Do not edit this section.",
+		"",
+		"Read and follow these rule files in `.claude/rules/` when they apply:",
+		"",
+	}
+	for _, agentID := range agents {
+		suffixes, err := listRuleSuffixes(agentID, language)
+		if err != nil {
+			return "", err
+		}
+		for _, suffix := range suffixes {
+			base := agentID
+			if suffix != "" {
+				base = agentID + "-" + suffix
+			}
+			description, _ := codexRuleDescription(agentID, language, suffix)
+			if description == "" {
+				description = "Rules for " + base
+			}
+			lines = append(lines, fmt.Sprintf("- `.claude/rules/%s.md` — %s", base, description))
 		}
 	}
 	lines = append(lines, "")
@@ -937,6 +1020,26 @@ func promptAgents(language string) ([]string, error) {
 	}
 }
 
+func promptYesNo(question string, defaultAnswer bool) (bool, error) {
+	reader := bufio.NewReader(os.Stdin)
+	suffix := " [y/N]: "
+	if defaultAnswer {
+		suffix = " [Y/n]: "
+	}
+	fmt.Print(question + suffix)
+	line, err := reader.ReadString('\n')
+	if err != nil && !errors.Is(err, os.ErrClosed) {
+		if len(strings.TrimSpace(line)) == 0 {
+			return false, err
+		}
+	}
+	value := strings.ToLower(strings.TrimSpace(line))
+	if value == "" {
+		return defaultAnswer, nil
+	}
+	return value == "y" || value == "yes", nil
+}
+
 func splitAgents(raw string) []string {
 	if strings.TrimSpace(raw) == "" {
 		return nil
@@ -1076,6 +1179,10 @@ func destination(projectRoot, target, basename string) (string, string) {
 
 func codexAgentsMDPath(projectRoot string) string {
 	return filepath.Join(projectRoot, "AGENTS.md")
+}
+
+func claudeMDPath(projectRoot string) string {
+	return filepath.Join(projectRoot, "CLAUDE.md")
 }
 
 func contains(items []string, value string) bool {

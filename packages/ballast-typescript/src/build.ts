@@ -247,6 +247,39 @@ export function buildCodexAgentsMd(
   return lines.join('\n');
 }
 
+export function buildClaudeMd(
+  agents: string[],
+  language: Language = 'typescript'
+): string {
+  const lines: string[] = [];
+  lines.push('# CLAUDE.md');
+  lines.push('');
+  lines.push(
+    'This file provides guidance to Claude Code for working in this repository.'
+  );
+  lines.push('');
+  lines.push('## Installed agent rules');
+  lines.push('');
+  lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
+  lines.push('');
+  lines.push(
+    'Read and follow these rule files in `.claude/rules/` when they apply:'
+  );
+  lines.push('');
+  for (const agentId of agents) {
+    const suffixes = listRuleSuffixes(agentId, language);
+    for (const ruleSuffix of suffixes) {
+      const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      const description =
+        getCodexRuleDescription(agentId, ruleSuffix, language) ??
+        `Rules for ${basename}`;
+      lines.push(`- \`.claude/rules/${basename}.md\` — ${description}`);
+    }
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
 /**
  * Build content for the given agent, target, and optional rule suffix
  */
@@ -312,6 +345,10 @@ export function getDestination(
  */
 export function getCodexAgentsMdPath(projectRoot: string): string {
   return path.join(path.resolve(projectRoot), 'AGENTS.md');
+}
+
+export function getClaudeMdPath(projectRoot: string): string {
+  return path.join(path.resolve(projectRoot), 'CLAUDE.md');
 }
 
 /**
