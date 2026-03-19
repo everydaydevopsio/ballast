@@ -160,7 +160,7 @@ Created by Ballast v9.9.9-test. Do not edit this section.
 
 Read and follow these rule files in \`.codex/rules/\` when they apply:
 
-- \`.codex/rules/linting.md\` — Linting rule
+- \`.codex/rules/typescript-linting.md\` — Linting rule
 `;
 
       const merged = patchCodexAgentsMd(existing, canonical);
@@ -171,7 +171,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(merged).toMatch(
         /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
-      expect(merged).toContain('`.codex/rules/linting.md`');
+      expect(merged).toContain('`.codex/rules/typescript-linting.md`');
       expect(merged).not.toContain('`.codex/rules/old.md`');
     });
   });

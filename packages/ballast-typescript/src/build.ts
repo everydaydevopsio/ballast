@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import { getAgentDir } from './agents';
+import { COMMON_AGENT_IDS, getAgentDir } from './agents';
 import type { Target } from './config';
 import type { Language } from './agents';
 import pkg from '../package.json';
@@ -17,7 +17,22 @@ function getScopedBasename(ruleSubdir: string | null, basename: string): string 
   if (!ruleSubdir || ruleSubdir === 'common') {
     return basename;
   }
+  if (basename.startsWith(`${ruleSubdir}-`)) {
+    return basename;
+  }
   return `${ruleSubdir}-${basename}`;
+}
+
+function getRuleBasename(
+  agentId: string,
+  language: Language,
+  ruleSuffix?: string
+): string {
+  const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+  if ((COMMON_AGENT_IDS as readonly string[]).includes(agentId)) {
+    return basename;
+  }
+  return `${language}-${basename}`;
 }
 
 /** Rule file convention: content.md (main) and content-<suffix>.md (e.g. content-mcp.md) */
@@ -248,7 +263,7 @@ export function buildCodexAgentsMd(
   for (const agentId of agents) {
     const suffixes = listRuleSuffixes(agentId, language);
     for (const ruleSuffix of suffixes) {
-      const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =
         getCodexRuleDescription(agentId, ruleSuffix, language) ??
         `Rules for ${basename}`;
@@ -281,7 +296,7 @@ export function buildClaudeMd(
   for (const agentId of agents) {
     const suffixes = listRuleSuffixes(agentId, language);
     for (const ruleSuffix of suffixes) {
-      const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =
         getCodexRuleDescription(agentId, ruleSuffix, language) ??
         `Rules for ${basename}`;
@@ -322,10 +337,11 @@ export function getDestination(
   agentId: string,
   target: Target,
   projectRoot: string,
-  ruleSuffix?: string
+  ruleSuffix?: string,
+  language: Language = 'typescript'
 ): { dir: string; file: string } {
   const root = path.resolve(projectRoot);
-  const rawBasename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+  const rawBasename = getRuleBasename(agentId, language, ruleSuffix);
   const ruleSubdir = getRuleSubdir();
   const basename = getScopedBasename(ruleSubdir, rawBasename);
   switch (target) {

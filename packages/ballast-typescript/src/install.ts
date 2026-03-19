@@ -179,7 +179,8 @@ export function install(options: InstallOptions): InstallResult {
           agentId,
           target,
           projectRoot,
-          ruleSuffix || undefined
+          ruleSuffix || undefined,
+          language
         );
         const fileExists = fs.existsSync(file);
         if (!fs.existsSync(dir)) {
@@ -360,7 +361,8 @@ export async function runInstall(
         agentId,
         target,
         projectRoot,
-        ruleSuffix || undefined
+        ruleSuffix || undefined,
+        language
       );
       const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
       console.log(`  ${label} -> ${file}`);

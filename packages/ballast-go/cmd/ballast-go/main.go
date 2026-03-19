@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -187,10 +188,7 @@ func runInstall(args []string) int {
 	if len(result.installedRules) > 0 {
 		fmt.Printf("Installed for %s: %s\n", resolved.Target, strings.Join(result.installed, ", "))
 		for _, rule := range result.installedRules {
-			base := rule.agentID
-			if rule.ruleSuffix != "" {
-				base = base + "-" + rule.ruleSuffix
-			}
+			base := ruleBaseName(rule.agentID, lang, rule.ruleSuffix)
 			_, file := destination(root, resolved.Target, base)
 			fmt.Printf("  %s -> %s\n", base, file)
 		}
@@ -299,10 +297,7 @@ func install(opts installOptions) installResult {
 		agentSkipped := false
 		agentProcessed := false
 		for _, suffix := range suffixes {
-			base := agentID
-			if suffix != "" {
-				base = agentID + "-" + suffix
-			}
+			base := ruleBaseName(agentID, opts.language, suffix)
 			dir, file := destination(opts.projectRoot, opts.target, base)
 			content, err := buildContent(agentID, opts.target, opts.language, suffix)
 			if err != nil {
@@ -424,10 +419,7 @@ func buildCodexAgentsMD(agents []string, language string) (string, error) {
 			return "", err
 		}
 		for _, suffix := range suffixes {
-			base := agentID
-			if suffix != "" {
-				base = agentID + "-" + suffix
-			}
+			base := ruleBaseName(agentID, language, suffix)
 			description, _ := codexRuleDescription(agentID, language, suffix)
 			if description == "" {
 				description = "Rules for " + base
@@ -458,10 +450,7 @@ func buildClaudeMD(agents []string, language string) (string, error) {
 			return "", err
 		}
 		for _, suffix := range suffixes {
-			base := agentID
-			if suffix != "" {
-				base = agentID + "-" + suffix
-			}
+			base := ruleBaseName(agentID, language, suffix)
 			description, _ := codexRuleDescription(agentID, language, suffix)
 			if description == "" {
 				description = "Rules for " + base
@@ -1164,7 +1153,7 @@ func validateRepoRootOverride() error {
 func destination(projectRoot, target, basename string) (string, string) {
 	ruleSubdir := strings.TrimSpace(os.Getenv("BALLAST_RULE_SUBDIR"))
 	scopedBasename := basename
-	if ruleSubdir != "" && ruleSubdir != "common" {
+	if ruleSubdir != "" && ruleSubdir != "common" && !strings.HasPrefix(basename, ruleSubdir+"-") {
 		scopedBasename = ruleSubdir + "-" + basename
 	}
 	switch target {
@@ -1193,6 +1182,17 @@ func destination(projectRoot, target, basename string) (string, string) {
 		}
 		return dir, filepath.Join(dir, scopedBasename+".md")
 	}
+}
+
+func ruleBaseName(agentID, language, suffix string) string {
+	base := agentID
+	if suffix != "" {
+		base = agentID + "-" + suffix
+	}
+	if slices.Contains(commonAgents, agentID) {
+		return base
+	}
+	return language + "-" + base
 }
 
 func codexAgentsMDPath(projectRoot string) string {

@@ -77,9 +77,37 @@ func TestPatchRuleContentMergesFrontmatterAndHandlesCRLF(t *testing.T) {
 	}
 }
 
+func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "codex",
+		agents:      []string{"linting"},
+		language:    "go",
+		force:       false,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if len(result.installed) != 1 || result.installed[0] != "linting" {
+		t.Fatalf("expected linting to be installed, got %+v", result.installed)
+	}
+
+	rulePath := filepath.Join(tmpDir, ".codex", "rules", "go-linting.md")
+	content, err := os.ReadFile(rulePath)
+	if err != nil {
+		t.Fatalf("read go-linting.md: %v", err)
+	}
+	if !strings.Contains(string(content), "Go linting specialist") {
+		t.Fatalf("expected go-specific linting content, got %s", string(content))
+	}
+}
+
 func TestInstallPatchUpdatesCodexAgentsMDSectionOnly(t *testing.T) {
 	tmpDir := t.TempDir()
-	rulePath := filepath.Join(tmpDir, ".codex", "rules", "linting.md")
+	rulePath := filepath.Join(tmpDir, ".codex", "rules", "go-linting.md")
 	if err := os.MkdirAll(filepath.Dir(rulePath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +150,7 @@ Keep my custom rule text.
 	if !regexp.MustCompile(`Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
 		t.Fatalf("expected ballast notice to be present: %s", text)
 	}
-	if !strings.Contains(text, "`.codex/rules/linting.md`") {
+	if !strings.Contains(text, "`.codex/rules/go-linting.md`") {
 		t.Fatalf("expected linting rule to be installed: %s", text)
 	}
 	if strings.Contains(text, "`.codex/rules/old.md`") {
@@ -132,7 +160,7 @@ Keep my custom rule text.
 
 func TestInstallPatchUpdatesClaudeMDSectionOnly(t *testing.T) {
 	tmpDir := t.TempDir()
-	rulePath := filepath.Join(tmpDir, ".claude", "rules", "linting.md")
+	rulePath := filepath.Join(tmpDir, ".claude", "rules", "go-linting.md")
 	if err := os.MkdirAll(filepath.Dir(rulePath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +204,7 @@ Keep my custom rule text.
 	if !regexp.MustCompile(`Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
 		t.Fatalf("expected ballast notice to be present: %s", text)
 	}
-	if !strings.Contains(text, "`.claude/rules/linting.md`") {
+	if !strings.Contains(text, "`.claude/rules/go-linting.md`") {
 		t.Fatalf("expected linting rule to be installed: %s", text)
 	}
 	if strings.Contains(text, "`.claude/rules/old.md`") {

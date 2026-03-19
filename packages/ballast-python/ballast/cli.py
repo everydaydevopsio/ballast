@@ -190,7 +190,11 @@ def build_content(agent: str, target: str, language: str, suffix: str = "") -> s
 
 def destination(root: Path, target: str, basename: str) -> Path:
     rule_subdir = os.environ.get("BALLAST_RULE_SUBDIR", "").strip()
-    scoped_basename = basename if not rule_subdir or rule_subdir == "common" else f"{rule_subdir}-{basename}"
+    scoped_basename = (
+        basename
+        if not rule_subdir or rule_subdir == "common" or basename.startswith(f"{rule_subdir}-")
+        else f"{rule_subdir}-{basename}"
+    )
     if target == "cursor":
         base = root / ".cursor" / "rules"
         return (base / rule_subdir / f"{scoped_basename}.mdc") if rule_subdir else (base / f"{scoped_basename}.mdc")
@@ -220,6 +224,13 @@ def get_codex_rule_description(agent: str, language: str, suffix: str = "") -> s
         return None
 
 
+def rule_basename(agent: str, language: str, suffix: str = "") -> str:
+    basename = agent if suffix == "" else f"{agent}-{suffix}"
+    if agent in COMMON_AGENTS:
+        return basename
+    return f"{language}-{basename}"
+
+
 def build_codex_agents_md(agents: list[str], language: str) -> str:
     lines = [
         "# AGENTS.md",
@@ -235,7 +246,7 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
     ]
     for agent in agents:
         for suffix in list_rule_suffixes(agent, language):
-            basename = agent if suffix == "" else f"{agent}-{suffix}"
+            basename = rule_basename(agent, language, suffix)
             description = get_codex_rule_description(agent, language, suffix) or f"Rules for {basename}"
             lines.append(f"- `.codex/rules/{basename}.md` — {description}")
     lines.append("")
@@ -257,7 +268,7 @@ def build_claude_md(agents: list[str], language: str) -> str:
     ]
     for agent in agents:
         for suffix in list_rule_suffixes(agent, language):
-            basename = agent if suffix == "" else f"{agent}-{suffix}"
+            basename = rule_basename(agent, language, suffix)
             description = get_codex_rule_description(agent, language, suffix) or f"Rules for {basename}"
             lines.append(f"- `.claude/rules/{basename}.md` — {description}")
     lines.append("")
@@ -573,7 +584,7 @@ def install(
 
         try:
             for suffix in list_rule_suffixes(agent, language):
-                basename = agent if suffix == "" else f"{agent}-{suffix}"
+                basename = rule_basename(agent, language, suffix)
                 dst = destination(root, target, basename)
                 content = build_content(agent, target, language, suffix)
                 if dst.exists() and not force and not patch:
@@ -676,7 +687,7 @@ def run_install(args: argparse.Namespace) -> int:
     if result.installed_rules:
         print(f"Installed for {target}: {', '.join(result.installed)}")
         for agent, suffix in result.installed_rules:
-            basename = agent if suffix == "" else f"{agent}-{suffix}"
+            basename = rule_basename(agent, language, suffix)
             print(f"  {basename} -> {destination(root, target, basename)}")
     if result.installed_support_files:
         for file in result.installed_support_files:

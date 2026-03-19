@@ -11,10 +11,21 @@ from ballast import cli
 
 
 class PatchInstallTests(unittest.TestCase):
+    def test_install_creates_language_prefixed_rule_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(root, "codex", ["linting"], "python", False, False, False)
+
+            self.assertIn("linting", result.installed)
+            rule = root / ".codex" / "rules" / "python-linting.md"
+            self.assertTrue(rule.exists())
+            self.assertIn("Python linting specialist", rule.read_text(encoding="utf-8"))
+
     def test_patch_preserves_existing_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            rule = root / ".cursor" / "rules" / "linting.mdc"
+            rule = root / ".cursor" / "rules" / "python-linting.mdc"
             rule.parent.mkdir(parents=True, exist_ok=True)
             rule.write_text(
                 """---
@@ -48,7 +59,7 @@ Keep this note.
     def test_patch_updates_codex_agents_md_section_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            rule = root / ".codex" / "rules" / "linting.md"
+            rule = root / ".codex" / "rules" / "python-linting.md"
             rule.parent.mkdir(parents=True, exist_ok=True)
             rule.write_text(
                 """# Python Linting Rules
@@ -85,13 +96,13 @@ Read and follow these rule files in `.codex/rules/` when they apply:
                 agents_md,
                 r"Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.",
             )
-            self.assertIn("`.codex/rules/linting.md`", agents_md)
+            self.assertIn("`.codex/rules/python-linting.md`", agents_md)
             self.assertNotIn("`.codex/rules/old.md`", agents_md)
 
     def test_patch_updates_claude_md_section_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            rule = root / ".claude" / "rules" / "linting.md"
+            rule = root / ".claude" / "rules" / "python-linting.md"
             rule.parent.mkdir(parents=True, exist_ok=True)
             rule.write_text(
                 """# Python Linting Rules
@@ -128,7 +139,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
                 claude_md,
                 r"Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.",
             )
-            self.assertIn("`.claude/rules/linting.md`", claude_md)
+            self.assertIn("`.claude/rules/python-linting.md`", claude_md)
             self.assertNotIn("`.claude/rules/old.md`", claude_md)
 
     def test_patch_merges_frontmatter_keys(self) -> None:

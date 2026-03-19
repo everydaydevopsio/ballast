@@ -209,7 +209,7 @@ alwaysApply: false
       expect(content).toMatch(
         /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
-      expect(content).toContain('`.codex/rules/linting.md`');
+      expect(content).toContain('`.codex/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
     });
   });
@@ -221,7 +221,7 @@ alwaysApply: false
       expect(content).toMatch(
         /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
-      expect(content).toContain('`.claude/rules/linting.md`');
+      expect(content).toContain('`.claude/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
     });
   });
@@ -262,7 +262,7 @@ alwaysApply: false
       const { dir, file } = getDestination('linting', 'cursor', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.cursor', 'rules'));
       expect(file).toBe(
-        path.join(projectRoot, '.cursor', 'rules', 'linting.mdc')
+        path.join(projectRoot, '.cursor', 'rules', 'typescript-linting.mdc')
       );
     });
 
@@ -270,21 +270,21 @@ alwaysApply: false
       const { dir, file } = getDestination('linting', 'claude', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.claude', 'rules'));
       expect(file).toBe(
-        path.join(projectRoot, '.claude', 'rules', 'linting.md')
+        path.join(projectRoot, '.claude', 'rules', 'typescript-linting.md')
       );
     });
 
     test('opencode returns .opencode/<agent>.md', () => {
       const { dir, file } = getDestination('linting', 'opencode', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.opencode'));
-      expect(file).toBe(path.join(projectRoot, '.opencode', 'linting.md'));
+      expect(file).toBe(path.join(projectRoot, '.opencode', 'typescript-linting.md'));
     });
 
     test('codex returns .codex/rules/<agent>.md', () => {
       const { dir, file } = getDestination('linting', 'codex', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.codex', 'rules'));
       expect(file).toBe(
-        path.join(projectRoot, '.codex', 'rules', 'linting.md')
+        path.join(projectRoot, '.codex', 'rules', 'typescript-linting.md')
       );
     });
 
