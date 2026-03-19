@@ -769,7 +769,7 @@ func buildMonorepoSupportFile(plan *monorepoPlan) string {
 		for _, agent := range plan.Language {
 			for _, suffix := range ruleSuffixesForAgent(agent) {
 				base := agentBaseName(agent, suffix)
-				lines = append(lines, fmt.Sprintf("- `.%s/%s/%s%s` — Rules for %s/%s", strings.TrimPrefix(rulesDir, "."), lang, base, extension, lang, base))
+				lines = append(lines, fmt.Sprintf("- `.%s/%s/%s-%s%s` — Rules for %s/%s", strings.TrimPrefix(rulesDir, "."), lang, lang, base, extension, lang, base))
 			}
 		}
 	}

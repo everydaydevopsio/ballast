@@ -13,6 +13,13 @@ function getRuleSubdir(): string | null {
   return value ? value : null;
 }
 
+function getScopedBasename(ruleSubdir: string | null, basename: string): string {
+  if (!ruleSubdir || ruleSubdir === 'common') {
+    return basename;
+  }
+  return `${ruleSubdir}-${basename}`;
+}
+
 /** Rule file convention: content.md (main) and content-<suffix>.md (e.g. content-mcp.md) */
 const CONTENT_PREFIX = 'content';
 const CONTENT_MAIN = `${CONTENT_PREFIX}.md`;
@@ -318,8 +325,9 @@ export function getDestination(
   ruleSuffix?: string
 ): { dir: string; file: string } {
   const root = path.resolve(projectRoot);
-  const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+  const rawBasename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
   const ruleSubdir = getRuleSubdir();
+  const basename = getScopedBasename(ruleSubdir, rawBasename);
   switch (target) {
     case 'cursor': {
       const dir = ruleSubdir

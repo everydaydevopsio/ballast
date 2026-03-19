@@ -36,17 +36,17 @@ verify_common_rules() {
 verify_language_rules() {
   local monorepo="$1"
 
-  test -f "${monorepo}/.cursor/rules/typescript/linting.mdc"
-  test -f "${monorepo}/.cursor/rules/typescript/logging.mdc"
-  test -f "${monorepo}/.cursor/rules/typescript/testing.mdc"
+  test -f "${monorepo}/.cursor/rules/typescript/typescript-linting.mdc"
+  test -f "${monorepo}/.cursor/rules/typescript/typescript-logging.mdc"
+  test -f "${monorepo}/.cursor/rules/typescript/typescript-testing.mdc"
 
-  test -f "${monorepo}/.cursor/rules/python/linting.mdc"
-  test -f "${monorepo}/.cursor/rules/python/logging.mdc"
-  test -f "${monorepo}/.cursor/rules/python/testing.mdc"
+  test -f "${monorepo}/.cursor/rules/python/python-linting.mdc"
+  test -f "${monorepo}/.cursor/rules/python/python-logging.mdc"
+  test -f "${monorepo}/.cursor/rules/python/python-testing.mdc"
 
-  test -f "${monorepo}/.cursor/rules/go/linting.mdc"
-  test -f "${monorepo}/.cursor/rules/go/logging.mdc"
-  test -f "${monorepo}/.cursor/rules/go/testing.mdc"
+  test -f "${monorepo}/.cursor/rules/go/go-linting.mdc"
+  test -f "${monorepo}/.cursor/rules/go/go-logging.mdc"
+  test -f "${monorepo}/.cursor/rules/go/go-testing.mdc"
 }
 
 verify_rulesrc() {

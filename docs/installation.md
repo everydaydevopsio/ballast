@@ -77,6 +77,7 @@ Generated behavior:
 
 - Root common rules under directories such as `.cursor/rules/common/`
 - Root language rules under directories such as `.cursor/rules/typescript/`, `.claude/rules/python/`, and `.codex/rules/go/`
+- Language-specific filenames include the language prefix, for example `typescript-linting.mdc`, `python-testing.md`, and `go-logging.md`
 - Root `.rulesrc.json` containing `target`, `agents`, `languages`, and detected `paths`
 - Root `CLAUDE.md` or `AGENTS.md` created when needed for Claude/Codex installs
 

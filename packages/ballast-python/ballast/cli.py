@@ -190,17 +190,18 @@ def build_content(agent: str, target: str, language: str, suffix: str = "") -> s
 
 def destination(root: Path, target: str, basename: str) -> Path:
     rule_subdir = os.environ.get("BALLAST_RULE_SUBDIR", "").strip()
+    scoped_basename = basename if not rule_subdir or rule_subdir == "common" else f"{rule_subdir}-{basename}"
     if target == "cursor":
         base = root / ".cursor" / "rules"
-        return (base / rule_subdir / f"{basename}.mdc") if rule_subdir else (base / f"{basename}.mdc")
+        return (base / rule_subdir / f"{scoped_basename}.mdc") if rule_subdir else (base / f"{scoped_basename}.mdc")
     if target == "claude":
         base = root / ".claude" / "rules"
-        return (base / rule_subdir / f"{basename}.md") if rule_subdir else (base / f"{basename}.md")
+        return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
     if target == "opencode":
         base = root / ".opencode"
-        return (base / rule_subdir / f"{basename}.md") if rule_subdir else (base / f"{basename}.md")
+        return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
     base = root / ".codex" / "rules"
-    return (base / rule_subdir / f"{basename}.md") if rule_subdir else (base / f"{basename}.md")
+    return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
 
 
 def extract_description_from_frontmatter(frontmatter: str) -> str | None:

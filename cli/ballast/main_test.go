@@ -361,10 +361,10 @@ func TestUpdateMonorepoSupportFilesCreatesClaudeMdAtRoot(t *testing.T) {
 	if !strings.Contains(text, "`.claude/rules/common/local-dev-env.md`") {
 		t.Fatalf("expected common rules entry in CLAUDE.md, got %q", text)
 	}
-	if !strings.Contains(text, "`.claude/rules/typescript/linting.md`") {
+	if !strings.Contains(text, "`.claude/rules/typescript/typescript-linting.md`") {
 		t.Fatalf("expected language rules entry in CLAUDE.md, got %q", text)
 	}
-	if !strings.Contains(text, "`.claude/rules/python/linting.md`") {
+	if !strings.Contains(text, "`.claude/rules/python/python-linting.md`") {
 		t.Fatalf("expected python rules entry in CLAUDE.md, got %q", text)
 	}
 }

@@ -1163,31 +1163,35 @@ func validateRepoRootOverride() error {
 
 func destination(projectRoot, target, basename string) (string, string) {
 	ruleSubdir := strings.TrimSpace(os.Getenv("BALLAST_RULE_SUBDIR"))
+	scopedBasename := basename
+	if ruleSubdir != "" && ruleSubdir != "common" {
+		scopedBasename = ruleSubdir + "-" + basename
+	}
 	switch target {
 	case "cursor":
 		dir := filepath.Join(projectRoot, ".cursor", "rules")
 		if ruleSubdir != "" {
 			dir = filepath.Join(dir, ruleSubdir)
 		}
-		return dir, filepath.Join(dir, basename+".mdc")
+		return dir, filepath.Join(dir, scopedBasename+".mdc")
 	case "claude":
 		dir := filepath.Join(projectRoot, ".claude", "rules")
 		if ruleSubdir != "" {
 			dir = filepath.Join(dir, ruleSubdir)
 		}
-		return dir, filepath.Join(dir, basename+".md")
+		return dir, filepath.Join(dir, scopedBasename+".md")
 	case "opencode":
 		dir := filepath.Join(projectRoot, ".opencode")
 		if ruleSubdir != "" {
 			dir = filepath.Join(dir, ruleSubdir)
 		}
-		return dir, filepath.Join(dir, basename+".md")
+		return dir, filepath.Join(dir, scopedBasename+".md")
 	default:
 		dir := filepath.Join(projectRoot, ".codex", "rules")
 		if ruleSubdir != "" {
 			dir = filepath.Join(dir, ruleSubdir)
 		}
-		return dir, filepath.Join(dir, basename+".md")
+		return dir, filepath.Join(dir, scopedBasename+".md")
 	}
 }
 
