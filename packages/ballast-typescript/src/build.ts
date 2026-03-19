@@ -8,6 +8,11 @@ import pkg from '../package.json';
 
 const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
 
+function getRuleSubdir(): string | null {
+  const value = process.env.BALLAST_RULE_SUBDIR?.trim();
+  return value ? value : null;
+}
+
 /** Rule file convention: content.md (main) and content-<suffix>.md (e.g. content-mcp.md) */
 const CONTENT_PREFIX = 'content';
 const CONTENT_MAIN = `${CONTENT_PREFIX}.md`;
@@ -314,24 +319,33 @@ export function getDestination(
 ): { dir: string; file: string } {
   const root = path.resolve(projectRoot);
   const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+  const ruleSubdir = getRuleSubdir();
   switch (target) {
     case 'cursor': {
-      const dir = path.join(root, '.cursor', 'rules');
+      const dir = ruleSubdir
+        ? path.join(root, '.cursor', 'rules', ruleSubdir)
+        : path.join(root, '.cursor', 'rules');
       const file = path.join(dir, `${basename}.mdc`);
       return { dir, file };
     }
     case 'claude': {
-      const dir = path.join(root, '.claude', 'rules');
+      const dir = ruleSubdir
+        ? path.join(root, '.claude', 'rules', ruleSubdir)
+        : path.join(root, '.claude', 'rules');
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }
     case 'opencode': {
-      const dir = path.join(root, '.opencode');
+      const dir = ruleSubdir
+        ? path.join(root, '.opencode', ruleSubdir)
+        : path.join(root, '.opencode');
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }
     case 'codex': {
-      const dir = path.join(root, '.codex', 'rules');
+      const dir = ruleSubdir
+        ? path.join(root, '.codex', 'rules', ruleSubdir)
+        : path.join(root, '.codex', 'rules');
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }

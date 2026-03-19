@@ -149,9 +149,9 @@ func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testi
 	}
 
 	wantDirs := []string{
-		filepath.Join(root, "apps", "frontend"),
-		filepath.Join(root, "services", "api"),
-		filepath.Join(root, "tools", "worker"),
+		root,
+		root,
+		root,
 	}
 	for i, wantDir := range wantDirs {
 		if plan.Invocations[i+1].Dir != wantDir {
@@ -163,10 +163,13 @@ func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testi
 		if got := strings.Join(plan.Invocations[i+1].Args, " "); !strings.Contains(got, "--agent linting,testing") {
 			t.Fatalf("expected language agent selection for %q, got %q", wantDir, got)
 		}
+		if plan.Invocations[i+1].Env["BALLAST_RULE_SUBDIR"] == "" {
+			t.Fatalf("expected monorepo rule subdir env for invocation %#v", plan.Invocations[i+1])
+		}
 	}
 }
 
-func TestRunMonorepoInstallExecutesEachBackendInScopedDirectory(t *testing.T) {
+func TestRunMonorepoInstallExecutesEachBackendAtRepoRoot(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
@@ -182,11 +185,12 @@ func TestRunMonorepoInstallExecutesEachBackendInScopedDirectory(t *testing.T) {
 
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
 	var invocations []backendInvocation
-	execToolFunc = func(binary string, args []string, dir string) (int, error) {
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
 		invocations = append(invocations, backendInvocation{
 			Binary: binary,
 			Args:   append([]string(nil), args...),
 			Dir:    dir,
+			Env:    env,
 		})
 		return 0, nil
 	}
@@ -209,18 +213,19 @@ func TestRunMonorepoInstallExecutesEachBackendInScopedDirectory(t *testing.T) {
 		t.Fatalf("expected common agents in first invocation, got %q", got)
 	}
 
-	wantDirs := map[string]bool{
-		filepath.Join(root, "apps", "frontend"): true,
-		filepath.Join(root, "services", "api"):  true,
-		filepath.Join(root, "tools", "worker"):  true,
-	}
 	for _, invocation := range invocations[1:] {
-		if !wantDirs[invocation.Dir] {
+		if invocation.Dir != root {
 			t.Fatalf("unexpected invocation dir: %#v", invocation)
 		}
 		got := strings.Join(invocation.Args, " ")
 		if !strings.Contains(got, "--agent linting,logging,testing") {
 			t.Fatalf("expected language agents for scoped install, got %q", got)
+		}
+		if invocation.Env["BALLAST_DISABLE_SUPPORT_FILES"] != "1" {
+			t.Fatalf("expected support files to be disabled for monorepo backend invocation: %#v", invocation)
+		}
+		if invocation.Env["BALLAST_RULE_SUBDIR"] == "" {
+			t.Fatalf("expected language subdir env on monorepo invocation: %#v", invocation)
 		}
 	}
 
@@ -294,7 +299,7 @@ func TestRunMonorepoInstallDoesNotPersistConfigOnFailure(t *testing.T) {
 
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
 	callCount := 0
-	execToolFunc = func(binary string, args []string, dir string) (int, error) {
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
 		callCount++
 		if callCount == 2 {
 			return 1, nil
@@ -330,6 +335,37 @@ func TestDetectRepoProfilesPropagatesWalkErrors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "scan repo for language profiles") {
 		t.Fatalf("expected wrapped walk error, got %v", err)
+	}
+}
+
+func TestUpdateMonorepoSupportFilesCreatesClaudeMdAtRoot(t *testing.T) {
+	root := t.TempDir()
+	plan := &monorepoPlan{
+		Target:   "claude",
+		Common:   []string{"local-dev"},
+		Language: []string{"linting"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript", "python", "go"},
+		},
+	}
+
+	if err := updateMonorepoSupportFiles(root, plan, []string{"install", "--target", "claude", "--all", "--yes"}); err != nil {
+		t.Fatalf("updateMonorepoSupportFiles returned error: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read CLAUDE.md: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "`.claude/rules/common/local-dev-env.md`") {
+		t.Fatalf("expected common rules entry in CLAUDE.md, got %q", text)
+	}
+	if !strings.Contains(text, "`.claude/rules/typescript/linting.md`") {
+		t.Fatalf("expected language rules entry in CLAUDE.md, got %q", text)
+	}
+	if !strings.Contains(text, "`.claude/rules/python/linting.md`") {
+		t.Fatalf("expected python rules entry in CLAUDE.md, got %q", text)
 	}
 }
 

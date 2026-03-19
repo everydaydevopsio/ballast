@@ -274,6 +274,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 func install(opts installOptions) installResult {
 	result := installResult{}
 	processed := map[string]struct{}{}
+	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 
 	if opts.saveConfig {
 		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{Target: opts.target, Agents: opts.agents}); err != nil {
@@ -345,7 +346,7 @@ func install(opts installOptions) installResult {
 		}
 	}
 
-	if opts.target == "codex" {
+	if opts.target == "codex" && !disableSupportFiles {
 		agentsPath := codexAgentsMDPath(opts.projectRoot)
 		if exists(agentsPath) && !opts.force && !opts.patch {
 			result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
@@ -373,7 +374,7 @@ func install(opts installOptions) installResult {
 		}
 	}
 
-	if opts.target == "claude" {
+	if opts.target == "claude" && !disableSupportFiles {
 		claudePath := claudeMDPath(opts.projectRoot)
 		if exists(claudePath) && !opts.force && !opts.patchClaude {
 			result.skippedSupportFiles = append(result.skippedSupportFiles, claudePath)
@@ -1161,18 +1162,31 @@ func validateRepoRootOverride() error {
 }
 
 func destination(projectRoot, target, basename string) (string, string) {
+	ruleSubdir := strings.TrimSpace(os.Getenv("BALLAST_RULE_SUBDIR"))
 	switch target {
 	case "cursor":
 		dir := filepath.Join(projectRoot, ".cursor", "rules")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
 		return dir, filepath.Join(dir, basename+".mdc")
 	case "claude":
 		dir := filepath.Join(projectRoot, ".claude", "rules")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
 		return dir, filepath.Join(dir, basename+".md")
 	case "opencode":
 		dir := filepath.Join(projectRoot, ".opencode")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
 		return dir, filepath.Join(dir, basename+".md")
 	default:
 		dir := filepath.Join(projectRoot, ".codex", "rules")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
 		return dir, filepath.Join(dir, basename+".md")
 	}
 }

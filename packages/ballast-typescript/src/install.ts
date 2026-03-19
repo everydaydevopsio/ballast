@@ -157,6 +157,8 @@ export function install(options: InstallOptions): InstallResult {
   const skippedSupportFiles: string[] = [];
   const errors: Array<{ agent: string; error: string }> = [];
   const processedAgentIds = new Set<string>();
+  const disableSupportFiles =
+    process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
 
   if (persist) {
     saveConfig({ target, agents }, projectRoot, language);
@@ -214,7 +216,7 @@ export function install(options: InstallOptions): InstallResult {
     }
   }
 
-  if (target === 'claude') {
+  if (!disableSupportFiles && target === 'claude') {
     const claudeMdPath = getClaudeMdPath(projectRoot);
     if (fs.existsSync(claudeMdPath) && !force && !patchClaudeMd) {
       skippedSupportFiles.push(claudeMdPath);
@@ -236,7 +238,7 @@ export function install(options: InstallOptions): InstallResult {
     }
   }
 
-  if (target === 'codex') {
+  if (!disableSupportFiles && target === 'codex') {
     const agentsMdPath = getCodexAgentsMdPath(projectRoot);
     if (fs.existsSync(agentsMdPath) && !force && !patch) {
       skippedSupportFiles.push(agentsMdPath);

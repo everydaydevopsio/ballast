@@ -69,12 +69,16 @@ type backendInvocation struct {
 	Language language
 	Binary   string
 	Dir      string
+	Env      map[string]string
 	Args     []string
 }
 
 type monorepoPlan struct {
 	Invocations []backendInvocation
 	Config      monorepoConfig
+	Target      string
+	Common      []string
+	Language    []string
 }
 
 func main() {
@@ -127,7 +131,7 @@ func run(args []string) int {
 					fmt.Println(err)
 					return 1
 				}
-				exitCode, err := execToolFunc(invocation.Binary, invocation.Args, invocation.Dir)
+				exitCode, err := execToolFunc(invocation.Binary, invocation.Args, invocation.Dir, invocation.Env)
 				if err != nil {
 					fmt.Println(err)
 					return 1
@@ -137,6 +141,10 @@ func run(args []string) int {
 				}
 			}
 			if err := saveMonorepoConfig(root, plan.Config); err != nil {
+				fmt.Println(err)
+				return 1
+			}
+			if err := updateMonorepoSupportFiles(root, plan, forwardedArgs); err != nil {
 				fmt.Println(err)
 				return 1
 			}
@@ -164,7 +172,7 @@ func run(args []string) int {
 		return 1
 	}
 
-	exitCode, err := execToolFunc(tool.binary, forwardedArgs, "")
+	exitCode, err := execToolFunc(tool.binary, forwardedArgs, "", nil)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -235,7 +243,7 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
-	fmt.Println("Mixed TypeScript/Python/Go monorepos install common rules at the root and language-specific rules in each detected project directory.")
+	fmt.Println("Mixed TypeScript/Python/Go monorepos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/` and `.codex/rules/python/`).")
 }
 
 func printVersion() {
@@ -315,13 +323,16 @@ func ensureInstalled(tool toolConfig) error {
 	return nil
 }
 
-func execTool(binary string, args []string, dir string) (int, error) {
+func execTool(binary string, args []string, dir string, env map[string]string) (int, error) {
 	cmd := exec.Command(binary, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	if strings.TrimSpace(dir) != "" {
 		cmd.Dir = dir
+	}
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), envPairs(env)...)
 	}
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
@@ -404,6 +415,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			Language: commonLanguage,
 			Binary:   tool.binary,
 			Dir:      root,
+			Env:      monorepoInvocationEnv("common"),
 			Args:     withAgentSelection(baseArgs, commonSelection),
 		})
 	}
@@ -412,11 +424,12 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			continue
 		}
 		tool := toolsByLanguage[profile.Language]
-		for _, installPath := range profile.Paths {
+		for range profile.Paths {
 			plan = append(plan, backendInvocation{
 				Language: profile.Language,
 				Binary:   tool.binary,
-				Dir:      installPath,
+				Dir:      root,
+				Env:      monorepoInvocationEnv(string(profile.Language)),
 				Args:     withAgentSelection(baseArgs, languageSelection),
 			})
 		}
@@ -432,6 +445,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	return &monorepoPlan{
 		Invocations: plan,
 		Config:      configToSave,
+		Target:      installTarget,
+		Common:      commonSelection,
+		Language:    languageSelection,
 	}, nil
 }
 
@@ -670,6 +686,202 @@ func relativePaths(root string, paths []string) []string {
 		relative = append(relative, filepath.Clean(rel))
 	}
 	return uniqueStrings(relative)
+}
+
+func monorepoInvocationEnv(subdir string) map[string]string {
+	return map[string]string{
+		"BALLAST_RULE_SUBDIR":           subdir,
+		"BALLAST_DISABLE_SUPPORT_FILES": "1",
+	}
+}
+
+func envPairs(env map[string]string) []string {
+	pairs := make([]string, 0, len(env))
+	for key, value := range env {
+		pairs = append(pairs, key+"="+value)
+	}
+	return pairs
+}
+
+func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) error {
+	if plan.Target != "claude" && plan.Target != "codex" {
+		return nil
+	}
+
+	path := supportFilePath(root, plan.Target)
+	content := buildMonorepoSupportFile(plan)
+	if !fileExists(path) {
+		return os.WriteFile(path, []byte(content), 0o644)
+	}
+	if hasPatchFlag(args) {
+		return os.WriteFile(path, []byte(patchInstalledRulesSection(readFile(path), content)), 0o644)
+	}
+	if isInteractiveInstall(args) {
+		approved, err := promptSupportFilePatch(path)
+		if err != nil {
+			return err
+		}
+		if approved {
+			return os.WriteFile(path, []byte(patchInstalledRulesSection(readFile(path), content)), 0o644)
+		}
+	}
+	return nil
+}
+
+func supportFilePath(root string, target string) string {
+	if target == "claude" {
+		return filepath.Join(root, "CLAUDE.md")
+	}
+	return filepath.Join(root, "AGENTS.md")
+}
+
+func buildMonorepoSupportFile(plan *monorepoPlan) string {
+	title := "# AGENTS.md"
+	intro := "This file provides guidance to Codex (CLI and app) for working in this repository."
+	rulesDir := ".codex/rules"
+	extension := ".md"
+	if plan.Target == "claude" {
+		title = "# CLAUDE.md"
+		intro = "This file provides guidance to Claude Code for working in this repository."
+		rulesDir = ".claude/rules"
+	}
+
+	lines := []string{
+		title,
+		"",
+		intro,
+		"",
+		"## Installed agent rules",
+		"",
+		"Created by Ballast. Do not edit this section.",
+		"",
+		fmt.Sprintf("Read and follow these rule files in `%s/` when they apply:", rulesDir),
+		"",
+	}
+
+	for _, agent := range plan.Common {
+		for _, suffix := range ruleSuffixesForAgent(agent) {
+			base := agentBaseName(agent, suffix)
+			lines = append(lines, fmt.Sprintf("- `.%s/common/%s%s` — Rules for common/%s", strings.TrimPrefix(rulesDir, "."), base, extension, base))
+		}
+	}
+	for _, lang := range plan.Config.Languages {
+		for _, agent := range plan.Language {
+			for _, suffix := range ruleSuffixesForAgent(agent) {
+				base := agentBaseName(agent, suffix)
+				lines = append(lines, fmt.Sprintf("- `.%s/%s/%s%s` — Rules for %s/%s", strings.TrimPrefix(rulesDir, "."), lang, base, extension, lang, base))
+			}
+		}
+	}
+	lines = append(lines, "")
+	return strings.Join(lines, "\n")
+}
+
+func ruleSuffixesForAgent(agent string) []string {
+	if agent == "local-dev" {
+		return []string{"badges", "env", "license", "mcp"}
+	}
+	return []string{""}
+}
+
+func agentBaseName(agent string, suffix string) string {
+	if suffix == "" {
+		return agent
+	}
+	return agent + "-" + suffix
+}
+
+func hasPatchFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--patch" || arg == "-p" {
+			return true
+		}
+	}
+	return false
+}
+
+func isInteractiveInstall(args []string) bool {
+	for _, arg := range args {
+		if arg == "--yes" || arg == "-y" {
+			return false
+		}
+	}
+	return true
+}
+
+func promptSupportFilePatch(path string) (bool, error) {
+	fmt.Printf("Existing %s found. Patch the Installed agent rules section? [y/N]: ", filepath.Base(path))
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		if errors.Is(err, os.ErrClosed) || strings.Contains(err.Error(), "unexpected newline") || strings.Contains(err.Error(), "expected newline") {
+			return false, nil
+		}
+		return false, err
+	}
+	value := strings.ToLower(strings.TrimSpace(response))
+	return value == "y" || value == "yes", nil
+}
+
+func readFile(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func patchInstalledRulesSection(existing string, canonical string) string {
+	canonicalRange := findSectionRange(canonical, "Installed agent rules")
+	if canonicalRange == nil {
+		return existing
+	}
+	canonicalSection := strings.TrimRight(canonical[canonicalRange[0]:canonicalRange[1]], "\n")
+
+	existingRange := findSectionRange(existing, "Installed agent rules")
+	if existingRange == nil {
+		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
+	}
+
+	return strings.TrimRight(existing[:existingRange[0]], "\n") + "\n\n" +
+		canonicalSection + "\n\n" +
+		strings.TrimLeft(existing[existingRange[1]:], "\n")
+}
+
+func findSectionRange(content string, heading string) []int {
+	match := indexHeading(content, "## "+heading)
+	if match == nil {
+		return nil
+	}
+	next := indexNextHeading(content[match[1]:])
+	end := len(content)
+	if next >= 0 {
+		end = match[1] + next
+	}
+	return []int{match[0], end}
+}
+
+func indexHeading(content string, heading string) []int {
+	lines := strings.Split(content, "\n")
+	offset := 0
+	for _, line := range lines {
+		if line == heading {
+			return []int{offset, offset + len(line)}
+		}
+		offset += len(line) + 1
+	}
+	return nil
+}
+
+func indexNextHeading(content string) int {
+	lines := strings.Split(content, "\n")
+	offset := 0
+	for _, line := range lines {
+		if strings.HasPrefix(line, "## ") {
+			return offset
+		}
+		offset += len(line) + 1
+	}
+	return -1
 }
 
 func validateSelectedAgents(agents []string) error {

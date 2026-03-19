@@ -189,13 +189,18 @@ def build_content(agent: str, target: str, language: str, suffix: str = "") -> s
 
 
 def destination(root: Path, target: str, basename: str) -> Path:
+    rule_subdir = os.environ.get("BALLAST_RULE_SUBDIR", "").strip()
     if target == "cursor":
-        return root / ".cursor" / "rules" / f"{basename}.mdc"
+        base = root / ".cursor" / "rules"
+        return (base / rule_subdir / f"{basename}.mdc") if rule_subdir else (base / f"{basename}.mdc")
     if target == "claude":
-        return root / ".claude" / "rules" / f"{basename}.md"
+        base = root / ".claude" / "rules"
+        return (base / rule_subdir / f"{basename}.md") if rule_subdir else (base / f"{basename}.md")
     if target == "opencode":
-        return root / ".opencode" / f"{basename}.md"
-    return root / ".codex" / "rules" / f"{basename}.md"
+        base = root / ".opencode"
+        return (base / rule_subdir / f"{basename}.md") if rule_subdir else (base / f"{basename}.md")
+    base = root / ".codex" / "rules"
+    return (base / rule_subdir / f"{basename}.md") if rule_subdir else (base / f"{basename}.md")
 
 
 def extract_description_from_frontmatter(frontmatter: str) -> str | None:
@@ -551,6 +556,7 @@ def install(
 ) -> InstallResult:
     result = InstallResult()
     processed_agents: list[str] = []
+    disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 
     if persist:
         save_config(root, language, target, agents)
@@ -592,7 +598,7 @@ def install(
         except Exception as err:
             result.errors.append((agent, str(err)))
 
-    if target == "codex":
+    if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"
         if agents_md.exists() and not force and not patch:
             result.skipped_support_files.append(str(agents_md))
@@ -609,7 +615,7 @@ def install(
             except Exception as err:
                 result.errors.append(("codex", str(err)))
 
-    if target == "claude":
+    if target == "claude" and not disable_support_files:
         claude_md = root / "CLAUDE.md"
         if claude_md.exists() and not force and not patch_claude_md:
             result.skipped_support_files.append(str(claude_md))

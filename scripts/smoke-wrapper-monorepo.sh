@@ -28,25 +28,25 @@ EOF
 verify_common_rules() {
   local monorepo="$1"
 
-  test -f "${monorepo}/.cursor/rules/local-dev-env.mdc"
-  test -f "${monorepo}/.cursor/rules/cicd.mdc"
-  test -f "${monorepo}/.cursor/rules/observability.mdc"
+  test -f "${monorepo}/.cursor/rules/common/local-dev-env.mdc"
+  test -f "${monorepo}/.cursor/rules/common/cicd.mdc"
+  test -f "${monorepo}/.cursor/rules/common/observability.mdc"
 }
 
 verify_language_rules() {
   local monorepo="$1"
 
-  test -f "${monorepo}/apps/frontend/.cursor/rules/linting.mdc"
-  test -f "${monorepo}/apps/frontend/.cursor/rules/logging.mdc"
-  test -f "${monorepo}/apps/frontend/.cursor/rules/testing.mdc"
+  test -f "${monorepo}/.cursor/rules/typescript/linting.mdc"
+  test -f "${monorepo}/.cursor/rules/typescript/logging.mdc"
+  test -f "${monorepo}/.cursor/rules/typescript/testing.mdc"
 
-  test -f "${monorepo}/services/api/.cursor/rules/linting.mdc"
-  test -f "${monorepo}/services/api/.cursor/rules/logging.mdc"
-  test -f "${monorepo}/services/api/.cursor/rules/testing.mdc"
+  test -f "${monorepo}/.cursor/rules/python/linting.mdc"
+  test -f "${monorepo}/.cursor/rules/python/logging.mdc"
+  test -f "${monorepo}/.cursor/rules/python/testing.mdc"
 
-  test -f "${monorepo}/tools/worker/.cursor/rules/linting.mdc"
-  test -f "${monorepo}/tools/worker/.cursor/rules/logging.mdc"
-  test -f "${monorepo}/tools/worker/.cursor/rules/testing.mdc"
+  test -f "${monorepo}/.cursor/rules/go/linting.mdc"
+  test -f "${monorepo}/.cursor/rules/go/logging.mdc"
+  test -f "${monorepo}/.cursor/rules/go/testing.mdc"
 }
 
 verify_rulesrc() {

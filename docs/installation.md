@@ -67,7 +67,7 @@ ballast-go install --target cursor --all
 
 ## Monorepo Setup: TypeScript + Python + Go
 
-For mixed-language monorepos, prefer the unified `ballast` wrapper from the repository root. It auto-detects TypeScript, Python, and Go subprojects, installs common agents once at the root, installs language-specific agents in each matching directory, and writes a root `.rulesrc.json` with detected languages and paths.
+For mixed-language monorepos, prefer the unified `ballast` wrapper from the repository root. It auto-detects TypeScript, Python, and Go subprojects, installs all rules at the repo root, and separates them by language-specific directories under each target.
 
 ```bash
 ballast install --target cursor --all --yes
@@ -75,9 +75,10 @@ ballast install --target cursor --all --yes
 
 Generated behavior:
 
-- Root common rules in `.cursor/rules/` for `local-dev`, `cicd`, and `observability`
-- Per-directory language rules in each detected TypeScript, Python, and Go project
-- Root `.rulesrc.json` containing `target`, `agents`, `languages`, and `paths`
+- Root common rules under directories such as `.cursor/rules/common/`
+- Root language rules under directories such as `.cursor/rules/typescript/`, `.claude/rules/python/`, and `.codex/rules/go/`
+- Root `.rulesrc.json` containing `target`, `agents`, `languages`, and detected `paths`
+- Root `CLAUDE.md` or `AGENTS.md` created when needed for Claude/Codex installs
 
 Example root config:
 
@@ -95,6 +96,8 @@ Example root config:
 ```
 
 Manual path overrides are supported by editing the root `.rulesrc.json` before the next `ballast install`.
+
+If `CLAUDE.md` or `AGENTS.md` already exists, Ballast creates the file when missing and otherwise patches the `Installed agent rules` section only when `--patch` is set or the interactive installer confirms that update.
 
 ### Per-language fallback
 
