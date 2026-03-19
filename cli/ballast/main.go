@@ -378,6 +378,9 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 		}
 	}
 
+	if mergedEnv == nil {
+		mergedEnv = map[string]string{}
+	}
 	mergedEnv["BALLAST_REPO_ROOT"] = repoRoot
 	for key, value := range local.Env {
 		mergedEnv[key] = value

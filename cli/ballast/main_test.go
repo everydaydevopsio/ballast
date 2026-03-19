@@ -326,6 +326,64 @@ func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
 	}
 }
 
+func TestRunSingleLanguageInstallPrefersLocalBackendWithoutNilEnvPanic(t *testing.T) {
+	sourceRoot := t.TempDir()
+	projectRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n")
+	mustWriteFile(t, filepath.Join(projectRoot, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(projectRoot, "tsconfig.json"), "{}")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		osExecutableFunc = originalExecutable
+	})
+
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(sourceRoot, "cli", "ballast", "ballast"), nil
+	}
+
+	ensureCalled := false
+	ensureInstalledFunc = func(tool toolConfig) error {
+		ensureCalled = true
+		return nil
+	}
+
+	var invocation backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocation = backendInvocation{
+			Binary: binary,
+			Args:   append([]string(nil), args...),
+			Dir:    dir,
+			Env:    env,
+		}
+		return 0, nil
+	}
+
+	withWorkingDir(t, projectRoot, func() {
+		exitCode := run([]string{"install", "--target", "codex", "--all", "--patch"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if ensureCalled {
+		t.Fatal("expected local backend resolution to skip ensureInstalled")
+	}
+	if invocation.Binary != "node" {
+		t.Fatalf("expected local TypeScript backend to run via node, got %#v", invocation)
+	}
+	if invocation.Env["BALLAST_REPO_ROOT"] != sourceRoot {
+		t.Fatalf("expected BALLAST_REPO_ROOT in local invocation env, got %#v", invocation)
+	}
+}
+
 func TestResolveMonorepoPlanRejectsEscapingPathsFromConfig(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
