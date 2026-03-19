@@ -48,6 +48,7 @@ var version = "dev"
 var ensureInstalledFunc = ensureInstalled
 var execToolFunc = execTool
 var walkDirFunc = filepath.WalkDir
+var osExecutableFunc = os.Executable
 
 var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
@@ -127,11 +128,14 @@ func run(args []string) int {
 					fmt.Printf("Unsupported language: %s\n", invocation.Language)
 					return 1
 				}
-				if err := ensureInstalledFunc(tool); err != nil {
-					fmt.Println(err)
-					return 1
+				resolved := resolveBackendCommand(invocation.Language, tool, invocation.Args, invocation.Env)
+				if !resolved.UseLocal {
+					if err := ensureInstalledFunc(tool); err != nil {
+						fmt.Println(err)
+						return 1
+					}
 				}
-				exitCode, err := execToolFunc(invocation.Binary, invocation.Args, invocation.Dir, invocation.Env)
+				exitCode, err := execToolFunc(resolved.Binary, resolved.Args, invocation.Dir, resolved.Env)
 				if err != nil {
 					fmt.Println(err)
 					return 1
@@ -167,12 +171,15 @@ func run(args []string) int {
 		return 1
 	}
 
-	if err := ensureInstalledFunc(tool); err != nil {
-		fmt.Println(err)
-		return 1
+	resolved := resolveBackendCommand(selectedLanguage, tool, forwardedArgs, nil)
+	if !resolved.UseLocal {
+		if err := ensureInstalledFunc(tool); err != nil {
+			fmt.Println(err)
+			return 1
+		}
 	}
 
-	exitCode, err := execToolFunc(tool.binary, forwardedArgs, "", nil)
+	exitCode, err := execToolFunc(resolved.Binary, resolved.Args, "", resolved.Env)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -342,6 +349,113 @@ func execTool(binary string, args []string, dir string, env map[string]string) (
 		return 1, fmt.Errorf("failed to run %s: %w", binary, err)
 	}
 	return 0, nil
+}
+
+type resolvedBackendCommand struct {
+	Binary   string
+	Args     []string
+	Env      map[string]string
+	UseLocal bool
+}
+
+func resolveBackendCommand(lang language, tool toolConfig, args []string, env map[string]string) resolvedBackendCommand {
+	mergedEnv := cloneEnvMap(env)
+	repoRoot := findBallastSourceRoot()
+	if repoRoot == "" {
+		return resolvedBackendCommand{
+			Binary: tool.binary,
+			Args:   append([]string(nil), args...),
+			Env:    mergedEnv,
+		}
+	}
+
+	local := resolveLocalBackendCommand(repoRoot, lang)
+	if local.Binary == "" {
+		return resolvedBackendCommand{
+			Binary: tool.binary,
+			Args:   append([]string(nil), args...),
+			Env:    mergedEnv,
+		}
+	}
+
+	mergedEnv["BALLAST_REPO_ROOT"] = repoRoot
+	for key, value := range local.Env {
+		mergedEnv[key] = value
+	}
+
+	return resolvedBackendCommand{
+		Binary:   local.Binary,
+		Args:     append(append([]string(nil), local.Args...), args...),
+		Env:      mergedEnv,
+		UseLocal: true,
+	}
+}
+
+func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendCommand {
+	switch lang {
+	case langTypeScript:
+		cliPath := filepath.Join(repoRoot, "packages", "ballast-typescript", "dist", "cli.js")
+		if fileExists(cliPath) {
+			return resolvedBackendCommand{
+				Binary: "node",
+				Args:   []string{cliPath},
+			}
+		}
+	case langPython:
+		modulePath := filepath.Join(repoRoot, "packages", "ballast-python", "ballast", "__main__.py")
+		if fileExists(modulePath) {
+			return resolvedBackendCommand{
+				Binary: "python3",
+				Args:   []string{"-m", "ballast"},
+				Env: map[string]string{
+					"PYTHONPATH": filepath.Join(repoRoot, "packages", "ballast-python"),
+				},
+			}
+		}
+	case langGo:
+		binaryPath := filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go")
+		if fileExists(binaryPath) {
+			return resolvedBackendCommand{
+				Binary: binaryPath,
+			}
+		}
+	}
+	return resolvedBackendCommand{}
+}
+
+func findBallastSourceRoot() string {
+	executable, err := osExecutableFunc()
+	if err != nil {
+		return ""
+	}
+	current := filepath.Dir(executable)
+	for {
+		if isBallastSourceRoot(current) {
+			return current
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return ""
+		}
+		current = parent
+	}
+}
+
+func isBallastSourceRoot(root string) bool {
+	return fileExists(filepath.Join(root, "packages", "ballast-typescript", "package.json")) &&
+		fileExists(filepath.Join(root, "packages", "ballast-python", "pyproject.toml")) &&
+		fileExists(filepath.Join(root, "packages", "ballast-go", "go.mod"))
+}
+
+func cloneEnvMap(env map[string]string) map[string]string {
+	if len(env) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(env))
+	for key, value := range env {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {

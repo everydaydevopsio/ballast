@@ -242,6 +242,90 @@ func TestRunMonorepoInstallExecutesEachBackendAtRepoRoot(t *testing.T) {
 	}
 }
 
+func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
+	sourceRoot := t.TempDir()
+	projectRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "ballast", "__main__.py"), "print('py')")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "ballast-go"), "#!/bin/sh\n")
+	mustWriteFile(t, filepath.Join(projectRoot, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(projectRoot, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(projectRoot, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(projectRoot, "tools", "worker", "go.mod"), "module example.com/worker\n\ngo 1.24\n")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		osExecutableFunc = originalExecutable
+	})
+
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(sourceRoot, "cli", "ballast", "ballast"), nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+
+	var invocations []backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocations = append(invocations, backendInvocation{
+			Binary: binary,
+			Args:   append([]string(nil), args...),
+			Dir:    dir,
+			Env:    env,
+		})
+		return 0, nil
+	}
+
+	withWorkingDir(t, filepath.Join(projectRoot, "apps", "frontend"), func() {
+		exitCode := run([]string{"install", "--target", "claude", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(invocations) != 4 {
+		t.Fatalf("expected 4 invocations, got %d: %#v", len(invocations), invocations)
+	}
+
+	if invocations[0].Binary != "node" {
+		t.Fatalf("expected TypeScript backend to use node local entrypoint, got %#v", invocations[0])
+	}
+	if len(invocations[0].Args) < 2 || invocations[0].Args[0] != filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js") {
+		t.Fatalf("expected local TypeScript CLI path, got %#v", invocations[0])
+	}
+	if invocations[0].Env["BALLAST_REPO_ROOT"] != sourceRoot {
+		t.Fatalf("expected BALLAST_REPO_ROOT on local TypeScript invocation, got %#v", invocations[0])
+	}
+
+	if invocations[1].Binary != "node" {
+		t.Fatalf("expected language TypeScript backend to use node local entrypoint, got %#v", invocations[1])
+	}
+	if invocations[2].Binary != "python3" {
+		t.Fatalf("expected Python backend to use python3 local module entrypoint, got %#v", invocations[2])
+	}
+	if got := strings.Join(invocations[2].Args, " "); got != "-m ballast install --target claude --yes --agent linting,logging,testing" {
+		t.Fatalf("unexpected Python invocation args: %q", got)
+	}
+	if invocations[2].Env["BALLAST_REPO_ROOT"] != sourceRoot {
+		t.Fatalf("expected BALLAST_REPO_ROOT on local Python invocation, got %#v", invocations[2])
+	}
+	if invocations[2].Env["PYTHONPATH"] != filepath.Join(sourceRoot, "packages", "ballast-python") {
+		t.Fatalf("expected PYTHONPATH for local Python invocation, got %#v", invocations[2])
+	}
+
+	if invocations[3].Binary != filepath.Join(sourceRoot, "packages", "ballast-go", "ballast-go") {
+		t.Fatalf("expected Go backend to use local binary, got %#v", invocations[3])
+	}
+	if invocations[3].Env["BALLAST_REPO_ROOT"] != sourceRoot {
+		t.Fatalf("expected BALLAST_REPO_ROOT on local Go invocation, got %#v", invocations[3])
+	}
+}
+
 func TestResolveMonorepoPlanRejectsEscapingPathsFromConfig(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
