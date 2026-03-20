@@ -541,15 +541,13 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			continue
 		}
 		tool := toolsByLanguage[profile.Language]
-		for range profile.Paths {
-			plan = append(plan, backendInvocation{
-				Language: profile.Language,
-				Binary:   tool.binary,
-				Dir:      root,
-				Env:      monorepoInvocationEnv(string(profile.Language)),
-				Args:     withAgentSelection(baseArgs, languageSelection),
-			})
-		}
+		plan = append(plan, backendInvocation{
+			Language: profile.Language,
+			Binary:   tool.binary,
+			Dir:      root,
+			Env:      monorepoInvocationEnv(string(profile.Language)),
+			Args:     withAgentSelection(baseArgs, languageSelection),
+		})
 	}
 
 	if len(plan) == 0 {
@@ -980,8 +978,12 @@ func findSectionRange(content string, heading string) []int {
 func indexHeading(content string, heading string) []int {
 	lines := strings.Split(content, "\n")
 	offset := 0
+	inFence := false
 	for _, line := range lines {
-		if line == heading {
+		if strings.HasPrefix(line, "```") {
+			inFence = !inFence
+		}
+		if !inFence && line == heading {
 			return []int{offset, offset + len(line)}
 		}
 		offset += len(line) + 1
@@ -992,8 +994,12 @@ func indexHeading(content string, heading string) []int {
 func indexNextHeading(content string) int {
 	lines := strings.Split(content, "\n")
 	offset := 0
+	inFence := false
 	for _, line := range lines {
-		if strings.HasPrefix(line, "## ") {
+		if strings.HasPrefix(line, "```") {
+			inFence = !inFence
+		}
+		if !inFence && strings.HasPrefix(line, "## ") {
 			return offset
 		}
 		offset += len(line) + 1

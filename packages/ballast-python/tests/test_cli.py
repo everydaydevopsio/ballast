@@ -12,6 +12,20 @@ from ballast import cli
 
 
 class PatchInstallTests(unittest.TestCase):
+    def test_destination_rejects_invalid_rule_subdir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            old = os.environ.get("BALLAST_RULE_SUBDIR")
+            os.environ["BALLAST_RULE_SUBDIR"] = "../escape"
+            try:
+                with self.assertRaisesRegex(ValueError, "Invalid BALLAST_RULE_SUBDIR"):
+                    cli.destination(root, "codex", "python-linting")
+            finally:
+                if old is None:
+                    os.environ.pop("BALLAST_RULE_SUBDIR", None)
+                else:
+                    os.environ["BALLAST_RULE_SUBDIR"] = old
+
     def test_run_install_writes_shared_rulesrc_for_explicit_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -157,6 +171,26 @@ Read and follow these rule files in `.claude/rules/` when they apply:
             self.assertIn("`.claude/rules/python-linting.md`", claude_md)
             self.assertNotIn("`.claude/rules/old.md`", claude_md)
 
+    def test_patch_flag_updates_claude_md_section(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "CLAUDE.md").write_text(
+                """# CLAUDE.md
+
+## Installed agent rules
+
+- `.claude/rules/old.md` - Old rule
+""",
+                encoding="utf-8",
+            )
+
+            result = cli.install(root, "claude", ["linting"], "python", False, True, False)
+
+            self.assertIn(str(root / "CLAUDE.md"), result.installed_support_files)
+            claude_md = (root / "CLAUDE.md").read_text(encoding="utf-8")
+            self.assertIn("`.claude/rules/python-linting.md`", claude_md)
+            self.assertNotIn("`.claude/rules/old.md`", claude_md)
+
     def test_patch_merges_frontmatter_keys(self) -> None:
         existing = """---
 description: Team customized linting rules
@@ -191,6 +225,32 @@ Canonical content.
         self.assertIn("globs:", merged)
         self.assertIn("  read: false", merged)
         self.assertIn("  write: true", merged)
+
+    def test_patch_codex_agents_md_ignores_heading_inside_code_fence(self) -> None:
+        existing = """# AGENTS.md
+
+```md
+## Installed agent rules
+```
+
+## Installed agent rules
+
+- `.codex/rules/old.md` - Old rule
+"""
+        canonical = """# AGENTS.md
+
+## Installed agent rules
+
+Created by Ballast v9.9.9-test. Do not edit this section.
+
+- `.codex/rules/python-linting.md` - New rule
+"""
+
+        merged = cli.patch_codex_agents_md(existing, canonical)
+
+        self.assertIn("```md\n## Installed agent rules\n```", merged)
+        self.assertIn("`.codex/rules/python-linting.md`", merged)
+        self.assertNotIn("`.codex/rules/old.md`", merged)
 
 
 if __name__ == "__main__":

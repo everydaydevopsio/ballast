@@ -98,7 +98,7 @@ Example root config:
 
 Manual path overrides are supported by editing the root `.rulesrc.json` before the next `ballast install`.
 
-If `CLAUDE.md` or `AGENTS.md` already exists, Ballast creates the file when missing and otherwise patches the `Installed agent rules` section only when `--patch` is set or the interactive installer confirms that update.
+If `CLAUDE.md` or `AGENTS.md` already exists, Ballast creates the file when missing. `--patch` updates the `Installed agent rules` section for both files; without `--patch`, the interactive installer asks before patching an existing support file.
 
 ### Per-language fallback
 
@@ -122,18 +122,19 @@ Ballast preserves existing rule files unless `--force` is provided. Use `--patch
 
 ## Config Persistence
 
-- Wrapper monorepo config: `.rulesrc.json`
-- TypeScript CLI: `.rulesrc.ts.json`
-- Python CLI: `.rulesrc.python.json`
-- Go CLI: `.rulesrc.go.json`
+- Shared config (wrapper + TypeScript/Python/Go CLIs, current default): `.rulesrc.json`
+- Legacy per-language configs (still read as fallbacks for backward compatibility):
+  - TypeScript CLI (legacy): `.rulesrc.ts.json`
+  - Python CLI (legacy): `.rulesrc.python.json`
+  - Go CLI (legacy): `.rulesrc.go.json`
 
 ## Install Paths
 
 Platform | Path | File pattern
 -------- | ---- | ------------
-Cursor | `.cursor/rules/` | `<agent>.mdc`
-Claude | `.claude/rules/` | `<agent>.md`
-OpenCode | `.opencode/` | `<agent>.md`
-Codex | `.codex/rules/` | `<agent>.md`
+Cursor | `.cursor/rules/` | common agents use `<agent>.mdc`; language agents use `<language>-<agent>.mdc`
+Claude | `.claude/rules/` | common agents use `<agent>.md`; language agents use `<language>-<agent>.md`
+OpenCode | `.opencode/` | common agents use `<agent>.md`; language agents use `<language>-<agent>.md`
+Codex | `.codex/rules/` | common agents use `<agent>.md`; language agents use `<language>-<agent>.md`
 
 Codex installs root `AGENTS.md` when missing (or always with `--force`).

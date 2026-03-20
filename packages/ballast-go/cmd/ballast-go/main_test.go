@@ -105,6 +105,14 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	}
 }
 
+func TestValidatedRuleSubdirRejectsInvalidValues(t *testing.T) {
+	t.Setenv("BALLAST_RULE_SUBDIR", "../escape")
+	_, err := validatedRuleSubdir()
+	if err == nil {
+		t.Fatal("expected validatedRuleSubdir to reject invalid BALLAST_RULE_SUBDIR")
+	}
+}
+
 func TestRunInstallWritesSharedRulesrcForExplicitFlags(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalWD, err := os.Getwd()
@@ -127,6 +135,41 @@ func TestRunInstallWritesSharedRulesrcForExplicitFlags(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(tmpDir, ".rulesrc.json")); err != nil {
 		t.Fatalf("expected .rulesrc.json to be created: %v", err)
+	}
+}
+
+func TestPatchFlagUpdatesClaudeMDSection(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "CLAUDE.md"), []byte("# CLAUDE.md\n\n## Installed agent rules\n\n- `.claude/rules/old.md` - Old rule\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "claude",
+		agents:      []string{"linting"},
+		language:    "go",
+		force:       false,
+		patch:       true,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "`.claude/rules/go-linting.md`") {
+		t.Fatalf("expected go linting entry in CLAUDE.md: %s", text)
+	}
+	if strings.Contains(text, "`.claude/rules/old.md`") {
+		t.Fatalf("expected old installed-rules entry to be replaced: %s", text)
 	}
 }
 

@@ -316,6 +316,14 @@ alwaysApply: false
         getDestination('linting', 'unknown' as 'cursor', projectRoot)
       ).toThrow(/Unknown target/);
     });
+
+    test('rejects invalid BALLAST_RULE_SUBDIR values', () => {
+      process.env.BALLAST_RULE_SUBDIR = '../escape';
+      expect(() =>
+        getDestination('linting', 'codex', projectRoot)
+      ).toThrow(/Invalid BALLAST_RULE_SUBDIR/);
+      delete process.env.BALLAST_RULE_SUBDIR;
+    });
   });
 
   describe('listTargets', () => {

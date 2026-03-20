@@ -10,7 +10,15 @@ const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
 
 function getRuleSubdir(): string | null {
   const value = process.env.BALLAST_RULE_SUBDIR?.trim();
-  return value ? value : null;
+  if (!value) {
+    return null;
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new Error(
+      `Invalid BALLAST_RULE_SUBDIR "${value}". Only [A-Za-z0-9_-] are allowed.`
+    );
+  }
+  return value;
 }
 
 function getScopedBasename(ruleSubdir: string | null, basename: string): string {

@@ -174,5 +174,32 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(merged).toContain('`.codex/rules/typescript-linting.md`');
       expect(merged).not.toContain('`.codex/rules/old.md`');
     });
+
+    test('ignores installed-rules headings inside fenced code blocks', () => {
+      const existing = `# AGENTS.md
+
+\`\`\`md
+## Installed agent rules
+\`\`\`
+
+## Installed agent rules
+
+- \`.codex/rules/old.md\` — Old rule
+`;
+
+      const canonical = `# AGENTS.md
+
+## Installed agent rules
+
+Created by Ballast v9.9.9-test. Do not edit this section.
+
+- \`.codex/rules/typescript-linting.md\` — Linting rule
+`;
+
+      const merged = patchCodexAgentsMd(existing, canonical);
+      expect(merged).toContain('```md\n## Installed agent rules\n```');
+      expect(merged).toContain('`.codex/rules/typescript-linting.md`');
+      expect(merged).not.toContain('`.codex/rules/old.md`');
+    });
   });
 });

@@ -194,6 +194,10 @@ def build_content(agent: str, target: str, language: str, suffix: str = "") -> s
 
 def destination(root: Path, target: str, basename: str) -> Path:
     rule_subdir = os.environ.get("BALLAST_RULE_SUBDIR", "").strip()
+    if rule_subdir and not re.fullmatch(r"[A-Za-z0-9_-]+", rule_subdir):
+        raise ValueError(
+            f"Invalid BALLAST_RULE_SUBDIR value {rule_subdir!r}. Only letters, digits, '-' and '_' are allowed."
+        )
     scoped_basename = (
         basename
         if not rule_subdir or rule_subdir == "common" or basename.startswith(f"{rule_subdir}-")
@@ -473,12 +477,26 @@ def patch_rule_content(existing: str, canonical: str, target: str) -> str:
 
 def find_markdown_section_range(content: str, heading: str) -> tuple[int, int] | None:
     normalized = normalize_line_endings(content)
-    match = re.search(rf"^## {re.escape(heading)}$", normalized, re.MULTILINE)
-    if not match:
-        return None
-    next_heading = re.search(r"\n## .*", normalized[match.end() :])
-    end = match.end() + next_heading.start() + 1 if next_heading else len(normalized)
-    return match.start(), end
+    lines = normalized.split("\n")
+    target = f"## {heading}"
+    in_fence = False
+    offset = 0
+
+    for i, line in enumerate(lines):
+        if line.startswith("```"):
+            in_fence = not in_fence
+        if not in_fence and line == target:
+            start = offset
+            offset += len(line) + 1
+            for next_line in lines[i + 1 :]:
+                if next_line.startswith("```"):
+                    in_fence = not in_fence
+                if not in_fence and next_line.startswith("## "):
+                    return start, offset - 1
+                offset += len(next_line) + 1
+            return start, len(normalized)
+        offset += len(line) + 1
+    return None
 
 
 def patch_codex_agents_md(existing: str, canonical: str) -> str:
@@ -633,14 +651,15 @@ def install(
 
     if target == "claude" and not disable_support_files:
         claude_md = root / "CLAUDE.md"
-        if claude_md.exists() and not force and not patch_claude_md:
+        should_patch_claude_md = patch or patch_claude_md
+        if claude_md.exists() and not force and not should_patch_claude_md:
             result.skipped_support_files.append(str(claude_md))
         else:
             try:
                 content = build_claude_md(processed_agents, language)
                 next_content = (
                     patch_codex_agents_md(claude_md.read_text(encoding="utf-8"), content)
-                    if claude_md.exists() and not force and patch_claude_md
+                    if claude_md.exists() and not force and should_patch_claude_md
                     else content
                 )
                 claude_md.write_text(next_content, encoding="utf-8")
@@ -671,15 +690,14 @@ def run_install(args: argparse.Namespace) -> int:
         print("Invalid --target. Use: cursor, claude, opencode, codex")
         return 1
 
-    patch_claude_md = (
-        target == "claude"
-        and not is_ci_mode()
-        and not bool(args.yes)
-        and not bool(args.force)
-        and not bool(args.patch)
-        and (root / "CLAUDE.md").exists()
-        and prompt_yes_no(f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?")
-    )
+    patch_claude_md = False
+    if target == "claude" and (root / "CLAUDE.md").exists() and not bool(args.force):
+        if bool(args.patch):
+            patch_claude_md = True
+        elif not is_ci_mode() and not bool(args.yes):
+            patch_claude_md = prompt_yes_no(
+                f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?"
+            )
     result = install(root, target, agents, language, bool(args.force), bool(args.patch), True, patch_claude_md)
 
     if result.errors:

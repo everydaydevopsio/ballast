@@ -498,6 +498,34 @@ Read and follow these rule files in \`.claude/rules/\` when they apply:
         expect(claudeMd).not.toContain('`.claude/rules/old.md`');
       });
 
+      test('claude --patch updates installed rules section without prompt approval', () => {
+        fs.writeFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          `# CLAUDE.md
+
+## Installed agent rules
+
+Read and follow these rule files in \`.claude/rules/\` when they apply:
+
+- \`.claude/rules/old.md\` — Old rule
+`
+        );
+
+        const result = install({
+          projectRoot: tmpDir,
+          target: 'claude',
+          agents: ['linting'],
+          patch: true,
+          force: false,
+          saveConfig: false
+        });
+
+        expect(result.installedSupportFiles).toContain(path.join(tmpDir, 'CLAUDE.md'));
+        const claudeMd = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8');
+        expect(claudeMd).toContain('`.claude/rules/typescript-linting.md`');
+        expect(claudeMd).not.toContain('`.claude/rules/old.md`');
+      });
+
       test('opencode: writes to .opencode/<agent>.md', () => {
         install({
           projectRoot: tmpDir,

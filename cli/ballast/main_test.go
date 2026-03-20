@@ -169,6 +169,24 @@ func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testi
 	}
 }
 
+func TestResolveMonorepoPlanInvokesOncePerLanguage(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend-a", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend-b", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--all"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) != 3 {
+		t.Fatalf("expected 3 invocations (common + typescript + python), got %d: %#v", len(plan.Invocations), plan.Invocations)
+	}
+}
+
 func TestRunMonorepoInstallExecutesEachBackendAtRepoRoot(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
@@ -508,6 +526,22 @@ func TestUpdateMonorepoSupportFilesCreatesClaudeMdAtRoot(t *testing.T) {
 	}
 	if !strings.Contains(text, "`.claude/rules/python/python-linting.md`") {
 		t.Fatalf("expected python rules entry in CLAUDE.md, got %q", text)
+	}
+}
+
+func TestPatchInstalledRulesSectionIgnoresHeadingInsideCodeFence(t *testing.T) {
+	existing := "# CLAUDE.md\n\n```md\n## Installed agent rules\n```\n\n## Installed agent rules\n\n- `.claude/rules/old.md` — Old rule\n"
+	canonical := "# CLAUDE.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.claude/rules/typescript-linting.md` — Rules for typescript/linting\n"
+
+	merged := patchInstalledRulesSection(existing, canonical)
+	if !strings.Contains(merged, "```md\n## Installed agent rules\n```") {
+		t.Fatalf("expected fenced code block to remain untouched, got %q", merged)
+	}
+	if !strings.Contains(merged, "`.claude/rules/typescript-linting.md`") {
+		t.Fatalf("expected installed rules section to be updated, got %q", merged)
+	}
+	if strings.Contains(merged, "`.claude/rules/old.md`") {
+		t.Fatalf("expected old installed-rules entry to be replaced, got %q", merged)
 	}
 }
 

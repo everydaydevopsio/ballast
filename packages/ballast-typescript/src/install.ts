@@ -219,13 +219,14 @@ export function install(options: InstallOptions): InstallResult {
 
   if (!disableSupportFiles && target === 'claude') {
     const claudeMdPath = getClaudeMdPath(projectRoot);
-    if (fs.existsSync(claudeMdPath) && !force && !patchClaudeMd) {
+    const shouldPatchClaudeMd = patch || patchClaudeMd;
+    if (fs.existsSync(claudeMdPath) && !force && !shouldPatchClaudeMd) {
       skippedSupportFiles.push(claudeMdPath);
     } else {
       try {
         const content = buildClaudeMd(Array.from(processedAgentIds), language);
         const nextContent =
-          fs.existsSync(claudeMdPath) && !force && patchClaudeMd
+          fs.existsSync(claudeMdPath) && !force && shouldPatchClaudeMd
             ? patchCodexAgentsMd(fs.readFileSync(claudeMdPath, 'utf8'), content)
             : content;
         fs.writeFileSync(claudeMdPath, nextContent, 'utf8');
@@ -325,16 +326,16 @@ export async function runInstall(
 
   const { target, agents } = resolved;
   const claudeMdPath = getClaudeMdPath(projectRoot);
-  const patchClaudeMd =
-    !isCiMode() &&
-    !options.yes &&
-    target === 'claude' &&
-    fs.existsSync(claudeMdPath) &&
-    !options.force &&
-    !options.patch &&
-    (await promptYesNo(
-      `Existing CLAUDE.md found at ${claudeMdPath}. Patch the Installed agent rules section?`
-    ));
+  let patchClaudeMd = false;
+  if (target === 'claude' && fs.existsSync(claudeMdPath) && !options.force) {
+    if (options.patch) {
+      patchClaudeMd = true;
+    } else if (!isCiMode() && !options.yes) {
+      patchClaudeMd = await promptYesNo(
+        `Existing CLAUDE.md found at ${claudeMdPath}. Patch the Installed agent rules section?`
+      );
+    }
+  }
   const result = install({
     projectRoot,
     target,
