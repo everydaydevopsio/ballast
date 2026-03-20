@@ -157,11 +157,10 @@ export function install(options: InstallOptions): InstallResult {
   const skippedSupportFiles: string[] = [];
   const errors: Array<{ agent: string; error: string }> = [];
   const processedAgentIds = new Set<string>();
-  const disableSupportFiles =
-    process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
+  const disableSupportFiles = process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
 
   if (persist) {
-    saveConfig({ target, agents }, projectRoot, language);
+    saveConfig({ target, agents }, projectRoot);
   }
 
   for (const agentId of agents) {

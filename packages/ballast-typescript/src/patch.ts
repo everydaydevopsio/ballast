@@ -192,8 +192,6 @@ function findMarkdownSectionRange(
   const lines = content.split(/\r?\n/);
   const targetHeading = `## ${heading}`;
   let inFence = false;
-  let start = -1;
-  let end = content.length;
   let offset = 0;
 
   for (let i = 0; i < lines.length; i++) {
@@ -202,7 +200,7 @@ function findMarkdownSectionRange(
       inFence = !inFence;
     }
     if (!inFence && line === targetHeading) {
-      start = offset;
+      const start = offset;
       offset += line.length + 1;
       for (let j = i + 1; j < lines.length; j++) {
         const nextLine = lines[j];
@@ -210,12 +208,11 @@ function findMarkdownSectionRange(
           inFence = !inFence;
         }
         if (!inFence && nextLine.startsWith('## ')) {
-          end = offset - 1;
-          return { start, end };
+          return { start, end: offset - 1 };
         }
         offset += nextLine.length + 1;
       }
-      return { start, end };
+      return { start, end: content.length };
     }
     offset += line.length + 1;
   }

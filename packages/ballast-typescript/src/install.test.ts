@@ -143,10 +143,7 @@ describe('install', () => {
       expect(result.installed).toHaveLength(0);
       expect(result.skipped).toContain('linting');
       expect(
-        fs.readFileSync(
-          path.join(cursorDir, 'typescript-linting.mdc'),
-          'utf8'
-        )
+        fs.readFileSync(path.join(cursorDir, 'typescript-linting.mdc'), 'utf8')
       ).toBe('existing content');
     });
 
@@ -446,10 +443,12 @@ Keep this section.
           saveConfig: false
         });
 
-        expect(result.skippedSupportFiles).toContain(path.join(tmpDir, 'CLAUDE.md'));
-        expect(fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')).toContain(
-          '## Team Notes'
+        expect(result.skippedSupportFiles).toContain(
+          path.join(tmpDir, 'CLAUDE.md')
         );
+        expect(
+          fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
+        ).toContain('## Team Notes');
       });
 
       test('claude patch updates installed rules section without removing user notes', () => {
@@ -491,7 +490,10 @@ Read and follow these rule files in \`.claude/rules/\` when they apply:
           saveConfig: false
         });
 
-        const claudeMd = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8');
+        const claudeMd = fs.readFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          'utf8'
+        );
         expect(claudeMd).toContain('## Team Notes');
         expect(claudeMd).toContain('Keep this section.');
         expect(claudeMd).toContain('`.claude/rules/typescript-linting.md`');
@@ -520,8 +522,13 @@ Read and follow these rule files in \`.claude/rules/\` when they apply:
           saveConfig: false
         });
 
-        expect(result.installedSupportFiles).toContain(path.join(tmpDir, 'CLAUDE.md'));
-        const claudeMd = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8');
+        expect(result.installedSupportFiles).toContain(
+          path.join(tmpDir, 'CLAUDE.md')
+        );
+        const claudeMd = fs.readFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          'utf8'
+        );
         expect(claudeMd).toContain('`.claude/rules/typescript-linting.md`');
         expect(claudeMd).not.toContain('`.claude/rules/old.md`');
       });
@@ -536,7 +543,9 @@ Read and follow these rule files in \`.claude/rules/\` when they apply:
         });
         const { dir, file } = getDestination('linting', 'opencode', tmpDir);
         expect(fs.existsSync(file)).toBe(true);
-        expect(file).toBe(path.join(tmpDir, '.opencode', 'typescript-linting.md'));
+        expect(file).toBe(
+          path.join(tmpDir, '.opencode', 'typescript-linting.md')
+        );
         expect(dir).toBe(path.join(tmpDir, '.opencode'));
       });
 

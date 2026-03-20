@@ -12,11 +12,13 @@ export interface RulesConfig {
   agents: string[];
 }
 
-export function getRulesrcFilename(language: string = 'typescript'): string {
+export function getRulesrcFilename(): string {
   return RULESRC_FILENAME;
 }
 
-export function getLegacyRulesrcFilename(language: string = 'typescript'): string {
+export function getLegacyRulesrcFilename(
+  language: string = 'typescript'
+): string {
   if (language === 'typescript') return LEGACY_TYPESCRIPT_RULESRC_FILENAME;
   return `.rulesrc.${language}.json`;
 }
@@ -56,7 +58,7 @@ export function loadConfig(
 ): RulesConfig | null {
   const root = projectRoot ?? findProjectRoot();
   const fileCandidates = [
-    getRulesrcFilename(language),
+    getRulesrcFilename(),
     getLegacyRulesrcFilename(language)
   ];
   const filePath = fileCandidates
@@ -85,13 +87,9 @@ export function loadConfig(
 /**
  * Save rules config to project root
  */
-export function saveConfig(
-  config: RulesConfig,
-  projectRoot?: string,
-  language: string = 'typescript'
-): void {
+export function saveConfig(config: RulesConfig, projectRoot?: string): void {
   const root = projectRoot ?? findProjectRoot();
-  const filePath = path.join(root, getRulesrcFilename(language));
+  const filePath = path.join(root, getRulesrcFilename());
   fs.writeFileSync(
     filePath,
     JSON.stringify({ target: config.target, agents: config.agents }, null, 2),

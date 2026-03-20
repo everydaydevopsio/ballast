@@ -21,7 +21,10 @@ function getRuleSubdir(): string | null {
   return value;
 }
 
-function getScopedBasename(ruleSubdir: string | null, basename: string): string {
+function getScopedBasename(
+  ruleSubdir: string | null,
+  basename: string
+): string {
   if (!ruleSubdir || ruleSubdir === 'common') {
     return basename;
   }

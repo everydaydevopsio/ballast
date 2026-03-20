@@ -277,7 +277,9 @@ alwaysApply: false
     test('opencode returns .opencode/<agent>.md', () => {
       const { dir, file } = getDestination('linting', 'opencode', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.opencode'));
-      expect(file).toBe(path.join(projectRoot, '.opencode', 'typescript-linting.md'));
+      expect(file).toBe(
+        path.join(projectRoot, '.opencode', 'typescript-linting.md')
+      );
     });
 
     test('codex returns .codex/rules/<agent>.md', () => {
@@ -319,9 +321,9 @@ alwaysApply: false
 
     test('rejects invalid BALLAST_RULE_SUBDIR values', () => {
       process.env.BALLAST_RULE_SUBDIR = '../escape';
-      expect(() =>
-        getDestination('linting', 'codex', projectRoot)
-      ).toThrow(/Invalid BALLAST_RULE_SUBDIR/);
+      expect(() => getDestination('linting', 'codex', projectRoot)).toThrow(
+        /Invalid BALLAST_RULE_SUBDIR/
+      );
       delete process.env.BALLAST_RULE_SUBDIR;
     });
   });
