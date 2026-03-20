@@ -344,6 +344,69 @@ func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
 	}
 }
 
+func TestRunMonorepoInstallPrefersSiblingBackendsNextToWrapper(t *testing.T) {
+	sourceRoot := t.TempDir()
+	projectRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "ballast", "__main__.py"), "print('py')")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "ballast-go"), "#!/bin/sh\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, ".ci", "bin", "ballast-typescript"), "#!/bin/sh\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, ".ci", "bin", "ballast-python"), "#!/bin/sh\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, ".ci", "bin", "ballast-go"), "#!/bin/sh\n")
+	mustWriteFile(t, filepath.Join(projectRoot, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(projectRoot, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(projectRoot, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(projectRoot, "tools", "worker", "go.mod"), "module example.com/worker\n\ngo 1.24\n")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		osExecutableFunc = originalExecutable
+	})
+
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(sourceRoot, ".ci", "bin", "ballast"), nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+
+	var invocations []backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocations = append(invocations, backendInvocation{
+			Binary: binary,
+			Args:   append([]string(nil), args...),
+			Dir:    dir,
+			Env:    env,
+		})
+		return 0, nil
+	}
+
+	withWorkingDir(t, filepath.Join(projectRoot, "apps", "frontend"), func() {
+		exitCode := run([]string{"install", "--target", "cursor", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(invocations) != 4 {
+		t.Fatalf("expected 4 invocations, got %d: %#v", len(invocations), invocations)
+	}
+	if invocations[0].Binary != filepath.Join(sourceRoot, ".ci", "bin", "ballast-typescript") {
+		t.Fatalf("expected sibling TypeScript backend binary, got %#v", invocations[0])
+	}
+	if invocations[2].Binary != filepath.Join(sourceRoot, ".ci", "bin", "ballast-python") {
+		t.Fatalf("expected sibling Python backend binary, got %#v", invocations[2])
+	}
+	if invocations[3].Binary != filepath.Join(sourceRoot, ".ci", "bin", "ballast-go") {
+		t.Fatalf("expected sibling Go backend binary, got %#v", invocations[3])
+	}
+}
+
 func TestRunSingleLanguageInstallPrefersLocalBackendWithoutNilEnvPanic(t *testing.T) {
 	sourceRoot := t.TempDir()
 	projectRoot := t.TempDir()

@@ -395,6 +395,11 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 }
 
 func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendCommand {
+	if siblingBinary, ok := siblingBackendBinary(lang); ok {
+		return resolvedBackendCommand{
+			Binary: siblingBinary,
+		}
+	}
 	switch lang {
 	case langTypeScript:
 		cliPath := filepath.Join(repoRoot, "packages", "ballast-typescript", "dist", "cli.js")
@@ -424,6 +429,30 @@ func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendC
 		}
 	}
 	return resolvedBackendCommand{}
+}
+
+func siblingBackendBinary(lang language) (string, bool) {
+	executable, err := osExecutableFunc()
+	if err != nil {
+		return "", false
+	}
+	dir := filepath.Dir(executable)
+	var name string
+	switch lang {
+	case langTypeScript:
+		name = "ballast-typescript"
+	case langPython:
+		name = "ballast-python"
+	case langGo:
+		name = "ballast-go"
+	default:
+		return "", false
+	}
+	path := filepath.Join(dir, name)
+	if !fileExists(path) {
+		return "", false
+	}
+	return path, true
 }
 
 func findBallastSourceRoot() string {
