@@ -297,7 +297,7 @@ async function promptYesNo(
 
 /**
  * Run install flow: resolve target/agents (interactive or from config/flags), then install.
- * In CI mode with no .rulesrc.ts.json, --target and (--agent X or --all) are required.
+ * In CI mode with no .rulesrc.json, --target and (--agent X or --all) are required.
  */
 export async function runInstall(
   options: RunInstallOptions = {}
@@ -315,7 +315,7 @@ export async function runInstall(
 
   if (!resolved) {
     console.error(
-      'In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when .rulesrc.ts.json is missing.'
+      'In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when .rulesrc.json is missing.'
     );
     console.error(
       'Example: ballast-typescript install --yes --target cursor --agent linting'

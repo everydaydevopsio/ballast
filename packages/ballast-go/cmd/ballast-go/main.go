@@ -913,11 +913,11 @@ func findProjectRoot(cwd string) (string, error) {
 }
 
 func hasAnyRulesConfig(dir string) bool {
-	if exists(filepath.Join(dir, ".rulesrc.ts.json")) || exists(filepath.Join(dir, ".rulesrc.json")) {
+	if exists(filepath.Join(dir, ".rulesrc.json")) || exists(filepath.Join(dir, ".rulesrc.ts.json")) {
 		return true
 	}
 	for _, language := range languages {
-		if exists(filepath.Join(dir, rulesrcFilename(language))) {
+		if exists(filepath.Join(dir, legacyRulesrcFilename(language))) {
 			return true
 		}
 	}
@@ -926,8 +926,8 @@ func hasAnyRulesConfig(dir string) bool {
 
 func loadConfig(projectRoot, language string) *rulesConfig {
 	file := filepath.Join(projectRoot, rulesrcFilename(language))
-	if language == "typescript" && !exists(file) {
-		file = filepath.Join(projectRoot, ".rulesrc.json")
+	if !exists(file) {
+		file = filepath.Join(projectRoot, legacyRulesrcFilename(language))
 	}
 	if !exists(file) {
 		return nil
@@ -955,6 +955,10 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 }
 
 func rulesrcFilename(language string) string {
+	return ".rulesrc.json"
+}
+
+func legacyRulesrcFilename(language string) string {
 	if language == "typescript" {
 		return ".rulesrc.ts.json"
 	}

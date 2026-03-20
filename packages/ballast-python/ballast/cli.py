@@ -57,6 +57,10 @@ def resolve_agents_root() -> Path:
 
 
 def rulesrc_filename(language: str) -> str:
+    return ".rulesrc.json"
+
+
+def legacy_rulesrc_filename(language: str) -> str:
     if language == "typescript":
         return ".rulesrc.ts.json"
     return f".rulesrc.{language}.json"
@@ -86,8 +90,8 @@ def resolve_project_root(cwd: Path) -> Path:
         has_pkg = (directory / "package.json").exists()
         has_go = (directory / "go.mod").exists()
         has_pyproject = (directory / "pyproject.toml").exists()
-        has_any_cfg = (directory / ".rulesrc.ts.json").exists() or (directory / ".rulesrc.json").exists() or any(
-            (directory / rulesrc_filename(lang)).exists() for lang in LANGUAGES
+        has_any_cfg = (directory / ".rulesrc.json").exists() or (directory / ".rulesrc.ts.json").exists() or any(
+            (directory / legacy_rulesrc_filename(lang)).exists() for lang in LANGUAGES
         )
         if has_pkg or has_go or has_pyproject or has_any_cfg:
             return directory
@@ -105,8 +109,8 @@ def is_ci_mode() -> bool:
 
 def load_config(root: Path, language: str) -> dict[str, object] | None:
     file_path = root / rulesrc_filename(language)
-    if not file_path.exists() and language == "typescript":
-        file_path = root / ".rulesrc.json"
+    if not file_path.exists():
+        file_path = root / legacy_rulesrc_filename(language)
     if not file_path.exists():
         return None
     try:

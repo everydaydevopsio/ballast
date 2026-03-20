@@ -264,7 +264,7 @@ Keep my custom responsibilities.
       });
     });
 
-    test('saves language-specific config file for go', () => {
+    test('saves shared .rulesrc.json for go installs', () => {
       install({
         projectRoot: tmpDir,
         target: 'claude',

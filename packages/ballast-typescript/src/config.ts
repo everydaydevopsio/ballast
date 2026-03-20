@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { LANGUAGES } from './agents';
 
-const RULESRC_FILENAME = '.rulesrc.ts.json';
-const LEGACY_RULESRC_FILENAME = '.rulesrc.json';
+const RULESRC_FILENAME = '.rulesrc.json';
+const LEGACY_TYPESCRIPT_RULESRC_FILENAME = '.rulesrc.ts.json';
 
 export type Target = 'cursor' | 'claude' | 'opencode' | 'codex';
 
@@ -13,18 +13,22 @@ export interface RulesConfig {
 }
 
 export function getRulesrcFilename(language: string = 'typescript'): string {
-  if (language === 'typescript') return RULESRC_FILENAME;
+  return RULESRC_FILENAME;
+}
+
+export function getLegacyRulesrcFilename(language: string = 'typescript'): string {
+  if (language === 'typescript') return LEGACY_TYPESCRIPT_RULESRC_FILENAME;
   return `.rulesrc.${language}.json`;
 }
 
 function hasConfigFile(dir: string): boolean {
   if (
     fs.existsSync(path.join(dir, RULESRC_FILENAME)) ||
-    fs.existsSync(path.join(dir, LEGACY_RULESRC_FILENAME))
+    fs.existsSync(path.join(dir, LEGACY_TYPESCRIPT_RULESRC_FILENAME))
   )
     return true;
   return LANGUAGES.some((language) =>
-    fs.existsSync(path.join(dir, getRulesrcFilename(language)))
+    fs.existsSync(path.join(dir, getLegacyRulesrcFilename(language)))
   );
 }
 
@@ -51,10 +55,10 @@ export function loadConfig(
   language: string = 'typescript'
 ): RulesConfig | null {
   const root = projectRoot ?? findProjectRoot();
-  const fileCandidates =
-    language === 'typescript'
-      ? [getRulesrcFilename(language), LEGACY_RULESRC_FILENAME]
-      : [getRulesrcFilename(language)];
+  const fileCandidates = [
+    getRulesrcFilename(language),
+    getLegacyRulesrcFilename(language)
+  ];
   const filePath = fileCandidates
     .map((name) => path.join(root, name))
     .find((candidate) => fs.existsSync(candidate));
