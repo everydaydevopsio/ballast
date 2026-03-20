@@ -671,7 +671,6 @@ def run_install(args: argparse.Namespace) -> int:
         print("Invalid --target. Use: cursor, claude, opencode, codex")
         return 1
 
-    persist = not args.target and not args.agent and not args.all
     patch_claude_md = (
         target == "claude"
         and not is_ci_mode()
@@ -681,7 +680,7 @@ def run_install(args: argparse.Namespace) -> int:
         and (root / "CLAUDE.md").exists()
         and prompt_yes_no(f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?")
     )
-    result = install(root, target, agents, language, bool(args.force), bool(args.patch), persist, patch_claude_md)
+    result = install(root, target, agents, language, bool(args.force), bool(args.patch), True, patch_claude_md)
 
     if result.errors:
         for agent, error in result.errors:

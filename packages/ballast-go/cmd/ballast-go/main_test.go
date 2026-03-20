@@ -105,6 +105,31 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	}
 }
 
+func TestRunInstallWritesSharedRulesrcForExplicitFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	exitCode := runInstall([]string{"install", "--target", "codex", "--all", "--yes"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".rulesrc.json")); err != nil {
+		t.Fatalf("expected .rulesrc.json to be created: %v", err)
+	}
+}
+
 func TestInstallPatchUpdatesCodexAgentsMDSectionOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	rulePath := filepath.Join(tmpDir, ".codex", "rules", "go-linting.md")

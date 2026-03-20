@@ -637,6 +637,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(file).toBe(
         path.join(tmpDir, '.claude', 'rules', 'typescript-linting.md')
       );
+      expect(fs.existsSync(path.join(tmpDir, '.rulesrc.json'))).toBe(true);
     });
 
     test('returns 1 when CI and no config and no target/agents', async () => {

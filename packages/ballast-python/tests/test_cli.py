@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,20 @@ from ballast import cli
 
 
 class PatchInstallTests(unittest.TestCase):
+    def test_run_install_writes_shared_rulesrc_for_explicit_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            old_cwd = Path.cwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(["install", "--target", "codex", "--all", "--yes"])
+                exit_code = cli.run_install(args)
+            finally:
+                os.chdir(old_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((root / ".rulesrc.json").exists())
+
     def test_install_creates_language_prefixed_rule_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

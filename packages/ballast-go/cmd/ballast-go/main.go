@@ -151,7 +151,6 @@ func runInstall(args []string) int {
 		return 1
 	}
 
-	persist := strings.TrimSpace(*target) == "" && strings.TrimSpace(*agent) == "" && !*all
 	patchClaude := false
 	if resolved.Target == "claude" && !*yes && !isCIMode() && !*force && !*patch && exists(claudeMDPath(root)) {
 		approved, promptErr := promptYesNo(
@@ -175,7 +174,7 @@ func runInstall(args []string) int {
 		force:       *force,
 		patch:       *patch,
 		patchClaude: patchClaude,
-		saveConfig:  persist,
+		saveConfig:  true,
 	})
 
 	if len(result.errors) > 0 {

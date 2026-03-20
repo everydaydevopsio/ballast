@@ -324,7 +324,6 @@ export async function runInstall(
   }
 
   const { target, agents } = resolved;
-  const persist = !options.target && !options.agents && !options.all;
   const claudeMdPath = getClaudeMdPath(projectRoot);
   const patchClaudeMd =
     !isCiMode() &&
@@ -344,7 +343,7 @@ export async function runInstall(
     force: options.force ?? false,
     patch: options.patch ?? false,
     patchClaudeMd,
-    saveConfig: persist
+    saveConfig: true
   });
 
   if (result.errors.length > 0) {
