@@ -9,6 +9,7 @@ run_language_smoke() {
   local sample="$1"
   local language="$2"
   local binary="$3"
+  local expected_rule="$4"
 
   local sample_dir="${WORKDIR}/${sample}"
   mkdir -p "${sample_dir}"
@@ -19,13 +20,13 @@ run_language_smoke() {
     "${binary}" install --language "${language}" --target cursor --agent linting --yes
   )
 
-  test -f "${sample_dir}/.cursor/rules/linting.mdc"
+  test -f "${sample_dir}/.cursor/rules/${expected_rule}"
 }
 
 main() {
-  run_language_smoke "typescript-sample" "typescript" "ballast-typescript"
-  run_language_smoke "python-sample" "python" "ballast-python"
-  run_language_smoke "go-sample" "go" "ballast-go"
+  run_language_smoke "typescript-sample" "typescript" "ballast-typescript" "typescript-linting.mdc"
+  run_language_smoke "python-sample" "python" "ballast-python" "python-linting.mdc"
+  run_language_smoke "go-sample" "go" "ballast-go" "go-linting.mdc"
 
   "${REPO_ROOT}/scripts/smoke-wrapper-monorepo.sh"
 

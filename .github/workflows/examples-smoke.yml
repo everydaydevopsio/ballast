@@ -20,10 +20,13 @@ jobs:
         include:
           - sample: go-sample
             language: go
+            expected_rule: go-linting.mdc
           - sample: python-sample
             language: python
+            expected_rule: python-linting.mdc
           - sample: typescript-sample
             language: typescript
+            expected_rule: typescript-linting.mdc
 
     steps:
       - name: Checkout ballast repo
@@ -51,7 +54,7 @@ jobs:
       - name: Verify outputs
         run: |
           set -euo pipefail
-          test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/linting.mdc"
+          test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/${{ matrix.expected_rule }}"
 
   monorepo-patch-smoke:
     name: monorepo-patch-smoke
