@@ -21,15 +21,7 @@ AGENTS_BY_LANGUAGE = {
 
 
 def cli_version() -> str:
-    try:
-        return metadata.version("ballast-python")
-    except metadata.PackageNotFoundError:
-        pyproject = package_root().parent / "pyproject.toml"
-        if pyproject.exists():
-            match = re.search(r'^version = "([^"]+)"$', pyproject.read_text(encoding="utf-8"), re.MULTILINE)
-            if match:
-                return match.group(1)
-        return "dev"
+    return ballast_version()
 
 
 @dataclass

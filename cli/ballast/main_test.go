@@ -472,21 +472,38 @@ func TestRunSingleLanguageInstallReinstallsBackendWhenVersionMismatches(t *testi
 
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
+	originalLookPath := execLookPathFunc
+	originalRun := runCommandFunc
 	originalResolve := resolveInstalledVersionFunc
+	originalVersion := version
 	t.Cleanup(func() {
 		ensureInstalledFunc = originalEnsure
 		execToolFunc = originalExec
+		execLookPathFunc = originalLookPath
+		runCommandFunc = originalRun
 		resolveInstalledVersionFunc = originalResolve
+		version = originalVersion
 	})
 
-	var ensured []toolConfig
-	ensureInstalledFunc = func(tool toolConfig) error {
-		ensured = append(ensured, tool)
-		return nil
+	version = "5.0.0"
+
+	lookups := 0
+	execLookPathFunc = func(file string) (string, error) {
+		if file != "ballast-typescript" {
+			t.Fatalf("unexpected lookpath lookup for %q", file)
+		}
+		lookups++
+		return "/tmp/ballast-typescript", nil
 	}
 
 	resolveInstalledVersionFunc = func(tool toolConfig) (string, error) {
 		return "4.1.7", nil
+	}
+
+	var installCommands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		installCommands = append(installCommands, append([]string{name}, args...))
+		return nil
 	}
 
 	var invocation backendInvocation
@@ -507,11 +524,14 @@ func TestRunSingleLanguageInstallReinstallsBackendWhenVersionMismatches(t *testi
 		}
 	})
 
-	if len(ensured) != 1 {
-		t.Fatalf("expected exactly one reinstall attempt, got %d", len(ensured))
+	if len(installCommands) != 1 {
+		t.Fatalf("expected exactly one reinstall command, got %d", len(installCommands))
 	}
-	if ensured[0].binary != "ballast-typescript" {
-		t.Fatalf("expected TypeScript backend reinstall, got %#v", ensured[0])
+	if got := strings.Join(installCommands[0], " "); got != "npm install -g @everydaydevopsio/ballast@5.0.0" {
+		t.Fatalf("unexpected reinstall command: %q", got)
+	}
+	if lookups < 2 {
+		t.Fatalf("expected lookpath to verify the reinstalled backend, got %d calls", lookups)
 	}
 	if invocation.Binary != "ballast-typescript" {
 		t.Fatalf("expected installed TypeScript backend to be executed, got %#v", invocation)
@@ -564,6 +584,48 @@ func TestEnsureInstalledUsesPinnedVersionWhenBackendVersionDiffers(t *testing.T)
 	}
 	if got := strings.Join(commands[0], " "); got != "go install example.com/ballast-go@5.0.0" {
 		t.Fatalf("unexpected install command: %q", got)
+	}
+}
+
+func TestEnsureInstalledSkipsVersionCheckForDevWrapperBuilds(t *testing.T) {
+	originalLookPath := execLookPathFunc
+	originalRun := runCommandFunc
+	originalResolve := resolveInstalledVersionFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		execLookPathFunc = originalLookPath
+		runCommandFunc = originalRun
+		resolveInstalledVersionFunc = originalResolve
+		version = originalVersion
+	})
+
+	version = "dev"
+
+	execLookPathFunc = func(file string) (string, error) {
+		if file != "ballast-go" {
+			t.Fatalf("unexpected lookpath lookup for %q", file)
+		}
+		return "/tmp/ballast-go", nil
+	}
+
+	resolveInstalledVersionFunc = func(tool toolConfig) (string, error) {
+		t.Fatal("expected dev builds to skip backend version resolution")
+		return "", nil
+	}
+
+	runCommandFunc = func(name string, args []string) error {
+		t.Fatalf("expected dev builds to skip backend reinstalls, got %s %s", name, strings.Join(args, " "))
+		return nil
+	}
+
+	err := ensureInstalled(toolConfig{
+		binary: "ballast-go",
+		installCommand: func(version string) []string {
+			return []string{"go", "install", "example.com/ballast-go@" + version}
+		},
+	})
+	if err != nil {
+		t.Fatalf("ensureInstalled returned error: %v", err)
 	}
 }
 

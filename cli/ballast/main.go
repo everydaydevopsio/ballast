@@ -349,9 +349,13 @@ func languageNames() []string {
 func ensureInstalled(tool toolConfig) error {
 	currentPath, err := execLookPathFunc(tool.binary)
 	desiredVersion := resolveVersion()
+	desiredRelease := releaseVersion(desiredVersion)
 	if err == nil {
+		if desiredRelease == "" {
+			return nil
+		}
 		currentVersion, versionErr := resolveInstalledVersionFunc(tool)
-		if versionErr == nil && normalizeVersion(currentVersion) == normalizeVersion(desiredVersion) {
+		if versionErr == nil && normalizeVersion(currentVersion) == normalizeVersion(desiredRelease) {
 			return nil
 		}
 		if versionErr == nil {
@@ -359,14 +363,14 @@ func ensureInstalled(tool toolConfig) error {
 				"%s %s does not match ballast %s. Reinstalling...\n",
 				tool.binary,
 				currentVersion,
-				desiredVersion,
+				desiredRelease,
 			)
 		} else {
 			fmt.Printf(
 				"Could not determine %s version (%v). Reinstalling to match ballast %s...\n",
 				tool.binary,
 				versionErr,
-				desiredVersion,
+				desiredRelease,
 			)
 		}
 	} else {
