@@ -19,8 +19,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate_cross_language:
+    uses: ./.github/workflows/cross-language-validate.yml
+    with:
+      ref: refs/tags/v${{ inputs.version }}
+
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: validate_cross_language
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -54,6 +60,7 @@ jobs:
 
   publish_from_version:
     if: ${{ github.event_name == 'workflow_call' }}
+    needs: validate_cross_language
     runs-on: ubuntu-latest
     permissions:
       contents: write

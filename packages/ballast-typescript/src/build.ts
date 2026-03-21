@@ -1,12 +1,50 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import { getAgentDir } from './agents';
+import { COMMON_AGENT_IDS, getAgentDir } from './agents';
 import type { Target } from './config';
 import type { Language } from './agents';
 import pkg from '../package.json';
 
 const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
+
+function getRuleSubdir(): string | null {
+  const value = process.env.BALLAST_RULE_SUBDIR?.trim();
+  if (!value) {
+    return null;
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new Error(
+      `Invalid BALLAST_RULE_SUBDIR "${value}". Only [A-Za-z0-9_-] are allowed.`
+    );
+  }
+  return value;
+}
+
+function getScopedBasename(
+  ruleSubdir: string | null,
+  basename: string
+): string {
+  if (!ruleSubdir || ruleSubdir === 'common') {
+    return basename;
+  }
+  if (basename.startsWith(`${ruleSubdir}-`)) {
+    return basename;
+  }
+  return `${ruleSubdir}-${basename}`;
+}
+
+function getRuleBasename(
+  agentId: string,
+  language: Language,
+  ruleSuffix?: string
+): string {
+  const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+  if ((COMMON_AGENT_IDS as readonly string[]).includes(agentId)) {
+    return basename;
+  }
+  return `${language}-${basename}`;
+}
 
 /** Rule file convention: content.md (main) and content-<suffix>.md (e.g. content-mcp.md) */
 const CONTENT_PREFIX = 'content';
@@ -236,11 +274,44 @@ export function buildCodexAgentsMd(
   for (const agentId of agents) {
     const suffixes = listRuleSuffixes(agentId, language);
     for (const ruleSuffix of suffixes) {
-      const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =
         getCodexRuleDescription(agentId, ruleSuffix, language) ??
         `Rules for ${basename}`;
       lines.push(`- \`.codex/rules/${basename}.md\` — ${description}`);
+    }
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+export function buildClaudeMd(
+  agents: string[],
+  language: Language = 'typescript'
+): string {
+  const lines: string[] = [];
+  lines.push('# CLAUDE.md');
+  lines.push('');
+  lines.push(
+    'This file provides guidance to Claude Code for working in this repository.'
+  );
+  lines.push('');
+  lines.push('## Installed agent rules');
+  lines.push('');
+  lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
+  lines.push('');
+  lines.push(
+    'Read and follow these rule files in `.claude/rules/` when they apply:'
+  );
+  lines.push('');
+  for (const agentId of agents) {
+    const suffixes = listRuleSuffixes(agentId, language);
+    for (const ruleSuffix of suffixes) {
+      const basename = getRuleBasename(agentId, language, ruleSuffix);
+      const description =
+        getCodexRuleDescription(agentId, ruleSuffix, language) ??
+        `Rules for ${basename}`;
+      lines.push(`- \`.claude/rules/${basename}.md\` — ${description}`);
     }
   }
   lines.push('');
@@ -277,28 +348,39 @@ export function getDestination(
   agentId: string,
   target: Target,
   projectRoot: string,
-  ruleSuffix?: string
+  ruleSuffix?: string,
+  language: Language = 'typescript'
 ): { dir: string; file: string } {
   const root = path.resolve(projectRoot);
-  const basename = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+  const rawBasename = getRuleBasename(agentId, language, ruleSuffix);
+  const ruleSubdir = getRuleSubdir();
+  const basename = getScopedBasename(ruleSubdir, rawBasename);
   switch (target) {
     case 'cursor': {
-      const dir = path.join(root, '.cursor', 'rules');
+      const dir = ruleSubdir
+        ? path.join(root, '.cursor', 'rules', ruleSubdir)
+        : path.join(root, '.cursor', 'rules');
       const file = path.join(dir, `${basename}.mdc`);
       return { dir, file };
     }
     case 'claude': {
-      const dir = path.join(root, '.claude', 'rules');
+      const dir = ruleSubdir
+        ? path.join(root, '.claude', 'rules', ruleSubdir)
+        : path.join(root, '.claude', 'rules');
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }
     case 'opencode': {
-      const dir = path.join(root, '.opencode');
+      const dir = ruleSubdir
+        ? path.join(root, '.opencode', ruleSubdir)
+        : path.join(root, '.opencode');
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }
     case 'codex': {
-      const dir = path.join(root, '.codex', 'rules');
+      const dir = ruleSubdir
+        ? path.join(root, '.codex', 'rules', ruleSubdir)
+        : path.join(root, '.codex', 'rules');
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }
@@ -312,6 +394,10 @@ export function getDestination(
  */
 export function getCodexAgentsMdPath(projectRoot: string): string {
   return path.join(path.resolve(projectRoot), 'AGENTS.md');
+}
+
+export function getClaudeMdPath(projectRoot: string): string {
+  return path.join(path.resolve(projectRoot), 'CLAUDE.md');
 }
 
 /**

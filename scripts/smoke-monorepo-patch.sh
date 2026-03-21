@@ -39,9 +39,10 @@ EOF
 
 seed_existing_rule() {
   local monorepo="$1"
+  local rule_name="$2"
 
   mkdir -p "${monorepo}/.cursor/rules"
-  cat > "${monorepo}/.cursor/rules/linting.mdc" <<'EOF'
+  cat > "${monorepo}/.cursor/rules/${rule_name}" <<'EOF'
 ---
 description: Team customized linting rules
 alwaysApply: true
@@ -73,42 +74,42 @@ verify_rule() {
 run_typescript_smoke() {
   local monorepo="${WORKDIR}/typescript-monorepo"
   build_monorepo_fixture "${monorepo}"
-  seed_existing_rule "${monorepo}"
+  seed_existing_rule "${monorepo}" "typescript-linting.mdc"
 
   (
     cd "${monorepo}"
     node "${REPO_ROOT}/packages/ballast-typescript/dist/cli.js" install --target cursor --agent linting --patch --yes
   )
 
-  verify_rule "${monorepo}/.cursor/rules/linting.mdc" "## When Completed"
+  verify_rule "${monorepo}/.cursor/rules/typescript-linting.mdc" "## When Completed"
   echo "TypeScript monorepo patch smoke test passed."
 }
 
 run_python_smoke() {
   local monorepo="${WORKDIR}/python-monorepo"
   build_monorepo_fixture "${monorepo}"
-  seed_existing_rule "${monorepo}"
+  seed_existing_rule "${monorepo}" "python-linting.mdc"
 
   (
     cd "${monorepo}"
     PYTHONPATH="${REPO_ROOT}/packages/ballast-python" python3 -m ballast install --language python --target cursor --agent linting --patch --yes
   )
 
-  verify_rule "${monorepo}/.cursor/rules/linting.mdc" "## Baseline Tooling"
+  verify_rule "${monorepo}/.cursor/rules/python-linting.mdc" "## Baseline Tooling"
   echo "Python monorepo patch smoke test passed."
 }
 
 run_go_smoke() {
   local monorepo="${WORKDIR}/go-monorepo"
   build_monorepo_fixture "${monorepo}"
-  seed_existing_rule "${monorepo}"
+  seed_existing_rule "${monorepo}" "go-linting.mdc"
 
   (
     cd "${monorepo}"
     "${REPO_ROOT}/.ci/bin/ballast-go" install --language go --target cursor --agent linting --patch --yes
   )
 
-  verify_rule "${monorepo}/.cursor/rules/linting.mdc" "## Commands"
+  verify_rule "${monorepo}/.cursor/rules/go-linting.mdc" "## Commands"
   echo "Go monorepo patch smoke test passed."
 }
 

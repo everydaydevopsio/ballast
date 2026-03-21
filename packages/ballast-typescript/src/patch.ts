@@ -189,24 +189,34 @@ function findMarkdownSectionRange(
   content: string,
   heading: string
 ): { start: number; end: number } | null {
-  const headingRegex = new RegExp(
-    `^## ${heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-    'm'
-  );
-  const headingMatch = headingRegex.exec(content);
-  if (!headingMatch || headingMatch.index == null) {
-    return null;
+  const lines = content.split(/\r?\n/);
+  const targetHeading = `## ${heading}`;
+  let inFence = false;
+  let offset = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('```')) {
+      inFence = !inFence;
+    }
+    if (!inFence && line === targetHeading) {
+      const start = offset;
+      offset += line.length + 1;
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextLine = lines[j];
+        if (nextLine.startsWith('```')) {
+          inFence = !inFence;
+        }
+        if (!inFence && nextLine.startsWith('## ')) {
+          return { start, end: offset - 1 };
+        }
+        offset += nextLine.length + 1;
+      }
+      return { start, end: content.length };
+    }
+    offset += line.length + 1;
   }
-
-  const afterHeading = content.slice(
-    headingMatch.index + headingMatch[0].length
-  );
-  const nextHeadingMatch = /\n## .*/.exec(afterHeading);
-  const end = nextHeadingMatch
-    ? headingMatch.index + headingMatch[0].length + nextHeadingMatch.index + 1
-    : content.length;
-
-  return { start: headingMatch.index, end };
+  return null;
 }
 
 export function patchCodexAgentsMd(

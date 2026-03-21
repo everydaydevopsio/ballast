@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { LANGUAGES } from './agents';
 
-const RULESRC_FILENAME = '.rulesrc.ts.json';
-const LEGACY_RULESRC_FILENAME = '.rulesrc.json';
+const RULESRC_FILENAME = '.rulesrc.json';
+const LEGACY_TYPESCRIPT_RULESRC_FILENAME = '.rulesrc.ts.json';
 
 export type Target = 'cursor' | 'claude' | 'opencode' | 'codex';
 
@@ -12,19 +12,25 @@ export interface RulesConfig {
   agents: string[];
 }
 
-export function getRulesrcFilename(language: string = 'typescript'): string {
-  if (language === 'typescript') return RULESRC_FILENAME;
+export function getRulesrcFilename(): string {
+  return RULESRC_FILENAME;
+}
+
+export function getLegacyRulesrcFilename(
+  language: string = 'typescript'
+): string {
+  if (language === 'typescript') return LEGACY_TYPESCRIPT_RULESRC_FILENAME;
   return `.rulesrc.${language}.json`;
 }
 
 function hasConfigFile(dir: string): boolean {
   if (
     fs.existsSync(path.join(dir, RULESRC_FILENAME)) ||
-    fs.existsSync(path.join(dir, LEGACY_RULESRC_FILENAME))
+    fs.existsSync(path.join(dir, LEGACY_TYPESCRIPT_RULESRC_FILENAME))
   )
     return true;
   return LANGUAGES.some((language) =>
-    fs.existsSync(path.join(dir, getRulesrcFilename(language)))
+    fs.existsSync(path.join(dir, getLegacyRulesrcFilename(language)))
   );
 }
 
@@ -51,10 +57,10 @@ export function loadConfig(
   language: string = 'typescript'
 ): RulesConfig | null {
   const root = projectRoot ?? findProjectRoot();
-  const fileCandidates =
-    language === 'typescript'
-      ? [getRulesrcFilename(language), LEGACY_RULESRC_FILENAME]
-      : [getRulesrcFilename(language)];
+  const fileCandidates = [
+    getRulesrcFilename(),
+    getLegacyRulesrcFilename(language)
+  ];
   const filePath = fileCandidates
     .map((name) => path.join(root, name))
     .find((candidate) => fs.existsSync(candidate));
@@ -81,13 +87,9 @@ export function loadConfig(
 /**
  * Save rules config to project root
  */
-export function saveConfig(
-  config: RulesConfig,
-  projectRoot?: string,
-  language: string = 'typescript'
-): void {
+export function saveConfig(config: RulesConfig, projectRoot?: string): void {
   const root = projectRoot ?? findProjectRoot();
-  const filePath = path.join(root, getRulesrcFilename(language));
+  const filePath = path.join(root, getRulesrcFilename());
   fs.writeFileSync(
     filePath,
     JSON.stringify({ target: config.target, agents: config.agents }, null, 2),

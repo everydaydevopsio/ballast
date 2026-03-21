@@ -8,7 +8,9 @@ import {
   buildOpenCodeFormat,
   buildCodexFormat,
   buildContent,
+  buildClaudeMd,
   buildCodexAgentsMd,
+  getClaudeMdPath,
   getCodexAgentsMdPath,
   getCodexRuleDescription,
   extractDescriptionFromFrontmatter,
@@ -207,7 +209,19 @@ alwaysApply: false
       expect(content).toMatch(
         /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
-      expect(content).toContain('`.codex/rules/linting.md`');
+      expect(content).toContain('`.codex/rules/typescript-linting.md`');
+      expect(content).toContain('TypeScript linting specialist');
+    });
+  });
+
+  describe('buildClaudeMd', () => {
+    test('lists claude rule files with descriptions', () => {
+      const content = buildClaudeMd(['linting']);
+      expect(content).toContain('# CLAUDE.md');
+      expect(content).toMatch(
+        /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
+      );
+      expect(content).toContain('`.claude/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
     });
   });
@@ -248,7 +262,7 @@ alwaysApply: false
       const { dir, file } = getDestination('linting', 'cursor', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.cursor', 'rules'));
       expect(file).toBe(
-        path.join(projectRoot, '.cursor', 'rules', 'linting.mdc')
+        path.join(projectRoot, '.cursor', 'rules', 'typescript-linting.mdc')
       );
     });
 
@@ -256,27 +270,34 @@ alwaysApply: false
       const { dir, file } = getDestination('linting', 'claude', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.claude', 'rules'));
       expect(file).toBe(
-        path.join(projectRoot, '.claude', 'rules', 'linting.md')
+        path.join(projectRoot, '.claude', 'rules', 'typescript-linting.md')
       );
     });
 
     test('opencode returns .opencode/<agent>.md', () => {
       const { dir, file } = getDestination('linting', 'opencode', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.opencode'));
-      expect(file).toBe(path.join(projectRoot, '.opencode', 'linting.md'));
+      expect(file).toBe(
+        path.join(projectRoot, '.opencode', 'typescript-linting.md')
+      );
     });
 
     test('codex returns .codex/rules/<agent>.md', () => {
       const { dir, file } = getDestination('linting', 'codex', projectRoot);
       expect(dir).toBe(path.join(projectRoot, '.codex', 'rules'));
       expect(file).toBe(
-        path.join(projectRoot, '.codex', 'rules', 'linting.md')
+        path.join(projectRoot, '.codex', 'rules', 'typescript-linting.md')
       );
     });
 
     test('codex agents.md path returns project root AGENTS.md', () => {
       const agentsMd = getCodexAgentsMdPath(projectRoot);
       expect(agentsMd).toBe(path.join(projectRoot, 'AGENTS.md'));
+    });
+
+    test('claude md path returns project root CLAUDE.md', () => {
+      const claudeMd = getClaudeMdPath(projectRoot);
+      expect(claudeMd).toBe(path.join(projectRoot, 'CLAUDE.md'));
     });
 
     test('cursor with ruleSuffix returns .cursor/rules/<agent>-<suffix>.mdc', () => {
@@ -296,6 +317,14 @@ alwaysApply: false
       expect(() =>
         getDestination('linting', 'unknown' as 'cursor', projectRoot)
       ).toThrow(/Unknown target/);
+    });
+
+    test('rejects invalid BALLAST_RULE_SUBDIR values', () => {
+      process.env.BALLAST_RULE_SUBDIR = '../escape';
+      expect(() => getDestination('linting', 'codex', projectRoot)).toThrow(
+        /Invalid BALLAST_RULE_SUBDIR/
+      );
+      delete process.env.BALLAST_RULE_SUBDIR;
     });
   });
 

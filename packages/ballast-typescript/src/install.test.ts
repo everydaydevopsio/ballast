@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { install, resolveTargetAndAgents, runInstall } from './install';
-import { getDestination } from './build';
+import { getClaudeMdPath, getDestination } from './build';
 import { findProjectRoot, saveConfig, loadConfig } from './config';
 
 describe('install', () => {
@@ -92,7 +92,12 @@ describe('install', () => {
       });
       expect(result.installed).toContain('linting');
       expect(result.errors).toHaveLength(0);
-      const cursorFile = path.join(tmpDir, '.cursor', 'rules', 'linting.mdc');
+      const cursorFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'typescript-linting.mdc'
+      );
       expect(fs.existsSync(cursorFile)).toBe(true);
       expect(fs.readFileSync(cursorFile, 'utf8')).toContain(
         'TypeScript linting specialist'
@@ -109,7 +114,12 @@ describe('install', () => {
         saveConfig: false
       });
       expect(result.installed).toContain('linting');
-      const cursorFile = path.join(tmpDir, '.cursor', 'rules', 'linting.mdc');
+      const cursorFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'python-linting.mdc'
+      );
       expect(fs.existsSync(cursorFile)).toBe(true);
       expect(fs.readFileSync(cursorFile, 'utf8')).toContain(
         'Python linting specialist'
@@ -119,7 +129,10 @@ describe('install', () => {
     test('skips when file exists and force is false', () => {
       const cursorDir = path.join(tmpDir, '.cursor', 'rules');
       fs.mkdirSync(cursorDir, { recursive: true });
-      fs.writeFileSync(path.join(cursorDir, 'linting.mdc'), 'existing content');
+      fs.writeFileSync(
+        path.join(cursorDir, 'typescript-linting.mdc'),
+        'existing content'
+      );
       const result = install({
         projectRoot: tmpDir,
         target: 'cursor',
@@ -129,15 +142,18 @@ describe('install', () => {
       });
       expect(result.installed).toHaveLength(0);
       expect(result.skipped).toContain('linting');
-      expect(fs.readFileSync(path.join(cursorDir, 'linting.mdc'), 'utf8')).toBe(
-        'existing content'
-      );
+      expect(
+        fs.readFileSync(path.join(cursorDir, 'typescript-linting.mdc'), 'utf8')
+      ).toBe('existing content');
     });
 
     test('overwrites when force is true', () => {
       const cursorDir = path.join(tmpDir, '.cursor', 'rules');
       fs.mkdirSync(cursorDir, { recursive: true });
-      fs.writeFileSync(path.join(cursorDir, 'linting.mdc'), 'existing content');
+      fs.writeFileSync(
+        path.join(cursorDir, 'typescript-linting.mdc'),
+        'existing content'
+      );
       const result = install({
         projectRoot: tmpDir,
         target: 'cursor',
@@ -147,7 +163,7 @@ describe('install', () => {
       });
       expect(result.installed).toContain('linting');
       expect(
-        fs.readFileSync(path.join(cursorDir, 'linting.mdc'), 'utf8')
+        fs.readFileSync(path.join(cursorDir, 'typescript-linting.mdc'), 'utf8')
       ).toContain('TypeScript linting specialist');
     });
 
@@ -155,7 +171,7 @@ describe('install', () => {
       const cursorDir = path.join(tmpDir, '.cursor', 'rules');
       fs.mkdirSync(cursorDir, { recursive: true });
       fs.writeFileSync(
-        path.join(cursorDir, 'linting.mdc'),
+        path.join(cursorDir, 'typescript-linting.mdc'),
         `---
 description: Team customized linting rules
 alwaysApply: true
@@ -184,7 +200,7 @@ Do not remove this note.
 
       expect(result.installed).toContain('linting');
       const content = fs.readFileSync(
-        path.join(cursorDir, 'linting.mdc'),
+        path.join(cursorDir, 'typescript-linting.mdc'),
         'utf8'
       );
       expect(content).toContain('description: Team customized linting rules');
@@ -198,7 +214,7 @@ Do not remove this note.
       const cursorDir = path.join(tmpDir, '.cursor', 'rules');
       fs.mkdirSync(cursorDir, { recursive: true });
       fs.writeFileSync(
-        path.join(cursorDir, 'linting.mdc'),
+        path.join(cursorDir, 'typescript-linting.mdc'),
         `---
 description: Team customized linting rules
 alwaysApply: true
@@ -222,7 +238,7 @@ Keep my custom responsibilities.
       });
 
       const content = fs.readFileSync(
-        path.join(cursorDir, 'linting.mdc'),
+        path.join(cursorDir, 'typescript-linting.mdc'),
         'utf8'
       );
       expect(content).toContain('TypeScript linting specialist');
@@ -245,7 +261,7 @@ Keep my custom responsibilities.
       });
     });
 
-    test('saves language-specific config file for go', () => {
+    test('saves shared .rulesrc.json for go installs', () => {
       install({
         projectRoot: tmpDir,
         target: 'claude',
@@ -273,7 +289,9 @@ Keep my custom responsibilities.
       expect(result.installed).toContain('local-dev');
       expect(result.installed).toContain('cicd');
       expect(
-        fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'linting.mdc'))
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'typescript-linting.mdc')
+        )
       ).toBe(true);
       expect(
         fs.existsSync(
@@ -379,7 +397,9 @@ Keep my custom responsibilities.
         });
         const { dir, file } = getDestination('linting', 'cursor', tmpDir);
         expect(fs.existsSync(file)).toBe(true);
-        expect(file).toBe(path.join(tmpDir, '.cursor', 'rules', 'linting.mdc'));
+        expect(file).toBe(
+          path.join(tmpDir, '.cursor', 'rules', 'typescript-linting.mdc')
+        );
         expect(dir).toBe(path.join(tmpDir, '.cursor', 'rules'));
       });
 
@@ -393,8 +413,124 @@ Keep my custom responsibilities.
         });
         const { dir, file } = getDestination('linting', 'claude', tmpDir);
         expect(fs.existsSync(file)).toBe(true);
-        expect(file).toBe(path.join(tmpDir, '.claude', 'rules', 'linting.md'));
+        expect(file).toBe(
+          path.join(tmpDir, '.claude', 'rules', 'typescript-linting.md')
+        );
         expect(dir).toBe(path.join(tmpDir, '.claude', 'rules'));
+        const claudeMd = getClaudeMdPath(tmpDir);
+        expect(fs.existsSync(claudeMd)).toBe(true);
+        expect(fs.readFileSync(claudeMd, 'utf8')).toContain(
+          '`.claude/rules/typescript-linting.md`'
+        );
+      });
+
+      test('claude skips existing CLAUDE.md unless patch is approved', () => {
+        fs.writeFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          `# CLAUDE.md
+
+## Team Notes
+
+Keep this section.
+`
+        );
+
+        const result = install({
+          projectRoot: tmpDir,
+          target: 'claude',
+          agents: ['linting'],
+          force: false,
+          saveConfig: false
+        });
+
+        expect(result.skippedSupportFiles).toContain(
+          path.join(tmpDir, 'CLAUDE.md')
+        );
+        expect(
+          fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
+        ).toContain('## Team Notes');
+      });
+
+      test('claude patch updates installed rules section without removing user notes', () => {
+        const claudeRulesDir = path.join(tmpDir, '.claude', 'rules');
+        fs.mkdirSync(claudeRulesDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(claudeRulesDir, 'typescript-linting.md'),
+          `# TypeScript Linting Rules
+
+Team intro.
+
+## Your Responsibilities
+
+Keep my custom rule text.
+`
+        );
+        fs.writeFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          `# CLAUDE.md
+
+## Team Notes
+
+Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in \`.claude/rules/\` when they apply:
+
+- \`.claude/rules/old.md\` — Old rule
+`
+        );
+
+        install({
+          projectRoot: tmpDir,
+          target: 'claude',
+          agents: ['linting'],
+          patchClaudeMd: true,
+          force: false,
+          saveConfig: false
+        });
+
+        const claudeMd = fs.readFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          'utf8'
+        );
+        expect(claudeMd).toContain('## Team Notes');
+        expect(claudeMd).toContain('Keep this section.');
+        expect(claudeMd).toContain('`.claude/rules/typescript-linting.md`');
+        expect(claudeMd).not.toContain('`.claude/rules/old.md`');
+      });
+
+      test('claude --patch updates installed rules section without prompt approval', () => {
+        fs.writeFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          `# CLAUDE.md
+
+## Installed agent rules
+
+Read and follow these rule files in \`.claude/rules/\` when they apply:
+
+- \`.claude/rules/old.md\` — Old rule
+`
+        );
+
+        const result = install({
+          projectRoot: tmpDir,
+          target: 'claude',
+          agents: ['linting'],
+          patch: true,
+          force: false,
+          saveConfig: false
+        });
+
+        expect(result.installedSupportFiles).toContain(
+          path.join(tmpDir, 'CLAUDE.md')
+        );
+        const claudeMd = fs.readFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          'utf8'
+        );
+        expect(claudeMd).toContain('`.claude/rules/typescript-linting.md`');
+        expect(claudeMd).not.toContain('`.claude/rules/old.md`');
       });
 
       test('opencode: writes to .opencode/<agent>.md', () => {
@@ -407,7 +543,9 @@ Keep my custom responsibilities.
         });
         const { dir, file } = getDestination('linting', 'opencode', tmpDir);
         expect(fs.existsSync(file)).toBe(true);
-        expect(file).toBe(path.join(tmpDir, '.opencode', 'linting.md'));
+        expect(file).toBe(
+          path.join(tmpDir, '.opencode', 'typescript-linting.md')
+        );
         expect(dir).toBe(path.join(tmpDir, '.opencode'));
       });
 
@@ -421,12 +559,14 @@ Keep my custom responsibilities.
         });
         const { dir, file } = getDestination('linting', 'codex', tmpDir);
         expect(fs.existsSync(file)).toBe(true);
-        expect(file).toBe(path.join(tmpDir, '.codex', 'rules', 'linting.md'));
+        expect(file).toBe(
+          path.join(tmpDir, '.codex', 'rules', 'typescript-linting.md')
+        );
         expect(dir).toBe(path.join(tmpDir, '.codex', 'rules'));
         const agentsMd = path.join(tmpDir, 'AGENTS.md');
         expect(fs.existsSync(agentsMd)).toBe(true);
         expect(fs.readFileSync(agentsMd, 'utf8')).toContain(
-          '`.codex/rules/linting.md`'
+          '`.codex/rules/typescript-linting.md`'
         );
       });
 
@@ -434,7 +574,7 @@ Keep my custom responsibilities.
         const codexDir = path.join(tmpDir, '.codex', 'rules');
         fs.mkdirSync(codexDir, { recursive: true });
         fs.writeFileSync(
-          path.join(codexDir, 'linting.md'),
+          path.join(codexDir, 'typescript-linting.md'),
           `# TypeScript Linting Rules
 
 Team intro.
@@ -470,7 +610,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         });
 
         const codexRule = fs.readFileSync(
-          path.join(codexDir, 'linting.md'),
+          path.join(codexDir, 'typescript-linting.md'),
           'utf8'
         );
         expect(codexRule).toContain('Keep my custom rule text.');
@@ -482,7 +622,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         );
         expect(agentsMd).toContain('## Team Notes');
         expect(agentsMd).toContain('Keep this section.');
-        expect(agentsMd).toContain('`.codex/rules/linting.md`');
+        expect(agentsMd).toContain('`.codex/rules/typescript-linting.md`');
         expect(agentsMd).not.toContain('`.codex/rules/old.md`');
       });
 
@@ -531,7 +671,10 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(exitCode).toBe(0);
       const { file } = getDestination('linting', 'claude', tmpDir);
       expect(fs.existsSync(file)).toBe(true);
-      expect(file).toBe(path.join(tmpDir, '.claude', 'rules', 'linting.md'));
+      expect(file).toBe(
+        path.join(tmpDir, '.claude', 'rules', 'typescript-linting.md')
+      );
+      expect(fs.existsSync(path.join(tmpDir, '.rulesrc.json'))).toBe(true);
     });
 
     test('returns 1 when CI and no config and no target/agents', async () => {

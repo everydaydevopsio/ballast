@@ -15,6 +15,7 @@ This guide explains how to configure GitHub Actions publishing for:
 - Python publish workflow: `.github/workflows/publish-python.yml`
 - Go package workflow: `.github/workflows/publish-go.yml`
 - CLI wrapper workflow: `.github/workflows/publish-cli.yml`
+- Shared cross-language validation workflow: `.github/workflows/cross-language-validate.yml`
 
 ## npmjs (OIDC Trusted Publishing)
 
@@ -131,6 +132,8 @@ brew install --cask ballast
 
 ## Quick Checklist
 
+- Single-language publish workflows call the shared cross-language validation workflow before publishing.
+- Release validation runs `scripts/release-cross-language-check.sh` to verify TypeScript, Python, Go, and unified monorepo installs.
 - npm trusted publisher configured for this repo/workflow.
 - Python workflow uploads wheel/sdist assets to GitHub Release tag `v<version>`.
 - CLI workflow uploads archives/checksums to GitHub Release and updates the Homebrew tap formula and cask.

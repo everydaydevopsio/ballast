@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -70,6 +71,7 @@ type installOptions struct {
 	language    string
 	force       bool
 	patch       bool
+	patchClaude bool
 	saveConfig  bool
 }
 
@@ -149,7 +151,25 @@ func runInstall(args []string) int {
 		return 1
 	}
 
-	persist := strings.TrimSpace(*target) == "" && strings.TrimSpace(*agent) == "" && !*all
+	patchClaude := false
+	if resolved.Target == "claude" && exists(claudeMDPath(root)) && !*force {
+		if *patch {
+			patchClaude = true
+		} else if !*yes && !isCIMode() {
+			approved, promptErr := promptYesNo(
+				fmt.Sprintf(
+					"Existing CLAUDE.md found at %s. Patch the Installed agent rules section?",
+					claudeMDPath(root),
+				),
+				false,
+			)
+			if promptErr != nil {
+				fmt.Println(promptErr)
+				return 1
+			}
+			patchClaude = approved
+		}
+	}
 	result := install(installOptions{
 		projectRoot: root,
 		target:      resolved.Target,
@@ -157,7 +177,8 @@ func runInstall(args []string) int {
 		language:    lang,
 		force:       *force,
 		patch:       *patch,
-		saveConfig:  persist,
+		patchClaude: patchClaude,
+		saveConfig:  true,
 	})
 
 	if len(result.errors) > 0 {
@@ -170,17 +191,22 @@ func runInstall(args []string) int {
 	if len(result.installedRules) > 0 {
 		fmt.Printf("Installed for %s: %s\n", resolved.Target, strings.Join(result.installed, ", "))
 		for _, rule := range result.installedRules {
-			base := rule.agentID
-			if rule.ruleSuffix != "" {
-				base = base + "-" + rule.ruleSuffix
+			base := ruleBaseName(rule.agentID, lang, rule.ruleSuffix)
+			_, file, err := destination(root, resolved.Target, base)
+			if err != nil {
+				fmt.Println(err)
+				return 1
 			}
-			_, file := destination(root, resolved.Target, base)
 			fmt.Printf("  %s -> %s\n", base, file)
 		}
 	}
 	if len(result.installedSupport) > 0 {
 		for _, file := range result.installedSupport {
-			fmt.Printf("  AGENTS.md -> %s\n", file)
+			label := "AGENTS.md"
+			if strings.HasSuffix(file, "CLAUDE.md") {
+				label = "CLAUDE.md"
+			}
+			fmt.Printf("  %s -> %s\n", label, file)
 		}
 	}
 	if len(result.skipped) > 0 {
@@ -253,6 +279,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 func install(opts installOptions) installResult {
 	result := installResult{}
 	processed := map[string]struct{}{}
+	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 
 	if opts.saveConfig {
 		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{Target: opts.target, Agents: opts.agents}); err != nil {
@@ -277,11 +304,12 @@ func install(opts installOptions) installResult {
 		agentSkipped := false
 		agentProcessed := false
 		for _, suffix := range suffixes {
-			base := agentID
-			if suffix != "" {
-				base = agentID + "-" + suffix
+			base := ruleBaseName(agentID, opts.language, suffix)
+			dir, file, err := destination(opts.projectRoot, opts.target, base)
+			if err != nil {
+				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
+				continue
 			}
-			dir, file := destination(opts.projectRoot, opts.target, base)
 			content, err := buildContent(agentID, opts.target, opts.language, suffix)
 			if err != nil {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
@@ -324,7 +352,7 @@ func install(opts installOptions) installResult {
 		}
 	}
 
-	if opts.target == "codex" {
+	if opts.target == "codex" && !disableSupportFiles {
 		agentsPath := codexAgentsMDPath(opts.projectRoot)
 		if exists(agentsPath) && !opts.force && !opts.patch {
 			result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
@@ -352,6 +380,35 @@ func install(opts installOptions) installResult {
 		}
 	}
 
+	if opts.target == "claude" && !disableSupportFiles {
+		claudePath := claudeMDPath(opts.projectRoot)
+		shouldPatchClaude := opts.patch || opts.patchClaude
+		if exists(claudePath) && !opts.force && !shouldPatchClaude {
+			result.skippedSupportFiles = append(result.skippedSupportFiles, claudePath)
+		} else {
+			ids := sortedKeys(processed)
+			content, err := buildClaudeMD(ids, opts.language)
+			if err != nil {
+				result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
+			} else {
+				nextContent := content
+				if exists(claudePath) && !opts.force && shouldPatchClaude {
+					existing, readErr := os.ReadFile(claudePath)
+					if readErr != nil {
+						result.errors = append(result.errors, agentError{agent: "claude", err: readErr.Error()})
+					} else {
+						nextContent = patchCodexAgentsMD(string(existing), content)
+					}
+				}
+				if err := os.WriteFile(claudePath, []byte(nextContent), 0o644); err != nil {
+					result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
+				} else {
+					result.installedSupport = append(result.installedSupport, claudePath)
+				}
+			}
+		}
+	}
+
 	return result
 }
 
@@ -374,15 +431,43 @@ func buildCodexAgentsMD(agents []string, language string) (string, error) {
 			return "", err
 		}
 		for _, suffix := range suffixes {
-			base := agentID
-			if suffix != "" {
-				base = agentID + "-" + suffix
-			}
+			base := ruleBaseName(agentID, language, suffix)
 			description, _ := codexRuleDescription(agentID, language, suffix)
 			if description == "" {
 				description = "Rules for " + base
 			}
 			lines = append(lines, fmt.Sprintf("- `.codex/rules/%s.md` — %s", base, description))
+		}
+	}
+	lines = append(lines, "")
+	return strings.Join(lines, "\n"), nil
+}
+
+func buildClaudeMD(agents []string, language string) (string, error) {
+	lines := []string{
+		"# CLAUDE.md",
+		"",
+		"This file provides guidance to Claude Code for working in this repository.",
+		"",
+		"## Installed agent rules",
+		"",
+		"Created by Ballast v" + ballastVersion + ". Do not edit this section.",
+		"",
+		"Read and follow these rule files in `.claude/rules/` when they apply:",
+		"",
+	}
+	for _, agentID := range agents {
+		suffixes, err := listRuleSuffixes(agentID, language)
+		if err != nil {
+			return "", err
+		}
+		for _, suffix := range suffixes {
+			base := ruleBaseName(agentID, language, suffix)
+			description, _ := codexRuleDescription(agentID, language, suffix)
+			if description == "" {
+				description = "Rules for " + base
+			}
+			lines = append(lines, fmt.Sprintf("- `.claude/rules/%s.md` — %s", base, description))
 		}
 	}
 	lines = append(lines, "")
@@ -840,11 +925,11 @@ func findProjectRoot(cwd string) (string, error) {
 }
 
 func hasAnyRulesConfig(dir string) bool {
-	if exists(filepath.Join(dir, ".rulesrc.ts.json")) || exists(filepath.Join(dir, ".rulesrc.json")) {
+	if exists(filepath.Join(dir, ".rulesrc.json")) || exists(filepath.Join(dir, ".rulesrc.ts.json")) {
 		return true
 	}
 	for _, language := range languages {
-		if exists(filepath.Join(dir, rulesrcFilename(language))) {
+		if exists(filepath.Join(dir, legacyRulesrcFilename(language))) {
 			return true
 		}
 	}
@@ -853,8 +938,8 @@ func hasAnyRulesConfig(dir string) bool {
 
 func loadConfig(projectRoot, language string) *rulesConfig {
 	file := filepath.Join(projectRoot, rulesrcFilename(language))
-	if language == "typescript" && !exists(file) {
-		file = filepath.Join(projectRoot, ".rulesrc.json")
+	if !exists(file) {
+		file = filepath.Join(projectRoot, legacyRulesrcFilename(language))
 	}
 	if !exists(file) {
 		return nil
@@ -882,6 +967,10 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 }
 
 func rulesrcFilename(language string) string {
+	return ".rulesrc.json"
+}
+
+func legacyRulesrcFilename(language string) string {
 	if language == "typescript" {
 		return ".rulesrc.ts.json"
 	}
@@ -935,6 +1024,26 @@ func promptAgents(language string) ([]string, error) {
 		}
 		fmt.Printf("Invalid agents. Use \"all\" or comma-separated: %s\n", strings.Join(allowed, ", "))
 	}
+}
+
+func promptYesNo(question string, defaultAnswer bool) (bool, error) {
+	reader := bufio.NewReader(os.Stdin)
+	suffix := " [y/N]: "
+	if defaultAnswer {
+		suffix = " [Y/n]: "
+	}
+	fmt.Print(question + suffix)
+	line, err := reader.ReadString('\n')
+	if err != nil && !errors.Is(err, os.ErrClosed) {
+		if len(strings.TrimSpace(line)) == 0 {
+			return false, err
+		}
+	}
+	value := strings.ToLower(strings.TrimSpace(line))
+	if value == "" {
+		return defaultAnswer, nil
+	}
+	return value == "y" || value == "yes", nil
 }
 
 func splitAgents(raw string) []string {
@@ -1057,25 +1166,71 @@ func validateRepoRootOverride() error {
 	return nil
 }
 
-func destination(projectRoot, target, basename string) (string, string) {
+func destination(projectRoot, target, basename string) (string, string, error) {
+	ruleSubdir, err := validatedRuleSubdir()
+	if err != nil {
+		return "", "", err
+	}
+	scopedBasename := basename
+	if ruleSubdir != "" && ruleSubdir != "common" && !strings.HasPrefix(basename, ruleSubdir+"-") {
+		scopedBasename = ruleSubdir + "-" + basename
+	}
 	switch target {
 	case "cursor":
 		dir := filepath.Join(projectRoot, ".cursor", "rules")
-		return dir, filepath.Join(dir, basename+".mdc")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
+		return dir, filepath.Join(dir, scopedBasename+".mdc"), nil
 	case "claude":
 		dir := filepath.Join(projectRoot, ".claude", "rules")
-		return dir, filepath.Join(dir, basename+".md")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
+		return dir, filepath.Join(dir, scopedBasename+".md"), nil
 	case "opencode":
 		dir := filepath.Join(projectRoot, ".opencode")
-		return dir, filepath.Join(dir, basename+".md")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
+		return dir, filepath.Join(dir, scopedBasename+".md"), nil
 	default:
 		dir := filepath.Join(projectRoot, ".codex", "rules")
-		return dir, filepath.Join(dir, basename+".md")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
+		return dir, filepath.Join(dir, scopedBasename+".md"), nil
 	}
+}
+
+func validatedRuleSubdir() (string, error) {
+	ruleSubdir := strings.TrimSpace(os.Getenv("BALLAST_RULE_SUBDIR"))
+	if ruleSubdir == "" {
+		return "", nil
+	}
+	if matched := regexp.MustCompile(`^[A-Za-z0-9_-]+$`).MatchString(ruleSubdir); !matched {
+		return "", fmt.Errorf("invalid BALLAST_RULE_SUBDIR %q: only [A-Za-z0-9_-] are allowed", ruleSubdir)
+	}
+	return ruleSubdir, nil
+}
+
+func ruleBaseName(agentID, language, suffix string) string {
+	base := agentID
+	if suffix != "" {
+		base = agentID + "-" + suffix
+	}
+	if slices.Contains(commonAgents, agentID) {
+		return base
+	}
+	return language + "-" + base
 }
 
 func codexAgentsMDPath(projectRoot string) string {
 	return filepath.Join(projectRoot, "AGENTS.md")
+}
+
+func claudeMDPath(projectRoot string) string {
+	return filepath.Join(projectRoot, "CLAUDE.md")
 }
 
 func contains(items []string, value string) bool {

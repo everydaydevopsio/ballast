@@ -57,6 +57,10 @@ def resolve_agents_root() -> Path:
 
 
 def rulesrc_filename(language: str) -> str:
+    return ".rulesrc.json"
+
+
+def legacy_rulesrc_filename(language: str) -> str:
     if language == "typescript":
         return ".rulesrc.ts.json"
     return f".rulesrc.{language}.json"
@@ -86,8 +90,8 @@ def resolve_project_root(cwd: Path) -> Path:
         has_pkg = (directory / "package.json").exists()
         has_go = (directory / "go.mod").exists()
         has_pyproject = (directory / "pyproject.toml").exists()
-        has_any_cfg = (directory / ".rulesrc.ts.json").exists() or (directory / ".rulesrc.json").exists() or any(
-            (directory / rulesrc_filename(lang)).exists() for lang in LANGUAGES
+        has_any_cfg = (directory / ".rulesrc.json").exists() or (directory / ".rulesrc.ts.json").exists() or any(
+            (directory / legacy_rulesrc_filename(lang)).exists() for lang in LANGUAGES
         )
         if has_pkg or has_go or has_pyproject or has_any_cfg:
             return directory
@@ -105,8 +109,8 @@ def is_ci_mode() -> bool:
 
 def load_config(root: Path, language: str) -> dict[str, object] | None:
     file_path = root / rulesrc_filename(language)
-    if not file_path.exists() and language == "typescript":
-        file_path = root / ".rulesrc.json"
+    if not file_path.exists():
+        file_path = root / legacy_rulesrc_filename(language)
     if not file_path.exists():
         return None
     try:
@@ -189,13 +193,27 @@ def build_content(agent: str, target: str, language: str, suffix: str = "") -> s
 
 
 def destination(root: Path, target: str, basename: str) -> Path:
+    rule_subdir = os.environ.get("BALLAST_RULE_SUBDIR", "").strip()
+    if rule_subdir and not re.fullmatch(r"[A-Za-z0-9_-]+", rule_subdir):
+        raise ValueError(
+            f"Invalid BALLAST_RULE_SUBDIR value {rule_subdir!r}. Only letters, digits, '-' and '_' are allowed."
+        )
+    scoped_basename = (
+        basename
+        if not rule_subdir or rule_subdir == "common" or basename.startswith(f"{rule_subdir}-")
+        else f"{rule_subdir}-{basename}"
+    )
     if target == "cursor":
-        return root / ".cursor" / "rules" / f"{basename}.mdc"
+        base = root / ".cursor" / "rules"
+        return (base / rule_subdir / f"{scoped_basename}.mdc") if rule_subdir else (base / f"{scoped_basename}.mdc")
     if target == "claude":
-        return root / ".claude" / "rules" / f"{basename}.md"
+        base = root / ".claude" / "rules"
+        return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
     if target == "opencode":
-        return root / ".opencode" / f"{basename}.md"
-    return root / ".codex" / "rules" / f"{basename}.md"
+        base = root / ".opencode"
+        return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
+    base = root / ".codex" / "rules"
+    return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
 
 
 def extract_description_from_frontmatter(frontmatter: str) -> str | None:
@@ -214,6 +232,13 @@ def get_codex_rule_description(agent: str, language: str, suffix: str = "") -> s
         return None
 
 
+def rule_basename(agent: str, language: str, suffix: str = "") -> str:
+    basename = agent if suffix == "" else f"{agent}-{suffix}"
+    if agent in COMMON_AGENTS:
+        return basename
+    return f"{language}-{basename}"
+
+
 def build_codex_agents_md(agents: list[str], language: str) -> str:
     lines = [
         "# AGENTS.md",
@@ -229,9 +254,31 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
     ]
     for agent in agents:
         for suffix in list_rule_suffixes(agent, language):
-            basename = agent if suffix == "" else f"{agent}-{suffix}"
+            basename = rule_basename(agent, language, suffix)
             description = get_codex_rule_description(agent, language, suffix) or f"Rules for {basename}"
             lines.append(f"- `.codex/rules/{basename}.md` — {description}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_claude_md(agents: list[str], language: str) -> str:
+    lines = [
+        "# CLAUDE.md",
+        "",
+        "This file provides guidance to Claude Code for working in this repository.",
+        "",
+        "## Installed agent rules",
+        "",
+        f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+        "",
+        "Read and follow these rule files in `.claude/rules/` when they apply:",
+        "",
+    ]
+    for agent in agents:
+        for suffix in list_rule_suffixes(agent, language):
+            basename = rule_basename(agent, language, suffix)
+            description = get_codex_rule_description(agent, language, suffix) or f"Rules for {basename}"
+            lines.append(f"- `.claude/rules/{basename}.md` — {description}")
     lines.append("")
     return "\n".join(lines)
 
@@ -430,12 +477,26 @@ def patch_rule_content(existing: str, canonical: str, target: str) -> str:
 
 def find_markdown_section_range(content: str, heading: str) -> tuple[int, int] | None:
     normalized = normalize_line_endings(content)
-    match = re.search(rf"^## {re.escape(heading)}$", normalized, re.MULTILINE)
-    if not match:
-        return None
-    next_heading = re.search(r"\n## .*", normalized[match.end() :])
-    end = match.end() + next_heading.start() + 1 if next_heading else len(normalized)
-    return match.start(), end
+    lines = normalized.split("\n")
+    target = f"## {heading}"
+    in_fence = False
+    offset = 0
+
+    for i, line in enumerate(lines):
+        if line.startswith("```"):
+            in_fence = not in_fence
+        if not in_fence and line == target:
+            start = offset
+            offset += len(line) + 1
+            for next_line in lines[i + 1 :]:
+                if next_line.startswith("```"):
+                    in_fence = not in_fence
+                if not in_fence and next_line.startswith("## "):
+                    return start, offset - 1
+                offset += len(next_line) + 1
+            return start, len(normalized)
+        offset += len(line) + 1
+    return None
 
 
 def patch_codex_agents_md(existing: str, canonical: str) -> str:
@@ -462,6 +523,14 @@ def patch_codex_agents_md(existing: str, canonical: str) -> str:
 
 def prompt(question: str) -> str:
     return input(question).strip()
+
+
+def prompt_yes_no(question: str, default: bool = False) -> bool:
+    suffix = " [Y/n]: " if default else " [y/N]: "
+    value = prompt(question + suffix).lower()
+    if not value:
+        return default
+    return value in {"y", "yes"}
 
 
 def prompt_target() -> str:
@@ -510,10 +579,18 @@ def resolve_target_and_agents(args: argparse.Namespace, root: Path, language: st
 
 
 def install(
-    root: Path, target: str, agents: list[str], language: str, force: bool, patch: bool, persist: bool
+    root: Path,
+    target: str,
+    agents: list[str],
+    language: str,
+    force: bool,
+    patch: bool,
+    persist: bool,
+    patch_claude_md: bool = False,
 ) -> InstallResult:
     result = InstallResult()
     processed_agents: list[str] = []
+    disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 
     if persist:
         save_config(root, language, target, agents)
@@ -529,7 +606,7 @@ def install(
 
         try:
             for suffix in list_rule_suffixes(agent, language):
-                basename = agent if suffix == "" else f"{agent}-{suffix}"
+                basename = rule_basename(agent, language, suffix)
                 dst = destination(root, target, basename)
                 content = build_content(agent, target, language, suffix)
                 if dst.exists() and not force and not patch:
@@ -555,7 +632,7 @@ def install(
         except Exception as err:
             result.errors.append((agent, str(err)))
 
-    if target == "codex":
+    if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"
         if agents_md.exists() and not force and not patch:
             result.skipped_support_files.append(str(agents_md))
@@ -571,6 +648,24 @@ def install(
                 result.installed_support_files.append(str(agents_md))
             except Exception as err:
                 result.errors.append(("codex", str(err)))
+
+    if target == "claude" and not disable_support_files:
+        claude_md = root / "CLAUDE.md"
+        should_patch_claude_md = patch or patch_claude_md
+        if claude_md.exists() and not force and not should_patch_claude_md:
+            result.skipped_support_files.append(str(claude_md))
+        else:
+            try:
+                content = build_claude_md(processed_agents, language)
+                next_content = (
+                    patch_codex_agents_md(claude_md.read_text(encoding="utf-8"), content)
+                    if claude_md.exists() and not force and should_patch_claude_md
+                    else content
+                )
+                claude_md.write_text(next_content, encoding="utf-8")
+                result.installed_support_files.append(str(claude_md))
+            except Exception as err:
+                result.errors.append(("claude", str(err)))
 
     return result
 
@@ -595,8 +690,15 @@ def run_install(args: argparse.Namespace) -> int:
         print("Invalid --target. Use: cursor, claude, opencode, codex")
         return 1
 
-    persist = not args.target and not args.agent and not args.all
-    result = install(root, target, agents, language, bool(args.force), bool(args.patch), persist)
+    patch_claude_md = False
+    if target == "claude" and (root / "CLAUDE.md").exists() and not bool(args.force):
+        if bool(args.patch):
+            patch_claude_md = True
+        elif not is_ci_mode() and not bool(args.yes):
+            patch_claude_md = prompt_yes_no(
+                f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?"
+            )
+    result = install(root, target, agents, language, bool(args.force), bool(args.patch), True, patch_claude_md)
 
     if result.errors:
         for agent, error in result.errors:
@@ -606,11 +708,12 @@ def run_install(args: argparse.Namespace) -> int:
     if result.installed_rules:
         print(f"Installed for {target}: {', '.join(result.installed)}")
         for agent, suffix in result.installed_rules:
-            basename = agent if suffix == "" else f"{agent}-{suffix}"
+            basename = rule_basename(agent, language, suffix)
             print(f"  {basename} -> {destination(root, target, basename)}")
     if result.installed_support_files:
         for file in result.installed_support_files:
-            print(f"  AGENTS.md -> {file}")
+            label = "CLAUDE.md" if file.endswith("CLAUDE.md") else "AGENTS.md"
+            print(f"  {label} -> {file}")
     if result.skipped:
         print("Skipped (already present; use --force to overwrite): " + ", ".join(result.skipped))
     if result.skipped_support_files:

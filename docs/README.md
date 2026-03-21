@@ -30,8 +30,9 @@ Agent | TypeScript | Python | Go | Guide
 
 ## Installation and Monorepos
 
-See [installation.md](installation.md) for package-specific commands and monorepo workflows for each language:
+See [installation.md](installation.md) for package-specific commands and the unified monorepo workflow:
 
+- `ballast install --target cursor --all --yes` for TypeScript + Python + Go monorepos
 - npm (`@everydaydevopsio/ballast`)
 - uv/uvx from GitHub Releases wheel (`ballast-python`)
 - go install/go run (`ballast-go`)

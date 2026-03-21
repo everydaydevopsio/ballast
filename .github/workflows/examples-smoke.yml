@@ -20,10 +20,13 @@ jobs:
         include:
           - sample: go-sample
             language: go
+            expected_rule: go-linting.mdc
           - sample: python-sample
             language: python
+            expected_rule: python-linting.mdc
           - sample: typescript-sample
             language: typescript
+            expected_rule: typescript-linting.mdc
 
     steps:
       - name: Checkout ballast repo
@@ -51,7 +54,7 @@ jobs:
       - name: Verify outputs
         run: |
           set -euo pipefail
-          test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/linting.mdc"
+          test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/${{ matrix.expected_rule }}"
 
   monorepo-patch-smoke:
     name: monorepo-patch-smoke
@@ -71,6 +74,14 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 10.27.0
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -94,6 +105,32 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
           go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+          echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
+
+      - name: Build ballast wrapper
+        run: |
+          set -euo pipefail
+          go build -C cli/ballast -o "$GITHUB_WORKSPACE/.ci/bin/ballast" .
+
+      - name: Create local backend shims
+        run: |
+          set -euo pipefail
+          cat > "$GITHUB_WORKSPACE/.ci/bin/ballast-typescript" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          node "$GITHUB_WORKSPACE/packages/ballast-typescript/dist/cli.js" "$@"
+          EOF
+          chmod +x "$GITHUB_WORKSPACE/.ci/bin/ballast-typescript"
+
+          cat > "$GITHUB_WORKSPACE/.ci/bin/ballast-python" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          PYTHONPATH="$GITHUB_WORKSPACE/packages/ballast-python${PYTHONPATH:+:$PYTHONPATH}" python3 -m ballast "$@"
+          EOF
+          chmod +x "$GITHUB_WORKSPACE/.ci/bin/ballast-python"
 
       - name: Run monorepo patch smoke test
         run: ./scripts/smoke-monorepo-patch.sh "$GITHUB_WORKSPACE/.ci/ballast-examples"
+
+      - name: Run wrapper monorepo smoke test
+        run: ./scripts/smoke-wrapper-monorepo.sh

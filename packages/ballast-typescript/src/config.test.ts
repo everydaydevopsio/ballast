@@ -7,7 +7,7 @@ import {
   saveConfig,
   isCiMode,
   RULESRC_FILENAME,
-  getRulesrcFilename
+  getLegacyRulesrcFilename
 } from './config';
 
 describe('config', () => {
@@ -37,7 +37,7 @@ describe('config', () => {
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
     });
 
-    test('returns dir containing .rulesrc.ts.json', () => {
+    test('returns dir containing .rulesrc.json', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),
         JSON.stringify({ target: 'cursor', agents: ['linting'] })
@@ -83,7 +83,7 @@ describe('config', () => {
   });
 
   describe('saveConfig', () => {
-    test('writes .rulesrc.ts.json', () => {
+    test('writes .rulesrc.json', () => {
       const config = { target: 'opencode' as const, agents: ['cicd'] };
       saveConfig(config, tmpDir);
       const file = path.join(tmpDir, RULESRC_FILENAME);
@@ -92,22 +92,21 @@ describe('config', () => {
       expect(parsed).toEqual(config);
     });
 
-    test('loads legacy .rulesrc.json for typescript', () => {
+    test('loads legacy .rulesrc.ts.json for typescript', () => {
       const config = { target: 'cursor' as const, agents: ['linting'] };
       fs.writeFileSync(
-        path.join(tmpDir, '.rulesrc.json'),
+        path.join(tmpDir, getLegacyRulesrcFilename('typescript')),
         JSON.stringify(config)
       );
       expect(loadConfig(tmpDir)).toEqual(config);
     });
 
-    test('writes language-specific rulesrc for python', () => {
+    test('loads legacy language-specific rulesrc for python', () => {
       const config = { target: 'opencode' as const, agents: ['linting'] };
-      saveConfig(config, tmpDir, 'python');
-      const file = path.join(tmpDir, getRulesrcFilename('python'));
-      expect(fs.existsSync(file)).toBe(true);
-      const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-      expect(parsed).toEqual(config);
+      fs.writeFileSync(
+        path.join(tmpDir, getLegacyRulesrcFilename('python')),
+        JSON.stringify(config)
+      );
       expect(loadConfig(tmpDir, 'python')).toEqual(config);
     });
   });

@@ -2,7 +2,9 @@ import fs from 'fs';
 import readline from 'readline';
 import {
   buildContent,
+  buildClaudeMd,
   buildCodexAgentsMd,
+  getClaudeMdPath,
   getCodexAgentsMdPath,
   getDestination,
   listRuleSuffixes,
@@ -120,6 +122,7 @@ export interface InstallOptions {
   language?: Language;
   force?: boolean;
   patch?: boolean;
+  patchClaudeMd?: boolean;
   saveConfig?: boolean;
 }
 
@@ -144,6 +147,7 @@ export function install(options: InstallOptions): InstallResult {
     language = 'typescript',
     force = false,
     patch = false,
+    patchClaudeMd = false,
     saveConfig: persist
   } = options;
   const installed: string[] = [];
@@ -153,9 +157,10 @@ export function install(options: InstallOptions): InstallResult {
   const skippedSupportFiles: string[] = [];
   const errors: Array<{ agent: string; error: string }> = [];
   const processedAgentIds = new Set<string>();
+  const disableSupportFiles = process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
 
   if (persist) {
-    saveConfig({ target, agents }, projectRoot, language);
+    saveConfig({ target, agents }, projectRoot);
   }
 
   for (const agentId of agents) {
@@ -173,7 +178,8 @@ export function install(options: InstallOptions): InstallResult {
           agentId,
           target,
           projectRoot,
-          ruleSuffix || undefined
+          ruleSuffix || undefined,
+          language
         );
         const fileExists = fs.existsSync(file);
         if (!fs.existsSync(dir)) {
@@ -210,7 +216,30 @@ export function install(options: InstallOptions): InstallResult {
     }
   }
 
-  if (target === 'codex') {
+  if (!disableSupportFiles && target === 'claude') {
+    const claudeMdPath = getClaudeMdPath(projectRoot);
+    const shouldPatchClaudeMd = patch || patchClaudeMd;
+    if (fs.existsSync(claudeMdPath) && !force && !shouldPatchClaudeMd) {
+      skippedSupportFiles.push(claudeMdPath);
+    } else {
+      try {
+        const content = buildClaudeMd(Array.from(processedAgentIds), language);
+        const nextContent =
+          fs.existsSync(claudeMdPath) && !force && shouldPatchClaudeMd
+            ? patchCodexAgentsMd(fs.readFileSync(claudeMdPath, 'utf8'), content)
+            : content;
+        fs.writeFileSync(claudeMdPath, nextContent, 'utf8');
+        installedSupportFiles.push(claudeMdPath);
+      } catch (err) {
+        errors.push({
+          agent: 'claude',
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+  }
+
+  if (!disableSupportFiles && target === 'codex') {
     const agentsMdPath = getCodexAgentsMdPath(projectRoot);
     if (fs.existsSync(agentsMdPath) && !force && !patch) {
       skippedSupportFiles.push(agentsMdPath);
@@ -256,9 +285,19 @@ export interface RunInstallOptions {
   yes?: boolean;
 }
 
+async function promptYesNo(
+  question: string,
+  defaultAnswer: boolean = false
+): Promise<boolean> {
+  const suffix = defaultAnswer ? ' [Y/n]: ' : ' [y/N]: ';
+  const line = (await prompt(question + suffix)).toLowerCase();
+  if (!line) return defaultAnswer;
+  return line === 'y' || line === 'yes';
+}
+
 /**
  * Run install flow: resolve target/agents (interactive or from config/flags), then install.
- * In CI mode with no .rulesrc.ts.json, --target and (--agent X or --all) are required.
+ * In CI mode with no .rulesrc.json, --target and (--agent X or --all) are required.
  */
 export async function runInstall(
   options: RunInstallOptions = {}
@@ -276,7 +315,7 @@ export async function runInstall(
 
   if (!resolved) {
     console.error(
-      'In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when .rulesrc.ts.json is missing.'
+      'In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when .rulesrc.json is missing.'
     );
     console.error(
       'Example: ballast-typescript install --yes --target cursor --agent linting'
@@ -285,7 +324,17 @@ export async function runInstall(
   }
 
   const { target, agents } = resolved;
-  const persist = !options.target && !options.agents && !options.all;
+  const claudeMdPath = getClaudeMdPath(projectRoot);
+  let patchClaudeMd = false;
+  if (target === 'claude' && fs.existsSync(claudeMdPath) && !options.force) {
+    if (options.patch) {
+      patchClaudeMd = true;
+    } else if (!isCiMode() && !options.yes) {
+      patchClaudeMd = await promptYesNo(
+        `Existing CLAUDE.md found at ${claudeMdPath}. Patch the Installed agent rules section?`
+      );
+    }
+  }
   const result = install({
     projectRoot,
     target,
@@ -293,7 +342,8 @@ export async function runInstall(
     language,
     force: options.force ?? false,
     patch: options.patch ?? false,
-    saveConfig: persist
+    patchClaudeMd,
+    saveConfig: true
   });
 
   if (result.errors.length > 0) {
@@ -310,7 +360,8 @@ export async function runInstall(
         agentId,
         target,
         projectRoot,
-        ruleSuffix || undefined
+        ruleSuffix || undefined,
+        language
       );
       const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
       console.log(`  ${label} -> ${file}`);
@@ -318,7 +369,8 @@ export async function runInstall(
   }
   if (result.installedSupportFiles.length > 0) {
     result.installedSupportFiles.forEach((file) => {
-      console.log(`  AGENTS.md -> ${file}`);
+      const label = file.endsWith('CLAUDE.md') ? 'CLAUDE.md' : 'AGENTS.md';
+      console.log(`  ${label} -> ${file}`);
     });
   }
   if (result.skipped.length > 0) {

@@ -98,7 +98,7 @@ Options:
   --all                     Install all agents
   --force, -f               Overwrite existing rule files
   --patch, -p               Merge upstream rule updates into existing files; ignored when --force is set
-  --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.ts.json
+  --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
   --help, -h                Show this help
   --version, -v             Show version
 
