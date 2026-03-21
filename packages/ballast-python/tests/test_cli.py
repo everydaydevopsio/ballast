@@ -39,6 +39,24 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertTrue((root / ".rulesrc.json").exists())
+            content = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"languages": [', content)
+            self.assertIn('"python"', content)
+            self.assertIn('"paths": {', content)
+
+    def test_manual_installs_accumulate_languages_in_shared_rulesrc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            cli.save_config(root, "python", "claude", ["linting"])
+            cli.save_config(root, "go", "claude", ["linting"])
+
+            content = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"languages": [', content)
+            self.assertIn('"python"', content)
+            self.assertIn('"go"', content)
+            self.assertIn('"python": [', content)
+            self.assertIn('"go": [', content)
 
     def test_install_creates_language_prefixed_rule_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

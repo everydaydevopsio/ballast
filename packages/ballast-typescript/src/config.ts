@@ -10,6 +10,8 @@ export type Target = 'cursor' | 'claude' | 'opencode' | 'codex';
 export interface RulesConfig {
   target: Target;
   agents: string[];
+  languages?: string[];
+  paths?: Record<string, string[]>;
 }
 
 export function getRulesrcFilename(): string {
@@ -90,11 +92,76 @@ export function loadConfig(
 export function saveConfig(config: RulesConfig, projectRoot?: string): void {
   const root = projectRoot ?? findProjectRoot();
   const filePath = path.join(root, getRulesrcFilename());
+  let nextConfig: RulesConfig = {
+    target: config.target,
+    agents: config.agents
+  };
+
+  const existing = loadRawConfig(filePath);
+  const mergedLanguages = mergeLanguages(existing, config);
+  const mergedPaths = mergePaths(existing, config, mergedLanguages);
+  if (mergedLanguages.length > 0) {
+    nextConfig = {
+      ...nextConfig,
+      languages: mergedLanguages,
+      paths: mergedPaths
+    };
+  }
+
   fs.writeFileSync(
     filePath,
-    JSON.stringify({ target: config.target, agents: config.agents }, null, 2),
+    JSON.stringify(nextConfig, null, 2),
     'utf8'
   );
+}
+
+function loadRawConfig(filePath: string): RulesConfig | null {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const data = JSON.parse(raw) as RulesConfig;
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      typeof data.target !== 'string' ||
+      !Array.isArray(data.agents)
+    ) {
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function mergeLanguages(
+  existing: RulesConfig | null,
+  config: RulesConfig
+): string[] {
+  const languages = new Set<string>(existing?.languages ?? []);
+  for (const language of config.languages ?? []) {
+    languages.add(language);
+  }
+  return Array.from(languages);
+}
+
+function mergePaths(
+  existing: RulesConfig | null,
+  config: RulesConfig,
+  languages: string[]
+): Record<string, string[]> {
+  const merged: Record<string, string[]> = { ...(existing?.paths ?? {}) };
+  for (const language of config.languages ?? []) {
+    if (!merged[language] || merged[language].length === 0) {
+      merged[language] = ['.'];
+    }
+  }
+  for (const language of languages) {
+    if (!merged[language] || merged[language].length === 0) {
+      merged[language] = ['.'];
+    }
+  }
+  return merged;
 }
 
 /**

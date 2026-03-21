@@ -133,8 +133,35 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
 
 
 def save_config(root: Path, language: str, target: str, agents: list[str]) -> None:
-    (root / rulesrc_filename(language)).write_text(
-        json.dumps({"target": target, "agents": agents}, indent=2), encoding="utf-8"
+    file_path = root / rulesrc_filename(language)
+    languages: list[str] = []
+    paths: dict[str, list[str]] = {}
+    if file_path.exists():
+        try:
+            raw = json.loads(file_path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                existing_languages = raw.get("languages")
+                existing_paths = raw.get("paths")
+                if isinstance(existing_languages, list) and all(isinstance(item, str) for item in existing_languages):
+                    languages = list(existing_languages)
+                if isinstance(existing_paths, dict):
+                    for key, value in existing_paths.items():
+                        if isinstance(key, str) and isinstance(value, list) and all(
+                            isinstance(item, str) for item in value
+                        ):
+                            paths[key] = list(value)
+        except Exception:
+            pass
+
+    if language not in languages:
+        languages.append(language)
+    for item in languages:
+        if item not in paths or not paths[item]:
+            paths[item] = ["."]
+
+    file_path.write_text(
+        json.dumps({"target": target, "agents": agents, "languages": languages, "paths": paths}, indent=2),
+        encoding="utf-8",
     )
 
 

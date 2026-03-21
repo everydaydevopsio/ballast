@@ -33,8 +33,10 @@ var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
 var embeddedAgentsFS embed.FS
 
 type rulesConfig struct {
-	Target string   `json:"target"`
-	Agents []string `json:"agents"`
+	Target    string              `json:"target"`
+	Agents    []string            `json:"agents"`
+	Languages []string            `json:"languages,omitempty"`
+	Paths     map[string][]string `json:"paths,omitempty"`
 }
 
 type installResult struct {
@@ -313,7 +315,11 @@ func install(opts installOptions) installResult {
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 
 	if opts.saveConfig {
-		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{Target: opts.target, Agents: opts.agents}); err != nil {
+		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{
+			Target:    opts.target,
+			Agents:    opts.agents,
+			Languages: []string{opts.language},
+		}); err != nil {
 			result.errors = append(result.errors, agentError{agent: "config", err: err.Error()})
 			return result
 		}
@@ -990,11 +996,52 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 }
 
 func saveConfig(projectRoot, language string, cfg rulesConfig) error {
+	filePath := filepath.Join(projectRoot, rulesrcFilename(language))
+	existing := loadConfig(projectRoot, language)
+	if existing != nil {
+		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)
+		cfg.Paths = mergeLanguagePaths(existing.Paths, cfg.Languages)
+	} else {
+		cfg.Paths = mergeLanguagePaths(nil, cfg.Languages)
+	}
 	bytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(projectRoot, rulesrcFilename(language)), bytes, 0o644)
+	return os.WriteFile(filePath, bytes, 0o644)
+}
+
+func mergeLanguageList(existing, incoming []string) []string {
+	seen := make(map[string]struct{}, len(existing)+len(incoming))
+	merged := make([]string, 0, len(existing)+len(incoming))
+	for _, language := range existing {
+		if _, ok := seen[language]; ok {
+			continue
+		}
+		seen[language] = struct{}{}
+		merged = append(merged, language)
+	}
+	for _, language := range incoming {
+		if _, ok := seen[language]; ok {
+			continue
+		}
+		seen[language] = struct{}{}
+		merged = append(merged, language)
+	}
+	return merged
+}
+
+func mergeLanguagePaths(existing map[string][]string, languages []string) map[string][]string {
+	merged := make(map[string][]string, len(existing)+len(languages))
+	for key, paths := range existing {
+		merged[key] = append([]string(nil), paths...)
+	}
+	for _, language := range languages {
+		if len(merged[language]) == 0 {
+			merged[language] = []string{"."}
+		}
+	}
+	return merged
 }
 
 func rulesrcFilename(language string) string {
