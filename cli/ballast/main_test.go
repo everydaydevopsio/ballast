@@ -465,6 +465,108 @@ func TestRunSingleLanguageInstallPrefersLocalBackendWithoutNilEnvPanic(t *testin
 	}
 }
 
+func TestRunSingleLanguageInstallReinstallsBackendWhenVersionMismatches(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "tsconfig.json"), "{}")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalResolve := resolveInstalledVersionFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		resolveInstalledVersionFunc = originalResolve
+	})
+
+	var ensured []toolConfig
+	ensureInstalledFunc = func(tool toolConfig) error {
+		ensured = append(ensured, tool)
+		return nil
+	}
+
+	resolveInstalledVersionFunc = func(tool toolConfig) (string, error) {
+		return "4.1.7", nil
+	}
+
+	var invocation backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocation = backendInvocation{
+			Binary: binary,
+			Args:   append([]string(nil), args...),
+			Dir:    dir,
+			Env:    env,
+		}
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--target", "cursor", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(ensured) != 1 {
+		t.Fatalf("expected exactly one reinstall attempt, got %d", len(ensured))
+	}
+	if ensured[0].binary != "ballast-typescript" {
+		t.Fatalf("expected TypeScript backend reinstall, got %#v", ensured[0])
+	}
+	if invocation.Binary != "ballast-typescript" {
+		t.Fatalf("expected installed TypeScript backend to be executed, got %#v", invocation)
+	}
+}
+
+func TestEnsureInstalledUsesPinnedVersionWhenBackendVersionDiffers(t *testing.T) {
+	originalLookPath := execLookPathFunc
+	originalRun := runCommandFunc
+	originalResolve := resolveInstalledVersionFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		execLookPathFunc = originalLookPath
+		runCommandFunc = originalRun
+		resolveInstalledVersionFunc = originalResolve
+		version = originalVersion
+	})
+
+	version = "5.0.0"
+
+	execLookPathFunc = func(file string) (string, error) {
+		if file != "ballast-go" {
+			t.Fatalf("unexpected lookpath lookup for %q", file)
+		}
+		return "/tmp/ballast-go", nil
+	}
+
+	resolveInstalledVersionFunc = func(tool toolConfig) (string, error) {
+		return "4.1.7", nil
+	}
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	err := ensureInstalled(toolConfig{
+		binary: "ballast-go",
+		installCommand: func(version string) []string {
+			return []string{"go", "install", "example.com/ballast-go@" + version}
+		},
+	})
+	if err != nil {
+		t.Fatalf("ensureInstalled returned error: %v", err)
+	}
+
+	if len(commands) != 1 {
+		t.Fatalf("expected one reinstall command, got %d", len(commands))
+	}
+	if got := strings.Join(commands[0], " "); got != "go install example.com/ballast-go@5.0.0" {
+		t.Fatalf("unexpected install command: %q", got)
+	}
+}
+
 func TestResolveMonorepoPlanRejectsEscapingPathsFromConfig(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{

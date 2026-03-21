@@ -25,21 +25,44 @@ var supportedLanguages = []language{langTypeScript, langPython, langGo}
 
 type toolConfig struct {
 	binary         string
-	installCommand []string
+	installCommand func(version string) []string
 }
 
 var toolsByLanguage = map[language]toolConfig{
 	langTypeScript: {
-		binary:         "ballast-typescript",
-		installCommand: []string{"npm", "install", "-g", "@everydaydevopsio/ballast"},
+		binary: "ballast-typescript",
+		installCommand: func(version string) []string {
+			pkg := "@everydaydevopsio/ballast"
+			if releaseVersion(version) != "" {
+				pkg += "@" + releaseVersion(version)
+			}
+			return []string{"npm", "install", "-g", pkg}
+		},
 	},
 	langPython: {
-		binary:         "ballast-python",
-		installCommand: []string{"uv", "tool", "install", "ballast-python"},
+		binary: "ballast-python",
+		installCommand: func(version string) []string {
+			release := releaseVersion(version)
+			if release == "" {
+				return []string{"uv", "tool", "install", "--reinstall", "ballast-python"}
+			}
+			wheel := fmt.Sprintf(
+				"https://github.com/everydaydevopsio/ballast/releases/download/v%s/ballast_python-%s-py3-none-any.whl",
+				release,
+				release,
+			)
+			return []string{"uv", "tool", "install", "--reinstall", "--from", wheel, "ballast-python"}
+		},
 	},
 	langGo: {
-		binary:         "ballast-go",
-		installCommand: []string{"go", "install", "github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest"},
+		binary: "ballast-go",
+		installCommand: func(version string) []string {
+			target := "latest"
+			if release := releaseVersion(version); release != "" {
+				target = "v" + release
+			}
+			return []string{"go", "install", "github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@" + target}
+		},
 	},
 }
 
@@ -49,6 +72,9 @@ var ensureInstalledFunc = ensureInstalled
 var execToolFunc = execTool
 var walkDirFunc = filepath.WalkDir
 var osExecutableFunc = os.Executable
+var execLookPathFunc = exec.LookPath
+var runCommandFunc = runCommand
+var resolveInstalledVersionFunc = resolveInstalledVersion
 
 var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
@@ -272,6 +298,20 @@ func resolveVersion() string {
 	return version
 }
 
+func releaseVersion(raw string) string {
+	trimmed := normalizeVersion(raw)
+	if trimmed == "" || trimmed == "dev" || trimmed == "(devel)" {
+		return ""
+	}
+	return trimmed
+}
+
+func normalizeVersion(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	trimmed = strings.TrimPrefix(trimmed, "v")
+	return trimmed
+}
+
 func hasVersionFlag(args []string) bool {
 	for _, arg := range args {
 		if arg == "--version" || arg == "-v" {
@@ -307,27 +347,74 @@ func languageNames() []string {
 }
 
 func ensureInstalled(tool toolConfig) error {
-	if _, err := exec.LookPath(tool.binary); err == nil {
-		return nil
+	currentPath, err := execLookPathFunc(tool.binary)
+	desiredVersion := resolveVersion()
+	if err == nil {
+		currentVersion, versionErr := resolveInstalledVersionFunc(tool)
+		if versionErr == nil && normalizeVersion(currentVersion) == normalizeVersion(desiredVersion) {
+			return nil
+		}
+		if versionErr == nil {
+			fmt.Printf(
+				"%s %s does not match ballast %s. Reinstalling...\n",
+				tool.binary,
+				currentVersion,
+				desiredVersion,
+			)
+		} else {
+			fmt.Printf(
+				"Could not determine %s version (%v). Reinstalling to match ballast %s...\n",
+				tool.binary,
+				versionErr,
+				desiredVersion,
+			)
+		}
+	} else {
+		fmt.Printf("%s not found. Installing...\n", tool.binary)
 	}
 
-	if len(tool.installCommand) == 0 {
+	if tool.installCommand == nil {
 		return fmt.Errorf("%s is not installed and no installer is configured", tool.binary)
 	}
 
-	fmt.Printf("%s not found. Installing...\n", tool.binary)
-	cmd := exec.Command(tool.installCommand[0], tool.installCommand[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	if err := cmd.Run(); err != nil {
+	installCommand := tool.installCommand(desiredVersion)
+	if len(installCommand) == 0 {
+		return fmt.Errorf("%s is not installed and no installer is configured", tool.binary)
+	}
+
+	if err := runCommandFunc(installCommand[0], installCommand[1:]); err != nil {
 		return fmt.Errorf("failed to install %s: %w", tool.binary, err)
 	}
 
-	if _, err := exec.LookPath(tool.binary); err != nil {
+	if currentPath != "" {
+		if _, err := execLookPathFunc(tool.binary); err != nil {
+			return fmt.Errorf("reinstalled %s but it is no longer on PATH", tool.binary)
+		}
+	}
+	if _, err := execLookPathFunc(tool.binary); err != nil {
 		return fmt.Errorf("installed dependencies but %s is still not on PATH", tool.binary)
 	}
 	return nil
+}
+
+func runCommand(name string, args []string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
+}
+
+func resolveInstalledVersion(tool toolConfig) (string, error) {
+	output, err := exec.Command(tool.binary, "--version").CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("run --version: %w", err)
+	}
+	versionText := strings.TrimSpace(string(output))
+	if versionText == "" {
+		return "", errors.New("empty version output")
+	}
+	return versionText, nil
 }
 
 func execTool(binary string, args []string, dir string, env map[string]string) (int, error) {

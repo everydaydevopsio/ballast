@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"slices"
 	"sort"
 	"strings"
@@ -90,6 +91,10 @@ func main() {
 }
 
 func run(args []string) int {
+	if hasVersionFlag(args) || isVersionCommand(args) {
+		fmt.Println(resolveVersion())
+		return 0
+	}
 	if len(args) == 0 || args[0] == "install" {
 		return runInstall(args)
 	}
@@ -223,6 +228,32 @@ func runInstall(args []string) int {
 	}
 
 	return 0
+}
+
+func hasVersionFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--version" || arg == "-v" {
+			return true
+		}
+	}
+	return false
+}
+
+func isVersionCommand(args []string) bool {
+	return len(args) == 1 && args[0] == "version"
+}
+
+func resolveVersion() string {
+	if strings.TrimSpace(ballastVersion) != "" && ballastVersion != "dev" {
+		return ballastVersion
+	}
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		if strings.TrimSpace(info.Main.Version) != "" && info.Main.Version != "(devel)" {
+			return strings.TrimPrefix(info.Main.Version, "v")
+		}
+	}
+	return ballastVersion
 }
 
 func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {

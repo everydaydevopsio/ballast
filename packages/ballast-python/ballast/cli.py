@@ -20,6 +20,18 @@ AGENTS_BY_LANGUAGE = {
 }
 
 
+def cli_version() -> str:
+    try:
+        return metadata.version("ballast-python")
+    except metadata.PackageNotFoundError:
+        pyproject = package_root().parent / "pyproject.toml"
+        if pyproject.exists():
+            match = re.search(r'^version = "([^"]+)"$', pyproject.read_text(encoding="utf-8"), re.MULTILINE)
+            if match:
+                return match.group(1)
+        return "dev"
+
+
 @dataclass
 class InstallResult:
     installed: list[str] = field(default_factory=list)
@@ -729,6 +741,7 @@ def run_install(args: argparse.Namespace) -> int:
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ballast-python", description="Install Ballast rules for Python projects")
+    p.add_argument("--version", action="version", version=cli_version())
     sub = p.add_subparsers(dest="command")
     install_cmd = sub.add_parser("install", help="Install rule files")
     install_cmd.add_argument("--target", "-t")
