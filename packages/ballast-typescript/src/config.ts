@@ -108,11 +108,7 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     };
   }
 
-  fs.writeFileSync(
-    filePath,
-    JSON.stringify(nextConfig, null, 2),
-    'utf8'
-  );
+  fs.writeFileSync(filePath, JSON.stringify(nextConfig, null, 2), 'utf8');
 }
 
 function loadRawConfig(filePath: string): RulesConfig | null {
