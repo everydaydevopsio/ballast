@@ -160,7 +160,7 @@ export function install(options: InstallOptions): InstallResult {
   const disableSupportFiles = process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
 
   if (persist) {
-    saveConfig({ target, agents }, projectRoot);
+    saveConfig({ target, agents, languages: [language] }, projectRoot);
   }
 
   for (const agentId of agents) {

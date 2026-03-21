@@ -92,6 +92,38 @@ describe('config', () => {
       expect(parsed).toEqual(config);
     });
 
+    test('accumulates languages and default paths in shared config', () => {
+      saveConfig(
+        {
+          target: 'claude',
+          agents: ['linting'],
+          languages: ['typescript']
+        },
+        tmpDir
+      );
+      saveConfig(
+        {
+          target: 'claude',
+          agents: ['linting'],
+          languages: ['go']
+        },
+        tmpDir
+      );
+
+      const parsed = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, RULESRC_FILENAME), 'utf8')
+      );
+      expect(parsed).toEqual({
+        target: 'claude',
+        agents: ['linting'],
+        languages: ['typescript', 'go'],
+        paths: {
+          typescript: ['.'],
+          go: ['.']
+        }
+      });
+    });
+
     test('loads legacy .rulesrc.ts.json for typescript', () => {
       const config = { target: 'cursor' as const, agents: ['linting'] };
       fs.writeFileSync(

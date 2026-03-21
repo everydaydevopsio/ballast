@@ -136,6 +136,47 @@ func TestRunInstallWritesSharedRulesrcForExplicitFlags(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(tmpDir, ".rulesrc.json")); err != nil {
 		t.Fatalf("expected .rulesrc.json to be created: %v", err)
 	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	if !strings.Contains(string(content), `"languages": [`+"\n"+`    "go"`) {
+		t.Fatalf("expected go language in shared config: %s", string(content))
+	}
+	if !strings.Contains(string(content), `"paths": {`) {
+		t.Fatalf("expected paths in shared config: %s", string(content))
+	}
+}
+
+func TestSaveConfigAccumulatesLanguagesInSharedRulesrc(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	if err := saveConfig(tmpDir, "typescript", rulesConfig{
+		Target:    "claude",
+		Agents:    []string{"linting"},
+		Languages: []string{"typescript"},
+	}); err != nil {
+		t.Fatalf("save typescript config: %v", err)
+	}
+	if err := saveConfig(tmpDir, "go", rulesConfig{
+		Target:    "claude",
+		Agents:    []string{"linting"},
+		Languages: []string{"go"},
+	}); err != nil {
+		t.Fatalf("save go config: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, `"typescript"`) || !strings.Contains(text, `"go"`) {
+		t.Fatalf("expected accumulated languages in shared config: %s", text)
+	}
+	if !strings.Contains(text, `"typescript": [`) || !strings.Contains(text, `"go": [`) {
+		t.Fatalf("expected accumulated language paths in shared config: %s", text)
+	}
 }
 
 func TestPatchFlagUpdatesClaudeMDSection(t *testing.T) {

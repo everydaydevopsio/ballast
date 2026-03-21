@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"slices"
 	"sort"
 	"strings"
@@ -32,8 +33,10 @@ var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
 var embeddedAgentsFS embed.FS
 
 type rulesConfig struct {
-	Target string   `json:"target"`
-	Agents []string `json:"agents"`
+	Target    string              `json:"target"`
+	Agents    []string            `json:"agents"`
+	Languages []string            `json:"languages,omitempty"`
+	Paths     map[string][]string `json:"paths,omitempty"`
 }
 
 type installResult struct {
@@ -90,6 +93,10 @@ func main() {
 }
 
 func run(args []string) int {
+	if hasVersionFlag(args) || isVersionCommand(args) {
+		fmt.Println(resolveVersion())
+		return 0
+	}
 	if len(args) == 0 || args[0] == "install" {
 		return runInstall(args)
 	}
@@ -225,6 +232,32 @@ func runInstall(args []string) int {
 	return 0
 }
 
+func hasVersionFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--version" || arg == "-v" {
+			return true
+		}
+	}
+	return false
+}
+
+func isVersionCommand(args []string) bool {
+	return len(args) == 1 && args[0] == "version"
+}
+
+func resolveVersion() string {
+	if strings.TrimSpace(ballastVersion) != "" && ballastVersion != "dev" {
+		return ballastVersion
+	}
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		if strings.TrimSpace(info.Main.Version) != "" && info.Main.Version != "(devel)" {
+			return strings.TrimPrefix(info.Main.Version, "v")
+		}
+	}
+	return ballastVersion
+}
+
 func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	config := loadConfig(opts.projectRoot, opts.language)
 	ci := isCIMode() || opts.yes
@@ -282,7 +315,11 @@ func install(opts installOptions) installResult {
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 
 	if opts.saveConfig {
-		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{Target: opts.target, Agents: opts.agents}); err != nil {
+		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{
+			Target:    opts.target,
+			Agents:    opts.agents,
+			Languages: []string{opts.language},
+		}); err != nil {
 			result.errors = append(result.errors, agentError{agent: "config", err: err.Error()})
 			return result
 		}
@@ -959,11 +996,52 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 }
 
 func saveConfig(projectRoot, language string, cfg rulesConfig) error {
+	filePath := filepath.Join(projectRoot, rulesrcFilename(language))
+	existing := loadConfig(projectRoot, language)
+	if existing != nil {
+		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)
+		cfg.Paths = mergeLanguagePaths(existing.Paths, cfg.Languages)
+	} else {
+		cfg.Paths = mergeLanguagePaths(nil, cfg.Languages)
+	}
 	bytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(projectRoot, rulesrcFilename(language)), bytes, 0o644)
+	return os.WriteFile(filePath, bytes, 0o644)
+}
+
+func mergeLanguageList(existing, incoming []string) []string {
+	seen := make(map[string]struct{}, len(existing)+len(incoming))
+	merged := make([]string, 0, len(existing)+len(incoming))
+	for _, language := range existing {
+		if _, ok := seen[language]; ok {
+			continue
+		}
+		seen[language] = struct{}{}
+		merged = append(merged, language)
+	}
+	for _, language := range incoming {
+		if _, ok := seen[language]; ok {
+			continue
+		}
+		seen[language] = struct{}{}
+		merged = append(merged, language)
+	}
+	return merged
+}
+
+func mergeLanguagePaths(existing map[string][]string, languages []string) map[string][]string {
+	merged := make(map[string][]string, len(existing)+len(languages))
+	for key, paths := range existing {
+		merged[key] = append([]string(nil), paths...)
+	}
+	for _, language := range languages {
+		if len(merged[language]) == 0 {
+			merged[language] = []string{"."}
+		}
+	}
+	return merged
 }
 
 func rulesrcFilename(language string) string {

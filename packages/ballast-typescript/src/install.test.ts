@@ -259,6 +259,11 @@ Keep my custom responsibilities.
         target: 'claude',
         agents: ['linting', 'local-dev']
       });
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.languages).toEqual(['typescript']);
+      expect(raw.paths).toEqual({ typescript: ['.'] });
     });
 
     test('saves shared .rulesrc.json for go installs', () => {
@@ -274,6 +279,39 @@ Keep my custom responsibilities.
       expect(config).toEqual({
         target: 'claude',
         agents: ['linting', 'local-dev']
+      });
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.languages).toEqual(['go']);
+      expect(raw.paths).toEqual({ go: ['.'] });
+    });
+
+    test('manual language installs accumulate languages in shared config', () => {
+      install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        language: 'typescript',
+        agents: ['linting', 'local-dev'],
+        force: false,
+        saveConfig: true
+      });
+      install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        language: 'go',
+        agents: ['linting', 'local-dev'],
+        force: false,
+        saveConfig: true
+      });
+
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.languages).toEqual(['typescript', 'go']);
+      expect(raw.paths).toEqual({
+        typescript: ['.'],
+        go: ['.']
       });
     });
 
