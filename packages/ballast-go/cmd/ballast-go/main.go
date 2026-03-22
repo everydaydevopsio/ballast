@@ -28,6 +28,7 @@ var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?
 var ballastVersion = "dev"
 var frontmatterRegex = regexp.MustCompile(`(?s)^\s*---\n(.*?)\n---\n?`)
 var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
+var hookGuidanceToken = "{{BALLAST_HOOK_GUIDANCE}}"
 
 //go:embed agents/**
 var embeddedAgentsFS embed.FS
@@ -313,6 +314,7 @@ func install(opts installOptions) installResult {
 	result := installResult{}
 	processed := map[string]struct{}{}
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
+	hookMode := resolveTsHookMode(opts.projectRoot, opts.language)
 
 	if opts.saveConfig {
 		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{
@@ -347,7 +349,7 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 				continue
 			}
-			content, err := buildContent(agentID, opts.target, opts.language, suffix)
+			content, err := buildContent(agentID, opts.target, opts.language, suffix, hookMode)
 			if err != nil {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 				continue
@@ -836,8 +838,8 @@ func patchCodexAgentsMD(existing, canonical string) string {
 		strings.TrimLeft(existing[existingEnd:], "\n") + "\n"
 }
 
-func buildContent(agentID, target, language, suffix string) (string, error) {
-	content, err := readContent(agentID, language, suffix)
+func buildContent(agentID, target, language, suffix, hookMode string) (string, error) {
+	content, err := readContent(agentID, language, suffix, hookMode)
 	if err != nil {
 		return "", err
 	}
@@ -901,7 +903,7 @@ func listRuleSuffixes(agentID, language string) ([]string, error) {
 	return suffixes, nil
 }
 
-func readContent(agentID, language, suffix string) (string, error) {
+func readContent(agentID, language, suffix, hookMode string) (string, error) {
 	name := "content.md"
 	if suffix != "" {
 		name = "content-" + suffix + ".md"
@@ -910,7 +912,11 @@ func readContent(agentID, language, suffix string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("agent %q has no %s", agentID, name)
 	}
-	return string(bytes), nil
+	content := string(bytes)
+	if agentID != "linting" || !strings.Contains(content, hookGuidanceToken) {
+		return content, nil
+	}
+	return strings.ReplaceAll(content, hookGuidanceToken, renderHookGuidance(language, hookMode)), nil
 }
 
 func readTemplate(agentID, language, filename, suffix string) (string, error) {
@@ -933,6 +939,138 @@ func readTemplate(agentID, language, filename, suffix string) (string, error) {
 		return "", fmt.Errorf("agent %q missing template: %s", agentID, filename)
 	}
 	return string(bytes), nil
+}
+
+func renderHookGuidance(language, hookMode string) string {
+	switch language {
+	case "typescript":
+		if hookMode == "monorepo" {
+			return strings.Join([]string{
+				"- Use Husky for this monorepo.",
+				"- Install and initialize Husky.",
+				"- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
+				"- Keep the hook file executable with `chmod +x .husky/pre-commit`.",
+				"- Keep the hook in sync with the repo's linting workflow whenever the command changes.",
+			}, "\n")
+		}
+		return strings.Join([]string{
+			"- Use `pre-commit` for this repository layout.",
+			"- Create `.pre-commit-config.yaml` at the repo root.",
+			"- Install hooks with `pre-commit install`.",
+			"- Keep the configuration current with `pre-commit autoupdate`.",
+			"- Verify the hook configuration with `pre-commit run --all-files`.",
+		}, "\n")
+	case "python":
+		return strings.Join([]string{
+			"- Use `pre-commit` for Python projects.",
+			"- Create `.pre-commit-config.yaml` at the repo root.",
+			"- Install hooks with `pre-commit install`.",
+			"- Keep the configuration current with `pre-commit autoupdate`.",
+			"- Re-run `pre-commit run --all-files` after hook changes.",
+		}, "\n")
+	case "go":
+		return strings.Join([]string{
+			"- Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.",
+			"- Create or update `.pre-commit-config.yaml` at the repo root.",
+			"- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.",
+			"- Install hooks with `pre-commit install`.",
+			"- Keep the configuration current with `pre-commit autoupdate`.",
+			"- Verify the hook configuration with `pre-commit run --all-files`.",
+		}, "\n")
+	default:
+		return ""
+	}
+}
+
+func resolveTsHookMode(projectRoot, language string) string {
+	if language != "typescript" {
+		return "standalone"
+	}
+
+	configPath := filepath.Join(projectRoot, ".rulesrc.json")
+	if exists(configPath) {
+		var raw struct {
+			Languages []string            `json:"languages"`
+			Paths     map[string][]string `json:"paths"`
+		}
+		if content, err := os.ReadFile(configPath); err == nil {
+			if err := json.Unmarshal(content, &raw); err == nil {
+				if len(raw.Languages) > 1 || len(raw.Paths) > 1 {
+					return "monorepo"
+				}
+			}
+		}
+	}
+
+	if hasWorkspaceMonorepo(projectRoot) {
+		return "monorepo"
+	}
+	return "standalone"
+}
+
+func hasWorkspaceMonorepo(projectRoot string) bool {
+	root := filepath.Clean(projectRoot)
+	if !exists(filepath.Join(root, "pnpm-workspace.yaml")) {
+		rootPackageJSON := filepath.Join(root, "package.json")
+		if !exists(rootPackageJSON) {
+			return false
+		}
+		var raw map[string]any
+		content, err := os.ReadFile(rootPackageJSON)
+		if err != nil {
+			return false
+		}
+		if err := json.Unmarshal(content, &raw); err != nil {
+			return false
+		}
+		if _, ok := raw["workspaces"]; !ok {
+			return false
+		}
+	}
+
+	ignored := map[string]bool{
+		".git":         true,
+		"node_modules": true,
+		"dist":         true,
+		"build":        true,
+		"coverage":     true,
+		".next":        true,
+		".turbo":       true,
+		".pnpm-store":  true,
+	}
+
+	count := 0
+	var walk func(string, int) bool
+	walk = func(dir string, depth int) bool {
+		if depth > 4 {
+			return false
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return false
+		}
+		for _, entry := range entries {
+			name := entry.Name()
+			if entry.IsDir() {
+				if ignored[name] {
+					continue
+				}
+				if walk(filepath.Join(dir, name), depth+1) {
+					return true
+				}
+				continue
+			}
+			if name == "package.json" {
+				count++
+				if count > 1 {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	return walk(root, 0)
 }
 
 func findProjectRoot(cwd string) (string, error) {
