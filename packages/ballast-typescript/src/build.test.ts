@@ -83,6 +83,17 @@ describe('build', () => {
       const content = getContent('linting', undefined, 'python');
       expect(content).toContain('Python linting specialist');
       expect(content).toContain('Ruff');
+      expect(content).toContain('.pre-commit-config.yaml');
+      expect(content).toContain('pre-commit install');
+      expect(content).toContain('pre-commit autoupdate');
+    });
+
+    test('returns go-specific linting content with pre-commit guidance', () => {
+      const content = getContent('linting', undefined, 'go');
+      expect(content).toContain('Go linting specialist');
+      expect(content).toContain('.pre-commit-config.yaml');
+      expect(content).toContain('sub-pre-commit');
+      expect(content).toContain('pre-commit autoupdate');
     });
 
     test('returns go-specific testing content when language is go', () => {
@@ -231,6 +242,26 @@ alwaysApply: false
       const result = buildContent('linting', 'cursor');
       expect(result).toMatch(/^---\n/);
       expect(result).toContain('globs:');
+    });
+
+    test('standalone typescript content is consistently pre-commit based', () => {
+      const result = buildContent('linting', 'codex', undefined, 'typescript', {
+        hookMode: 'standalone'
+      });
+      expect(result).toContain('Use `pre-commit` for this repository layout.');
+      expect(result).toContain('Install hooks with `pre-commit install`.');
+      expect(result).not.toContain('Set Up Git Hooks with Husky');
+      expect(result).not.toContain('Set up husky and initialize it');
+      expect(result).not.toContain('Configure lint-staged');
+    });
+
+    test('monorepo typescript content is consistently husky based', () => {
+      const result = buildContent('linting', 'codex', undefined, 'typescript', {
+        hookMode: 'monorepo'
+      });
+      expect(result).toContain('## Set Up Git Hooks with Husky');
+      expect(result).toContain('npx lint-staged');
+      expect(result).not.toContain('pre-commit install');
     });
 
     test('claude returns header + content', () => {

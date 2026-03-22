@@ -7,14 +7,17 @@ The **linting** agent provides language-appropriate linting, formatting, and CI 
 - **TypeScript/JavaScript**
   - ESLint (flat config)
   - Prettier
-  - Optional Husky + lint-staged workflow
+  - `pre-commit` for single-repo installs
+  - Husky + lint-staged for unified multi-language monorepos
 - **Python**
   - Ruff for linting and formatting
   - Optional Black when explicitly required
   - mypy for type checking when type hints are used
+  - `pre-commit` with a maintained `.pre-commit-config.yaml`
 - **Go**
   - `gofmt` for formatting
   - `golangci-lint` for static analysis
+  - `pre-commit` with sub-config support for nested Go packages when needed
 
 ## What It Provides
 
@@ -25,6 +28,12 @@ The **linting** agent provides language-appropriate linting, formatting, and CI 
 ## Monorepo Usage
 
 In a TypeScript + Python + Go monorepo, apply linting standards per language area and keep each tool scoped to its files.
+
+Hook strategy:
+
+- TypeScript at the monorepo root uses Husky + lint-staged.
+- Python and Go use `pre-commit` with root or package-level `.pre-commit-config.yaml` files as needed.
+- Keep every `.pre-commit-config.yaml` current with `pre-commit autoupdate` whenever hook versions change.
 
 Recommended command set:
 

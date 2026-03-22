@@ -104,6 +104,109 @@ describe('install', () => {
       );
     });
 
+    test('uses pre-commit guidance for standalone typescript installs', () => {
+      saveConfig(
+        {
+          target: 'cursor',
+          agents: ['linting'],
+          languages: ['typescript']
+        },
+        tmpDir
+      );
+
+      install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        force: true,
+        saveConfig: false
+      });
+
+      const cursorFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'typescript-linting.mdc'
+      );
+      const content = fs.readFileSync(cursorFile, 'utf8');
+      expect(content).toContain('.pre-commit-config.yaml');
+      expect(content).toContain('pre-commit install');
+      expect(content).not.toContain('Set Up Git Hooks with Husky');
+    });
+
+    test('uses husky guidance for monorepo typescript installs', () => {
+      saveConfig(
+        {
+          target: 'cursor',
+          agents: ['linting'],
+          languages: ['typescript', 'python', 'go']
+        },
+        tmpDir
+      );
+
+      install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        force: true,
+        saveConfig: false
+      });
+
+      const cursorFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'typescript-linting.mdc'
+      );
+      const content = fs.readFileSync(cursorFile, 'utf8');
+      expect(content).toContain('Set Up Git Hooks with Husky');
+      expect(content).toContain('lint-staged');
+      expect(content).not.toContain('pre-commit install');
+    });
+
+    test('uses husky guidance for typescript workspace monorepos even with one language', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, 'package.json'),
+        JSON.stringify({ name: 'workspace-root', private: true }, null, 2)
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, 'pnpm-workspace.yaml'),
+        'packages:\n  - apps/*\n  - packages/*\n',
+        'utf8'
+      );
+      fs.mkdirSync(path.join(tmpDir, 'apps', 'web'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, 'apps', 'web', 'package.json'),
+        JSON.stringify({ name: '@app/web', private: true }, null, 2)
+      );
+      saveConfig(
+        {
+          target: 'cursor',
+          agents: ['linting'],
+          languages: ['typescript']
+        },
+        tmpDir
+      );
+
+      install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        force: true,
+        saveConfig: false
+      });
+
+      const cursorFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'typescript-linting.mdc'
+      );
+      const content = fs.readFileSync(cursorFile, 'utf8');
+      expect(content).toContain('Set Up Git Hooks with Husky');
+      expect(content).not.toContain('pre-commit install');
+    });
+
     test('writes python language files and uses python-specific content', () => {
       const result = install({
         projectRoot: tmpDir,

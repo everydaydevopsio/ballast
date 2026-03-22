@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import readline from 'readline';
 import {
   buildContent,
@@ -31,6 +32,111 @@ function prompt(question: string): Promise<string> {
       resolve((answer || '').trim());
     });
   });
+}
+
+function resolveTsHookMode(
+  projectRoot: string,
+  language: Language
+): 'standalone' | 'monorepo' {
+  if (language !== 'typescript') {
+    return 'standalone';
+  }
+
+  const configPath = path.join(projectRoot, '.rulesrc.json');
+  if (!fs.existsSync(configPath)) {
+    return 'standalone';
+  }
+
+  try {
+    const raw = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+      languages?: unknown;
+      paths?: Record<string, unknown>;
+    };
+    const languages = Array.isArray(raw.languages)
+      ? raw.languages.filter(
+          (language): language is string => typeof language === 'string'
+        )
+      : [];
+    if (new Set(languages).size > 1) {
+      return 'monorepo';
+    }
+    const pathKeys = raw.paths ? Object.keys(raw.paths) : [];
+    if (pathKeys.length > 1) {
+      return 'monorepo';
+    }
+  } catch {
+    // Fall through to workspace-based detection.
+  }
+
+  if (hasWorkspaceMonorepo(projectRoot)) {
+    return 'monorepo';
+  }
+
+  return 'standalone';
+}
+
+function hasWorkspaceMonorepo(projectRoot: string): boolean {
+  const root = path.resolve(projectRoot);
+  if (!hasWorkspaceManifest(root)) {
+    return false;
+  }
+  return countPackageJsonFiles(root) > 1;
+}
+
+function hasWorkspaceManifest(root: string): boolean {
+  const rootPackageJson = path.join(root, 'package.json');
+  const pnpmWorkspaceYaml = path.join(root, 'pnpm-workspace.yaml');
+  if (fs.existsSync(pnpmWorkspaceYaml)) {
+    return true;
+  }
+  if (!fs.existsSync(rootPackageJson)) {
+    return false;
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(rootPackageJson, 'utf8')) as {
+      workspaces?: unknown;
+    };
+    return Array.isArray(raw.workspaces) || !!raw.workspaces;
+  } catch {
+    return false;
+  }
+}
+
+function countPackageJsonFiles(root: string): number {
+  const ignoredDirs = new Set([
+    '.git',
+    'node_modules',
+    'dist',
+    'build',
+    'coverage',
+    '.next',
+    '.turbo',
+    '.pnpm-store'
+  ]);
+  let count = 0;
+
+  function walk(dir: string, depth: number): void {
+    if (depth > 4) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (ignoredDirs.has(entry.name)) continue;
+        walk(path.join(dir, entry.name), depth + 1);
+        continue;
+      }
+      if (entry.isFile() && entry.name === 'package.json') {
+        count += 1;
+      }
+    }
+  }
+
+  walk(root, 0);
+  return count;
 }
 
 /**
@@ -162,6 +268,7 @@ export function install(options: InstallOptions): InstallResult {
   if (persist) {
     saveConfig({ target, agents, languages: [language] }, projectRoot);
   }
+  const hookMode = resolveTsHookMode(projectRoot, language);
 
   for (const agentId of agents) {
     if (!isValidAgent(agentId, language)) {
@@ -189,7 +296,8 @@ export function install(options: InstallOptions): InstallResult {
           agentId,
           target,
           ruleSuffix || undefined,
-          language
+          language,
+          { hookMode }
         );
         if (fileExists && !force && !patch) {
           agentSkipped = true;

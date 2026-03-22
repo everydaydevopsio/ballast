@@ -7,6 +7,15 @@ import type { Language } from './agents';
 import pkg from '../package.json';
 
 const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
+const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
+const HOOK_GUIDANCE_TOKEN = '{{BALLAST_HOOK_GUIDANCE}}';
+
+type HookMode = 'standalone' | 'monorepo';
+
+interface BuildOptions {
+  hookMode?: HookMode;
+}
 
 function getRuleSubdir(): string | null {
   const value = process.env.BALLAST_RULE_SUBDIR?.trim();
@@ -46,6 +55,110 @@ function getRuleBasename(
   return `${language}-${basename}`;
 }
 
+function getPreferredAgentDir(agentId: string, language: Language): string {
+  const sourceDir = (COMMON_AGENT_IDS as readonly string[]).includes(agentId)
+    ? path.join(SOURCE_AGENTS_ROOT, 'common', agentId)
+    : path.join(SOURCE_AGENTS_ROOT, language, agentId);
+  if (fs.existsSync(sourceDir)) {
+    return sourceDir;
+  }
+  return getAgentDir(agentId, language);
+}
+
+function getHookMode(
+  agentId: string,
+  language: Language,
+  options?: BuildOptions
+): HookMode {
+  if (options?.hookMode) {
+    return options.hookMode;
+  }
+  if (agentId === 'linting' && language === 'typescript') {
+    return 'standalone';
+  }
+  return 'standalone';
+}
+
+function renderHookGuidance(
+  agentId: string,
+  language: Language,
+  options?: BuildOptions
+): string {
+  if (agentId !== 'linting') {
+    return '';
+  }
+
+  const hookMode = getHookMode(agentId, language, options);
+  if (language === 'typescript') {
+    if (hookMode === 'monorepo') {
+      return [
+        '## Set Up Git Hooks with Husky',
+        '',
+        'Use Husky for this monorepo.',
+        '',
+        '- Install and initialize Husky.',
+        "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
+        '- Keep the hook file executable with `chmod +x .husky/pre-commit`.',
+        "- Keep the hook in sync with the repo's linting workflow whenever the command changes."
+      ].join('\n');
+    }
+
+    return [
+      '## Git Hooks',
+      '',
+      'Use `pre-commit` for this repository layout.',
+      '',
+      '- Create `.pre-commit-config.yaml` at the repo root.',
+      '- Install hooks with `pre-commit install`.',
+      '- Keep the configuration current with `pre-commit autoupdate`.',
+      '- Verify the hook configuration with `pre-commit run --all-files`.'
+    ].join('\n');
+  }
+
+  if (language === 'python') {
+    return [
+      '## Git Hooks',
+      '',
+      'Use `pre-commit` for Python projects.',
+      '',
+      '- Create `.pre-commit-config.yaml` at the repo root.',
+      '- Install hooks with `pre-commit install`.',
+      '- Keep the configuration current with `pre-commit autoupdate`.',
+      '- Re-run `pre-commit run --all-files` after hook changes.'
+    ].join('\n');
+  }
+
+  if (language === 'go') {
+    return [
+      '## Git Hooks',
+      '',
+      'Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.',
+      '',
+      '- Create or update `.pre-commit-config.yaml` at the repo root.',
+      '- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.',
+      '- Keep the configuration current with `pre-commit autoupdate`.',
+      '- Verify the hook configuration with `pre-commit run --all-files`.'
+    ].join('\n');
+  }
+
+  return '';
+}
+
+function applyHookGuidance(
+  content: string,
+  agentId: string,
+  language: Language,
+  options?: BuildOptions
+): string {
+  if (!content.includes(HOOK_GUIDANCE_TOKEN)) {
+    return content;
+  }
+  return content.replace(
+    HOOK_GUIDANCE_TOKEN,
+    renderHookGuidance(agentId, language, options)
+  );
+}
+
 /** Rule file convention: content.md (main) and content-<suffix>.md (e.g. content-mcp.md) */
 const CONTENT_PREFIX = 'content';
 const CONTENT_MAIN = `${CONTENT_PREFIX}.md`;
@@ -58,7 +171,7 @@ export function listRuleSuffixes(
   agentId: string,
   language: Language = 'typescript'
 ): string[] {
-  const dir = getAgentDir(agentId, language);
+  const dir = getPreferredAgentDir(agentId, language);
   if (!fs.existsSync(dir)) {
     throw new Error(`Agent "${agentId}" has no content.md or content-*.md`);
   }
@@ -90,9 +203,10 @@ export function listRuleSuffixes(
 export function getContent(
   agentId: string,
   ruleSuffix?: string,
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  options?: BuildOptions
 ): string {
-  const dir = getAgentDir(agentId, language);
+  const dir = getPreferredAgentDir(agentId, language);
   const basename = ruleSuffix
     ? `${CONTENT_PREFIX}-${ruleSuffix}.md`
     : CONTENT_MAIN;
@@ -100,7 +214,12 @@ export function getContent(
   if (!fs.existsSync(file)) {
     throw new Error(`Agent "${agentId}" has no ${basename}`);
   }
-  return fs.readFileSync(file, 'utf8');
+  return applyHookGuidance(
+    fs.readFileSync(file, 'utf8'),
+    agentId,
+    language,
+    options
+  );
 }
 
 /**
@@ -112,7 +231,7 @@ export function getTemplate(
   ruleSuffix?: string,
   language: Language = 'typescript'
 ): string {
-  const dir = getAgentDir(agentId, language);
+  const dir = getPreferredAgentDir(agentId, language);
   const base = filename.replace(/\.[^.]+$/, '');
   const ext = path.extname(filename);
   if (ruleSuffix) {
@@ -134,7 +253,8 @@ export function getTemplate(
 export function buildCursorFormat(
   agentId: string,
   ruleSuffix?: string,
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  options?: BuildOptions
 ): string {
   const frontmatter = getTemplate(
     agentId,
@@ -142,7 +262,7 @@ export function buildCursorFormat(
     ruleSuffix,
     language
   );
-  const content = getContent(agentId, ruleSuffix, language);
+  const content = getContent(agentId, ruleSuffix, language, options);
   return frontmatter + '\n' + content;
 }
 
@@ -152,10 +272,11 @@ export function buildCursorFormat(
 export function buildClaudeFormat(
   agentId: string,
   ruleSuffix?: string,
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  options?: BuildOptions
 ): string {
   const header = getTemplate(agentId, 'claude-header.md', ruleSuffix, language);
-  const content = getContent(agentId, ruleSuffix, language);
+  const content = getContent(agentId, ruleSuffix, language, options);
   return header + content;
 }
 
@@ -165,7 +286,8 @@ export function buildClaudeFormat(
 export function buildOpenCodeFormat(
   agentId: string,
   ruleSuffix?: string,
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  options?: BuildOptions
 ): string {
   const frontmatter = getTemplate(
     agentId,
@@ -173,7 +295,7 @@ export function buildOpenCodeFormat(
     ruleSuffix,
     language
   );
-  const content = getContent(agentId, ruleSuffix, language);
+  const content = getContent(agentId, ruleSuffix, language, options);
   return frontmatter + '\n' + content;
 }
 
@@ -208,10 +330,11 @@ function getCodexHeader(
 export function buildCodexFormat(
   agentId: string,
   ruleSuffix?: string,
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  options?: BuildOptions
 ): string {
   const header = getCodexHeader(agentId, ruleSuffix, language);
-  const content = getContent(agentId, ruleSuffix, language);
+  const content = getContent(agentId, ruleSuffix, language, options);
   return header + content;
 }
 
@@ -325,17 +448,18 @@ export function buildContent(
   agentId: string,
   target: Target,
   ruleSuffix?: string,
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  options?: BuildOptions
 ): string {
   switch (target) {
     case 'cursor':
-      return buildCursorFormat(agentId, ruleSuffix, language);
+      return buildCursorFormat(agentId, ruleSuffix, language, options);
     case 'claude':
-      return buildClaudeFormat(agentId, ruleSuffix, language);
+      return buildClaudeFormat(agentId, ruleSuffix, language, options);
     case 'opencode':
-      return buildOpenCodeFormat(agentId, ruleSuffix, language);
+      return buildOpenCodeFormat(agentId, ruleSuffix, language, options);
     case 'codex':
-      return buildCodexFormat(agentId, ruleSuffix, language);
+      return buildCodexFormat(agentId, ruleSuffix, language, options);
     default:
       throw new Error(`Unknown target: ${target}`);
   }

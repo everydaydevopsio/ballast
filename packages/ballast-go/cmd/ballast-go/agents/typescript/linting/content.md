@@ -28,11 +28,10 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
    - prettier: "prettier . --check"
    - prettier:fix: "prettier . --write"
 
-5. **Set Up Git Hooks with Husky**
-   - Install and initialize husky
-   - Create a pre-commit hook with the command to run (e.g. `npx lint-staged`). Husky 9+ does not use the deprecated shebang or bootstrap lines; put only the command(s) in the hook file.
-   - Ensure the hook file is **executable** (e.g. `chmod +x .husky/pre-commit`)
-   - Ensure test script exists (even if it's just a placeholder)
+5. **Set Up Git Hooks**
+   - Use the hook guidance below to match the repository layout.
+   - Keep the hook command lightweight and aligned with the lint workflow.
+   - Ensure a test script exists, even if it is just a placeholder.
 
 6. **Configure lint-staged**
    - For .js files: prettier --write, eslint --fix
@@ -103,11 +102,7 @@ export default [
 }
 ```
 
-**Husky pre-commit hook (Husky 9+):** Put only the command in the hook file (no shebang or bootstrap lines; those are deprecated). Ensure the file is executable (`chmod +x .husky/pre-commit`).
-
-```sh
-npx lint-staged
-```
+{{BALLAST_HOOK_GUIDANCE}}
 
 **GitHub Actions (when project uses pnpm):** If the project uses pnpm (pnpm-lock.yaml or package.json "packageManager"), include a pnpm setup step with an explicit version before setup-node:
 
@@ -139,7 +134,7 @@ Omit the pnpm step only when the project uses npm or yarn.
 - Use tsc-files instead of tsc for faster TypeScript checking of staged files only
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
 - When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
-- The pre-commit hook must contain only the command(s) to run (e.g. `npx lint-staged`). Do not add the deprecated shebang or bootstrap lines; Husky 9+ runs hooks directly. Git must be configured to look for hooks in the `.husky` directory (e.g. `core.hooksPath=.husky`). Make the hook file executable (`chmod +x .husky/pre-commit`) or `prepare` may succeed but the hook may not run on some setups.
+- Keep the Git hook workflow in sync with the repository layout. Use `pre-commit` for single-repo installs and Husky for monorepos.
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
 ## When Completed
