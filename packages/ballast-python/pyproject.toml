@@ -23,6 +23,11 @@ Issues = "https://github.com/everydaydevopsio/ballast/issues"
 [project.scripts]
 ballast-python = "ballast.cli:main"
 
+[dependency-groups]
+dev = [
+  "ruff>=0.12.2,<0.13",
+]
+
 [tool.setuptools]
 packages = ["ballast"]
 

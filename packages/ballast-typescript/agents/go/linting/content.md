@@ -13,7 +13,10 @@ You are a Go linting specialist. Your role is to implement consistent linting an
 
 {{BALLAST_HOOK_GUIDANCE}}
 
+Configure `pre-push` to run the Go unit test command for each module covered by the repo.
+
 ## Commands
 
 - `gofmt -w .`
 - `golangci-lint run`
+- `go test ./...`

@@ -113,6 +113,7 @@ Omit the pnpm step only when the project uses npm or yarn.
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
 - When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
 - Keep the Git hook workflow in sync with the repository layout. Use `pre-commit` for single-repo installs and Husky for monorepos.
+- Configure a `pre-push` hook to run the unit test command. For TypeScript repos whose tests depend on built output, run the build before the tests in `pre-push`.
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
 ## When Completed

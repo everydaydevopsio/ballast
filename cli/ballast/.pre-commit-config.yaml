@@ -1,0 +1,17 @@
+repos:
+  - repo: https://github.com/TekWizely/pre-commit-golang
+    rev: v1.0.0-rc.2
+    hooks:
+      - id: go-fmt
+      - id: go-vet-mod
+      - id: go-mod-tidy
+
+  - repo: local
+    hooks:
+      - id: cli-unit-tests
+        name: Ballast CLI unit tests
+        entry: go test
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: ["pre-push"]

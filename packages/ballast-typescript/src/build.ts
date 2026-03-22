@@ -97,7 +97,9 @@ function renderHookGuidance(
         '',
         '- Install and initialize Husky.',
         "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
+        "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.",
         '- Keep the hook file executable with `chmod +x .husky/pre-commit`.',
+        '- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.',
         "- Keep the hook in sync with the repo's linting workflow whenever the command changes."
       ].join('\n');
     }
@@ -109,6 +111,8 @@ function renderHookGuidance(
       '',
       '- Create `.pre-commit-config.yaml` at the repo root.',
       '- Install hooks with `pre-commit install`.',
+      '- Install the pre-push hook with `pre-commit install --hook-type pre-push`.',
+      '- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.',
       '- Keep the configuration current with `pre-commit autoupdate`.',
       '- Verify the hook configuration with `pre-commit run --all-files`.'
     ].join('\n');
@@ -122,6 +126,8 @@ function renderHookGuidance(
       '',
       '- Create `.pre-commit-config.yaml` at the repo root.',
       '- Install hooks with `pre-commit install`.',
+      '- Install the pre-push hook with `pre-commit install --hook-type pre-push`.',
+      '- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.',
       '- Keep the configuration current with `pre-commit autoupdate`.',
       '- Re-run `pre-commit run --all-files` after hook changes.'
     ].join('\n');
@@ -135,6 +141,8 @@ function renderHookGuidance(
       '',
       '- Create or update `.pre-commit-config.yaml` at the repo root.',
       '- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.',
+      '- Install hooks with `pre-commit install` and `pre-commit install --hook-type pre-push`.',
+      '- Configure the pre-push stage to run Go unit tests for each module.',
       '- Keep the configuration current with `pre-commit autoupdate`.',
       '- Verify the hook configuration with `pre-commit run --all-files`.'
     ].join('\n');

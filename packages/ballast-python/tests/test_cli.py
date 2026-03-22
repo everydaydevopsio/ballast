@@ -32,7 +32,9 @@ class PatchInstallTests(unittest.TestCase):
             old_cwd = Path.cwd()
             os.chdir(root)
             try:
-                args = cli.parser().parse_args(["install", "--target", "codex", "--all", "--yes"])
+                args = cli.parser().parse_args(
+                    ["install", "--target", "codex", "--all", "--yes"]
+                )
                 exit_code = cli.run_install(args)
             finally:
                 os.chdir(old_cwd)
@@ -62,7 +64,9 @@ class PatchInstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
-            result = cli.install(root, "codex", ["linting"], "python", False, False, False)
+            result = cli.install(
+                root, "codex", ["linting"], "python", False, False, False
+            )
 
             self.assertIn("linting", result.installed)
             rule = root / ".codex" / "rules" / "python-linting.md"
@@ -73,13 +77,16 @@ class PatchInstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
-            result = cli.install(root, "codex", ["linting"], "python", False, False, False)
+            result = cli.install(
+                root, "codex", ["linting"], "python", False, False, False
+            )
 
             self.assertIn("linting", result.installed)
             rule = root / ".codex" / "rules" / "python-linting.md"
             content = rule.read_text(encoding="utf-8")
             self.assertNotIn("{{BALLAST_HOOK_GUIDANCE}}", content)
             self.assertIn("pre-commit install", content)
+            self.assertIn("pre-commit install --hook-type pre-push", content)
 
     def test_patch_preserves_existing_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -105,7 +112,9 @@ Keep this note.
                 encoding="utf-8",
             )
 
-            result = cli.install(root, "cursor", ["linting"], "python", False, True, False)
+            result = cli.install(
+                root, "cursor", ["linting"], "python", False, True, False
+            )
 
             self.assertIn("linting", result.installed)
             content = rule.read_text(encoding="utf-8")
@@ -190,7 +199,9 @@ Read and follow these rule files in `.claude/rules/` when they apply:
                 encoding="utf-8",
             )
 
-            cli.install(root, "claude", ["linting"], "python", False, False, False, True)
+            cli.install(
+                root, "claude", ["linting"], "python", False, False, False, True
+            )
 
             claude_md = (root / "CLAUDE.md").read_text(encoding="utf-8")
             self.assertIn("## Team Notes", claude_md)
@@ -214,7 +225,9 @@ Read and follow these rule files in `.claude/rules/` when they apply:
                 encoding="utf-8",
             )
 
-            result = cli.install(root, "claude", ["linting"], "python", False, True, False)
+            result = cli.install(
+                root, "claude", ["linting"], "python", False, True, False
+            )
 
             self.assertIn(str(root / "CLAUDE.md"), result.installed_support_files)
             claude_md = (root / "CLAUDE.md").read_text(encoding="utf-8")

@@ -20,8 +20,11 @@ You are a Python linting specialist. Your role is to implement practical linting
 
 {{BALLAST_HOOK_GUIDANCE}}
 
+Configure `pre-push` to run the Python unit test command for the repo.
+
 ## Commands
 
 - `ruff check .`
 - `ruff format .`
 - `mypy .`
+- `python -m unittest`

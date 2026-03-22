@@ -131,6 +131,7 @@ describe('install', () => {
       const content = fs.readFileSync(cursorFile, 'utf8');
       expect(content).toContain('.pre-commit-config.yaml');
       expect(content).toContain('pre-commit install');
+      expect(content).toContain('pre-commit install --hook-type pre-push');
       expect(content).not.toContain('Set Up Git Hooks with Husky');
     });
 
@@ -161,6 +162,7 @@ describe('install', () => {
       const content = fs.readFileSync(cursorFile, 'utf8');
       expect(content).toContain('Set Up Git Hooks with Husky');
       expect(content).toContain('lint-staged');
+      expect(content).toContain('.husky/pre-push');
       expect(content).not.toContain('pre-commit install');
     });
 

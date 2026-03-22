@@ -1,0 +1,22 @@
+repos:
+  - repo: local
+    hooks:
+      - id: prettier
+        name: TypeScript package prettier
+        entry: pnpm exec prettier --write
+        language: system
+        files: \.(js|ts|json|md|yaml|yml)$
+
+      - id: eslint
+        name: TypeScript package eslint
+        entry: pnpm exec eslint --fix --max-warnings=0
+        language: system
+        files: \.(js|ts)$
+
+      - id: typescript-unit-tests
+        name: TypeScript package unit tests
+        entry: pnpm test
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: ['pre-push']
