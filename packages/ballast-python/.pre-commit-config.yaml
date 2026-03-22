@@ -1,0 +1,22 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: Python package ruff check
+        entry: uv run ruff check --fix
+        language: system
+        files: \.py$
+
+      - id: ruff-format
+        name: Python package ruff format
+        entry: uv run ruff format
+        language: system
+        files: \.py$
+
+      - id: python-unit-tests
+        name: Python package unit tests
+        entry: uv run python -m unittest tests.test_cli
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: ["pre-push"]

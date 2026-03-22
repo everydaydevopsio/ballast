@@ -85,6 +85,7 @@ describe('build', () => {
       expect(content).toContain('Ruff');
       expect(content).toContain('.pre-commit-config.yaml');
       expect(content).toContain('pre-commit install');
+      expect(content).toContain('pre-commit install --hook-type pre-push');
       expect(content).toContain('pre-commit autoupdate');
     });
 
@@ -93,6 +94,7 @@ describe('build', () => {
       expect(content).toContain('Go linting specialist');
       expect(content).toContain('.pre-commit-config.yaml');
       expect(content).toContain('sub-pre-commit');
+      expect(content).toContain('pre-commit install --hook-type pre-push');
       expect(content).toContain('pre-commit autoupdate');
     });
 
@@ -250,6 +252,9 @@ alwaysApply: false
       });
       expect(result).toContain('Use `pre-commit` for this repository layout.');
       expect(result).toContain('Install hooks with `pre-commit install`.');
+      expect(result).toContain(
+        'Install the pre-push hook with `pre-commit install --hook-type pre-push`.'
+      );
       expect(result).not.toContain('Set Up Git Hooks with Husky');
       expect(result).not.toContain('Set up husky and initialize it');
       expect(result).not.toContain('Configure lint-staged');
@@ -261,6 +266,7 @@ alwaysApply: false
       });
       expect(result).toContain('## Set Up Git Hooks with Husky');
       expect(result).toContain('npx lint-staged');
+      expect(result).toContain('.husky/pre-push');
       expect(result).not.toContain('pre-commit install');
     });
 

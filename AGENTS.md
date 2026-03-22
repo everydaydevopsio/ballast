@@ -60,3 +60,19 @@ Default license for this project: **MIT**. If you add or modify license setup (L
 - Run `pnpm run build` before relying on `packages/ballast-typescript/bin/ballast.js` or `packages/ballast-typescript/dist/`.
 - When adding or updating an agent: update `docs/agents/<id>.md` and the agent table in `docs/README.md` so docs stay in sync (see **Docs sync** under Conventions).
 - See **CLAUDE.md** for more detailed architecture and **rules-installer-architecture.md** for design notes.
+
+## Installed agent rules
+
+Created by Ballast v5.0.2. Do not edit this section.
+
+Read and follow these rule files in `.codex/rules/` when they apply:
+
+- `.codex/rules/local-dev-badges.md` — Add standard badges (CI, Release, License, GitHub Release, npm) to the top of README.md
+- `.codex/rules/local-dev-env.md` — Local development environment specialist - reproducible dev setup, DX, and documentation
+- `.codex/rules/local-dev-license.md` — License setup - ensure LICENSE file, package.json license field, and README reference (default MIT; overridable in AGENTS.md/CLAUDE.md)
+- `.codex/rules/local-dev-mcp.md` — Optional: use GitHub MCP and issues MCP (Jira/Linear/GitHub) for local-dev context
+- `.codex/rules/cicd.md` — CI/CD specialist - pipeline design, quality gates, and deployment
+- `.codex/rules/observability.md` — Observability specialist - logging, tracing, metrics, and SLOs
+- `.codex/rules/typescript-linting.md` — TypeScript linting specialist - implements comprehensive linting and code formatting for TypeScript/JavaScript projects
+- `.codex/rules/typescript-logging.md` — Centralized logging specialist - configures Pino with Fluentd for Node/Next.js, and pino-browser to /api/logs
+- `.codex/rules/typescript-testing.md` — Testing specialist - sets up Jest (default) or Vitest for Vite projects, 50% coverage, and test step in build GitHub Action

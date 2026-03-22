@@ -109,6 +109,9 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	if !strings.Contains(string(content), "pre-commit install") {
 		t.Fatalf("expected concrete pre-commit guidance, got %s", string(content))
 	}
+	if !strings.Contains(string(content), "pre-commit install --hook-type pre-push") {
+		t.Fatalf("expected concrete pre-push guidance, got %s", string(content))
+	}
 }
 
 func TestValidatedRuleSubdirRejectsInvalidValues(t *testing.T) {

@@ -9,15 +9,18 @@ The **linting** agent provides language-appropriate linting, formatting, and CI 
   - Prettier
   - `pre-commit` for single-repo installs
   - Husky + lint-staged for unified multi-language monorepos
+  - A unit-test `pre-push` hook
 - **Python**
   - Ruff for linting and formatting
   - Optional Black when explicitly required
   - mypy for type checking when type hints are used
   - `pre-commit` with a maintained `.pre-commit-config.yaml`
+  - A `pre-push` test hook managed by `pre-commit`
 - **Go**
   - `gofmt` for formatting
   - `golangci-lint` for static analysis
   - `pre-commit` with sub-config support for nested Go packages when needed
+  - A `pre-push` test hook managed by `pre-commit`
 
 ## What It Provides
 
@@ -33,6 +36,7 @@ Hook strategy:
 
 - TypeScript at the monorepo root uses Husky + lint-staged.
 - Python and Go use `pre-commit` with root or package-level `.pre-commit-config.yaml` files as needed.
+- Use `pre-commit install --hook-type pre-push` for `pre-commit` repos, and use `.husky/pre-push` for TypeScript monorepos.
 - Keep every `.pre-commit-config.yaml` current with `pre-commit autoupdate` whenever hook versions change.
 
 Recommended command set:

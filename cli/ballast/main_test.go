@@ -187,6 +187,45 @@ func TestResolveMonorepoPlanInvokesOncePerLanguage(t *testing.T) {
 	}
 }
 
+func TestResolveMonorepoPlanIgnoresStaleRulesrcProfiles(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, "tools", "worker", "go.mod"), "module example.com/worker\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "cursor",
+  "agents": ["local-dev", "cicd", "observability", "linting", "logging", "testing"],
+  "languages": ["typescript"],
+  "paths": {
+    "typescript": ["."]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--all"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) != 4 {
+		t.Fatalf("expected 4 invocations (common + typescript + python + go), got %d: %#v", len(plan.Invocations), plan.Invocations)
+	}
+
+	langs := []language{
+		plan.Invocations[1].Language,
+		plan.Invocations[2].Language,
+		plan.Invocations[3].Language,
+	}
+	if !reflect.DeepEqual(langs, []language{langTypeScript, langPython, langGo}) {
+		t.Fatalf("expected language invocations for detected repo profiles, got %#v", langs)
+	}
+	if !strings.Contains(strings.Join(plan.Config.Languages, ","), "python") || !strings.Contains(strings.Join(plan.Config.Languages, ","), "go") {
+		t.Fatalf("expected saved config to include detected languages, got %#v", plan.Config)
+	}
+}
+
 func TestRunMonorepoInstallExecutesEachBackendAtRepoRoot(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")

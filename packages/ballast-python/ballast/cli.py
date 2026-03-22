@@ -78,7 +78,9 @@ def ballast_version() -> str:
     except metadata.PackageNotFoundError:
         pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
         if pyproject.exists():
-            match = re.search(r'(?m)^version = "([^"]+)"$', pyproject.read_text(encoding="utf-8"))
+            match = re.search(
+                r'(?m)^version = "([^"]+)"$', pyproject.read_text(encoding="utf-8")
+            )
             if match:
                 return match.group(1)
     return "dev"
@@ -95,8 +97,13 @@ def resolve_project_root(cwd: Path) -> Path:
         has_pkg = (directory / "package.json").exists()
         has_go = (directory / "go.mod").exists()
         has_pyproject = (directory / "pyproject.toml").exists()
-        has_any_cfg = (directory / ".rulesrc.json").exists() or (directory / ".rulesrc.ts.json").exists() or any(
-            (directory / legacy_rulesrc_filename(lang)).exists() for lang in LANGUAGES
+        has_any_cfg = (
+            (directory / ".rulesrc.json").exists()
+            or (directory / ".rulesrc.ts.json").exists()
+            or any(
+                (directory / legacy_rulesrc_filename(lang)).exists()
+                for lang in LANGUAGES
+            )
         )
         if has_pkg or has_go or has_pyproject or has_any_cfg:
             return directory
@@ -143,12 +150,16 @@ def save_config(root: Path, language: str, target: str, agents: list[str]) -> No
             if isinstance(raw, dict):
                 existing_languages = raw.get("languages")
                 existing_paths = raw.get("paths")
-                if isinstance(existing_languages, list) and all(isinstance(item, str) for item in existing_languages):
+                if isinstance(existing_languages, list) and all(
+                    isinstance(item, str) for item in existing_languages
+                ):
                     languages = list(existing_languages)
                 if isinstance(existing_paths, dict):
                     for key, value in existing_paths.items():
-                        if isinstance(key, str) and isinstance(value, list) and all(
-                            isinstance(item, str) for item in value
+                        if (
+                            isinstance(key, str)
+                            and isinstance(value, list)
+                            and all(isinstance(item, str) for item in value)
                         ):
                             paths[key] = list(value)
         except Exception:
@@ -161,7 +172,15 @@ def save_config(root: Path, language: str, target: str, agents: list[str]) -> No
             paths[item] = ["."]
 
     file_path.write_text(
-        json.dumps({"target": target, "agents": agents, "languages": languages, "paths": paths}, indent=2),
+        json.dumps(
+            {
+                "target": target,
+                "agents": agents,
+                "languages": languages,
+                "paths": paths,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
@@ -208,7 +227,9 @@ def render_hook_guidance(language: str, hook_mode: str) -> str:
                     "- Use Husky for this monorepo.",
                     "- Install and initialize Husky.",
                     "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
+                    "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.",
                     "- Keep the hook file executable with `chmod +x .husky/pre-commit`.",
+                    "- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.",
                     "- Keep the hook in sync with the repo's linting workflow whenever the command changes.",
                 ]
             )
@@ -217,6 +238,8 @@ def render_hook_guidance(language: str, hook_mode: str) -> str:
                 "- Use `pre-commit` for this repository layout.",
                 "- Create `.pre-commit-config.yaml` at the repo root.",
                 "- Install hooks with `pre-commit install`.",
+                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                "- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
                 "- Verify the hook configuration with `pre-commit run --all-files`.",
             ]
@@ -227,6 +250,8 @@ def render_hook_guidance(language: str, hook_mode: str) -> str:
                 "- Use `pre-commit` for Python projects.",
                 "- Create `.pre-commit-config.yaml` at the repo root.",
                 "- Install hooks with `pre-commit install`.",
+                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                "- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
                 "- Re-run `pre-commit run --all-files` after hook changes.",
             ]
@@ -237,7 +262,8 @@ def render_hook_guidance(language: str, hook_mode: str) -> str:
                 "- Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.",
                 "- Create or update `.pre-commit-config.yaml` at the repo root.",
                 "- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.",
-                "- Install hooks with `pre-commit install`.",
+                "- Install hooks with `pre-commit install` and `pre-commit install --hook-type pre-push`.",
+                "- Configure the pre-push stage to run Go unit tests for each module.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
                 "- Verify the hook configuration with `pre-commit run --all-files`.",
             ]
@@ -257,7 +283,16 @@ def has_workspace_monorepo(root: Path) -> bool:
         if not raw.get("workspaces"):
             return False
 
-    ignored = {".git", "node_modules", "dist", "build", "coverage", ".next", ".turbo", ".pnpm-store"}
+    ignored = {
+        ".git",
+        "node_modules",
+        "dist",
+        "build",
+        "coverage",
+        ".next",
+        ".turbo",
+        ".pnpm-store",
+    }
     count = 0
     for current, dirs, files in os.walk(root):
         rel = Path(current).relative_to(root)
@@ -281,7 +316,10 @@ def resolve_ts_hook_mode(root: Path, language: str) -> str:
         try:
             raw = json.loads(config_path.read_text(encoding="utf-8"))
             languages = raw.get("languages") or []
-            if isinstance(languages, list) and len({item for item in languages if isinstance(item, str)}) > 1:
+            if (
+                isinstance(languages, list)
+                and len({item for item in languages if isinstance(item, str)}) > 1
+            ):
                 return "monorepo"
             paths = raw.get("paths") or {}
             if isinstance(paths, dict) and len(paths.keys()) > 1:
@@ -294,11 +332,17 @@ def resolve_ts_hook_mode(root: Path, language: str) -> str:
     return "standalone"
 
 
-def apply_hook_guidance(content: str, agent: str, language: str, root: Path | None) -> str:
+def apply_hook_guidance(
+    content: str, agent: str, language: str, root: Path | None
+) -> str:
     if agent != "linting" or HOOK_GUIDANCE_TOKEN not in content:
         return content
-    hook_mode = resolve_ts_hook_mode(root, language) if root is not None else "standalone"
-    return content.replace(HOOK_GUIDANCE_TOKEN, render_hook_guidance(language, hook_mode))
+    hook_mode = (
+        resolve_ts_hook_mode(root, language) if root is not None else "standalone"
+    )
+    return content.replace(
+        HOOK_GUIDANCE_TOKEN, render_hook_guidance(language, hook_mode)
+    )
 
 
 def read_template(agent: str, language: str, filename: str, suffix: str = "") -> str:
@@ -307,17 +351,31 @@ def read_template(agent: str, language: str, filename: str, suffix: str = "") ->
         candidate = agent_dir(agent, language) / "templates" / f"{base}-{suffix}.{ext}"
         if candidate.exists():
             return candidate.read_text(encoding="utf-8")
-    return (agent_dir(agent, language) / "templates" / filename).read_text(encoding="utf-8")
+    return (agent_dir(agent, language) / "templates" / filename).read_text(
+        encoding="utf-8"
+    )
 
 
-def build_content(agent: str, target: str, language: str, suffix: str = "", root: Path | None = None) -> str:
-    body = apply_hook_guidance(read_content(agent, language, suffix), agent, language, root)
+def build_content(
+    agent: str, target: str, language: str, suffix: str = "", root: Path | None = None
+) -> str:
+    body = apply_hook_guidance(
+        read_content(agent, language, suffix), agent, language, root
+    )
     if target == "cursor":
-        return read_template(agent, language, "cursor-frontmatter.yaml", suffix) + "\n" + body
+        return (
+            read_template(agent, language, "cursor-frontmatter.yaml", suffix)
+            + "\n"
+            + body
+        )
     if target == "claude":
         return read_template(agent, language, "claude-header.md", suffix) + body
     if target == "opencode":
-        return read_template(agent, language, "opencode-frontmatter.yaml", suffix) + "\n" + body
+        return (
+            read_template(agent, language, "opencode-frontmatter.yaml", suffix)
+            + "\n"
+            + body
+        )
     try:
         header = read_template(agent, language, "codex-header.md", suffix)
     except FileNotFoundError:
@@ -333,20 +391,38 @@ def destination(root: Path, target: str, basename: str) -> Path:
         )
     scoped_basename = (
         basename
-        if not rule_subdir or rule_subdir == "common" or basename.startswith(f"{rule_subdir}-")
+        if not rule_subdir
+        or rule_subdir == "common"
+        or basename.startswith(f"{rule_subdir}-")
         else f"{rule_subdir}-{basename}"
     )
     if target == "cursor":
         base = root / ".cursor" / "rules"
-        return (base / rule_subdir / f"{scoped_basename}.mdc") if rule_subdir else (base / f"{scoped_basename}.mdc")
+        return (
+            (base / rule_subdir / f"{scoped_basename}.mdc")
+            if rule_subdir
+            else (base / f"{scoped_basename}.mdc")
+        )
     if target == "claude":
         base = root / ".claude" / "rules"
-        return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
+        return (
+            (base / rule_subdir / f"{scoped_basename}.md")
+            if rule_subdir
+            else (base / f"{scoped_basename}.md")
+        )
     if target == "opencode":
         base = root / ".opencode"
-        return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
+        return (
+            (base / rule_subdir / f"{scoped_basename}.md")
+            if rule_subdir
+            else (base / f"{scoped_basename}.md")
+        )
     base = root / ".codex" / "rules"
-    return (base / rule_subdir / f"{scoped_basename}.md") if rule_subdir else (base / f"{scoped_basename}.md")
+    return (
+        (base / rule_subdir / f"{scoped_basename}.md")
+        if rule_subdir
+        else (base / f"{scoped_basename}.md")
+    )
 
 
 def extract_description_from_frontmatter(frontmatter: str) -> str | None:
@@ -357,7 +433,9 @@ def extract_description_from_frontmatter(frontmatter: str) -> str | None:
     return None
 
 
-def get_codex_rule_description(agent: str, language: str, suffix: str = "") -> str | None:
+def get_codex_rule_description(
+    agent: str, language: str, suffix: str = ""
+) -> str | None:
     try:
         frontmatter = read_template(agent, language, "cursor-frontmatter.yaml", suffix)
         return extract_description_from_frontmatter(frontmatter)
@@ -388,7 +466,10 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
     for agent in agents:
         for suffix in list_rule_suffixes(agent, language):
             basename = rule_basename(agent, language, suffix)
-            description = get_codex_rule_description(agent, language, suffix) or f"Rules for {basename}"
+            description = (
+                get_codex_rule_description(agent, language, suffix)
+                or f"Rules for {basename}"
+            )
             lines.append(f"- `.codex/rules/{basename}.md` — {description}")
     lines.append("")
     return "\n".join(lines)
@@ -410,7 +491,10 @@ def build_claude_md(agents: list[str], language: str) -> str:
     for agent in agents:
         for suffix in list_rule_suffixes(agent, language):
             basename = rule_basename(agent, language, suffix)
-            description = get_codex_rule_description(agent, language, suffix) or f"Rules for {basename}"
+            description = (
+                get_codex_rule_description(agent, language, suffix)
+                or f"Rules for {basename}"
+            )
             lines.append(f"- `.claude/rules/{basename}.md` — {description}")
     lines.append("")
     return "\n".join(lines)
@@ -535,7 +619,9 @@ def merge_yaml_mapping_content(existing_yaml: str, canonical_yaml: str) -> str |
     return "\n".join(parts).rstrip()
 
 
-def merge_frontmatter(existing_frontmatter: str | None, canonical_frontmatter: str | None) -> str | None:
+def merge_frontmatter(
+    existing_frontmatter: str | None, canonical_frontmatter: str | None
+) -> str | None:
     if not canonical_frontmatter:
         return existing_frontmatter
     if not existing_frontmatter:
@@ -561,7 +647,9 @@ def parse_markdown_body(content: str) -> tuple[str, list[tuple[str, str]]]:
     intro = normalized[: matches[0].start()].strip()
     sections: list[tuple[str, str]] = []
     for index, match in enumerate(matches):
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(normalized)
+        end = (
+            matches[index + 1].start() if index + 1 < len(matches) else len(normalized)
+        )
         section_text = normalized[match.start() : end].strip()
         heading = section_text.splitlines()[0]
         sections.append((heading, section_text))
@@ -676,7 +764,7 @@ def prompt_target() -> str:
 
 def prompt_agents(language: str) -> list[str]:
     agent_ids = AGENTS_BY_LANGUAGE[language]
-    value = prompt(f"Agents (comma-separated or \"all\") [{', '.join(agent_ids)}]: ")
+    value = prompt(f'Agents (comma-separated or "all") [{", ".join(agent_ids)}]: ')
     if not value:
         return list(agent_ids)
     tokens = parse_agent_tokens(value, False, language)
@@ -687,18 +775,28 @@ def prompt_agents(language: str) -> list[str]:
     return prompt_agents(language)
 
 
-def resolve_target_and_agents(args: argparse.Namespace, root: Path, language: str) -> tuple[str, list[str]] | None:
+def resolve_target_and_agents(
+    args: argparse.Namespace, root: Path, language: str
+) -> tuple[str, list[str]] | None:
     cfg = load_config(root, language)
     ci = is_ci_mode() or bool(args.yes)
 
     target_from_flag = (args.target or "").strip().lower() if args.target else None
-    agents_from_flag = parse_agent_tokens(args.agent, bool(args.all), language) if (args.agent or args.all) else None
+    agents_from_flag = (
+        parse_agent_tokens(args.agent, bool(args.all), language)
+        if (args.agent or args.all)
+        else None
+    )
 
     if cfg and not target_from_flag and agents_from_flag is None:
         return str(cfg["target"]), list(cfg["agents"])
 
     target = target_from_flag or (str(cfg["target"]) if cfg else None)
-    agents = agents_from_flag if agents_from_flag is not None else (list(cfg["agents"]) if cfg else None)
+    agents = (
+        agents_from_flag
+        if agents_from_flag is not None
+        else (list(cfg["agents"]) if cfg else None)
+    )
 
     if target and agents and len(agents) > 0:
         return target, agents
@@ -773,7 +871,9 @@ def install(
             try:
                 content = build_codex_agents_md(processed_agents, language)
                 next_content = (
-                    patch_codex_agents_md(agents_md.read_text(encoding="utf-8"), content)
+                    patch_codex_agents_md(
+                        agents_md.read_text(encoding="utf-8"), content
+                    )
                     if agents_md.exists() and not force and patch
                     else content
                 )
@@ -791,7 +891,9 @@ def install(
             try:
                 content = build_claude_md(processed_agents, language)
                 next_content = (
-                    patch_codex_agents_md(claude_md.read_text(encoding="utf-8"), content)
+                    patch_codex_agents_md(
+                        claude_md.read_text(encoding="utf-8"), content
+                    )
                     if claude_md.exists() and not force and should_patch_claude_md
                     else content
                 )
@@ -831,7 +933,16 @@ def run_install(args: argparse.Namespace) -> int:
             patch_claude_md = prompt_yes_no(
                 f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?"
             )
-    result = install(root, target, agents, language, bool(args.force), bool(args.patch), True, patch_claude_md)
+    result = install(
+        root,
+        target,
+        agents,
+        language,
+        bool(args.force),
+        bool(args.patch),
+        True,
+        patch_claude_md,
+    )
 
     if result.errors:
         for agent, error in result.errors:
@@ -848,7 +959,10 @@ def run_install(args: argparse.Namespace) -> int:
             label = "CLAUDE.md" if file.endswith("CLAUDE.md") else "AGENTS.md"
             print(f"  {label} -> {file}")
     if result.skipped:
-        print("Skipped (already present; use --force to overwrite): " + ", ".join(result.skipped))
+        print(
+            "Skipped (already present; use --force to overwrite): "
+            + ", ".join(result.skipped)
+        )
     if result.skipped_support_files:
         print(
             "Skipped support files (already present; use --force to overwrite): "
@@ -861,7 +975,9 @@ def run_install(args: argparse.Namespace) -> int:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ballast-python", description="Install Ballast rules for Python projects")
+    p = argparse.ArgumentParser(
+        prog="ballast-python", description="Install Ballast rules for Python projects"
+    )
     p.add_argument("--version", action="version", version=cli_version())
     sub = p.add_subparsers(dest="command")
     install_cmd = sub.add_parser("install", help="Install rule files")

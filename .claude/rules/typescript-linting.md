@@ -1,3 +1,8 @@
+# TypeScript Linting Rules
+
+These rules provide TypeScript linting setup instructions following Everyday DevOps best practices from https://www.markcallen.com/typescript-linting/
+
+---
 You are a TypeScript linting specialist. Your role is to implement comprehensive linting and code formatting for TypeScript/JavaScript projects following the Everyday DevOps best practices from https://www.markcallen.com/typescript-linting/
 
 ## Your Responsibilities
@@ -29,7 +34,16 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
    - prettier:fix: "prettier . --write"
 
 5. **Set Up Git Hooks**
-   {{BALLAST_HOOK_GUIDANCE}}
+   ## Set Up Git Hooks with Husky
+
+Use Husky for this monorepo.
+
+- Install and initialize Husky.
+- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.
+- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.
+- Keep the hook file executable with `chmod +x .husky/pre-commit`.
+- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.
+- Keep the hook in sync with the repo's linting workflow whenever the command changes.
 
 6. **Create GitHub Actions Workflow**
    - Create .github/workflows/lint.yaml
@@ -113,7 +127,6 @@ Omit the pnpm step only when the project uses npm or yarn.
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
 - When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
 - Keep the Git hook workflow in sync with the repository layout. Use `pre-commit` for single-repo installs and Husky for monorepos.
-- Configure a `pre-push` hook to run the unit test command. For TypeScript repos whose tests depend on built output, run the build before the tests in `pre-push`.
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
 ## When Completed

@@ -1,0 +1,80 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-json
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: detect-private-key
+      - id: check-merge-conflict
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.37.1
+    hooks:
+      - id: yamllint
+        args: [--strict]
+
+  - repo: https://github.com/ddanier/sub-pre-commit.git
+    rev: v4.3.0-2
+    hooks:
+      - id: sub-pre-commit
+        alias: ballast-typescript
+        name: "pre-commit for packages/ballast-typescript/"
+        args: ["-p", "packages/ballast-typescript"]
+        files: "^packages/ballast-typescript/.*"
+        stages: ["pre-commit"]
+
+      - id: sub-pre-commit
+        alias: ballast-typescript-pre-push
+        name: "pre-push for packages/ballast-typescript/"
+        args: ["-p", "packages/ballast-typescript"]
+        pass_filenames: false
+        always_run: true
+        stages: ["pre-push"]
+
+      - id: sub-pre-commit
+        alias: ballast-python
+        name: "pre-commit for packages/ballast-python/"
+        args: ["-p", "packages/ballast-python"]
+        files: "^packages/ballast-python/.*"
+        stages: ["pre-commit"]
+
+      - id: sub-pre-commit
+        alias: ballast-python-pre-push
+        name: "pre-push for packages/ballast-python/"
+        args: ["-p", "packages/ballast-python"]
+        pass_filenames: false
+        always_run: true
+        stages: ["pre-push"]
+
+      - id: sub-pre-commit
+        alias: ballast-go
+        name: "pre-commit for packages/ballast-go/"
+        args: ["-p", "packages/ballast-go"]
+        files: "^packages/ballast-go/.*"
+        stages: ["pre-commit"]
+
+      - id: sub-pre-commit
+        alias: ballast-go-pre-push
+        name: "pre-push for packages/ballast-go/"
+        args: ["-p", "packages/ballast-go"]
+        pass_filenames: false
+        always_run: true
+        stages: ["pre-push"]
+
+      - id: sub-pre-commit
+        alias: ballast-cli
+        name: "pre-commit for cli/ballast/"
+        args: ["-p", "cli/ballast"]
+        files: "^cli/ballast/.*"
+        stages: ["pre-commit"]
+
+      - id: sub-pre-commit
+        alias: ballast-cli-pre-push
+        name: "pre-push for cli/ballast/"
+        args: ["-p", "cli/ballast"]
+        pass_filenames: false
+        always_run: true
+        stages: ["pre-push"]

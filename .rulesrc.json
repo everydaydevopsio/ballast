@@ -1,0 +1,28 @@
+{
+  "target": "claude",
+  "agents": [
+    "local-dev",
+    "cicd",
+    "observability"
+  ],
+  "languages": [
+    "typescript",
+    "python",
+    "go"
+  ],
+  "paths": {
+    "go": [
+      "cli/ballast",
+      "examples/smoke/go-sample",
+      "packages/ballast-go"
+    ],
+    "python": [
+      "examples/smoke/python-sample",
+      "packages/ballast-python"
+    ],
+    "typescript": [
+      "examples/smoke/typescript-sample",
+      "packages/ballast-typescript"
+    ]
+  }
+}

@@ -28,19 +28,10 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
    - prettier: "prettier . --check"
    - prettier:fix: "prettier . --write"
 
-5. **Set Up Git Hooks with Husky**
-   - Install and initialize husky
-   - Create a pre-commit hook with the command to run (e.g. `npx lint-staged`). Husky 9+ does not use the deprecated shebang or bootstrap lines; put only the command(s) in the hook file.
-   - Ensure the hook file is **executable** (e.g. `chmod +x .husky/pre-commit`)
-   - Ensure test script exists (even if it's just a placeholder)
+5. **Set Up Git Hooks**
+   {{BALLAST_HOOK_GUIDANCE}}
 
-6. **Configure lint-staged**
-   - For .js files: prettier --write, eslint --fix
-   - For .ts files: tsc-files --noEmit, prettier --write, eslint --fix
-   - For .json, .md, .yaml, .yml files: prettier --write
-   - Install tsc-files for TypeScript checking of staged files only
-
-7. **Create GitHub Actions Workflow**
+6. **Create GitHub Actions Workflow**
    - Create .github/workflows/lint.yaml
    - Run on pull requests to main branch
    - Set up Node.js environment
@@ -58,9 +49,9 @@ Follow this order for a clean implementation:
 4. Create ESLint configuration (eslint.config.js or .mjs)
 5. Create Prettier configuration (.prettierrc and .prettierignore)
 6. Add NPM scripts to package.json
-7. Set up husky and initialize it
-8. Install and configure lint-staged
-9. Create the pre-commit hook (command only, no deprecated header; make it executable)
+7. Set up the selected hook workflow for this repository layout
+8. Install the hook command dependencies required by that workflow
+9. Create the hook entrypoint and make it executable
 10. Create GitHub Actions workflow
 11. Test the setup
 
@@ -89,24 +80,6 @@ export default [
     ignores: ['node_modules', 'dist']
   }
 ];
-```
-
-**lint-staged Pattern:**
-
-```json
-{
-  "lint-staged": {
-    "**/*.js": ["prettier --write", "eslint --fix"],
-    "**/*.ts": ["tsc-files --noEmit", "prettier --write", "eslint --fix"],
-    "**/*.{json,md,yaml,yml}": ["prettier --write"]
-  }
-}
-```
-
-**Husky pre-commit hook (Husky 9+):** Put only the command in the hook file (no shebang or bootstrap lines; those are deprecated). Ensure the file is executable (`chmod +x .husky/pre-commit`).
-
-```sh
-npx lint-staged
 ```
 
 **GitHub Actions (when project uses pnpm):** If the project uses pnpm (pnpm-lock.yaml or package.json "packageManager"), include a pnpm setup step with an explicit version before setup-node:
@@ -139,7 +112,8 @@ Omit the pnpm step only when the project uses npm or yarn.
 - Use tsc-files instead of tsc for faster TypeScript checking of staged files only
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
 - When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
-- The pre-commit hook must contain only the command(s) to run (e.g. `npx lint-staged`). Do not add the deprecated shebang or bootstrap lines; Husky 9+ runs hooks directly. Git must be configured to look for hooks in the `.husky` directory (e.g. `core.hooksPath=.husky`). Make the hook file executable (`chmod +x .husky/pre-commit`) or `prepare` may succeed but the hook may not run on some setups.
+- Keep the Git hook workflow in sync with the repository layout. Use `pre-commit` for single-repo installs and Husky for monorepos.
+- Configure a `pre-push` hook to run the unit test command. For TypeScript repos whose tests depend on built output, run the build before the tests in `pre-push`.
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
 ## When Completed
