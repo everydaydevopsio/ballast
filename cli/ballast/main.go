@@ -591,14 +591,19 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, err
 	}
 
-	profiles, err := detectRepoProfiles(root)
+	detectedProfiles, err := detectRepoProfiles(root)
 	if err != nil {
 		return nil, err
 	}
+
+	profiles := detectedProfiles
 	if config != nil && len(config.Languages) > 0 {
-		profiles, err = profilesFromConfig(root, *config)
+		configProfiles, err := profilesFromConfig(root, *config)
 		if err != nil {
 			return nil, err
+		}
+		if len(detectedProfiles) == 0 || profilesMatchRepo(detectedProfiles, configProfiles) {
+			profiles = configProfiles
 		}
 	}
 
@@ -739,6 +744,60 @@ func profilesFromConfig(root string, config monorepoConfig) ([]repoProfile, erro
 		profiles = append(profiles, repoProfile{Language: lang, Paths: uniqueStrings(paths)})
 	}
 	return profiles, nil
+}
+
+func profilesMatchRepo(detected []repoProfile, configured []repoProfile) bool {
+	if len(detected) != len(configured) {
+		return false
+	}
+
+	detectedByLanguage := make(map[language][]string, len(detected))
+	for _, profile := range detected {
+		detectedByLanguage[profile.Language] = profile.Paths
+	}
+
+	configuredByLanguage := make(map[language][]string, len(configured))
+	for _, profile := range configured {
+		configuredByLanguage[profile.Language] = profile.Paths
+	}
+
+	if len(detectedByLanguage) != len(configuredByLanguage) {
+		return false
+	}
+
+	for lang, detectedPaths := range detectedByLanguage {
+		configuredPaths, ok := configuredByLanguage[lang]
+		if !ok || !sameStringSet(detectedPaths, configuredPaths) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func sameStringSet(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+
+	counts := make(map[string]int, len(left))
+	for _, value := range left {
+		counts[value]++
+	}
+
+	for _, value := range right {
+		count := counts[value]
+		if count == 0 {
+			return false
+		}
+		if count == 1 {
+			delete(counts, value)
+			continue
+		}
+		counts[value] = count - 1
+	}
+
+	return len(counts) == 0
 }
 
 func detectRepoProfiles(root string) ([]repoProfile, error) {

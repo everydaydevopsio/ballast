@@ -54,3 +54,17 @@ packages/
 ## License
 
 MIT
+
+## Installed agent rules
+
+Created by Ballast. Do not edit this section.
+
+Read and follow these rule files in `.claude/rules/` when they apply:
+
+- `.claude/rules/common/local-dev-badges.md` — Rules for common/local-dev-badges
+- `.claude/rules/common/local-dev-env.md` — Rules for common/local-dev-env
+- `.claude/rules/common/local-dev-license.md` — Rules for common/local-dev-license
+- `.claude/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
+- `.claude/rules/common/cicd.md` — Rules for common/cicd
+- `.claude/rules/common/observability.md` — Rules for common/observability
+

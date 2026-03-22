@@ -1,5 +1,7 @@
 # Local Development Environment Rules
 
+These rules are intended for Codex (CLI and app).
+
 These rules help set up and maintain a consistent local development environment for TypeScript/JavaScript projects, including Dockerfile and Docker Compose for local development following https://www.markcallen.com/dockerfile-for-typescript/
 
 ---
@@ -45,7 +47,6 @@ When setting up or working on Node.js/TypeScript projects, use **nvm** (Node Ver
 ### Example README Addition
 
 ````markdown
-
 ## Prerequisites
 
 - **Node.js**: Use the version in `.nvmrc`. Supported: Node 22 (LTS) or 24 (Active LTS). Run `nvm install` (or `nvm use`) after cloning so the correct Node version is active before `pnpm install`.
