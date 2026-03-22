@@ -147,6 +147,24 @@ pnpm run lint
 pnpm run build
 ```
 
+### Test Local Wrapper
+
+To test the wrapper against the local checkout instead of installed package binaries:
+
+```bash
+cd ~/src/ballast
+make build
+~/src/ballast/cli/ballast/ballast install --target cursor --all
+```
+
+`make build` builds the local artifacts the wrapper looks for:
+
+- `packages/ballast-typescript/dist/cli.js`
+- `packages/ballast-go/ballast-go`
+- `cli/ballast/ballast`
+
+The wrapper then dispatches to the local TypeScript, Python, and Go backends from this repo when those artifacts are present. If a local backend artifact is missing, the wrapper falls back to an installed backend on `PATH`.
+
 ## Smoke Testing Container
 
 Use `Dockerfile.smoke` to test wrapper + language CLIs.

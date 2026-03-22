@@ -33,6 +33,7 @@ Agent | TypeScript | Python | Go | Guide
 See [installation.md](installation.md) for package-specific commands and the unified monorepo workflow:
 
 - `ballast install --target cursor --all --yes` for TypeScript + Python + Go monorepos
+- TypeScript single-repo linting rules use `pre-commit`; unified monorepos use Husky for TypeScript and `pre-commit` for Python/Go
 - npm (`@everydaydevopsio/ballast`)
 - uv/uvx from GitHub Releases wheel (`ballast-python`)
 - go install/go run (`ballast-go`)

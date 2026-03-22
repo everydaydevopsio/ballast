@@ -103,6 +103,12 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	if !strings.Contains(string(content), "Go linting specialist") {
 		t.Fatalf("expected go-specific linting content, got %s", string(content))
 	}
+	if strings.Contains(string(content), "{{BALLAST_HOOK_GUIDANCE}}") {
+		t.Fatalf("expected hook guidance token to be replaced, got %s", string(content))
+	}
+	if !strings.Contains(string(content), "pre-commit install") {
+		t.Fatalf("expected concrete pre-commit guidance, got %s", string(content))
+	}
 }
 
 func TestValidatedRuleSubdirRejectsInvalidValues(t *testing.T) {

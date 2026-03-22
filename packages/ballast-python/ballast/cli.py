@@ -18,6 +18,7 @@ AGENTS_BY_LANGUAGE = {
     "python": COMMON_AGENTS + LANGUAGE_AGENTS,
     "go": COMMON_AGENTS + LANGUAGE_AGENTS,
 }
+HOOK_GUIDANCE_TOKEN = "{{BALLAST_HOOK_GUIDANCE}}"
 
 
 def cli_version() -> str:
@@ -199,6 +200,107 @@ def read_content(agent: str, language: str, suffix: str = "") -> str:
     return (agent_dir(agent, language) / filename).read_text(encoding="utf-8")
 
 
+def render_hook_guidance(language: str, hook_mode: str) -> str:
+    if language == "typescript":
+        if hook_mode == "monorepo":
+            return "\n".join(
+                [
+                    "- Use Husky for this monorepo.",
+                    "- Install and initialize Husky.",
+                    "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
+                    "- Keep the hook file executable with `chmod +x .husky/pre-commit`.",
+                    "- Keep the hook in sync with the repo's linting workflow whenever the command changes.",
+                ]
+            )
+        return "\n".join(
+            [
+                "- Use `pre-commit` for this repository layout.",
+                "- Create `.pre-commit-config.yaml` at the repo root.",
+                "- Install hooks with `pre-commit install`.",
+                "- Keep the configuration current with `pre-commit autoupdate`.",
+                "- Verify the hook configuration with `pre-commit run --all-files`.",
+            ]
+        )
+    if language == "python":
+        return "\n".join(
+            [
+                "- Use `pre-commit` for Python projects.",
+                "- Create `.pre-commit-config.yaml` at the repo root.",
+                "- Install hooks with `pre-commit install`.",
+                "- Keep the configuration current with `pre-commit autoupdate`.",
+                "- Re-run `pre-commit run --all-files` after hook changes.",
+            ]
+        )
+    if language == "go":
+        return "\n".join(
+            [
+                "- Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.",
+                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                "- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.",
+                "- Install hooks with `pre-commit install`.",
+                "- Keep the configuration current with `pre-commit autoupdate`.",
+                "- Verify the hook configuration with `pre-commit run --all-files`.",
+            ]
+        )
+    return ""
+
+
+def has_workspace_monorepo(root: Path) -> bool:
+    package_json = root / "package.json"
+    if not (root / "pnpm-workspace.yaml").exists():
+        if not package_json.exists():
+            return False
+        try:
+            raw = json.loads(package_json.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+        if not raw.get("workspaces"):
+            return False
+
+    ignored = {".git", "node_modules", "dist", "build", "coverage", ".next", ".turbo", ".pnpm-store"}
+    count = 0
+    for current, dirs, files in os.walk(root):
+        rel = Path(current).relative_to(root)
+        if len(rel.parts) > 4:
+            dirs[:] = []
+            continue
+        dirs[:] = [name for name in dirs if name not in ignored]
+        if "package.json" in files:
+            count += 1
+            if count > 1:
+                return True
+    return False
+
+
+def resolve_ts_hook_mode(root: Path, language: str) -> str:
+    if language != "typescript":
+        return "standalone"
+
+    config_path = root / ".rulesrc.json"
+    if config_path.exists():
+        try:
+            raw = json.loads(config_path.read_text(encoding="utf-8"))
+            languages = raw.get("languages") or []
+            if isinstance(languages, list) and len({item for item in languages if isinstance(item, str)}) > 1:
+                return "monorepo"
+            paths = raw.get("paths") or {}
+            if isinstance(paths, dict) and len(paths.keys()) > 1:
+                return "monorepo"
+        except Exception:
+            pass
+
+    if has_workspace_monorepo(root):
+        return "monorepo"
+    return "standalone"
+
+
+def apply_hook_guidance(content: str, agent: str, language: str, root: Path | None) -> str:
+    if agent != "linting" or HOOK_GUIDANCE_TOKEN not in content:
+        return content
+    hook_mode = resolve_ts_hook_mode(root, language) if root is not None else "standalone"
+    return content.replace(HOOK_GUIDANCE_TOKEN, render_hook_guidance(language, hook_mode))
+
+
 def read_template(agent: str, language: str, filename: str, suffix: str = "") -> str:
     base, ext = filename.rsplit(".", 1)
     if suffix:
@@ -208,8 +310,8 @@ def read_template(agent: str, language: str, filename: str, suffix: str = "") ->
     return (agent_dir(agent, language) / "templates" / filename).read_text(encoding="utf-8")
 
 
-def build_content(agent: str, target: str, language: str, suffix: str = "") -> str:
-    body = read_content(agent, language, suffix)
+def build_content(agent: str, target: str, language: str, suffix: str = "", root: Path | None = None) -> str:
+    body = apply_hook_guidance(read_content(agent, language, suffix), agent, language, root)
     if target == "cursor":
         return read_template(agent, language, "cursor-frontmatter.yaml", suffix) + "\n" + body
     if target == "claude":
@@ -639,7 +741,7 @@ def install(
             for suffix in list_rule_suffixes(agent, language):
                 basename = rule_basename(agent, language, suffix)
                 dst = destination(root, target, basename)
-                content = build_content(agent, target, language, suffix)
+                content = build_content(agent, target, language, suffix, root)
                 if dst.exists() and not force and not patch:
                     agent_skipped = True
                     agent_processed = True

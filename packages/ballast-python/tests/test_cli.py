@@ -69,6 +69,18 @@ class PatchInstallTests(unittest.TestCase):
             self.assertTrue(rule.exists())
             self.assertIn("Python linting specialist", rule.read_text(encoding="utf-8"))
 
+    def test_install_replaces_hook_guidance_token_for_python_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(root, "codex", ["linting"], "python", False, False, False)
+
+            self.assertIn("linting", result.installed)
+            rule = root / ".codex" / "rules" / "python-linting.md"
+            content = rule.read_text(encoding="utf-8")
+            self.assertNotIn("{{BALLAST_HOOK_GUIDANCE}}", content)
+            self.assertIn("pre-commit install", content)
+
     def test_patch_preserves_existing_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
