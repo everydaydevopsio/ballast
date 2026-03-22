@@ -73,9 +73,8 @@ function getHookMode(
   if (options?.hookMode) {
     return options.hookMode;
   }
-  if (agentId === 'linting' && language === 'typescript') {
-    return 'standalone';
-  }
+  void agentId;
+  void language;
   return 'standalone';
 }
 
