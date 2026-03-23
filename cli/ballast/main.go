@@ -33,8 +33,15 @@ func localSourceRoot() string {
 }
 
 func preferredSourceRoot(projectRoot string) string {
-	if isBallastSourceRoot(projectRoot) {
-		return projectRoot
+	for root := filepath.Clean(projectRoot); root != "" && root != string(filepath.Separator); {
+		if isBallastSourceRoot(root) {
+			return root
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			break
+		}
+		root = parent
 	}
 	return localSourceRoot()
 }
