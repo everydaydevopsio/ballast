@@ -78,6 +78,9 @@ func TestRunHelpAndVersionCommands(t *testing.T) {
 		if !strings.Contains(output, "doctor") {
 			t.Fatalf("expected doctor in help output, got %q", output)
 		}
+		if !strings.Contains(output, "upgrade") {
+			t.Fatalf("expected upgrade in help output, got %q", output)
+		}
 	})
 
 	t.Run("version command", func(t *testing.T) {
@@ -199,6 +202,130 @@ func TestRunDoctorFixInstallsBackendsAndRefreshesConfig(t *testing.T) {
 	}
 	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --yes") {
 		t.Fatalf("expected refresh-config install invocation, got %q", got)
+	}
+}
+
+func TestRunDoctorFixUsesConfigVersionForBackendInstallsInsideSourceCheckout(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.6"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.5",
+  "target":"claude",
+  "agents":["local-dev"],
+  "languages":["typescript"],
+  "paths":{"typescript":["."]}
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"doctor", "--fix"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 3 {
+		t.Fatalf("expected install commands for all backends, got %#v", commands)
+	}
+	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(root, ".ballast", "tools", "typescript")+" @everydaydevopsio/ballast@5.0.5" {
+		t.Fatalf("expected doctor fix to pin typescript backend to config version, got %q", got)
+	}
+	if got := strings.Join(commands[1], " "); got != "env UV_TOOL_DIR="+filepath.Join(root, ".ballast", "tools", "python")+" UV_TOOL_BIN_DIR="+filepath.Join(root, ".ballast", "bin")+" uv tool install --reinstall --from https://github.com/everydaydevopsio/ballast/releases/download/v5.0.5/ballast_python-5.0.5-py3-none-any.whl ballast-python" {
+		t.Fatalf("expected doctor fix to pin python backend to config version, got %q", got)
+	}
+	got := strings.Join(commands[2], " ")
+	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.5/ballast-go_5.0.5_") {
+		t.Fatalf("expected doctor fix to pin go backend to config version, got %q", got)
+	}
+	if strings.Contains(got, filepath.Join(root, "packages", "ballast-go")) {
+		t.Fatalf("expected doctor fix to avoid local source builds when config pins a release, got %q", got)
+	}
+}
+
+func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.6"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	var invocation backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocation = backendInvocation{Binary: binary, Args: append([]string(nil), args...)}
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.5",
+  "target":"claude",
+  "agents":["local-dev"],
+  "languages":["typescript"],
+  "paths":{"typescript":["."]}
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"upgrade"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		t.Fatalf("loadDoctorConfig returned error: %v", err)
+	}
+	if config == nil || config.BallastVersion != "5.0.6" {
+		t.Fatalf("expected upgrade to rewrite ballastVersion to 5.0.6, got %#v", config)
+	}
+	if len(commands) != 3 {
+		t.Fatalf("expected upgrade to install all backends, got %#v", commands)
+	}
+	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(root, ".ballast", "tools", "typescript")+" @everydaydevopsio/ballast@5.0.6" {
+		t.Fatalf("expected upgrade to install latest typescript backend, got %q", got)
+	}
+	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --yes") {
+		t.Fatalf("expected upgrade to refresh config via install --yes, got %q", got)
 	}
 }
 
@@ -467,6 +594,54 @@ func TestRunInstallCLIUsesLocalSourcesInsideSourceCheckoutForReleaseWrapper(t *t
 	}
 	if got := strings.Join(commands[2], " "); got != "go build -C "+filepath.Join(sourceRoot, "packages", "ballast-go")+" -o "+filepath.Join(sourceRoot, ".ballast", "bin", "ballast-go")+" ./cmd/ballast-go" {
 		t.Fatalf("unexpected local go install command: %q", got)
+	}
+}
+
+func TestRunInstallCLIUsesPinnedReleaseVersionsInsideSourceCheckout(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "5.0.6"
+	sourceRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(sourceRoot, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(t.TempDir(), "bin", "ballast"), nil
+	}
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	withWorkingDir(t, sourceRoot, func() {
+		exitCode := run([]string{"install-cli", "--version", "5.0.5"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 3 {
+		t.Fatalf("expected 3 install commands, got %#v", commands)
+	}
+	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(sourceRoot, ".ballast", "tools", "typescript")+" @everydaydevopsio/ballast@5.0.5" {
+		t.Fatalf("expected pinned typescript release install, got %q", got)
+	}
+	if got := strings.Join(commands[1], " "); got != "env UV_TOOL_DIR="+filepath.Join(sourceRoot, ".ballast", "tools", "python")+" UV_TOOL_BIN_DIR="+filepath.Join(sourceRoot, ".ballast", "bin")+" uv tool install --reinstall --from https://github.com/everydaydevopsio/ballast/releases/download/v5.0.5/ballast_python-5.0.5-py3-none-any.whl ballast-python" {
+		t.Fatalf("expected pinned python release install, got %q", got)
+	}
+	got := strings.Join(commands[2], " ")
+	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.5/ballast-go_5.0.5_") {
+		t.Fatalf("expected pinned go release install, got %q", got)
 	}
 }
 
