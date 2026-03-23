@@ -32,15 +32,20 @@ func localSourceRoot() string {
 	return findBallastSourceRoot()
 }
 
+func preferredSourceRoot(projectRoot string) string {
+	if isBallastSourceRoot(projectRoot) {
+		return projectRoot
+	}
+	return localSourceRoot()
+}
+
 var toolsByLanguage = map[language]toolConfig{
 	langTypeScript: {
 		binary: "ballast-typescript",
 		installCommand: func(version string, projectRoot string) ([]string, error) {
 			toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
-			if releaseVersion(version) == "" {
-				if sourceRoot := localSourceRoot(); sourceRoot != "" {
-					return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
-				}
+			if sourceRoot := preferredSourceRoot(projectRoot); sourceRoot != "" {
+				return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
 			}
 			pkg := "@everydaydevopsio/ballast"
 			if releaseVersion(version) != "" {
@@ -55,10 +60,10 @@ var toolsByLanguage = map[language]toolConfig{
 			binDir := filepath.Join(projectRoot, ".ballast", "bin")
 			toolDir := filepath.Join(projectRoot, ".ballast", "tools", "python")
 			release := releaseVersion(version)
+			if sourceRoot := preferredSourceRoot(projectRoot); sourceRoot != "" {
+				return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", filepath.Join(sourceRoot, "packages", "ballast-python")}, nil
+			}
 			if release == "" {
-				if sourceRoot := localSourceRoot(); sourceRoot != "" {
-					return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", filepath.Join(sourceRoot, "packages", "ballast-python")}, nil
-				}
 				release = releaseVersion(resolveVersion())
 				if release == "" {
 					return nil, errors.New("ballast-python install requires a release version or a ballast source checkout")
@@ -75,11 +80,9 @@ var toolsByLanguage = map[language]toolConfig{
 	langGo: {
 		binary: "ballast-go",
 		installCommand: func(version string, projectRoot string) ([]string, error) {
-			if releaseVersion(version) == "" {
-				if sourceRoot := localSourceRoot(); sourceRoot != "" {
-					moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
-					return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
-				}
+			if sourceRoot := preferredSourceRoot(projectRoot); sourceRoot != "" {
+				moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
+				return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
 			}
 			target := "latest"
 			if release := releaseVersion(version); release != "" {
