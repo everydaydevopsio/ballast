@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -91,11 +92,7 @@ var toolsByLanguage = map[language]toolConfig{
 				moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
 				return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
 			}
-			target := "latest"
-			if release := releaseVersion(version); release != "" {
-				target = "v" + release
-			}
-			return []string{"env", "GOBIN=" + filepath.Join(projectRoot, ".ballast", "bin"), "go", "install", "github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@" + target}, nil
+			return releasedGoInstallCommand(version, projectRoot)
 		},
 	},
 }
@@ -668,6 +665,70 @@ func ensureLocalToolDirs(root string) error {
 		return fmt.Errorf("create local ballast tools dir: %w", err)
 	}
 	return nil
+}
+
+func releasedGoInstallCommand(version string, projectRoot string) ([]string, error) {
+	release := releaseVersion(version)
+	if release == "" {
+		release = releaseVersion(resolveVersion())
+	}
+	if release == "" {
+		return nil, errors.New("ballast-go install requires a release version or a ballast source checkout")
+	}
+
+	url, err := releasedGoArchiveURL(release)
+	if err != nil {
+		return nil, err
+	}
+	destination := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
+
+	if runtime.GOOS == "windows" {
+		script := `$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString()); ` +
+			`New-Item -ItemType Directory -Path $tmp | Out-Null; ` +
+			`try { ` +
+			`$archive = Join-Path $tmp 'ballast-go.zip'; ` +
+			`Invoke-WebRequest -Uri $args[0] -OutFile $archive; ` +
+			`Expand-Archive -Path $archive -DestinationPath $tmp -Force; ` +
+			`Copy-Item (Join-Path $tmp 'ballast-go.exe') $args[1] -Force ` +
+			`} finally { ` +
+			`Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue ` +
+			`}`
+		return []string{"powershell", "-NoProfile", "-Command", script, url, destination + ".exe"}, nil
+	}
+
+	script := `set -e
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+archive="$tmpdir/ballast-go.tar.gz"
+curl -fsSL "$1" -o "$archive"
+tar -xzf "$archive" -C "$tmpdir"
+install -m 0755 "$tmpdir/ballast-go" "$2"`
+	return []string{"sh", "-c", script, "sh", url, destination}, nil
+}
+
+func releasedGoArchiveURL(release string) (string, error) {
+	goos, goarch, archiveExt, err := releasedGoArchiveParts(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return "", err
+	}
+	filename := fmt.Sprintf("ballast-go_%s_%s_%s.%s", release, goos, goarch, archiveExt)
+	return fmt.Sprintf("https://github.com/everydaydevopsio/ballast/releases/download/v%s/%s", release, filename), nil
+}
+
+func releasedGoArchiveParts(goos string, goarch string) (string, string, string, error) {
+	switch goos {
+	case "linux", "darwin":
+		switch goarch {
+		case "amd64", "arm64":
+			return goos, goarch, "tar.gz", nil
+		}
+	case "windows":
+		switch goarch {
+		case "amd64":
+			return goos, goarch, "zip", nil
+		}
+	}
+	return "", "", "", fmt.Errorf("unsupported ballast-go release platform: %s/%s", goos, goarch)
 }
 
 func hasFlag(args []string, longFlag string, shortFlag string) bool {

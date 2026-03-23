@@ -63,7 +63,16 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ### Go Package (`ballast-go`)
 
 ```bash
-go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest
+VERSION=5.0.5
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64) ARCH=amd64 ;;
+  arm64|aarch64) ARCH=arm64 ;;
+esac
+curl -fsSL -o /tmp/ballast-go.tar.gz "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast-go_${VERSION}_${OS}_${ARCH}.tar.gz"
+tar -xzf /tmp/ballast-go.tar.gz -C /tmp
+install -m 0755 /tmp/ballast-go ~/.local/bin/ballast-go
 ballast-go install --target cursor --all
 ```
 
@@ -115,7 +124,7 @@ If `CLAUDE.md` or `AGENTS.md` already exists, Ballast creates the file when miss
 pnpm exec ballast-typescript install --target cursor --all
 VERSION=4.0.0
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
-go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest install --target cursor --all
+ballast-go install --target cursor --all
 ```
 
 Ballast preserves existing rule files unless `--force` is provided. Use `--patch` to merge upstream Ballast updates into an existing rule file while preserving the user's edited sections.
