@@ -72,7 +72,8 @@ case "$ARCH" in
 esac
 curl -fsSL -o /tmp/ballast-go.tar.gz "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast-go_${VERSION}_${OS}_${ARCH}.tar.gz"
 tar -xzf /tmp/ballast-go.tar.gz -C /tmp
-install -m 0755 /tmp/ballast-go ~/.local/bin/ballast-go
+mkdir -p "${HOME}/.local/bin"
+install -m 0755 /tmp/ballast-go "${HOME}/.local/bin/ballast-go"
 ballast-go install --target cursor --all
 ```
 
