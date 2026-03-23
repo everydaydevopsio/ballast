@@ -105,7 +105,17 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ### Go
 
 ```bash
-go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest
+VERSION=5.0.5
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64) ARCH=amd64 ;;
+  arm64|aarch64) ARCH=arm64 ;;
+esac
+curl -fsSL -o /tmp/ballast-go.tar.gz "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast-go_${VERSION}_${OS}_${ARCH}.tar.gz"
+tar -xzf /tmp/ballast-go.tar.gz -C /tmp
+mkdir -p "${HOME}/.local/bin"
+install -m 0755 /tmp/ballast-go "${HOME}/.local/bin/ballast-go"
 ballast-go install --target cursor --all
 ```
 
@@ -129,7 +139,7 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ### 3. Go rules in a monorepo
 
 ```bash
-go run github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@latest install --target cursor --all
+ballast-go install --target cursor --all
 ```
 
 Recommended order for one repository that uses all three languages:

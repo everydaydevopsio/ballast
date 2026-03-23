@@ -262,6 +262,42 @@ func TestRunInstallCLICommand(t *testing.T) {
 	}
 }
 
+func TestRunInstallCLIGoUsesReleaseArchiveForPinnedVersion(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+	})
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/test\n\ngo 1.24\n")
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install-cli", "--language", "go", "--version", "5.0.2"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected 1 install command, got %#v", commands)
+	}
+	got := strings.Join(commands[0], " ")
+	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.2/ballast-go_5.0.2_") {
+		t.Fatalf("expected installer to use a release archive, got %q", got)
+	}
+	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.2/ballast-go_checksums.txt") {
+		t.Fatalf("expected installer to verify the published checksum asset, got %q", got)
+	}
+	if strings.Contains(got, "go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@") {
+		t.Fatalf("expected installer to avoid the invalid module path, got %q", got)
+	}
+}
+
 func TestRunInstallCLICommandInstallsAllLanguagesByDefault(t *testing.T) {
 	originalRun := runCommandFunc
 	originalVersion := version
