@@ -4,6 +4,7 @@ import os from 'os';
 import { install, resolveTargetAndAgents, runInstall } from './install';
 import { getClaudeMdPath, getDestination } from './build';
 import { findProjectRoot, saveConfig, loadConfig } from './config';
+import { BALLAST_VERSION } from './version';
 
 describe('install', () => {
   let tmpDir: string;
@@ -362,12 +363,14 @@ Keep my custom responsibilities.
       const config = loadConfig(tmpDir);
       expect(config).toEqual({
         target: 'claude',
-        agents: ['linting', 'local-dev']
+        agents: ['linting', 'local-dev'],
+        ballastVersion: BALLAST_VERSION
       });
       const raw = JSON.parse(
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
       );
       expect(raw.languages).toEqual(['typescript']);
+      expect(raw.ballastVersion).toBe(BALLAST_VERSION);
       expect(raw.paths).toEqual({ typescript: ['.'] });
     });
 
@@ -383,12 +386,14 @@ Keep my custom responsibilities.
       const config = loadConfig(tmpDir, 'go');
       expect(config).toEqual({
         target: 'claude',
-        agents: ['linting', 'local-dev']
+        agents: ['linting', 'local-dev'],
+        ballastVersion: BALLAST_VERSION
       });
       const raw = JSON.parse(
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
       );
       expect(raw.languages).toEqual(['go']);
+      expect(raw.ballastVersion).toBe(BALLAST_VERSION);
       expect(raw.paths).toEqual({ go: ['.'] });
     });
 
@@ -413,6 +418,7 @@ Keep my custom responsibilities.
       const raw = JSON.parse(
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
       );
+      expect(raw.ballastVersion).toBe(BALLAST_VERSION);
       expect(raw.languages).toEqual(['typescript', 'go']);
       expect(raw.paths).toEqual({
         typescript: ['.'],

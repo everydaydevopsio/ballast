@@ -25,43 +25,67 @@ var supportedLanguages = []language{langTypeScript, langPython, langGo}
 
 type toolConfig struct {
 	binary         string
-	installCommand func(version string) []string
+	installCommand func(version string, projectRoot string) ([]string, error)
+}
+
+func localSourceRoot() string {
+	return findBallastSourceRoot()
 }
 
 var toolsByLanguage = map[language]toolConfig{
 	langTypeScript: {
 		binary: "ballast-typescript",
-		installCommand: func(version string) []string {
+		installCommand: func(version string, projectRoot string) ([]string, error) {
+			toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
+			if releaseVersion(version) == "" {
+				if sourceRoot := localSourceRoot(); sourceRoot != "" {
+					return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
+				}
+			}
 			pkg := "@everydaydevopsio/ballast"
 			if releaseVersion(version) != "" {
 				pkg += "@" + releaseVersion(version)
 			}
-			return []string{"npm", "install", "-g", pkg}
+			return []string{"npm", "install", "--prefix", toolRoot, pkg}, nil
 		},
 	},
 	langPython: {
 		binary: "ballast-python",
-		installCommand: func(version string) []string {
+		installCommand: func(version string, projectRoot string) ([]string, error) {
+			binDir := filepath.Join(projectRoot, ".ballast", "bin")
+			toolDir := filepath.Join(projectRoot, ".ballast", "tools", "python")
 			release := releaseVersion(version)
 			if release == "" {
-				return []string{"uv", "tool", "install", "--reinstall", "ballast-python"}
+				if sourceRoot := localSourceRoot(); sourceRoot != "" {
+					return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", filepath.Join(sourceRoot, "packages", "ballast-python")}, nil
+				}
+				release = releaseVersion(resolveVersion())
+				if release == "" {
+					return nil, errors.New("ballast-python install requires a release version or a ballast source checkout")
+				}
 			}
 			wheel := fmt.Sprintf(
 				"https://github.com/everydaydevopsio/ballast/releases/download/v%s/ballast_python-%s-py3-none-any.whl",
 				release,
 				release,
 			)
-			return []string{"uv", "tool", "install", "--reinstall", "--from", wheel, "ballast-python"}
+			return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", "--from", wheel, "ballast-python"}, nil
 		},
 	},
 	langGo: {
 		binary: "ballast-go",
-		installCommand: func(version string) []string {
+		installCommand: func(version string, projectRoot string) ([]string, error) {
+			if releaseVersion(version) == "" {
+				if sourceRoot := localSourceRoot(); sourceRoot != "" {
+					moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
+					return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
+				}
+			}
 			target := "latest"
 			if release := releaseVersion(version); release != "" {
 				target = "v" + release
 			}
-			return []string{"go", "install", "github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@" + target}
+			return []string{"env", "GOBIN=" + filepath.Join(projectRoot, ".ballast", "bin"), "go", "install", "github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@" + target}, nil
 		},
 	},
 }
@@ -75,16 +99,18 @@ var osExecutableFunc = os.Executable
 var execLookPathFunc = exec.LookPath
 var runCommandFunc = runCommand
 var resolveInstalledVersionFunc = resolveInstalledVersion
+var collectDoctorBackendsFunc = collectDoctorBackends
 
 var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var supportedAgents = append(slices.Clone(commonAgents), languageAgents...)
 
 type monorepoConfig struct {
-	Target    string              `json:"target,omitempty"`
-	Agents    []string            `json:"agents,omitempty"`
-	Languages []string            `json:"languages,omitempty"`
-	Paths     map[string][]string `json:"paths,omitempty"`
+	Target         string              `json:"target,omitempty"`
+	Agents         []string            `json:"agents,omitempty"`
+	BallastVersion string              `json:"ballastVersion,omitempty"`
+	Languages      []string            `json:"languages,omitempty"`
+	Paths          map[string][]string `json:"paths,omitempty"`
 }
 
 type repoProfile struct {
@@ -98,6 +124,13 @@ type backendInvocation struct {
 	Dir      string
 	Env      map[string]string
 	Args     []string
+}
+
+type doctorBackendStatus struct {
+	Name     string
+	Version  string
+	Location string
+	Found    bool
 }
 
 type monorepoPlan struct {
@@ -120,6 +153,13 @@ func run(args []string) int {
 		return 1
 	}
 
+	if len(forwardedArgs) > 0 && forwardedArgs[0] == "install-cli" {
+		return runInstallCLI(selectedLanguage, forwardedArgs[1:])
+	}
+	if len(forwardedArgs) > 0 && forwardedArgs[0] == "doctor" {
+		return runDoctor(selectedLanguage, forwardedArgs[1:])
+	}
+
 	if hasVersionFlag(forwardedArgs) {
 		printVersion()
 		return 0
@@ -140,8 +180,15 @@ func run(args []string) int {
 		return 0
 	}
 
+	root := findProjectRoot("")
+	normalizedArgs, err := normalizeInstallArgs(forwardedArgs, root)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	forwardedArgs = normalizedArgs
+
 	if selectedLanguage == "" {
-		root := findProjectRoot("")
 		plan, err := resolveMonorepoPlan(root, forwardedArgs)
 		if err != nil {
 			fmt.Println(err)
@@ -160,6 +207,7 @@ func run(args []string) int {
 						fmt.Println(err)
 						return 1
 					}
+					resolved = resolveBackendCommand(invocation.Language, tool, invocation.Args, invocation.Env)
 				}
 				exitCode, err := execToolFunc(resolved.Binary, resolved.Args, invocation.Dir, resolved.Env)
 				if err != nil {
@@ -203,6 +251,7 @@ func run(args []string) int {
 			fmt.Println(err)
 			return 1
 		}
+		resolved = resolveBackendCommand(selectedLanguage, tool, forwardedArgs, nil)
 	}
 
 	exitCode, err := execToolFunc(resolved.Binary, resolved.Args, "", resolved.Env)
@@ -258,7 +307,9 @@ func printUsage() {
 	fmt.Println("  ballast [flags] <command> [command flags]")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  install     Install agent rules for the detected or selected language")
+	fmt.Println("  install     Install agent rules for the detected or selected language (`--refresh-config` reuses saved .rulesrc.json settings)")
+	fmt.Println("  install-cli Install or upgrade backend CLIs (latest by default, or a specific --version)")
+	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config)")
 	fmt.Println("  help        Show help for ballast")
 	fmt.Println("  version     Print the ballast wrapper version")
 	fmt.Println()
@@ -270,6 +321,11 @@ func printUsage() {
 	fmt.Println("Examples:")
 	fmt.Println("  ballast")
 	fmt.Println("  ballast install --target cursor --all")
+	fmt.Println("  ballast install --refresh-config")
+	fmt.Println("  ballast install-cli --language python")
+	fmt.Println("  ballast doctor")
+	fmt.Println("  ballast doctor --fix")
+	fmt.Println("  ballast install-cli --language go --version 5.0.2")
 	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go monorepo")
 	fmt.Println("  ballast --language python install --target codex --agent linting")
 	fmt.Println("  ballast --version")
@@ -347,14 +403,19 @@ func languageNames() []string {
 }
 
 func ensureInstalled(tool toolConfig) error {
-	currentPath, err := execLookPathFunc(tool.binary)
+	root := findProjectRoot("")
+	lang, ok := languageForBinary(tool.binary)
+	if !ok {
+		return fmt.Errorf("unsupported tool binary: %s", tool.binary)
+	}
+	local := projectLocalBackendCommand(root, lang)
 	desiredVersion := resolveVersion()
 	desiredRelease := releaseVersion(desiredVersion)
-	if err == nil {
+	if local.Binary != "" {
 		if desiredRelease == "" {
 			return nil
 		}
-		currentVersion, versionErr := resolveInstalledVersionFunc(tool)
+		currentVersion, versionErr := resolveCommandVersion(local.Binary)
 		if versionErr == nil && normalizeVersion(currentVersion) == normalizeVersion(desiredRelease) {
 			return nil
 		}
@@ -374,14 +435,20 @@ func ensureInstalled(tool toolConfig) error {
 			)
 		}
 	} else {
-		fmt.Printf("%s not found. Installing...\n", tool.binary)
+		fmt.Printf("%s not found in %s. Installing...\n", tool.binary, filepath.Join(root, ".ballast"))
 	}
 
 	if tool.installCommand == nil {
 		return fmt.Errorf("%s is not installed and no installer is configured", tool.binary)
 	}
 
-	installCommand := tool.installCommand(desiredVersion)
+	if err := ensureLocalToolDirs(root); err != nil {
+		return err
+	}
+	installCommand, err := tool.installCommand(desiredVersion, root)
+	if err != nil {
+		return fmt.Errorf("prepare install for %s: %w", tool.binary, err)
+	}
 	if len(installCommand) == 0 {
 		return fmt.Errorf("%s is not installed and no installer is configured", tool.binary)
 	}
@@ -390,15 +457,216 @@ func ensureInstalled(tool toolConfig) error {
 		return fmt.Errorf("failed to install %s: %w", tool.binary, err)
 	}
 
-	if currentPath != "" {
-		if _, err := execLookPathFunc(tool.binary); err != nil {
-			return fmt.Errorf("reinstalled %s but it is no longer on PATH", tool.binary)
-		}
-	}
-	if _, err := execLookPathFunc(tool.binary); err != nil {
-		return fmt.Errorf("installed dependencies but %s is still not on PATH", tool.binary)
+	local = projectLocalBackendCommand(root, lang)
+	if local.Binary == "" {
+		return fmt.Errorf("installed dependencies but %s is still not available in %s", tool.binary, filepath.Join(root, ".ballast"))
 	}
 	return nil
+}
+
+func runInstallCLI(selectedLanguage language, args []string) int {
+	version, err := parseInstallCLIVersion(args)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	return installCLIs(selectedLanguage, version)
+}
+
+func installCLIs(selectedLanguage language, version string) int {
+	root := findProjectRoot("")
+	if err := ensureLocalToolDirs(root); err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	var languagesToInstall []language
+	if selectedLanguage != "" {
+		languagesToInstall = []language{selectedLanguage}
+	} else {
+		languagesToInstall = slices.Clone(supportedLanguages)
+	}
+
+	for _, lang := range languagesToInstall {
+		tool, ok := toolsByLanguage[lang]
+		if !ok {
+			fmt.Printf("Unsupported language: %s\n", lang)
+			return 1
+		}
+		command, err := tool.installCommand(version, root)
+		if err != nil {
+			fmt.Printf("failed to prepare %s install: %v\n", tool.binary, err)
+			return 1
+		}
+		if len(command) == 0 {
+			fmt.Printf("No installer configured for %s\n", lang)
+			return 1
+		}
+		if err := runCommandFunc(command[0], command[1:]); err != nil {
+			fmt.Printf("failed to install %s: %v\n", tool.binary, err)
+			return 1
+		}
+	}
+
+	return 0
+}
+
+func runDoctor(selectedLanguage language, args []string) int {
+	fix, err := parseDoctorFix(args)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	root := findProjectRoot("")
+	printDoctorSummary(root, selectedLanguage, fix)
+
+	if fix {
+		if exitCode := installCLIs(selectedLanguage, resolveVersion()); exitCode != 0 {
+			return exitCode
+		}
+		if fileExists(filepath.Join(root, ".rulesrc.json")) {
+			refreshArgs := []string{"install", "--refresh-config"}
+			if selectedLanguage != "" {
+				refreshArgs = append([]string{"--language", string(selectedLanguage)}, refreshArgs...)
+			}
+			return run(refreshArgs)
+		}
+		return 0
+	}
+	return 0
+}
+
+func printDoctorSummary(root string, selectedLanguage language, fix bool) {
+	fmt.Println("Ballast doctor")
+	fmt.Printf("Project root: %s\n", root)
+	if selectedLanguage != "" {
+		fmt.Printf("Fix target: %s\n", selectedLanguage)
+	}
+	if fix {
+		fmt.Println("Mode: fix")
+	}
+	fmt.Println()
+
+	fmt.Println("Installed backends:")
+	for _, status := range collectDoctorBackendsFunc(root) {
+		if !status.Found {
+			fmt.Printf("- %s: not found\n", status.Name)
+			continue
+		}
+		version := status.Version
+		if strings.TrimSpace(version) == "" {
+			version = "unknown"
+		}
+		fmt.Printf("- %s: %s (%s)\n", status.Name, version, status.Location)
+	}
+	fmt.Println()
+
+	fmt.Println("Config:")
+	configPath := filepath.Join(root, ".rulesrc.json")
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		fmt.Printf("- .rulesrc.json: unreadable (%v)\n", err)
+		fmt.Println()
+		return
+	}
+	if config == nil {
+		fmt.Println("- .rulesrc.json: not found")
+		fmt.Println()
+		return
+	}
+	fmt.Printf("- file: %s\n", configPath)
+	if strings.TrimSpace(config.BallastVersion) == "" {
+		fmt.Println("- ballastVersion: missing")
+	} else {
+		fmt.Printf("- ballastVersion: %s\n", config.BallastVersion)
+	}
+	if strings.TrimSpace(config.Target) != "" {
+		fmt.Printf("- target: %s\n", config.Target)
+	}
+	if len(config.Agents) > 0 {
+		fmt.Printf("- agents: %s\n", strings.Join(config.Agents, ", "))
+	}
+	fmt.Println()
+}
+
+func parseDoctorFix(args []string) (bool, error) {
+	fix := false
+	for _, arg := range args {
+		switch arg {
+		case "--fix":
+			fix = true
+		default:
+			return false, fmt.Errorf("unknown doctor option: %s", arg)
+		}
+	}
+	return fix, nil
+}
+
+func parseInstallCLIVersion(args []string) (string, error) {
+	version := ""
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		switch {
+		case strings.HasPrefix(arg, "--version="):
+			version = strings.TrimSpace(strings.TrimPrefix(arg, "--version="))
+		case arg == "--version":
+			if index+1 >= len(args) {
+				return "", errors.New("missing value for --version")
+			}
+			version = strings.TrimSpace(args[index+1])
+			index++
+		default:
+			return "", fmt.Errorf("unknown install-cli option: %s", arg)
+		}
+	}
+	return version, nil
+}
+
+func normalizeInstallArgs(args []string, root string) ([]string, error) {
+	if len(args) == 0 || args[0] != "install" {
+		return args, nil
+	}
+
+	filtered := []string{args[0]}
+	refreshConfig := false
+	for index := 1; index < len(args); index++ {
+		arg := args[index]
+		if arg == "--refresh-config" {
+			refreshConfig = true
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+
+	if !refreshConfig {
+		return filtered, nil
+	}
+	if !fileExists(filepath.Join(root, ".rulesrc.json")) {
+		return nil, errors.New("--refresh-config requires an existing .rulesrc.json")
+	}
+	if findFlagValue(filtered, "--target", "-t") == "" && !hasFlag(filtered, "--yes", "-y") {
+		filtered = append(filtered, "--yes")
+	}
+	return filtered, nil
+}
+
+func ensureLocalToolDirs(root string) error {
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "bin"), 0o755); err != nil {
+		return fmt.Errorf("create local ballast bin dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "tools"), 0o755); err != nil {
+		return fmt.Errorf("create local ballast tools dir: %w", err)
+	}
+	return nil
+}
+
+func hasFlag(args []string, longFlag string, shortFlag string) bool {
+	for _, arg := range args {
+		if arg == longFlag || arg == shortFlag {
+			return true
+		}
+	}
+	return false
 }
 
 func runCommand(name string, args []string) error {
@@ -409,8 +677,8 @@ func runCommand(name string, args []string) error {
 	return cmd.Run()
 }
 
-func resolveInstalledVersion(tool toolConfig) (string, error) {
-	output, err := exec.Command(tool.binary, "--version").CombinedOutput()
+func resolveCommandVersion(binary string) (string, error) {
+	output, err := exec.Command(binary, "--version").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("run --version: %w", err)
 	}
@@ -419,6 +687,72 @@ func resolveInstalledVersion(tool toolConfig) (string, error) {
 		return "", errors.New("empty version output")
 	}
 	return versionText, nil
+}
+
+func resolveInstalledVersion(tool toolConfig) (string, error) {
+	return resolveCommandVersion(tool.binary)
+}
+
+func resolveCommandVersionWithArgs(binary string, args []string, env map[string]string) (string, error) {
+	cmd := exec.Command(binary, append(append([]string(nil), args...), "--version")...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), envPairs(env)...)
+	}
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("run --version: %w", err)
+	}
+	versionText := strings.TrimSpace(string(output))
+	if versionText == "" {
+		return "", errors.New("empty version output")
+	}
+	return versionText, nil
+}
+
+func collectDoctorBackends(root string) []doctorBackendStatus {
+	statuses := make([]doctorBackendStatus, 0, len(supportedLanguages))
+	for _, lang := range supportedLanguages {
+		tool := toolsByLanguage[lang]
+		resolved := resolveBackendCommand(lang, tool, nil, nil)
+		statuses = append(statuses, detectDoctorBackendStatus(resolved, tool))
+	}
+	return statuses
+}
+
+func detectDoctorBackendStatus(resolved resolvedBackendCommand, tool toolConfig) doctorBackendStatus {
+	location := resolvedCommandLocation(resolved)
+	if resolved.UseLocal {
+		version, err := resolveCommandVersionWithArgs(resolved.Binary, resolved.Args, resolved.Env)
+		if err != nil {
+			return doctorBackendStatus{Name: tool.binary, Version: "", Location: location, Found: true}
+		}
+		return doctorBackendStatus{Name: tool.binary, Version: version, Location: location, Found: true}
+	}
+
+	binaryPath, err := execLookPathFunc(resolved.Binary)
+	if err != nil {
+		return doctorBackendStatus{Name: tool.binary}
+	}
+
+	version, err := resolveCommandVersionWithArgs(resolved.Binary, resolved.Args, resolved.Env)
+	if err != nil {
+		return doctorBackendStatus{Name: tool.binary, Version: "", Location: binaryPath, Found: true}
+	}
+	return doctorBackendStatus{Name: tool.binary, Version: version, Location: binaryPath, Found: true}
+}
+
+func resolvedCommandLocation(resolved resolvedBackendCommand) string {
+	switch resolved.Binary {
+	case "node":
+		if len(resolved.Args) > 0 {
+			return resolved.Args[0]
+		}
+	case "python3":
+		if pythonPath := strings.TrimSpace(resolved.Env["PYTHONPATH"]); pythonPath != "" {
+			return pythonPath
+		}
+	}
+	return resolved.Binary
 }
 
 func execTool(binary string, args []string, dir string, env map[string]string) (int, error) {
@@ -442,6 +776,23 @@ func execTool(binary string, args []string, dir string, env map[string]string) (
 	return 0, nil
 }
 
+func loadDoctorConfig(root string) (*monorepoConfig, error) {
+	path := filepath.Join(root, ".rulesrc.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	var config monorepoConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return &config, nil
+}
+
 type resolvedBackendCommand struct {
 	Binary   string
 	Args     []string
@@ -453,6 +804,14 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 	mergedEnv := cloneEnvMap(env)
 	repoRoot := findBallastSourceRoot()
 	if repoRoot == "" {
+		projectRoot := findProjectRoot("")
+		local := projectLocalBackendCommand(projectRoot, lang)
+		if local.Binary != "" {
+			local.Args = append(local.Args, args...)
+			local.Env = mergeResolvedEnv(mergedEnv, local.Env)
+			local.UseLocal = true
+			return local
+		}
 		return resolvedBackendCommand{
 			Binary: tool.binary,
 			Args:   append([]string(nil), args...),
@@ -469,6 +828,15 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 		}
 	}
 
+	projectRoot := findProjectRoot("")
+	projectLocal := projectLocalBackendCommand(projectRoot, lang)
+	if projectLocal.Binary != "" {
+		projectLocal.Args = append(projectLocal.Args, args...)
+		projectLocal.Env = mergeResolvedEnv(mergedEnv, projectLocal.Env)
+		projectLocal.UseLocal = true
+		return projectLocal
+	}
+
 	if mergedEnv == nil {
 		mergedEnv = map[string]string{}
 	}
@@ -483,6 +851,20 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 		Env:      mergedEnv,
 		UseLocal: true,
 	}
+}
+
+func mergeResolvedEnv(base map[string]string, extra map[string]string) map[string]string {
+	if len(base) == 0 && len(extra) == 0 {
+		return nil
+	}
+	merged := cloneEnvMap(base)
+	if merged == nil {
+		merged = map[string]string{}
+	}
+	for key, value := range extra {
+		merged[key] = value
+	}
+	return merged
 }
 
 func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendCommand {
@@ -520,6 +902,40 @@ func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendC
 		}
 	}
 	return resolvedBackendCommand{}
+}
+
+func projectLocalBackendCommand(projectRoot string, lang language) resolvedBackendCommand {
+	switch lang {
+	case langTypeScript:
+		binary := filepath.Join(projectRoot, ".ballast", "tools", "typescript", "node_modules", ".bin", "ballast-typescript")
+		if fileExists(binary) {
+			return resolvedBackendCommand{Binary: binary}
+		}
+	case langPython:
+		binary := filepath.Join(projectRoot, ".ballast", "bin", "ballast-python")
+		if fileExists(binary) {
+			return resolvedBackendCommand{Binary: binary}
+		}
+	case langGo:
+		binary := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
+		if fileExists(binary) {
+			return resolvedBackendCommand{Binary: binary}
+		}
+	}
+	return resolvedBackendCommand{}
+}
+
+func languageForBinary(binary string) (language, bool) {
+	switch binary {
+	case "ballast-typescript":
+		return langTypeScript, true
+	case "ballast-python":
+		return langPython, true
+	case "ballast-go":
+		return langGo, true
+	default:
+		return "", false
+	}
 }
 
 func siblingBackendBinary(lang language) (string, bool) {
@@ -632,10 +1048,11 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	}
 
 	configToSave := monorepoConfig{
-		Target:    installTarget,
-		Agents:    selectedAgents,
-		Languages: make([]string, 0, len(profiles)),
-		Paths:     map[string][]string{},
+		Target:         installTarget,
+		Agents:         selectedAgents,
+		BallastVersion: normalizeVersion(resolveVersion()),
+		Languages:      make([]string, 0, len(profiles)),
+		Paths:          map[string][]string{},
 	}
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))

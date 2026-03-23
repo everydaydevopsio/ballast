@@ -4,6 +4,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import metadata
@@ -135,7 +137,16 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
             return None
         if not all(isinstance(item, str) for item in agents):
             return None
-        return {"target": target, "agents": agents}
+        ballast_version_value = data.get("ballastVersion")
+        return {
+            "target": target,
+            "agents": agents,
+            "ballastVersion": (
+                ballast_version_value
+                if isinstance(ballast_version_value, str)
+                else None
+            ),
+        }
     except Exception:
         return None
 
@@ -176,6 +187,7 @@ def save_config(root: Path, language: str, target: str, agents: list[str]) -> No
             {
                 "target": target,
                 "agents": agents,
+                "ballastVersion": ballast_version(),
                 "languages": languages,
                 "paths": paths,
             },
@@ -183,6 +195,172 @@ def save_config(root: Path, language: str, target: str, agents: list[str]) -> No
         ),
         encoding="utf-8",
     )
+
+
+def compare_versions(left: str, right: str) -> int:
+    if left == right:
+        return 0
+    try:
+        left_parts = [int(part) for part in left.split(".")]
+    except ValueError:
+        left_parts = []
+        left_numeric = False
+    else:
+        left_numeric = True
+    try:
+        right_parts = [int(part) for part in right.split(".")]
+    except ValueError:
+        right_parts = []
+        right_numeric = False
+    else:
+        right_numeric = True
+    if left_numeric and not right_numeric:
+        return 1
+    if not left_numeric and right_numeric:
+        return -1
+    if not left_numeric or not right_numeric:
+        return -1 if left < right else 1
+    length = max(len(left_parts), len(right_parts))
+    for index in range(length):
+        delta = (left_parts[index] if index < len(left_parts) else 0) - (
+            right_parts[index] if index < len(right_parts) else 0
+        )
+        if delta != 0:
+            return delta
+    return 0
+
+
+def latest_version(values: list[str | None]) -> str:
+    versions = [value for value in values if isinstance(value, str) and value]
+    if not versions:
+        return ballast_version()
+    current = versions[0]
+    for value in versions[1:]:
+        if compare_versions(value, current) > 0:
+            current = value
+    return current
+
+
+def detect_installed_cli(name: str) -> dict[str, str | None]:
+    cli_path = shutil.which(name)
+    if cli_path is None:
+        return {"name": name, "version": None, "path": None}
+    result = subprocess.run(
+        [name, "--version"], capture_output=True, text=True, check=False
+    )
+    version = result.stdout.strip() if result.returncode == 0 else None
+    return {"name": name, "version": version, "path": cli_path}
+
+
+def upgrade_command(name: str, version: str) -> str:
+    _ = (name, version)
+    return "ballast doctor --fix"
+
+
+def build_doctor_report(
+    current_cli: str,
+    current_version: str,
+    config_path: Path | None,
+    config: dict[str, object] | None,
+    installed: list[dict[str, str | None]],
+) -> str:
+    config_version = (
+        config.get("ballastVersion")
+        if isinstance(config, dict) and isinstance(config.get("ballastVersion"), str)
+        else None
+    )
+    target_version = latest_version(
+        [current_version, config_version]
+        + [item.get("version") for item in installed if isinstance(item, dict)]
+    )
+    recommendations: list[str] = []
+    needs_cli_fix = False
+
+    for item in installed:
+        version = item["version"]
+        if version is None:
+            needs_cli_fix = True
+            continue
+        if compare_versions(version, target_version) < 0:
+            needs_cli_fix = True
+
+    if needs_cli_fix:
+        recommendations.append(
+            "Run ballast doctor --fix to install or upgrade local Ballast CLIs."
+        )
+
+    if config_path is not None and (
+        config_version is None or compare_versions(config_version, target_version) < 0
+    ):
+        target = config.get("target") if isinstance(config, dict) else None
+        agents = config.get("agents") if isinstance(config, dict) else None
+        if (
+            isinstance(target, str)
+            and isinstance(agents, list)
+            and all(isinstance(agent, str) for agent in agents)
+        ):
+            recommendations.append(
+                f"Refresh {config_path.name} to Ballast {target_version}: "
+                "ballast install --refresh-config"
+            )
+        else:
+            recommendations.append(
+                f"Refresh {config_path.name} with a current Ballast install command."
+            )
+
+    lines = [
+        "Ballast doctor",
+        f"Current CLI: {current_cli} {current_version}",
+        "",
+        "Installed CLIs:",
+    ]
+    for item in installed:
+        if item["path"] is None:
+            lines.append(f"- {item['name']}: not found")
+            continue
+        lines.append(
+            f"- {item['name']}: {item['version'] or 'unknown'} ({item['path']})"
+        )
+
+    lines.extend(["", "Config:"])
+    if config_path is None or config is None:
+        lines.append("- .rulesrc.json: not found")
+    else:
+        lines.append(f"- file: {config_path}")
+        lines.append(f"- ballastVersion: {config_version or 'missing'}")
+        target = config.get("target")
+        agents = config.get("agents")
+        if isinstance(target, str):
+            lines.append(f"- target: {target}")
+        if isinstance(agents, list) and all(isinstance(agent, str) for agent in agents):
+            lines.append(f"- agents: {', '.join(agents)}")
+
+    lines.extend(["", "Recommendations:"])
+    if recommendations:
+        lines.extend(f"- {item}" for item in recommendations)
+    else:
+        lines.append("- No action needed.")
+    return "\n".join(lines) + "\n"
+
+
+def run_doctor() -> int:
+    root = resolve_project_root(Path.cwd())
+    config_path = root / rulesrc_filename("python")
+    if not config_path.exists():
+        config_path = None
+    config = load_config(root, "python")
+    installed = [
+        detect_installed_cli("ballast-typescript"),
+        detect_installed_cli("ballast-python"),
+        detect_installed_cli("ballast-go"),
+    ]
+    print(
+        build_doctor_report(
+            "ballast-python", ballast_version(), config_path, config, installed
+        ),
+        end="",
+    )
+    return 0
 
 
 def parse_agent_tokens(raw: str | None, all_agents: bool, language: str) -> list[str]:
@@ -988,6 +1166,9 @@ def parser() -> argparse.ArgumentParser:
     install_cmd.add_argument("--force", "-f", action="store_true")
     install_cmd.add_argument("--patch", "-p", action="store_true")
     install_cmd.add_argument("--yes", "-y", action="store_true")
+    sub.add_parser(
+        "doctor", help="Check local Ballast CLI versions and .rulesrc.json metadata"
+    )
     return p
 
 
@@ -995,6 +1176,8 @@ def main(argv: list[str] | None = None) -> int:
     p = parser()
     args = p.parse_args(argv)
     command = args.command or "install"
+    if command == "doctor":
+        return run_doctor()
     if command != "install":
         print(f"Unknown command: {command}")
         return 1

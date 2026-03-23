@@ -2,6 +2,8 @@
 
 import { runInstall } from './install';
 import { LANGUAGES } from './agents';
+import { runDoctor } from './doctor';
+import { BALLAST_VERSION } from './version';
 
 export interface CliOptions {
   target?: string;
@@ -13,10 +15,18 @@ export interface CliOptions {
   yes: boolean;
 }
 
-export type ParseArgsResult = CliOptions | { help: true } | { version: true };
+export type ParseArgsResult =
+  | CliOptions
+  | { help: true }
+  | { version: true }
+  | { doctor: true };
 
-function parseArgs(argv: string[]): ParseArgsResult {
+export function parseArgs(argv: string[]): ParseArgsResult {
   const args = argv.slice(2);
+  const command = args[0];
+  if (command === 'doctor') {
+    return { doctor: true };
+  }
   const options: CliOptions = {
     target: undefined,
     agents: [],
@@ -81,7 +91,7 @@ function parseArgs(argv: string[]): ParseArgsResult {
   return options;
 }
 
-function printHelp(): void {
+export function printHelp(): void {
   const pkg = require('../package.json');
   console.log(`
 ${pkg.name} v${pkg.version}
@@ -90,6 +100,7 @@ Usage: ballast-typescript install [options]
 
 Commands:
   install    Install agent rules for the chosen AI platform (default)
+  doctor     Check local Ballast CLI versions and .rulesrc.json metadata
 
 Options:
   --target, -t <platform>   AI platform: cursor, claude, opencode, codex
@@ -112,12 +123,11 @@ Examples:
 `);
 }
 
-function printVersion(): void {
-  const pkg = require('../package.json');
-  console.log(pkg.version);
+export function printVersion(): void {
+  console.log(BALLAST_VERSION);
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const argv = process.argv;
   const command = argv[2];
   const isInstall = !command || command === 'install';
@@ -132,6 +142,9 @@ async function main(): Promise<void> {
   }
 
   if (!isInstall) {
+    if (command === 'doctor') {
+      process.exit(runDoctor());
+    }
     console.error(`Unknown command: ${command}`);
     console.error('Run ballast-typescript --help for usage.');
     process.exit(1);
@@ -145,6 +158,9 @@ async function main(): Promise<void> {
   if ('version' in options && options.version) {
     printVersion();
     process.exit(0);
+  }
+  if ('doctor' in options && options.doctor) {
+    process.exit(runDoctor());
   }
   const cliOptions = options as CliOptions;
   if (!LANGUAGES.includes(cliOptions.language as (typeof LANGUAGES)[number])) {
@@ -160,7 +176,9 @@ async function main(): Promise<void> {
   process.exit(exitCode);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

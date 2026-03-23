@@ -12,6 +12,56 @@ from ballast import cli
 
 
 class PatchInstallTests(unittest.TestCase):
+    def test_build_doctor_report_recommends_upgrades(self) -> None:
+        output = cli.build_doctor_report(
+            "ballast-python",
+            "5.0.2",
+            Path("/tmp/project/.rulesrc.json"),
+            {
+                "target": "cursor",
+                "agents": ["linting", "testing"],
+                "ballastVersion": "5.0.1",
+            },
+            [
+                {
+                    "name": "ballast-typescript",
+                    "version": "5.0.2",
+                    "path": "/tmp/ballast-typescript",
+                },
+                {
+                    "name": "ballast-python",
+                    "version": "5.0.1",
+                    "path": "/tmp/ballast-python",
+                },
+                {"name": "ballast-go", "version": None, "path": None},
+            ],
+        )
+
+        self.assertIn(
+            "Run ballast doctor --fix to install or upgrade local Ballast CLIs.",
+            output,
+        )
+        self.assertIn(
+            "Refresh .rulesrc.json to Ballast 5.0.2: ballast install --refresh-config",
+            output,
+        )
+
+    def test_parser_top_level_help_flag_exits_zero(self) -> None:
+        with self.assertRaises(SystemExit) as exc:
+            cli.parser().parse_args(["--help"])
+
+        self.assertEqual(exc.exception.code, 0)
+
+    def test_parser_top_level_version_flag_exits_zero(self) -> None:
+        with self.assertRaises(SystemExit) as exc:
+            cli.parser().parse_args(["--version"])
+
+        self.assertEqual(exc.exception.code, 0)
+
+    def test_parser_doctor_command(self) -> None:
+        args = cli.parser().parse_args(["doctor"])
+        self.assertEqual(args.command, "doctor")
+
     def test_destination_rejects_invalid_rule_subdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -42,6 +92,7 @@ class PatchInstallTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertTrue((root / ".rulesrc.json").exists())
             content = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"ballastVersion":', content)
             self.assertIn('"languages": [', content)
             self.assertIn('"python"', content)
             self.assertIn('"paths": {', content)
@@ -54,6 +105,7 @@ class PatchInstallTests(unittest.TestCase):
             cli.save_config(root, "go", "claude", ["linting"])
 
             content = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"ballastVersion":', content)
             self.assertIn('"languages": [', content)
             self.assertIn('"python"', content)
             self.assertIn('"go"', content)

@@ -10,6 +10,7 @@ export type Target = 'cursor' | 'claude' | 'opencode' | 'codex';
 export interface RulesConfig {
   target: Target;
   agents: string[];
+  ballastVersion?: string;
   languages?: string[];
   paths?: Record<string, string[]>;
 }
@@ -77,10 +78,14 @@ export function loadConfig(
       !Array.isArray((data as RulesConfig).agents)
     )
       return null;
-    return {
+    const config: RulesConfig = {
       target: (data as RulesConfig).target,
       agents: (data as RulesConfig).agents
     };
+    if (typeof (data as RulesConfig).ballastVersion === 'string') {
+      config.ballastVersion = (data as RulesConfig).ballastVersion;
+    }
+    return config;
   } catch {
     return null;
   }
@@ -92,12 +97,13 @@ export function loadConfig(
 export function saveConfig(config: RulesConfig, projectRoot?: string): void {
   const root = projectRoot ?? findProjectRoot();
   const filePath = path.join(root, getRulesrcFilename());
+  const existing = loadRawConfig(filePath);
   let nextConfig: RulesConfig = {
     target: config.target,
-    agents: config.agents
+    agents: config.agents,
+    ballastVersion: config.ballastVersion ?? existing?.ballastVersion
   };
 
-  const existing = loadRawConfig(filePath);
   const mergedLanguages = mergeLanguages(existing, config);
   const mergedPaths = mergePaths(existing, config, mergedLanguages);
   if (mergedLanguages.length > 0) {
