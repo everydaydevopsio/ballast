@@ -387,6 +387,101 @@ func TestRunInstallCLIUsesLocalSourcesForDevWrapper(t *testing.T) {
 	}
 }
 
+func TestRunInstallCLIUsesLocalSourcesInsideSourceCheckoutForReleaseWrapper(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "5.0.4"
+	sourceRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(sourceRoot, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(t.TempDir(), "bin", "ballast"), nil
+	}
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	withWorkingDir(t, sourceRoot, func() {
+		exitCode := run([]string{"install-cli"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 3 {
+		t.Fatalf("expected 3 install commands, got %#v", commands)
+	}
+	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(sourceRoot, ".ballast", "tools", "typescript")+" "+filepath.Join(sourceRoot, "packages", "ballast-typescript") {
+		t.Fatalf("unexpected local typescript install command: %q", got)
+	}
+	if got := strings.Join(commands[1], " "); got != "env UV_TOOL_DIR="+filepath.Join(sourceRoot, ".ballast", "tools", "python")+" UV_TOOL_BIN_DIR="+filepath.Join(sourceRoot, ".ballast", "bin")+" uv tool install --reinstall "+filepath.Join(sourceRoot, "packages", "ballast-python") {
+		t.Fatalf("unexpected local python install command: %q", got)
+	}
+	if got := strings.Join(commands[2], " "); got != "go build -C "+filepath.Join(sourceRoot, "packages", "ballast-go")+" -o "+filepath.Join(sourceRoot, ".ballast", "bin", "ballast-go")+" ./cmd/ballast-go" {
+		t.Fatalf("unexpected local go install command: %q", got)
+	}
+}
+
+func TestRunInstallCLIUsesLocalSourcesFromNestedPackageDirForReleaseWrapper(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "5.0.4"
+	sourceRoot := t.TempDir()
+	nestedRoot := filepath.Join(sourceRoot, "packages", "ballast-python")
+	mustWriteFile(t, filepath.Join(sourceRoot, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(nestedRoot, "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(t.TempDir(), "bin", "ballast"), nil
+	}
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	withWorkingDir(t, nestedRoot, func() {
+		exitCode := run([]string{"install-cli"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 3 {
+		t.Fatalf("expected 3 install commands, got %#v", commands)
+	}
+	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(nestedRoot, ".ballast", "tools", "typescript")+" "+filepath.Join(sourceRoot, "packages", "ballast-typescript") {
+		t.Fatalf("unexpected local typescript install command: %q", got)
+	}
+	if got := strings.Join(commands[1], " "); got != "env UV_TOOL_DIR="+filepath.Join(nestedRoot, ".ballast", "tools", "python")+" UV_TOOL_BIN_DIR="+filepath.Join(nestedRoot, ".ballast", "bin")+" uv tool install --reinstall "+filepath.Join(sourceRoot, "packages", "ballast-python") {
+		t.Fatalf("unexpected local python install command: %q", got)
+	}
+	if got := strings.Join(commands[2], " "); got != "go build -C "+filepath.Join(sourceRoot, "packages", "ballast-go")+" -o "+filepath.Join(nestedRoot, ".ballast", "bin", "ballast-go")+" ./cmd/ballast-go" {
+		t.Fatalf("unexpected local go install command: %q", got)
+	}
+}
+
 func TestDetectRepoProfilesFindsMultiLanguageMonorepo(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
