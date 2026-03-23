@@ -48,7 +48,7 @@ Agent sources in this repo:
 
 ```bash
 brew tap everydaydevopsio/ballast
-brew reinstall --formula ballast
+brew reinstall --formula everydaydevopsio/ballast/ballast
 ballast install --target cursor --all
 ballast doctor
 ballast install-cli --language python
@@ -61,6 +61,29 @@ brew tap everydaydevopsio/ballast
 brew install --cask ballast
 ballast install --target cursor --all
 ```
+
+### Homebrew Troubleshooting
+
+If Homebrew still installs an older Ballast release after the tap has been updated, your local tap checkout is stale. Reset the tap to the latest `origin/HEAD`, then reinstall the fully qualified formula:
+
+```bash
+brew update-reset "$(brew --repository everydaydevopsio/ballast)"
+brew info --formula everydaydevopsio/ballast/ballast
+brew reinstall --formula everydaydevopsio/ballast/ballast
+```
+
+If the tap still does not refresh, remove and re-add it:
+
+```bash
+brew untap everydaydevopsio/ballast
+brew tap everydaydevopsio/ballast
+brew reinstall --formula everydaydevopsio/ballast/ballast
+```
+
+Notes:
+
+- Use `everydaydevopsio/ballast/ballast` for the Linux formula. Plain `ballast` can collide with an unrelated Homebrew cask.
+- Verify the installed version with `brew info --formula everydaydevopsio/ballast/ballast` and `ballast --version`.
 
 ### TypeScript (npm)
 
