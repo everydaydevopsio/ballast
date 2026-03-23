@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -34,10 +35,11 @@ var hookGuidanceToken = "{{BALLAST_HOOK_GUIDANCE}}"
 var embeddedAgentsFS embed.FS
 
 type rulesConfig struct {
-	Target    string              `json:"target"`
-	Agents    []string            `json:"agents"`
-	Languages []string            `json:"languages,omitempty"`
-	Paths     map[string][]string `json:"paths,omitempty"`
+	Target         string              `json:"target"`
+	Agents         []string            `json:"agents"`
+	BallastVersion string              `json:"ballastVersion,omitempty"`
+	Languages      []string            `json:"languages,omitempty"`
+	Paths          map[string][]string `json:"paths,omitempty"`
 }
 
 type installResult struct {
@@ -89,14 +91,27 @@ type yamlBlock struct {
 	text string
 }
 
+type installedCLIStatus struct {
+	Name    string
+	Version string
+	Path    string
+}
+
 func main() {
 	os.Exit(run(os.Args[1:]))
 }
 
 func run(args []string) int {
+	if hasHelpFlag(args) || isHelpCommand(args) {
+		printHelp()
+		return 0
+	}
 	if hasVersionFlag(args) || isVersionCommand(args) {
 		fmt.Println(resolveVersion())
 		return 0
+	}
+	if len(args) > 0 && args[0] == "doctor" {
+		return runDoctor()
 	}
 	if len(args) == 0 || args[0] == "install" {
 		return runInstall(args)
@@ -121,6 +136,9 @@ func runInstall(args []string) int {
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	if err := fs.Parse(trimCommand(args)); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return 1
 	}
 
@@ -233,6 +251,46 @@ func runInstall(args []string) int {
 	return 0
 }
 
+func printHelp() {
+	fmt.Printf(`
+ballast-go v%s
+
+Usage: ballast-go install [options]
+
+Commands:
+  install    Install agent rules for the chosen AI platform (default)
+  doctor     Check local Ballast CLI versions and .rulesrc.json metadata
+
+Options:
+  --target, -t <platform>   AI platform: %s
+  --language, -l <lang>     Language profile: %s (default: go)
+  --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
+  --all                     Install all agents
+  --force                   Overwrite existing rule files
+  --patch, -p               Merge upstream rule updates into existing files; ignored when --force is set
+  --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
+  --help, -h                Show this help
+  --version, -v             Show version
+
+Examples:
+  ballast-go install
+  ballast-go install --target cursor --agent linting
+  ballast-go install --language python --target cursor --all
+  ballast-go install --target claude --all --force
+  ballast-go install --target cursor --agent linting --patch
+  ballast-go install --yes --target cursor --all
+`, resolveVersion(), strings.Join(targets, ", "), strings.Join(languages, ", "))
+}
+
+func hasHelpFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
 func hasVersionFlag(args []string) bool {
 	for _, arg := range args {
 		if arg == "--version" || arg == "-v" {
@@ -246,6 +304,10 @@ func isVersionCommand(args []string) bool {
 	return len(args) == 1 && args[0] == "version"
 }
 
+func isHelpCommand(args []string) bool {
+	return len(args) == 1 && args[0] == "help"
+}
+
 func resolveVersion() string {
 	if strings.TrimSpace(ballastVersion) != "" && ballastVersion != "dev" {
 		return ballastVersion
@@ -257,6 +319,186 @@ func resolveVersion() string {
 		}
 	}
 	return ballastVersion
+}
+
+func compareVersions(left, right string) int {
+	if left == right {
+		return 0
+	}
+	leftParts, leftOK := parseVersionParts(left)
+	rightParts, rightOK := parseVersionParts(right)
+	if leftOK && !rightOK {
+		return 1
+	}
+	if !leftOK && rightOK {
+		return -1
+	}
+	if !leftOK || !rightOK {
+		if left < right {
+			return -1
+		}
+		return 1
+	}
+	length := max(len(leftParts), len(rightParts))
+	for index := 0; index < length; index++ {
+		leftPart := 0
+		rightPart := 0
+		if index < len(leftParts) {
+			leftPart = leftParts[index]
+		}
+		if index < len(rightParts) {
+			rightPart = rightParts[index]
+		}
+		if leftPart < rightPart {
+			return -1
+		}
+		if leftPart > rightPart {
+			return 1
+		}
+	}
+	return 0
+}
+
+func parseVersionParts(value string) ([]int, bool) {
+	parts := strings.Split(value, ".")
+	parsed := make([]int, 0, len(parts))
+	for _, part := range parts {
+		number := 0
+		if _, err := fmt.Sscanf(part, "%d", &number); err != nil {
+			return nil, false
+		}
+		parsed = append(parsed, number)
+	}
+	return parsed, true
+}
+
+func latestVersion(values ...string) string {
+	best := resolveVersion()
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		if compareVersions(value, best) > 0 {
+			best = value
+		}
+	}
+	return best
+}
+
+func detectInstalledCLI(name string) installedCLIStatus {
+	cliPath, err := exec.LookPath(name)
+	if err != nil {
+		return installedCLIStatus{Name: name}
+	}
+	output, err := exec.Command(name, "--version").Output()
+	if err != nil {
+		return installedCLIStatus{Name: name, Path: cliPath}
+	}
+	return installedCLIStatus{
+		Name:    name,
+		Version: strings.TrimSpace(string(output)),
+		Path:    cliPath,
+	}
+}
+
+func upgradeCommand(name, version string) string {
+	_ = name
+	_ = version
+	return "ballast doctor --fix"
+}
+
+func buildDoctorReport(currentCLI, currentVersion string, configPath string, config *rulesConfig, installed []installedCLIStatus) string {
+	configVersion := ""
+	if config != nil {
+		configVersion = strings.TrimSpace(config.BallastVersion)
+	}
+	targetVersion := latestVersion(currentVersion, configVersion)
+	for _, item := range installed {
+		targetVersion = latestVersion(targetVersion, item.Version)
+	}
+
+	lines := []string{
+		"Ballast doctor",
+		fmt.Sprintf("Current CLI: %s %s", currentCLI, currentVersion),
+		"",
+		"Installed CLIs:",
+	}
+	recommendations := []string{}
+	needsCLIFix := false
+	for _, item := range installed {
+		if item.Path == "" {
+			lines = append(lines, fmt.Sprintf("- %s: not found", item.Name))
+			needsCLIFix = true
+			continue
+		}
+		version := item.Version
+		if version == "" {
+			version = "unknown"
+		}
+		lines = append(lines, fmt.Sprintf("- %s: %s (%s)", item.Name, version, item.Path))
+		if item.Version != "" && compareVersions(item.Version, targetVersion) < 0 {
+			needsCLIFix = true
+		}
+	}
+	if needsCLIFix {
+		recommendations = append(recommendations, "Run ballast doctor --fix to install or upgrade local Ballast CLIs.")
+	}
+
+	lines = append(lines, "", "Config:")
+	if config == nil || configPath == "" {
+		lines = append(lines, "- .rulesrc.json: not found")
+	} else {
+		lines = append(lines, fmt.Sprintf("- file: %s", configPath))
+		if configVersion == "" {
+			lines = append(lines, "- ballastVersion: missing")
+		} else {
+			lines = append(lines, fmt.Sprintf("- ballastVersion: %s", configVersion))
+		}
+		lines = append(lines, fmt.Sprintf("- target: %s", config.Target))
+		lines = append(lines, fmt.Sprintf("- agents: %s", strings.Join(config.Agents, ", ")))
+		if configVersion == "" || compareVersions(configVersion, targetVersion) < 0 {
+			recommendations = append(
+				recommendations,
+				fmt.Sprintf("Refresh %s to Ballast %s: ballast install --refresh-config", filepath.Base(configPath), targetVersion),
+			)
+		}
+	}
+
+	lines = append(lines, "", "Recommendations:")
+	if len(recommendations) == 0 {
+		lines = append(lines, "- No action needed.")
+	} else {
+		for _, item := range recommendations {
+			lines = append(lines, "- "+item)
+		}
+	}
+
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func runDoctor() int {
+	root, err := findProjectRoot("")
+	if err != nil {
+		root = "."
+	}
+	configPath := filepath.Join(root, rulesrcFilename("go"))
+	config := loadConfig(root, "go")
+	if !exists(configPath) {
+		configPath = ""
+	}
+	report := buildDoctorReport(
+		"ballast-go",
+		resolveVersion(),
+		configPath,
+		config,
+		[]installedCLIStatus{
+			detectInstalledCLI("ballast-typescript"),
+			detectInstalledCLI("ballast-python"),
+			detectInstalledCLI("ballast-go"),
+		},
+	)
+	fmt.Print(report)
+	return 0
 }
 
 func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
@@ -1143,7 +1385,13 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 	filePath := filepath.Join(projectRoot, rulesrcFilename(language))
 	existing := loadConfig(projectRoot, language)
+	if strings.TrimSpace(cfg.BallastVersion) == "" {
+		cfg.BallastVersion = resolveVersion()
+	}
 	if existing != nil {
+		if cfg.BallastVersion == "" {
+			cfg.BallastVersion = existing.BallastVersion
+		}
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)
 		cfg.Paths = mergeLanguagePaths(existing.Paths, cfg.Languages)
 	} else {

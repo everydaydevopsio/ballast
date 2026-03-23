@@ -50,6 +50,8 @@ Agent sources in this repo:
 brew tap everydaydevopsio/ballast
 brew reinstall --formula ballast
 ballast install --target cursor --all
+ballast doctor
+ballast install-cli --language python
 ```
 
 ### Homebrew wrapper on macOS
@@ -123,6 +125,12 @@ Ballast only installs shipped agents and follows the single overwrite policy (ex
 - `--force, -f`: overwrite existing rule files
 - `--patch, -p`: merge upstream rule updates into existing rule files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
+
+## Wrapper Commands
+
+- `ballast install`: install rules for the detected or selected language; add `--refresh-config` to reapply saved `.rulesrc.json` settings and rewrite the config version
+- `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically
+- `ballast install-cli [--language <typescript|python|go>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release
 
 ## Config Files
 

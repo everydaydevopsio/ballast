@@ -15,6 +15,10 @@ run_language_smoke() {
   mkdir -p "${sample_dir}"
   cp -R "${REPO_ROOT}/examples/smoke/${sample}/." "${sample_dir}/"
 
+  "${binary}" --help >/dev/null
+  "${binary}" --version >/dev/null
+  "${binary}" doctor >/dev/null
+
   (
     cd "${sample_dir}"
     "${binary}" install --language "${language}" --target cursor --agent linting --yes

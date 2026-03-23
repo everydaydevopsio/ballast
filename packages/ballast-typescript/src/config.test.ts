@@ -9,6 +9,7 @@ import {
   RULESRC_FILENAME,
   getLegacyRulesrcFilename
 } from './config';
+import { BALLAST_VERSION } from './version';
 
 describe('config', () => {
   let tmpDir: string;
@@ -65,6 +66,19 @@ describe('config', () => {
       expect(loadConfig(tmpDir)).toEqual(config);
     });
 
+    test('returns ballastVersion when present', () => {
+      const config = {
+        target: 'claude' as const,
+        agents: ['linting', 'local-dev'],
+        ballastVersion: BALLAST_VERSION
+      };
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify(config)
+      );
+      expect(loadConfig(tmpDir)).toEqual(config);
+    });
+
     test('returns null when invalid (missing target)', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),
@@ -84,7 +98,11 @@ describe('config', () => {
 
   describe('saveConfig', () => {
     test('writes .rulesrc.json', () => {
-      const config = { target: 'opencode' as const, agents: ['cicd'] };
+      const config = {
+        target: 'opencode' as const,
+        agents: ['cicd'],
+        ballastVersion: BALLAST_VERSION
+      };
       saveConfig(config, tmpDir);
       const file = path.join(tmpDir, RULESRC_FILENAME);
       expect(fs.existsSync(file)).toBe(true);
@@ -97,6 +115,7 @@ describe('config', () => {
         {
           target: 'claude',
           agents: ['linting'],
+          ballastVersion: BALLAST_VERSION,
           languages: ['typescript']
         },
         tmpDir
@@ -105,6 +124,7 @@ describe('config', () => {
         {
           target: 'claude',
           agents: ['linting'],
+          ballastVersion: BALLAST_VERSION,
           languages: ['go']
         },
         tmpDir
@@ -116,6 +136,7 @@ describe('config', () => {
       expect(parsed).toEqual({
         target: 'claude',
         agents: ['linting'],
+        ballastVersion: BALLAST_VERSION,
         languages: ['typescript', 'go'],
         paths: {
           typescript: ['.'],

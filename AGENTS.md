@@ -49,6 +49,12 @@ pnpm run prettier:fix     # Auto-fix formatting
 - **Agents**: Only agents shipped in this repo are installable (no external bundle discovery).
 - **Docs sync**: When you add or update an agent, update the docs in `docs/` so they stay in sync: add or update `docs/agents/<id>.md` for that agent, and update the agent table in `docs/README.md` (and any other references, e.g. `docs/installation.md` if needed).
 
+## Command Sync
+
+- When you add, remove, or rename a CLI command or flag in any app (`cli/ballast`, `packages/ballast-typescript`, `packages/ballast-python`, `packages/ballast-go`), update the built-in help output in that app in the same change.
+- Keep command docs in sync with the shipped CLI surface. Update `README.md` and `docs/installation.md` whenever command examples, command names, or supported flags change.
+- Add or update tests that cover the command/help surface when changing CLI behavior so help text and implementation do not drift apart.
+
 ## License
 
 Default license for this project: **MIT**. If you add or modify license setup (LICENSE file, `package.json` license, README reference), use MIT unless this section specifies otherwise. To override, replace MIT with another SPDX identifier (e.g. Apache-2.0, ISC, BSD-3-Clause).

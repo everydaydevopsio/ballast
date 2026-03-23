@@ -1,12 +1,120 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 )
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	original := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("create stdout pipe: %v", err)
+	}
+	os.Stdout = writer
+	defer func() {
+		os.Stdout = original
+	}()
+
+	fn()
+
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close stdout writer: %v", err)
+	}
+
+	var out bytes.Buffer
+	if _, err := out.ReadFrom(reader); err != nil {
+		t.Fatalf("read captured stdout: %v", err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("close stdout reader: %v", err)
+	}
+
+	return out.String()
+}
+
+func TestRunTopLevelHelpFlag(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"--help"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "Usage: ballast-go install [options]") {
+		t.Fatalf("expected help output, got %q", output)
+	}
+}
+
+func TestRunTopLevelVersionFlag(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"--version"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(strings.TrimSpace(output), resolveVersion()) {
+		t.Fatalf("expected version output %q, got %q", resolveVersion(), output)
+	}
+}
+
+func TestRunInstallHelpFlag(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"install", "--help"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "Usage: ballast-go install [options]") {
+		t.Fatalf("expected help output, got %q", output)
+	}
+}
+
+func TestRunDoctorCommand(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"doctor"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "Ballast doctor") {
+		t.Fatalf("expected doctor output, got %q", output)
+	}
+}
+
+func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
+	output := buildDoctorReport(
+		"ballast-go",
+		"5.0.2",
+		"/tmp/project/.rulesrc.json",
+		&rulesConfig{
+			Target:         "cursor",
+			Agents:         []string{"linting", "testing"},
+			BallastVersion: "5.0.1",
+		},
+		[]installedCLIStatus{
+			{Name: "ballast-typescript", Version: "5.0.2", Path: "/tmp/ballast-typescript"},
+			{Name: "ballast-python", Version: "5.0.1", Path: "/tmp/ballast-python"},
+			{Name: "ballast-go"},
+		},
+	)
+
+	if !strings.Contains(output, "Run ballast doctor --fix to install or upgrade local Ballast CLIs.") {
+		t.Fatalf("expected cli fix recommendation, got %q", output)
+	}
+	if !strings.Contains(output, "Refresh .rulesrc.json to Ballast 5.0.2: ballast install --refresh-config") {
+		t.Fatalf("expected config refresh recommendation, got %q", output)
+	}
+}
 
 func TestPatchRuleContentPreservesExistingSections(t *testing.T) {
 	existing := `---
@@ -149,6 +257,9 @@ func TestRunInstallWritesSharedRulesrcForExplicitFlags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .rulesrc.json: %v", err)
 	}
+	if !strings.Contains(string(content), `"ballastVersion": "`+resolveVersion()+`"`) {
+		t.Fatalf("expected ballastVersion in shared config: %s", string(content))
+	}
 	if !strings.Contains(string(content), `"languages": [`+"\n"+`    "go"`) {
 		t.Fatalf("expected go language in shared config: %s", string(content))
 	}
@@ -180,6 +291,9 @@ func TestSaveConfigAccumulatesLanguagesInSharedRulesrc(t *testing.T) {
 		t.Fatalf("read .rulesrc.json: %v", err)
 	}
 	text := string(content)
+	if !strings.Contains(text, `"ballastVersion": "`+resolveVersion()+`"`) {
+		t.Fatalf("expected ballastVersion in shared config: %s", text)
+	}
 	if !strings.Contains(text, `"typescript"`) || !strings.Contains(text, `"go"`) {
 		t.Fatalf("expected accumulated languages in shared config: %s", text)
 	}

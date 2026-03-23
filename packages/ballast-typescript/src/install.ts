@@ -20,6 +20,7 @@ import {
 } from './agents';
 import { findProjectRoot, loadConfig, saveConfig, isCiMode } from './config';
 import type { Target } from './config';
+import { BALLAST_VERSION } from './version';
 
 function prompt(question: string): Promise<string> {
   const rl = readline.createInterface({
@@ -266,7 +267,15 @@ export function install(options: InstallOptions): InstallResult {
   const disableSupportFiles = process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
 
   if (persist) {
-    saveConfig({ target, agents, languages: [language] }, projectRoot);
+    saveConfig(
+      {
+        target,
+        agents,
+        ballastVersion: BALLAST_VERSION,
+        languages: [language]
+      },
+      projectRoot
+    );
   }
   const hookMode = resolveTsHookMode(projectRoot, language);
 
