@@ -25,7 +25,7 @@ var supportedLanguages = []language{langTypeScript, langPython, langGo}
 
 type toolConfig struct {
 	binary         string
-	installCommand func(version string, projectRoot string) []string
+	installCommand func(version string, projectRoot string) ([]string, error)
 }
 
 func localSourceRoot() string {
@@ -35,54 +35,57 @@ func localSourceRoot() string {
 var toolsByLanguage = map[language]toolConfig{
 	langTypeScript: {
 		binary: "ballast-typescript",
-		installCommand: func(version string, projectRoot string) []string {
+		installCommand: func(version string, projectRoot string) ([]string, error) {
 			toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
 			if releaseVersion(version) == "" {
 				if sourceRoot := localSourceRoot(); sourceRoot != "" {
-					return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}
+					return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
 				}
 			}
 			pkg := "@everydaydevopsio/ballast"
 			if releaseVersion(version) != "" {
 				pkg += "@" + releaseVersion(version)
 			}
-			return []string{"npm", "install", "--prefix", toolRoot, pkg}
+			return []string{"npm", "install", "--prefix", toolRoot, pkg}, nil
 		},
 	},
 	langPython: {
 		binary: "ballast-python",
-		installCommand: func(version string, projectRoot string) []string {
+		installCommand: func(version string, projectRoot string) ([]string, error) {
 			binDir := filepath.Join(projectRoot, ".ballast", "bin")
 			toolDir := filepath.Join(projectRoot, ".ballast", "tools", "python")
 			release := releaseVersion(version)
 			if release == "" {
 				if sourceRoot := localSourceRoot(); sourceRoot != "" {
-					return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", filepath.Join(sourceRoot, "packages", "ballast-python")}
+					return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", filepath.Join(sourceRoot, "packages", "ballast-python")}, nil
 				}
 				release = releaseVersion(resolveVersion())
+				if release == "" {
+					return nil, errors.New("ballast-python install requires a release version or a ballast source checkout")
+				}
 			}
 			wheel := fmt.Sprintf(
 				"https://github.com/everydaydevopsio/ballast/releases/download/v%s/ballast_python-%s-py3-none-any.whl",
 				release,
 				release,
 			)
-			return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", "--from", wheel, "ballast-python"}
+			return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", "--from", wheel, "ballast-python"}, nil
 		},
 	},
 	langGo: {
 		binary: "ballast-go",
-		installCommand: func(version string, projectRoot string) []string {
+		installCommand: func(version string, projectRoot string) ([]string, error) {
 			if releaseVersion(version) == "" {
 				if sourceRoot := localSourceRoot(); sourceRoot != "" {
 					moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
-					return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}
+					return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
 				}
 			}
 			target := "latest"
 			if release := releaseVersion(version); release != "" {
 				target = "v" + release
 			}
-			return []string{"env", "GOBIN=" + filepath.Join(projectRoot, ".ballast", "bin"), "go", "install", "github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@" + target}
+			return []string{"env", "GOBIN=" + filepath.Join(projectRoot, ".ballast", "bin"), "go", "install", "github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@" + target}, nil
 		},
 	},
 }
@@ -439,10 +442,13 @@ func ensureInstalled(tool toolConfig) error {
 		return fmt.Errorf("%s is not installed and no installer is configured", tool.binary)
 	}
 
-	if err := os.MkdirAll(filepath.Join(root, ".ballast", "bin"), 0o755); err != nil {
-		return fmt.Errorf("create local ballast bin dir: %w", err)
+	if err := ensureLocalToolDirs(root); err != nil {
+		return err
 	}
-	installCommand := tool.installCommand(desiredVersion, root)
+	installCommand, err := tool.installCommand(desiredVersion, root)
+	if err != nil {
+		return fmt.Errorf("prepare install for %s: %w", tool.binary, err)
+	}
 	if len(installCommand) == 0 {
 		return fmt.Errorf("%s is not installed and no installer is configured", tool.binary)
 	}
@@ -470,6 +476,10 @@ func runInstallCLI(selectedLanguage language, args []string) int {
 
 func installCLIs(selectedLanguage language, version string) int {
 	root := findProjectRoot("")
+	if err := ensureLocalToolDirs(root); err != nil {
+		fmt.Println(err)
+		return 1
+	}
 	var languagesToInstall []language
 	if selectedLanguage != "" {
 		languagesToInstall = []language{selectedLanguage}
@@ -483,7 +493,11 @@ func installCLIs(selectedLanguage language, version string) int {
 			fmt.Printf("Unsupported language: %s\n", lang)
 			return 1
 		}
-		command := tool.installCommand(version, root)
+		command, err := tool.installCommand(version, root)
+		if err != nil {
+			fmt.Printf("failed to prepare %s install: %v\n", tool.binary, err)
+			return 1
+		}
 		if len(command) == 0 {
 			fmt.Printf("No installer configured for %s\n", lang)
 			return 1
@@ -634,6 +648,16 @@ func normalizeInstallArgs(args []string, root string) ([]string, error) {
 		filtered = append(filtered, "--yes")
 	}
 	return filtered, nil
+}
+
+func ensureLocalToolDirs(root string) error {
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "bin"), 0o755); err != nil {
+		return fmt.Errorf("create local ballast bin dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "tools"), 0o755); err != nil {
+		return fmt.Errorf("create local ballast tools dir: %w", err)
+	}
+	return nil
 }
 
 func hasFlag(args []string, longFlag string, shortFlag string) bool {

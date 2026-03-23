@@ -18,4 +18,26 @@ describe('parseArgs', () => {
       doctor: true
     });
   });
+
+  test('does not treat doctor as a later install argument', () => {
+    expect(
+      parseArgs([
+        'node',
+        'ballast-typescript',
+        'install',
+        '--agent',
+        'doctor',
+        '--target',
+        'cursor'
+      ])
+    ).toEqual({
+      target: 'cursor',
+      agents: ['doctor'],
+      language: 'typescript',
+      all: false,
+      force: false,
+      patch: false,
+      yes: false
+    });
+  });
 });

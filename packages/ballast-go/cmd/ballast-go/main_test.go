@@ -116,6 +116,22 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 }
 
+func TestBuildDoctorReportRecommendsFixForUnknownVersion(t *testing.T) {
+	output := buildDoctorReport(
+		"ballast-go",
+		"5.0.2",
+		"",
+		nil,
+		[]installedCLIStatus{
+			{Name: "ballast-typescript", Version: "", Path: "/tmp/ballast-typescript"},
+		},
+	)
+
+	if !strings.Contains(output, "Run ballast doctor --fix to install or upgrade local Ballast CLIs.") {
+		t.Fatalf("expected cli fix recommendation for unknown version, got %q", output)
+	}
+}
+
 func TestPatchRuleContentPreservesExistingSections(t *testing.T) {
 	existing := `---
 description: Team customized linting rules

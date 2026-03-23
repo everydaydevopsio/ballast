@@ -23,6 +23,10 @@ export type ParseArgsResult =
 
 export function parseArgs(argv: string[]): ParseArgsResult {
   const args = argv.slice(2);
+  const command = args[0];
+  if (command === 'doctor') {
+    return { doctor: true };
+  }
   const options: CliOptions = {
     target: undefined,
     agents: [],
@@ -81,9 +85,6 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     }
     if (arg === '--version' || arg === '-v') {
       return { version: true };
-    }
-    if (arg === 'doctor') {
-      return { doctor: true };
     }
     i++;
   }

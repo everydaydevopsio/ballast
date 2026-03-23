@@ -135,9 +135,12 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 
 func TestRunDoctorFixPrintsMode(t *testing.T) {
 	originalRun := runCommandFunc
+	originalVersion := version
 	t.Cleanup(func() {
 		runCommandFunc = originalRun
+		version = originalVersion
 	})
+	version = "5.0.2"
 	runCommandFunc = func(name string, args []string) error { return nil }
 
 	root := t.TempDir()
@@ -159,11 +162,14 @@ func TestRunDoctorFixInstallsBackendsAndRefreshesConfig(t *testing.T) {
 	originalRun := runCommandFunc
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
+	originalVersion := version
 	t.Cleanup(func() {
 		runCommandFunc = originalRun
 		ensureInstalledFunc = originalEnsure
 		execToolFunc = originalExec
+		version = originalVersion
 	})
+	version = "5.0.2"
 
 	var commands [][]string
 	runCommandFunc = func(name string, args []string) error {
@@ -285,6 +291,51 @@ func TestRunInstallCLICommandInstallsAllLanguagesByDefault(t *testing.T) {
 	}
 	if got := strings.Join(commands[1], " "); got != `env UV_TOOL_DIR=`+filepath.Join(root, ".ballast", "tools", "python")+` UV_TOOL_BIN_DIR=`+filepath.Join(root, ".ballast", "bin")+` uv tool install --reinstall --from https://github.com/everydaydevopsio/ballast/releases/download/v5.0.2/ballast_python-5.0.2-py3-none-any.whl ballast-python` {
 		t.Fatalf("unexpected default python install command: %q", got)
+	}
+}
+
+func TestRunInstallCLICreatesLocalBallastDirectories(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+	})
+
+	runCommandFunc = func(name string, args []string) error { return nil }
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install-cli", "--language", "go", "--version", "5.0.2"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin")); err != nil {
+		t.Fatalf("expected .ballast/bin to exist, got %v", err)
+	}
+}
+
+func TestPythonInstallCommandErrorsForDevVersionOutsideSourceTree(t *testing.T) {
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "dev"
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(t.TempDir(), "outside-ballast", "ballast"), nil
+	}
+
+	root := t.TempDir()
+	command, err := toolsByLanguage[langPython].installCommand("", root)
+	if err == nil {
+		t.Fatalf("expected dev version outside source tree to error, got command %#v", command)
+	}
+	if !strings.Contains(err.Error(), "requires a release version or a ballast source checkout") {
+		t.Fatalf("unexpected install error: %v", err)
 	}
 }
 
@@ -833,8 +884,8 @@ func TestEnsureInstalledUsesPinnedVersionWhenBackendVersionDiffers(t *testing.T)
 	withWorkingDir(t, root, func() {
 		err := ensureInstalled(toolConfig{
 			binary: "ballast-go",
-			installCommand: func(version string, projectRoot string) []string {
-				return []string{"go", "install", "example.com/ballast-go@" + version, projectRoot}
+			installCommand: func(version string, projectRoot string) ([]string, error) {
+				return []string{"go", "install", "example.com/ballast-go@" + version, projectRoot}, nil
 			},
 		})
 		if err != nil {
@@ -875,8 +926,8 @@ func TestEnsureInstalledSkipsVersionCheckForDevWrapperBuilds(t *testing.T) {
 	withWorkingDir(t, root, func() {
 		err := ensureInstalled(toolConfig{
 			binary: "ballast-go",
-			installCommand: func(version string, projectRoot string) []string {
-				return []string{"go", "install", "example.com/ballast-go@" + version, projectRoot}
+			installCommand: func(version string, projectRoot string) ([]string, error) {
+				return []string{"go", "install", "example.com/ballast-go@" + version, projectRoot}, nil
 			},
 		})
 		if err != nil {

@@ -436,7 +436,7 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 			version = "unknown"
 		}
 		lines = append(lines, fmt.Sprintf("- %s: %s (%s)", item.Name, version, item.Path))
-		if item.Version != "" && compareVersions(item.Version, targetVersion) < 0 {
+		if item.Version == "" || compareVersions(item.Version, targetVersion) < 0 {
 			needsCLIFix = true
 		}
 	}
