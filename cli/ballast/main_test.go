@@ -420,6 +420,9 @@ func TestRunInstallCLIGoUsesReleaseArchiveForPinnedVersion(t *testing.T) {
 	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.2/ballast-go_checksums.txt") {
 		t.Fatalf("expected installer to verify the published checksum asset, got %q", got)
 	}
+	if !strings.Contains(got, `destination="$3"`) || !strings.Contains(got, `install -m 0755 "$tmpdir/ballast-go" "$destination"`) {
+		t.Fatalf("expected installer to preserve the destination path while verifying checksums, got %q", got)
+	}
 	if strings.Contains(got, "go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@") {
 		t.Fatalf("expected installer to avoid the invalid module path, got %q", got)
 	}

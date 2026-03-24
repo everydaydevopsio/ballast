@@ -756,6 +756,7 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 archive="$tmpdir/ballast-go.tar.gz"
 checksums="$tmpdir/ballast-go_checksums.txt"
+destination="$3"
 curl -fsSL "$1" -o "$archive"
 curl -fsSL "$2" -o "$checksums"
 archive_name="$(basename "$1")"
@@ -765,7 +766,7 @@ expected_checksum="$1"
 set -- $(openssl dgst -sha256 -r "$archive")
 [ "${1:-}" = "$expected_checksum" ]
 tar -xzf "$archive" -C "$tmpdir"
-install -m 0755 "$tmpdir/ballast-go" "$3"`
+install -m 0755 "$tmpdir/ballast-go" "$destination"`
 	return []string{"sh", "-c", script, "sh", url, checksumURL, destination}, nil
 }
 
