@@ -47,12 +47,19 @@ func preferredSourceRoot(projectRoot string) string {
 	return localSourceRoot()
 }
 
+func preferredInstallSourceRoot(projectRoot string, version string) string {
+	if releaseVersion(version) != "" {
+		return ""
+	}
+	return preferredSourceRoot(projectRoot)
+}
+
 var toolsByLanguage = map[language]toolConfig{
 	langTypeScript: {
 		binary: "ballast-typescript",
 		installCommand: func(version string, projectRoot string) ([]string, error) {
 			toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
-			if sourceRoot := preferredSourceRoot(projectRoot); sourceRoot != "" {
+			if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
 				return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
 			}
 			pkg := "@everydaydevopsio/ballast"
@@ -68,7 +75,7 @@ var toolsByLanguage = map[language]toolConfig{
 			binDir := filepath.Join(projectRoot, ".ballast", "bin")
 			toolDir := filepath.Join(projectRoot, ".ballast", "tools", "python")
 			release := releaseVersion(version)
-			if sourceRoot := preferredSourceRoot(projectRoot); sourceRoot != "" {
+			if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
 				return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", filepath.Join(sourceRoot, "packages", "ballast-python")}, nil
 			}
 			if release == "" {
@@ -88,7 +95,7 @@ var toolsByLanguage = map[language]toolConfig{
 	langGo: {
 		binary: "ballast-go",
 		installCommand: func(version string, projectRoot string) ([]string, error) {
-			if sourceRoot := preferredSourceRoot(projectRoot); sourceRoot != "" {
+			if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
 				moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
 				return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
 			}
@@ -165,6 +172,9 @@ func run(args []string) int {
 	}
 	if len(forwardedArgs) > 0 && forwardedArgs[0] == "doctor" {
 		return runDoctor(selectedLanguage, forwardedArgs[1:])
+	}
+	if len(forwardedArgs) > 0 && forwardedArgs[0] == "upgrade" {
+		return runUpgrade(selectedLanguage, forwardedArgs[1:])
 	}
 
 	if hasVersionFlag(forwardedArgs) {
@@ -317,6 +327,7 @@ func printUsage() {
 	fmt.Println("  install     Install agent rules for the detected or selected language (`--refresh-config` reuses saved .rulesrc.json settings)")
 	fmt.Println("  install-cli Install or upgrade backend CLIs (latest by default, or a specific --version)")
 	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config)")
+	fmt.Println("  upgrade     Rewrite .rulesrc.json to the running ballast version and sync backend CLIs")
 	fmt.Println("  help        Show help for ballast")
 	fmt.Println("  version     Print the ballast wrapper version")
 	fmt.Println()
@@ -332,6 +343,7 @@ func printUsage() {
 	fmt.Println("  ballast install-cli --language python")
 	fmt.Println("  ballast doctor")
 	fmt.Println("  ballast doctor --fix")
+	fmt.Println("  ballast upgrade")
 	fmt.Println("  ballast install-cli --language go --version 5.0.2")
 	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go monorepo")
 	fmt.Println("  ballast --language python install --target codex --agent linting")
@@ -528,7 +540,8 @@ func runDoctor(selectedLanguage language, args []string) int {
 	printDoctorSummary(root, selectedLanguage, fix)
 
 	if fix {
-		if exitCode := installCLIs(selectedLanguage, resolveVersion()); exitCode != 0 {
+		desiredVersion := normalizeVersion(desiredDoctorInstallVersion(root))
+		if exitCode := installCLIs(selectedLanguage, desiredVersion); exitCode != 0 {
 			return exitCode
 		}
 		if fileExists(filepath.Join(root, ".rulesrc.json")) {
@@ -536,11 +549,68 @@ func runDoctor(selectedLanguage language, args []string) int {
 			if selectedLanguage != "" {
 				refreshArgs = append([]string{"--language", string(selectedLanguage)}, refreshArgs...)
 			}
-			return run(refreshArgs)
+			exitCode := run(refreshArgs)
+			if exitCode != 0 {
+				return exitCode
+			}
+			if desiredVersion != "" {
+				if err := rewriteDoctorConfigVersion(root, desiredVersion); err != nil {
+					fmt.Println(err)
+					return 1
+				}
+			}
+			return 0
 		}
 		return 0
 	}
 	return 0
+}
+
+func runUpgrade(selectedLanguage language, args []string) int {
+	if len(args) > 0 {
+		fmt.Printf("unknown upgrade option: %s\n", args[0])
+		return 1
+	}
+
+	root := findProjectRoot("")
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	if config == nil {
+		fmt.Println("upgrade requires an existing .rulesrc.json; run ballast install first")
+		return 1
+	}
+
+	config.BallastVersion = normalizeVersion(resolveVersion())
+	if err := saveMonorepoConfig(root, *config); err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	return runDoctor(selectedLanguage, []string{"--fix"})
+}
+
+func desiredDoctorInstallVersion(root string) string {
+	config, err := loadDoctorConfig(root)
+	if err == nil && config != nil {
+		if release := releaseVersion(config.BallastVersion); release != "" {
+			return release
+		}
+	}
+	return resolveVersion()
+}
+
+func rewriteDoctorConfigVersion(root string, version string) error {
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		return nil
+	}
+	config.BallastVersion = normalizeVersion(version)
+	return saveMonorepoConfig(root, *config)
 }
 
 func printDoctorSummary(root string, selectedLanguage language, fix bool) {
@@ -709,6 +779,7 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 archive="$tmpdir/ballast-go.tar.gz"
 checksums="$tmpdir/ballast-go_checksums.txt"
+destination="$3"
 curl -fsSL "$1" -o "$archive"
 curl -fsSL "$2" -o "$checksums"
 archive_name="$(basename "$1")"
@@ -718,7 +789,7 @@ expected_checksum="$1"
 set -- $(openssl dgst -sha256 -r "$archive")
 [ "${1:-}" = "$expected_checksum" ]
 tar -xzf "$archive" -C "$tmpdir"
-install -m 0755 "$tmpdir/ballast-go" "$3"`
+install -m 0755 "$tmpdir/ballast-go" "$destination"`
 	return []string{"sh", "-c", script, "sh", url, checksumURL, destination}, nil
 }
 

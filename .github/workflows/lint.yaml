@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
+  typescript-lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,10 +21,11 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v5
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22.x
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: 22.x
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -34,3 +35,78 @@ jobs:
 
       - name: Check Prettier formatting
         run: pnpm --filter @everydaydevopsio/ballast run prettier
+
+  python-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Ruff check
+        working-directory: packages/ballast-python
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        working-directory: packages/ballast-python
+        run: uv run ruff format --check .
+
+  go-pack-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+
+      - name: Check gofmt
+        working-directory: packages/ballast-go
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run go vet
+        working-directory: packages/ballast-go
+        run: go vet ./...
+
+      - name: Check go.mod and go.sum are tidy
+        working-directory: packages/ballast-go
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+  cli-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+
+      - name: Check gofmt
+        working-directory: cli/ballast
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run go vet
+        working-directory: cli/ballast
+        run: go vet ./...
+
+      - name: Check go.mod and go.sum are tidy
+        working-directory: cli/ballast
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
