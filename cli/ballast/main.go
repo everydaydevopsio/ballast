@@ -540,7 +540,8 @@ func runDoctor(selectedLanguage language, args []string) int {
 	printDoctorSummary(root, selectedLanguage, fix)
 
 	if fix {
-		if exitCode := installCLIs(selectedLanguage, desiredDoctorInstallVersion(root)); exitCode != 0 {
+		desiredVersion := normalizeVersion(desiredDoctorInstallVersion(root))
+		if exitCode := installCLIs(selectedLanguage, desiredVersion); exitCode != 0 {
 			return exitCode
 		}
 		if fileExists(filepath.Join(root, ".rulesrc.json")) {
@@ -548,7 +549,17 @@ func runDoctor(selectedLanguage language, args []string) int {
 			if selectedLanguage != "" {
 				refreshArgs = append([]string{"--language", string(selectedLanguage)}, refreshArgs...)
 			}
-			return run(refreshArgs)
+			exitCode := run(refreshArgs)
+			if exitCode != 0 {
+				return exitCode
+			}
+			if desiredVersion != "" {
+				if err := rewriteDoctorConfigVersion(root, desiredVersion); err != nil {
+					fmt.Println(err)
+					return 1
+				}
+			}
+			return 0
 		}
 		return 0
 	}
@@ -588,6 +599,18 @@ func desiredDoctorInstallVersion(root string) string {
 		}
 	}
 	return resolveVersion()
+}
+
+func rewriteDoctorConfigVersion(root string, version string) error {
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		return nil
+	}
+	config.BallastVersion = normalizeVersion(version)
+	return saveMonorepoConfig(root, *config)
 }
 
 func printDoctorSummary(root string, selectedLanguage language, fix bool) {

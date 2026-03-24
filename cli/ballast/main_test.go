@@ -264,6 +264,13 @@ func TestRunDoctorFixUsesConfigVersionForBackendInstallsInsideSourceCheckout(t *
 	if strings.Contains(got, filepath.Join(root, "packages", "ballast-go")) {
 		t.Fatalf("expected doctor fix to avoid local source builds when config pins a release, got %q", got)
 	}
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		t.Fatalf("loadDoctorConfig returned error: %v", err)
+	}
+	if config == nil || config.BallastVersion != "5.0.5" {
+		t.Fatalf("expected doctor fix to preserve pinned ballastVersion, got %#v", config)
+	}
 }
 
 func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T) {
