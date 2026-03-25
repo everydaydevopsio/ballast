@@ -159,7 +159,7 @@ jobs:
           python-version: '3.12'
 
       - name: Build package
-        run: env UV_CACHE_DIR=/tmp/uv-cache uvx --from build pyproject-build --sdist --wheel packages/ballast-python
+        run: env UV_CACHE_DIR=/tmp/uv-cache uv build packages/ballast-python --sdist --wheel
 
       - name: Publish Python artifacts to GitHub release
         uses: softprops/action-gh-release@v2
