@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -235,6 +236,127 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "pre-commit install --hook-type pre-push") {
 		t.Fatalf("expected concrete pre-push guidance, got %s", string(content))
+	}
+}
+
+func TestBuildCursorSkillFormatIncludesOnDemandFrontmatter(t *testing.T) {
+	content, err := buildCursorSkillFormat("owasp-security-scan", "go")
+	if err != nil {
+		t.Fatalf("buildCursorSkillFormat: %v", err)
+	}
+	if !strings.Contains(content, "alwaysApply: false") {
+		t.Fatalf("expected alwaysApply false frontmatter: %s", content)
+	}
+	if !strings.Contains(content, "description: \"Run OWASP-aligned security scans across Go, TypeScript, and Python codebases.") {
+		t.Fatalf("expected skill description in frontmatter: %s", content)
+	}
+	if strings.Contains(content, "description: >") {
+		t.Fatalf("expected folded YAML description to be resolved: %s", content)
+	}
+	if strings.Contains(content, "description: Run OWASP-aligned security scans across Go, TypeScript, and Python codebases.") {
+		t.Fatalf("expected description to remain quoted: %s", content)
+	}
+	if strings.Contains(content, "\n---\n---\n") {
+		t.Fatalf("expected normalized markdown body without duplicate frontmatter: %s", content)
+	}
+}
+
+func TestBuildClaudeSkillIncludesSkillAndReferences(t *testing.T) {
+	content, err := buildClaudeSkill("owasp-security-scan", "go")
+	if err != nil {
+		t.Fatalf("buildClaudeSkill: %v", err)
+	}
+
+	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
+	if err != nil {
+		t.Fatalf("open skill archive: %v", err)
+	}
+
+	entries := map[string]bool{}
+	for _, file := range reader.File {
+		entries[file.Name] = true
+	}
+
+	expected := []string{
+		"SKILL.md",
+		"references/owasp-mapping.md",
+		"references/remediation-guide.md",
+		"references/ci-workflow.md",
+		"references/tool-config.md",
+	}
+	for _, name := range expected {
+		if !entries[name] {
+			t.Fatalf("expected archive entry %q, got %+v", name, entries)
+		}
+	}
+}
+
+func TestSkillDestinationReturnsExpectedPaths(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cases := []struct {
+		target string
+		dir    string
+		file   string
+	}{
+		{target: "cursor", dir: filepath.Join(tmpDir, ".cursor", "rules"), file: filepath.Join(tmpDir, ".cursor", "rules", "owasp-security-scan.mdc")},
+		{target: "claude", dir: filepath.Join(tmpDir, ".claude", "skills"), file: filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")},
+		{target: "opencode", dir: filepath.Join(tmpDir, ".opencode", "skills"), file: filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")},
+		{target: "codex", dir: filepath.Join(tmpDir, ".codex", "rules"), file: filepath.Join(tmpDir, ".codex", "rules", "owasp-security-scan.md")},
+	}
+
+	for _, tc := range cases {
+		dir, file, err := skillDestination(tmpDir, tc.target, "owasp-security-scan")
+		if err != nil {
+			t.Fatalf("skillDestination(%s): %v", tc.target, err)
+		}
+		if dir != tc.dir || file != tc.file {
+			t.Fatalf("unexpected destination for %s: got (%s, %s), want (%s, %s)", tc.target, dir, file, tc.dir, tc.file)
+		}
+	}
+}
+
+func TestInstallCreatesClaudeSkillAndPersistsConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "claude",
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		saveConfig:  true,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if len(result.installedSkills) != 1 || result.installedSkills[0] != "owasp-security-scan" {
+		t.Fatalf("expected skill install result, got %+v", result.installedSkills)
+	}
+
+	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if _, err := os.Stat(skillPath); err != nil {
+		t.Fatalf("expected skill file at %s: %v", skillPath, err)
+	}
+
+	configContent, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(configContent)
+	if !strings.Contains(text, `"skills": [`+"\n"+`    "owasp-security-scan"`) {
+		t.Fatalf("expected skills array in shared config: %s", text)
+	}
+
+	claudeContent, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read CLAUDE.md: %v", err)
+	}
+	if !strings.Contains(string(claudeContent), "## Installed skills") {
+		t.Fatalf("expected installed skills section in CLAUDE.md: %s", string(claudeContent))
+	}
+	if !strings.Contains(string(claudeContent), "`.claude/skills/owasp-security-scan.skill`") {
+		t.Fatalf("expected skill entry in CLAUDE.md: %s", string(claudeContent))
 	}
 }
 

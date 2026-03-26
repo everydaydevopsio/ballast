@@ -9,7 +9,8 @@
   "files": [
     "bin",
     "dist",
-    "agents"
+    "agents",
+    "skills"
   ],
   "author": "Mark C Allen <mark@markcallen.com>",
   "license": "MIT",
@@ -23,6 +24,7 @@
   },
   "scripts": {
     "sync:agents": "node ./scripts/sync-agents.mjs",
+    "sync:skills": "node ./scripts/sync-agents.mjs",
     "build": "pnpm run sync:agents && tsc",
     "test": "jest",
     "test:coverage": "jest --coverage",

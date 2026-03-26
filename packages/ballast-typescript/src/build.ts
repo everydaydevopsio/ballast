@@ -1,7 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import { COMMON_AGENT_IDS, getAgentDir } from './agents';
+import {
+  COMMON_AGENT_IDS,
+  COMMON_SKILL_IDS,
+  getAgentDir,
+  getSkillDir
+} from './agents';
 import type { Target } from './config';
 import type { Language } from './agents';
 import pkg from '../package.json';
@@ -15,6 +20,11 @@ type HookMode = 'standalone' | 'monorepo';
 
 interface BuildOptions {
   hookMode?: HookMode;
+}
+
+interface SkillEntry {
+  name: string;
+  data: Buffer;
 }
 
 function getRuleSubdir(): string | null {
@@ -63,6 +73,16 @@ function getPreferredAgentDir(agentId: string, language: Language): string {
     return sourceDir;
   }
   return getAgentDir(agentId, language);
+}
+
+function getPreferredSkillDir(skillId: string): string {
+  const sourceDir = (COMMON_SKILL_IDS as readonly string[]).includes(skillId)
+    ? path.join(REPO_ROOT, 'skills', 'common', skillId)
+    : path.join(REPO_ROOT, 'skills', 'typescript', skillId);
+  if (fs.existsSync(sourceDir)) {
+    return sourceDir;
+  }
+  return getSkillDir(skillId);
 }
 
 function getHookMode(
@@ -254,6 +274,185 @@ export function getTemplate(
   return fs.readFileSync(file, 'utf8');
 }
 
+function getSkillFile(skillId: string, relativePath: string): string {
+  return path.join(getPreferredSkillDir(skillId), relativePath);
+}
+
+export function getSkillContent(skillId: string): string {
+  const file = getSkillFile(skillId, 'SKILL.md');
+  if (!fs.existsSync(file)) {
+    throw new Error(`Skill "${skillId}" missing SKILL.md`);
+  }
+  return fs.readFileSync(file, 'utf8');
+}
+
+function splitSkillDocument(content: string): {
+  frontmatter: string | null;
+  body: string;
+} {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match || match.index !== 0) {
+    return { frontmatter: null, body: content.trimStart() };
+  }
+  return {
+    frontmatter: match[0].trimEnd(),
+    body: content.slice(match[0].length).trimStart()
+  };
+}
+
+function parseSkillMetadata(skillId: string): {
+  name: string;
+  description: string;
+  body: string;
+  raw: string;
+} {
+  const raw = getSkillContent(skillId);
+  const { frontmatter, body } = splitSkillDocument(raw);
+  if (!frontmatter) {
+    throw new Error(`Skill "${skillId}" is missing YAML frontmatter`);
+  }
+  const metadata = YAML.parse(frontmatter.replace(/^---\r?\n|\r?\n---$/g, ''));
+  const name =
+    typeof metadata?.name === 'string' && metadata.name.trim()
+      ? metadata.name.trim()
+      : skillId;
+  const description =
+    typeof metadata?.description === 'string' && metadata.description.trim()
+      ? metadata.description.trim()
+      : `Skill ${skillId}`;
+  return { name, description, body, raw };
+}
+
+function listSkillReferenceFiles(skillId: string): string[] {
+  const referencesDir = getSkillFile(skillId, 'references');
+  if (!fs.existsSync(referencesDir)) {
+    return [];
+  }
+  const files: string[] = [];
+  const walk = (dir: string, prefix: string): void => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    entries.sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        walk(path.join(dir, entry.name), relativePath);
+        continue;
+      }
+      files.push(relativePath);
+    }
+  };
+  walk(referencesDir, '');
+  return files;
+}
+
+function crc32(buffer: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let index = 0; index < 8; index += 1) {
+      const mask = -(crc & 1);
+      crc = (crc >>> 1) ^ (0xedb88320 & mask);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function makeStoredZip(entries: SkillEntry[]): Buffer {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, 'utf8');
+    const data = entry.data;
+    const checksum = crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(0, 8);
+    local.writeUInt16LE(0, 10);
+    local.writeUInt16LE(0, 12);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    local.writeUInt16LE(0, 28);
+    localParts.push(local, name, data);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0, 8);
+    central.writeUInt16LE(0, 10);
+    central.writeUInt16LE(0, 12);
+    central.writeUInt16LE(0, 14);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt16LE(0, 30);
+    central.writeUInt16LE(0, 32);
+    central.writeUInt16LE(0, 34);
+    central.writeUInt16LE(0, 36);
+    central.writeUInt32LE(0, 38);
+    central.writeUInt32LE(offset, 42);
+    centralParts.push(central, name);
+
+    offset += local.length + name.length + data.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(0, 4);
+  end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(centralDirectory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  end.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, centralDirectory, end]);
+}
+
+export function buildCursorSkillFormat(skillId: string): string {
+  const skill = parseSkillMetadata(skillId);
+  return [
+    '---',
+    `description: ${JSON.stringify(skill.description)}`,
+    'alwaysApply: false',
+    '---',
+    '',
+    skill.body.trimEnd()
+  ].join('\n');
+}
+
+export function buildSkillMarkdown(skillId: string): string {
+  return parseSkillMetadata(skillId).body.trimEnd() + '\n';
+}
+
+export function buildClaudeSkill(skillId: string): Buffer {
+  const entries: SkillEntry[] = [
+    {
+      name: 'SKILL.md',
+      data: Buffer.from(getSkillContent(skillId), 'utf8')
+    }
+  ];
+  for (const relativePath of listSkillReferenceFiles(skillId)) {
+    const fullPath = getSkillFile(
+      skillId,
+      path.join('references', relativePath)
+    );
+    entries.push({
+      name: `references/${relativePath.replace(/\\/g, '/')}`,
+      data: fs.readFileSync(fullPath)
+    });
+  }
+  return makeStoredZip(entries);
+}
+
 /**
  * Build content for Cursor (.mdc = frontmatter + content)
  */
@@ -382,8 +581,13 @@ export function getCodexRuleDescription(
   }
 }
 
+export function getSkillDescription(skillId: string): string {
+  return parseSkillMetadata(skillId).description;
+}
+
 export function buildCodexAgentsMd(
   agents: string[],
+  skills: string[] = [],
   language: Language = 'typescript'
 ): string {
   const lines: string[] = [];
@@ -411,12 +615,29 @@ export function buildCodexAgentsMd(
       lines.push(`- \`.codex/rules/${basename}.md\` — ${description}`);
     }
   }
+  if (skills.length > 0) {
+    lines.push('');
+    lines.push('## Installed skills');
+    lines.push('');
+    lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
+    lines.push('');
+    lines.push(
+      'Read and use these skill files in `.codex/rules/` when they are relevant:'
+    );
+    lines.push('');
+    for (const skillId of skills) {
+      lines.push(
+        `- \`.codex/rules/${skillId}.md\` — ${getSkillDescription(skillId)}`
+      );
+    }
+  }
   lines.push('');
   return lines.join('\n');
 }
 
 export function buildClaudeMd(
   agents: string[],
+  skills: string[] = [],
   language: Language = 'typescript'
 ): string {
   const lines: string[] = [];
@@ -442,6 +663,22 @@ export function buildClaudeMd(
         getCodexRuleDescription(agentId, ruleSuffix, language) ??
         `Rules for ${basename}`;
       lines.push(`- \`.claude/rules/${basename}.md\` — ${description}`);
+    }
+  }
+  if (skills.length > 0) {
+    lines.push('');
+    lines.push('## Installed skills');
+    lines.push('');
+    lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
+    lines.push('');
+    lines.push(
+      'Read and use these skill files in `.claude/skills/` when they are relevant:'
+    );
+    lines.push('');
+    for (const skillId of skills) {
+      lines.push(
+        `- \`.claude/skills/${skillId}.skill\` — ${getSkillDescription(skillId)}`
+      );
     }
   }
   lines.push('');
@@ -514,6 +751,34 @@ export function getDestination(
         : path.join(root, '.codex', 'rules');
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
+    }
+    default:
+      throw new Error(`Unknown target: ${target}`);
+  }
+}
+
+export function getSkillDestination(
+  skillId: string,
+  target: Target,
+  projectRoot: string
+): { dir: string; file: string } {
+  const root = path.resolve(projectRoot);
+  switch (target) {
+    case 'cursor': {
+      const dir = path.join(root, '.cursor', 'rules');
+      return { dir, file: path.join(dir, `${skillId}.mdc`) };
+    }
+    case 'claude': {
+      const dir = path.join(root, '.claude', 'skills');
+      return { dir, file: path.join(dir, `${skillId}.skill`) };
+    }
+    case 'opencode': {
+      const dir = path.join(root, '.opencode', 'skills');
+      return { dir, file: path.join(dir, `${skillId}.md`) };
+    }
+    case 'codex': {
+      const dir = path.join(root, '.codex', 'rules');
+      return { dir, file: path.join(dir, `${skillId}.md`) };
     }
     default:
       throw new Error(`Unknown target: ${target}`);

@@ -118,10 +118,12 @@ var collectDoctorBackendsFunc = collectDoctorBackends
 var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var supportedAgents = append(slices.Clone(commonAgents), languageAgents...)
+var supportedSkills = []string{"owasp-security-scan"}
 
 type monorepoConfig struct {
 	Target         string              `json:"target,omitempty"`
 	Agents         []string            `json:"agents,omitempty"`
+	Skills         []string            `json:"skills,omitempty"`
 	BallastVersion string              `json:"ballastVersion,omitempty"`
 	Languages      []string            `json:"languages,omitempty"`
 	Paths          map[string][]string `json:"paths,omitempty"`
@@ -339,6 +341,7 @@ func printUsage() {
 	fmt.Println("Examples:")
 	fmt.Println("  ballast")
 	fmt.Println("  ballast install --target cursor --all")
+	fmt.Println("  ballast install --target claude --skill owasp-security-scan")
 	fmt.Println("  ballast install --refresh-config")
 	fmt.Println("  ballast install-cli --language python")
 	fmt.Println("  ballast doctor")
@@ -1190,20 +1193,27 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	}
 
 	installTarget := findFlagValue(args, "--target", "-t")
-	installAgents, installAll := parseInstallSelection(args)
+	installAgents, installAll, installSkills, installAllSkills := parseInstallSelection(args)
 	if installTarget == "" && config != nil {
 		installTarget = config.Target
 	}
 	if len(installAgents) == 0 && !installAll && config != nil {
 		installAgents = slices.Clone(config.Agents)
 	}
-	if installTarget == "" || (len(installAgents) == 0 && !installAll) {
-		return nil, errors.New("monorepo install requires --target and --agent/--all, or a root .rulesrc.json with target, agents, languages, and paths")
+	if len(installSkills) == 0 && !installAllSkills && config != nil {
+		installSkills = slices.Clone(config.Skills)
+	}
+	if installTarget == "" || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills)) {
+		return nil, errors.New("monorepo install requires --target and at least one of --agent/--all or --skill/--all-skills, or a root .rulesrc.json with target, agents/skills, languages, and paths")
 	}
 
 	selectedAgents := installAgents
 	if installAll {
 		selectedAgents = append(slices.Clone(commonAgents), languageAgents...)
+	}
+	selectedSkills := installSkills
+	if installAllSkills {
+		selectedSkills = slices.Clone(supportedSkills)
 	}
 	if err := validateSelectedAgents(selectedAgents); err != nil {
 		return nil, err
@@ -1212,6 +1222,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	configToSave := monorepoConfig{
 		Target:         installTarget,
 		Agents:         selectedAgents,
+		Skills:         selectedSkills,
 		BallastVersion: normalizeVersion(resolveVersion()),
 		Languages:      make([]string, 0, len(profiles)),
 		Paths:          map[string][]string{},
@@ -1226,7 +1237,8 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	baseArgs := stripMonorepoFlags(args)
 
 	plan := make([]backendInvocation, 0, len(profiles)+1)
-	if len(commonSelection) > 0 {
+	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
+	if len(commonSelection) > 0 || len(selectedSkills) > 0 {
 		commonLanguage := profiles[0].Language
 		if hasLanguage(profiles, langTypeScript) {
 			commonLanguage = langTypeScript
@@ -1237,7 +1249,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			Binary:   tool.binary,
 			Dir:      root,
 			Env:      monorepoInvocationEnv("common"),
-			Args:     withAgentSelection(baseArgs, commonSelection),
+			Args:     commonArgs,
 		})
 	}
 	for _, profile := range profiles {
@@ -1250,7 +1262,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			Binary:   tool.binary,
 			Dir:      root,
 			Env:      monorepoInvocationEnv(string(profile.Language)),
-			Args:     withAgentSelection(baseArgs, languageSelection),
+			Args:     withSkillSelection(withAgentSelection(baseArgs, languageSelection), nil),
 		})
 	}
 
@@ -1423,15 +1435,27 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 	return profiles, nil
 }
 
-func parseInstallSelection(args []string) ([]string, bool) {
+func parseInstallSelection(args []string) ([]string, bool, []string, bool) {
 	agents := []string{}
+	skills := []string{}
+	allAgents := false
+	allSkills := false
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--all" {
-			return nil, true
+			allAgents = true
+			continue
+		}
+		if arg == "--all-skills" {
+			allSkills = true
+			continue
 		}
 		if strings.HasPrefix(arg, "--agent=") {
 			agents = append(agents, splitAgentValues(strings.TrimPrefix(arg, "--agent="))...)
+			continue
+		}
+		if strings.HasPrefix(arg, "--skill=") {
+			skills = append(skills, splitAgentValues(strings.TrimPrefix(arg, "--skill="))...)
 			continue
 		}
 		if arg == "--agent" || arg == "-a" {
@@ -1440,9 +1464,17 @@ func parseInstallSelection(args []string) ([]string, bool) {
 			}
 			agents = append(agents, splitAgentValues(args[i+1])...)
 			i++
+			continue
+		}
+		if arg == "--skill" || arg == "-s" {
+			if i+1 >= len(args) {
+				continue
+			}
+			skills = append(skills, splitAgentValues(args[i+1])...)
+			i++
 		}
 	}
-	return uniqueStrings(agents), false
+	return uniqueStrings(agents), allAgents, uniqueStrings(skills), allSkills
 }
 
 func splitAgentValues(raw string) []string {
@@ -1508,6 +1540,28 @@ func withAgentSelection(baseArgs []string, agents []string) []string {
 	}
 	if len(agents) > 0 {
 		filtered = append(filtered, "--agent", strings.Join(agents, ","))
+	}
+	return filtered
+}
+
+func withSkillSelection(baseArgs []string, skills []string) []string {
+	filtered := make([]string, 0, len(baseArgs))
+	for i := 0; i < len(baseArgs); i++ {
+		arg := baseArgs[i]
+		if arg == "--all-skills" {
+			continue
+		}
+		if arg == "--skill" || arg == "-s" {
+			i++
+			continue
+		}
+		if strings.HasPrefix(arg, "--skill=") {
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	if len(skills) > 0 {
+		filtered = append(filtered, "--skill", strings.Join(skills, ","))
 	}
 	return filtered
 }

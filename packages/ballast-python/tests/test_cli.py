@@ -101,8 +101,10 @@ class PatchInstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
-            cli.save_config(root, "python", "claude", ["linting"])
-            cli.save_config(root, "go", "claude", ["linting"])
+            cli.save_config(
+                root, "python", "claude", ["linting"], ["owasp-security-scan"]
+            )
+            cli.save_config(root, "go", "claude", ["linting"], ["owasp-security-scan"])
 
             content = (root / ".rulesrc.json").read_text(encoding="utf-8")
             self.assertIn('"ballastVersion":', content)
@@ -111,13 +113,51 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn('"go"', content)
             self.assertIn('"python": [', content)
             self.assertIn('"go": [', content)
+            self.assertIn('"skills": [', content)
+
+    def test_install_creates_skill_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "claude",
+                ["linting"],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("owasp-security-scan", result.installed_skills)
+            skill = root / ".claude" / "skills" / "owasp-security-scan.skill"
+            self.assertTrue(skill.exists())
+            self.assertTrue(skill.read_bytes().startswith(b"PK\x03\x04"))
+
+    def test_build_cursor_skill_format_uses_folded_description_text(self) -> None:
+        content = cli.build_cursor_skill_format("owasp-security-scan", "python")
+
+        self.assertIn("alwaysApply: false", content)
+        self.assertIn(
+            'description: "Run OWASP-aligned security scans across Go, TypeScript, and Python codebases.',
+            content,
+        )
+        self.assertNotIn("description: >", content)
+
+    def test_build_support_file_includes_skills(self) -> None:
+        content = cli.build_codex_agents_md(
+            ["linting"], ["owasp-security-scan"], "python"
+        )
+        self.assertIn("## Installed skills", content)
+        self.assertIn("`.codex/rules/owasp-security-scan.md`", content)
 
     def test_install_creates_language_prefixed_rule_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
             result = cli.install(
-                root, "codex", ["linting"], "python", False, False, False
+                root, "codex", ["linting"], [], "python", False, False, False
             )
 
             self.assertIn("linting", result.installed)
@@ -130,7 +170,7 @@ class PatchInstallTests(unittest.TestCase):
             root = Path(tmp)
 
             result = cli.install(
-                root, "codex", ["linting"], "python", False, False, False
+                root, "codex", ["linting"], [], "python", False, False, False
             )
 
             self.assertIn("linting", result.installed)
@@ -165,7 +205,7 @@ Keep this note.
             )
 
             result = cli.install(
-                root, "cursor", ["linting"], "python", False, True, False
+                root, "cursor", ["linting"], [], "python", False, True, False
             )
 
             self.assertIn("linting", result.installed)
@@ -208,7 +248,7 @@ Read and follow these rule files in `.codex/rules/` when they apply:
                 encoding="utf-8",
             )
 
-            cli.install(root, "codex", ["linting"], "python", False, True, False)
+            cli.install(root, "codex", ["linting"], [], "python", False, True, False)
 
             agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("## Team Notes", agents_md)
@@ -252,7 +292,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
             )
 
             cli.install(
-                root, "claude", ["linting"], "python", False, False, False, True
+                root, "claude", ["linting"], [], "python", False, False, False, True
             )
 
             claude_md = (root / "CLAUDE.md").read_text(encoding="utf-8")
@@ -278,7 +318,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
             )
 
             result = cli.install(
-                root, "claude", ["linting"], "python", False, True, False
+                root, "claude", ["linting"], [], "python", False, True, False
             )
 
             self.assertIn(str(root / "CLAUDE.md"), result.installed_support_files)
