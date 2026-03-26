@@ -5,7 +5,7 @@
     "cicd",
     "observability"
   ],
-  "ballastVersion": "5.0.5",
+  "ballastVersion": "5.1.2",
   "languages": [
     "typescript",
     "python",
