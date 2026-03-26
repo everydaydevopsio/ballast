@@ -81,6 +81,7 @@ jobs:
         run: |
           set -euo pipefail
           uv version --directory packages/ballast-python "${{ steps.version.outputs.version }}" --frozen
+          uv lock --directory packages/ballast-python
 
       - name: Commit and create tag
         run: |
@@ -90,7 +91,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add packages/ballast-typescript/package.json packages/ballast-python/pyproject.toml
+          git add packages/ballast-typescript/package.json packages/ballast-python/pyproject.toml packages/ballast-python/uv.lock
           git commit -m "chore(release): bump version to ${VERSION} [skip ci]"
 
           git tag "v${VERSION}"
