@@ -529,8 +529,16 @@ export async function runInstall(
 ): Promise<number> {
   const projectRoot = options.projectRoot ?? findProjectRoot();
   const language = options.language ?? 'typescript';
-  const agentsFromFlag = options.all ? 'all' : options.agents;
-  const skillsFromFlag = options.allSkills ? 'all' : options.skills;
+  const agentsFromFlag = options.all
+    ? 'all'
+    : Array.isArray(options.agents) && options.agents.length === 0
+      ? undefined
+      : options.agents;
+  const skillsFromFlag = options.allSkills
+    ? 'all'
+    : Array.isArray(options.skills) && options.skills.length === 0
+      ? undefined
+      : options.skills;
   const resolved = await resolveTargetAndAgents({
     projectRoot,
     target: options.target,

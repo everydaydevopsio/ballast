@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { runInstall } from './install';
-import { LANGUAGES } from './agents';
+import { LANGUAGES, Language } from './agents';
 import { runDoctor } from './doctor';
 import { BALLAST_VERSION } from './version';
 
@@ -192,9 +192,14 @@ export async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const exitCode = await runInstall(
-    cliOptions as Parameters<typeof runInstall>[0]
-  );
+  const normalizedOptions: Parameters<typeof runInstall>[0] = {
+    ...cliOptions,
+    language: cliOptions.language as Language,
+    agents: cliOptions.agents.length > 0 ? cliOptions.agents : undefined,
+    skills: cliOptions.skills.length > 0 ? cliOptions.skills : undefined
+  };
+
+  const exitCode = await runInstall(normalizedOptions);
   process.exit(exitCode);
 }
 

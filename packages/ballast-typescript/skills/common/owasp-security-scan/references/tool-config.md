@@ -56,7 +56,7 @@ skips = ["B101"]
   },
   "G104": {
     "ErrorFunctions": {
-      "fmt": ["Fprintln", "Fprintf", "Fprintf"]
+      "fmt": ["Fprintln", "Fprint", "Fprintf"]
     }
   }
 }

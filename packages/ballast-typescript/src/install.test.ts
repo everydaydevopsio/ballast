@@ -850,6 +850,36 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(fs.existsSync(path.join(tmpDir, '.rulesrc.json'))).toBe(true);
     });
 
+    test('uses saved config when CLI passes empty agent and skill arrays', async () => {
+      saveConfig(
+        {
+          target: 'codex',
+          agents: ['linting'],
+          skills: ['owasp-security-scan']
+        },
+        tmpDir
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        agents: [],
+        skills: [],
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.codex', 'rules', 'typescript-linting.md')
+        )
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.codex', 'rules', 'owasp-security-scan.md')
+        )
+      ).toBe(true);
+    });
+
     test('returns 1 when CI and no config and no target/agents', async () => {
       process.env.CI = 'true';
       const exitCode = await runInstall({
