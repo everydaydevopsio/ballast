@@ -4,7 +4,7 @@
 [![Lint](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml)
 [![Release](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml)
 
-Ballast installs AI agent rules for Cursor, Claude Code, OpenCode, and Codex.
+Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, and Codex.
 
 Release `v4.0.0` supports three first-class language profiles in this repository:
 
@@ -39,6 +39,16 @@ Agent sources in this repo:
 - `agents/typescript/*`
 - `agents/python/*`
 - `agents/go/*`
+
+## Skill Model
+
+Common skills (all languages):
+
+- `owasp-security-scan`
+
+Skill sources in this repo:
+
+- `skills/common/*`
 
 ## Install and Use (Single Language)
 
@@ -91,6 +101,7 @@ Notes:
 ```bash
 pnpm add -D @everydaydevopsio/ballast
 pnpm exec ballast-typescript install --target cursor --all
+pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
 ```
 
 ### Python
@@ -101,6 +112,8 @@ uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/dow
 ballast-python install --target cursor --all
 # or
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target codex --agent linting
+# or
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target claude --skill owasp-security-scan
 ```
 
 ### Go
@@ -118,6 +131,7 @@ tar -xzf /tmp/ballast-go.tar.gz -C /tmp
 mkdir -p "${HOME}/.local/bin"
 install -m 0755 /tmp/ballast-go "${HOME}/.local/bin/ballast-go"
 ballast-go install --target cursor --all
+ballast-go install --target opencode --skill owasp-security-scan
 ```
 
 ## Monorepo: Install and Use by Language
@@ -149,13 +163,15 @@ Recommended order for one repository that uses all three languages:
 2. Run the Python command.
 3. Run the Go command.
 
-Ballast only installs shipped agents and follows the single overwrite policy (existing rule files are preserved unless `--force` is passed). Use `--patch` to merge new Ballast content into an existing rule file while preserving the user's version of edited sections.
+Ballast only installs shipped agents and skills and follows the single overwrite policy (existing rule files are preserved unless `--force` is passed). Use `--patch` to merge new Ballast content into an existing rule file while preserving the user's version of edited sections.
 
 ## CLI Flags
 
 - `--target, -t`: `cursor`, `claude`, `opencode`, `codex`
 - `--agent, -a`: comma-separated agent list
+- `--skill, -s`: comma-separated skill list
 - `--all`: install all agents for the selected language
+- `--all-skills`: install all available skills for the selected language
 - `--force, -f`: overwrite existing rule files
 - `--patch, -p`: merge upstream rule updates into existing rule files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
@@ -172,13 +188,16 @@ Ballast only installs shipped agents and follows the single overwrite policy (ex
 - TypeScript CLI: `.rulesrc.ts.json`
 - Python CLI: `.rulesrc.python.json`
 - Go CLI: `.rulesrc.go.json`
+- Saved settings include `target`, `agents`, and `skills`
 
 ## Install Locations
 
 - Cursor: `.cursor/rules/<agent>.mdc`
-- Claude: `.claude/rules/<agent>.md`
-- OpenCode: `.opencode/<agent>.md`
+- Claude: `.claude/rules/<agent>.md` and `.claude/skills/<skill>.skill`
+- OpenCode: `.opencode/<agent>.md` and `.opencode/skills/<skill>.md`
 - Codex: `.codex/rules/<agent>.md` and root `AGENTS.md`
+- Cursor skills: `.cursor/rules/<skill>.mdc`
+- Codex skills: `.codex/rules/<skill>.md`, with root `AGENTS.md` listing installed skills
 
 ## Development
 

@@ -56,6 +56,29 @@ jobs:
           set -euo pipefail
           test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/${{ matrix.expected_rule }}"
 
+  skills-smoke:
+    name: skills-smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: packages/ballast-go/go.mod
+
+      - name: Build ballast-go CLI
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
+          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+          echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
+
+      - name: Run skills smoke test
+        run: ./scripts/smoke-skills.sh "$GITHUB_WORKSPACE"
+
   monorepo-patch-smoke:
     name: monorepo-patch-smoke
     runs-on: ubuntu-latest

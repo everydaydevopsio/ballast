@@ -2,19 +2,25 @@ import path from 'path';
 import {
   getContent,
   getTemplate,
+  getSkillContent,
   listRuleSuffixes,
   buildCursorFormat,
   buildClaudeFormat,
   buildOpenCodeFormat,
   buildCodexFormat,
   buildContent,
+  buildClaudeSkill,
+  buildCursorSkillFormat,
+  buildSkillMarkdown,
   buildClaudeMd,
   buildCodexAgentsMd,
   getClaudeMdPath,
   getCodexAgentsMdPath,
   getCodexRuleDescription,
+  getSkillDescription,
   extractDescriptionFromFrontmatter,
   getDestination,
+  getSkillDestination,
   listTargets
 } from './build';
 
@@ -102,6 +108,52 @@ describe('build', () => {
       const content = getContent('testing', undefined, 'go');
       expect(content).toContain('Go testing specialist');
       expect(content).toContain('go test ./...');
+    });
+  });
+
+  describe('skills', () => {
+    test('reads skill content', () => {
+      const content = getSkillContent('owasp-security-scan');
+      expect(content).toContain('name: owasp-security-scan');
+      expect(content).toContain('# OWASP Security Scan Skill');
+    });
+
+    test('builds cursor skill format', () => {
+      const content = buildCursorSkillFormat('owasp-security-scan');
+      expect(content).toContain('alwaysApply: false');
+      expect(content).toContain('# OWASP Security Scan Skill');
+    });
+
+    test('builds markdown skill format', () => {
+      const content = buildSkillMarkdown('owasp-security-scan');
+      expect(content).toContain('# OWASP Security Scan Skill');
+      expect(content).not.toContain('name: owasp-security-scan');
+    });
+
+    test('builds claude skill zip with references', () => {
+      const archive = buildClaudeSkill('owasp-security-scan');
+      expect(archive.subarray(0, 4).toString('hex')).toBe('504b0304');
+      expect(archive.includes(Buffer.from('SKILL.md'))).toBe(true);
+      expect(archive.includes(Buffer.from('references/owasp-mapping.md'))).toBe(
+        true
+      );
+    });
+
+    test('gets skill description and destination', () => {
+      expect(getSkillDescription('owasp-security-scan')).toContain(
+        'Run OWASP-aligned security scans'
+      );
+      expect(
+        getSkillDestination('owasp-security-scan', 'claude', '/tmp/project')
+      ).toEqual({
+        dir: path.join('/tmp/project', '.claude', 'skills'),
+        file: path.join(
+          '/tmp/project',
+          '.claude',
+          'skills',
+          'owasp-security-scan.skill'
+        )
+      });
     });
   });
 
@@ -217,25 +269,29 @@ alwaysApply: false
 
   describe('buildCodexAgentsMd', () => {
     test('lists codex rule files with descriptions', () => {
-      const content = buildCodexAgentsMd(['linting']);
+      const content = buildCodexAgentsMd(['linting'], ['owasp-security-scan']);
       expect(content).toContain('# AGENTS.md');
       expect(content).toMatch(
         /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
       expect(content).toContain('`.codex/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
+      expect(content).toContain('## Installed skills');
+      expect(content).toContain('`.codex/rules/owasp-security-scan.md`');
     });
   });
 
   describe('buildClaudeMd', () => {
     test('lists claude rule files with descriptions', () => {
-      const content = buildClaudeMd(['linting']);
+      const content = buildClaudeMd(['linting'], ['owasp-security-scan']);
       expect(content).toContain('# CLAUDE.md');
       expect(content).toMatch(
         /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
       expect(content).toContain('`.claude/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
+      expect(content).toContain('## Installed skills');
+      expect(content).toContain('`.claude/skills/owasp-security-scan.skill`');
     });
   });
 

@@ -10,6 +10,7 @@ export type Target = 'cursor' | 'claude' | 'opencode' | 'codex';
 export interface RulesConfig {
   target: Target;
   agents: string[];
+  skills?: string[];
   ballastVersion?: string;
   languages?: string[];
   paths?: Record<string, string[]>;
@@ -82,6 +83,9 @@ export function loadConfig(
       target: (data as RulesConfig).target,
       agents: (data as RulesConfig).agents
     };
+    if (Array.isArray((data as RulesConfig).skills)) {
+      config.skills = (data as RulesConfig).skills;
+    }
     if (typeof (data as RulesConfig).ballastVersion === 'string') {
       config.ballastVersion = (data as RulesConfig).ballastVersion;
     }
@@ -103,6 +107,18 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     agents: config.agents,
     ballastVersion: config.ballastVersion ?? existing?.ballastVersion
   };
+  const nextSkills =
+    config.skills && config.skills.length > 0
+      ? config.skills
+      : existing?.skills && existing.skills.length > 0
+        ? existing.skills
+        : undefined;
+  if (nextSkills) {
+    nextConfig = {
+      ...nextConfig,
+      skills: nextSkills
+    };
+  }
 
   const mergedLanguages = mergeLanguages(existing, config);
   const mergedPaths = mergePaths(existing, config, mergedLanguages);

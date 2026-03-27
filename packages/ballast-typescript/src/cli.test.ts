@@ -33,8 +33,33 @@ describe('parseArgs', () => {
     ).toEqual({
       target: 'cursor',
       agents: ['doctor'],
+      skills: [],
       language: 'typescript',
       all: false,
+      allSkills: false,
+      force: false,
+      patch: false,
+      yes: false
+    });
+  });
+
+  test('parses skill flags', () => {
+    expect(
+      parseArgs([
+        'node',
+        'ballast-typescript',
+        'install',
+        '--skill',
+        'owasp-security-scan',
+        '--all-skills'
+      ])
+    ).toEqual({
+      target: undefined,
+      agents: [],
+      skills: ['owasp-security-scan'],
+      language: 'typescript',
+      all: false,
+      allSkills: true,
       force: false,
       patch: false,
       yes: false

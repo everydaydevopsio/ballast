@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 
 import { runInstall } from './install';
-import { LANGUAGES } from './agents';
+import { LANGUAGES, Language } from './agents';
 import { runDoctor } from './doctor';
 import { BALLAST_VERSION } from './version';
 
 export interface CliOptions {
   target?: string;
   agents: string[];
+  skills: string[];
   language: string;
   all: boolean;
+  allSkills: boolean;
   force: boolean;
   patch: boolean;
   yes: boolean;
@@ -30,8 +32,10 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   const options: CliOptions = {
     target: undefined,
     agents: [],
+    skills: [],
     language: 'typescript',
     all: false,
+    allSkills: false,
     force: false,
     patch: false,
     yes: false
@@ -60,8 +64,23 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       i++;
       continue;
     }
+    if (arg === '--skill' || arg === '-s') {
+      const value = args[++i];
+      if (value) {
+        options.skills = options.skills.concat(
+          value.split(',').map((s) => s.trim())
+        );
+      }
+      i++;
+      continue;
+    }
     if (arg === '--all') {
       options.all = true;
+      i++;
+      continue;
+    }
+    if (arg === '--all-skills') {
+      options.allSkills = true;
       i++;
       continue;
     }
@@ -106,7 +125,9 @@ Options:
   --target, -t <platform>   AI platform: cursor, claude, opencode, codex
   --language, -l <lang>     Language profile: ${LANGUAGES.join(', ')} (default: typescript)
   --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
+  --skill, -s <skills>      Skill(s): owasp-security-scan (comma-separated)
   --all                     Install all agents
+  --all-skills              Install all skills
   --force, -f               Overwrite existing rule files
   --patch, -p               Merge upstream rule updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -118,6 +139,7 @@ Examples:
   ballast-typescript install --target cursor --agent linting
   ballast-typescript install --language python --target cursor --all
   ballast-typescript install --target claude --all --force
+  ballast-typescript install --target claude --skill owasp-security-scan
   ballast-typescript install --target cursor --agent linting --patch
   ballast-typescript install --yes --target cursor --all
 `);
@@ -170,9 +192,14 @@ export async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const exitCode = await runInstall(
-    cliOptions as Parameters<typeof runInstall>[0]
-  );
+  const normalizedOptions: Parameters<typeof runInstall>[0] = {
+    ...cliOptions,
+    language: cliOptions.language as Language,
+    agents: cliOptions.agents.length > 0 ? cliOptions.agents : undefined,
+    skills: cliOptions.skills.length > 0 ? cliOptions.skills : undefined
+  };
+
+  const exitCode = await runInstall(normalizedOptions);
   process.exit(exitCode);
 }
 

@@ -32,7 +32,11 @@ describe('install', () => {
         target: 'cursor',
         agents: ['linting']
       });
-      expect(result).toEqual({ target: 'cursor', agents: ['linting'] });
+      expect(result).toEqual({
+        target: 'cursor',
+        agents: ['linting'],
+        skills: []
+      });
     });
 
     test('with --all expands to all agents', async () => {
@@ -48,16 +52,25 @@ describe('install', () => {
       expect(result?.agents).toContain('observability');
       expect(result?.agents).toContain('logging');
       expect(result?.agents).toContain('testing');
+      expect(result?.skills).toEqual([]);
     });
 
     test('with saved config returns config when no flags', async () => {
-      saveConfig({ target: 'opencode', agents: ['linting', 'cicd'] }, tmpDir);
+      saveConfig(
+        {
+          target: 'opencode',
+          agents: ['linting', 'cicd'],
+          skills: ['owasp-security-scan']
+        },
+        tmpDir
+      );
       const result = await resolveTargetAndAgents({
         projectRoot: tmpDir
       });
       expect(result).toEqual({
         target: 'opencode',
-        agents: ['linting', 'cicd']
+        agents: ['linting', 'cicd'],
+        skills: ['owasp-security-scan']
       });
     });
 
@@ -78,7 +91,11 @@ describe('install', () => {
         target: 'cursor',
         agents: ['linting']
       });
-      expect(result).toEqual({ target: 'cursor', agents: ['linting'] });
+      expect(result).toEqual({
+        target: 'cursor',
+        agents: ['linting'],
+        skills: []
+      });
     });
   });
 
@@ -88,10 +105,12 @@ describe('install', () => {
         projectRoot: tmpDir,
         target: 'cursor',
         agents: ['linting'],
+        skills: ['owasp-security-scan'],
         force: false,
         saveConfig: false
       });
       expect(result.installed).toContain('linting');
+      expect(result.installedSkills).toContain('owasp-security-scan');
       expect(result.errors).toHaveLength(0);
       const cursorFile = path.join(
         tmpDir,
@@ -103,6 +122,11 @@ describe('install', () => {
       expect(fs.readFileSync(cursorFile, 'utf8')).toContain(
         'TypeScript linting specialist'
       );
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'owasp-security-scan.mdc')
+        )
+      ).toBe(true);
     });
 
     test('uses pre-commit guidance for standalone typescript installs', () => {
@@ -824,6 +848,36 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         path.join(tmpDir, '.claude', 'rules', 'typescript-linting.md')
       );
       expect(fs.existsSync(path.join(tmpDir, '.rulesrc.json'))).toBe(true);
+    });
+
+    test('uses saved config when CLI passes empty agent and skill arrays', async () => {
+      saveConfig(
+        {
+          target: 'codex',
+          agents: ['linting'],
+          skills: ['owasp-security-scan']
+        },
+        tmpDir
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        agents: [],
+        skills: [],
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.codex', 'rules', 'typescript-linting.md')
+        )
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.codex', 'rules', 'owasp-security-scan.md')
+        )
+      ).toBe(true);
     });
 
     test('returns 1 when CI and no config and no target/agents', async () => {

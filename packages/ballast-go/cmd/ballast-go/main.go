@@ -1,7 +1,9 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
+	"bytes"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -24,6 +26,7 @@ var languages = []string{"typescript", "python", "go"}
 
 var commonAgents = []string{"local-dev", "cicd", "observability"}
 var languageAgents = []string{"linting", "logging", "testing"}
+var commonSkills = []string{"owasp-security-scan"}
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
 var ballastVersion = "dev"
@@ -34,9 +37,13 @@ var hookGuidanceToken = "{{BALLAST_HOOK_GUIDANCE}}"
 //go:embed agents/**
 var embeddedAgentsFS embed.FS
 
+//go:embed skills/**
+var embeddedSkillsFS embed.FS
+
 type rulesConfig struct {
 	Target         string              `json:"target"`
 	Agents         []string            `json:"agents"`
+	Skills         []string            `json:"skills,omitempty"`
 	BallastVersion string              `json:"ballastVersion,omitempty"`
 	Languages      []string            `json:"languages,omitempty"`
 	Paths          map[string][]string `json:"paths,omitempty"`
@@ -45,8 +52,10 @@ type rulesConfig struct {
 type installResult struct {
 	installed           []string
 	installedRules      []installedRule
+	installedSkills     []string
 	installedSupport    []string
 	skipped             []string
+	skippedSkills       []string
 	skippedSupportFiles []string
 	errors              []agentError
 }
@@ -65,7 +74,9 @@ type resolveOptions struct {
 	projectRoot string
 	target      string
 	agents      []string
+	skills      []string
 	all         bool
+	allSkills   bool
 	yes         bool
 	language    string
 }
@@ -74,6 +85,7 @@ type installOptions struct {
 	projectRoot string
 	target      string
 	agents      []string
+	skills      []string
 	language    string
 	force       bool
 	patch       bool
@@ -129,7 +141,10 @@ func runInstall(args []string) int {
 	fs.StringVar(language, "l", "go", "typescript|python|go")
 	agent := fs.String("agent", "", "comma-separated list")
 	fs.StringVar(agent, "a", "", "comma-separated list")
+	skill := fs.String("skill", "", "comma-separated list")
+	fs.StringVar(skill, "s", "", "comma-separated list")
 	all := fs.Bool("all", false, "install all agents")
+	allSkills := fs.Bool("all-skills", false, "install all skills")
 	force := fs.Bool("force", false, "overwrite files")
 	patch := fs.Bool("patch", false, "merge upstream updates into existing files")
 	fs.BoolVar(patch, "p", false, "merge upstream updates into existing files")
@@ -163,7 +178,9 @@ func runInstall(args []string) int {
 		projectRoot: root,
 		target:      strings.ToLower(strings.TrimSpace(*target)),
 		agents:      splitAgents(*agent),
+		skills:      splitCSV(*skill),
 		all:         *all,
+		allSkills:   *allSkills,
 		yes:         *yes,
 		language:    lang,
 	})
@@ -172,8 +189,8 @@ func runInstall(args []string) int {
 		return 1
 	}
 	if resolved == nil {
-		fmt.Println("In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when config is missing.")
-		fmt.Println("Example: ballast-go install --yes --target cursor --agent linting")
+		fmt.Println("In CI/non-interactive mode (--yes or CI env), --target and at least one of --agent/--all or --skill/--all-skills are required when config is missing.")
+		fmt.Println("Example: ballast-go install --yes --target cursor --agent linting --skill owasp-security-scan")
 		return 1
 	}
 
@@ -200,6 +217,7 @@ func runInstall(args []string) int {
 		projectRoot: root,
 		target:      resolved.Target,
 		agents:      resolved.Agents,
+		skills:      resolved.Skills,
 		language:    lang,
 		force:       *force,
 		patch:       *patch,
@@ -226,6 +244,17 @@ func runInstall(args []string) int {
 			fmt.Printf("  %s -> %s\n", base, file)
 		}
 	}
+	if len(result.installedSkills) > 0 {
+		fmt.Printf("Installed skills for %s: %s\n", resolved.Target, strings.Join(result.installedSkills, ", "))
+		for _, skillID := range result.installedSkills {
+			_, file, err := skillDestination(root, resolved.Target, skillID)
+			if err != nil {
+				fmt.Println(err)
+				return 1
+			}
+			fmt.Printf("  %s -> %s\n", skillID, file)
+		}
+	}
 	if len(result.installedSupport) > 0 {
 		for _, file := range result.installedSupport {
 			label := "AGENTS.md"
@@ -238,13 +267,16 @@ func runInstall(args []string) int {
 	if len(result.skipped) > 0 {
 		fmt.Printf("Skipped (already present; use --force to overwrite): %s\n", strings.Join(result.skipped, ", "))
 	}
+	if len(result.skippedSkills) > 0 {
+		fmt.Printf("Skipped skills (already present; use --force to overwrite): %s\n", strings.Join(result.skippedSkills, ", "))
+	}
 	if len(result.skippedSupportFiles) > 0 {
 		fmt.Printf(
 			"Skipped support files (already present; use --force to overwrite): %s\n",
 			strings.Join(result.skippedSupportFiles, ", "),
 		)
 	}
-	if len(result.installed) == 0 && len(result.skipped) == 0 && len(result.errors) == 0 {
+	if len(result.installed) == 0 && len(result.installedSkills) == 0 && len(result.skipped) == 0 && len(result.skippedSkills) == 0 && len(result.errors) == 0 {
 		fmt.Println("Nothing to install.")
 	}
 
@@ -265,7 +297,9 @@ Options:
   --target, -t <platform>   AI platform: %s
   --language, -l <lang>     Language profile: %s (default: go)
   --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
+  --skill, -s <skills>      Skill(s): owasp-security-scan (comma-separated)
   --all                     Install all agents
+  --all-skills              Install all skills
   --force                   Overwrite existing rule files
   --patch, -p               Merge upstream rule updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -275,6 +309,7 @@ Options:
 Examples:
   ballast-go install
   ballast-go install --target cursor --agent linting
+  ballast-go install --target claude --skill owasp-security-scan
   ballast-go install --language python --target cursor --all
   ballast-go install --target claude --all --force
   ballast-go install --target cursor --agent linting --patch
@@ -509,8 +544,12 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	if opts.all {
 		flagAgents = []string{"all"}
 	}
+	flagSkills := opts.skills
+	if opts.allSkills {
+		flagSkills = []string{"all"}
+	}
 
-	if config != nil && opts.target == "" && len(flagAgents) == 0 {
+	if config != nil && opts.target == "" && len(flagAgents) == 0 && len(flagSkills) == 0 {
 		return config, nil
 	}
 
@@ -525,9 +564,15 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	} else if config != nil {
 		resolvedAgents = config.Agents
 	}
+	resolvedSkills := []string{}
+	if len(flagSkills) > 0 {
+		resolvedSkills = resolveSkills(flagSkills, opts.language)
+	} else if config != nil {
+		resolvedSkills = slices.Clone(config.Skills)
+	}
 
-	if target != "" && len(resolvedAgents) > 0 {
-		return &rulesConfig{Target: target, Agents: resolvedAgents}, nil
+	if target != "" && (len(resolvedAgents) > 0 || len(resolvedSkills) > 0) {
+		return &rulesConfig{Target: target, Agents: resolvedAgents, Skills: resolvedSkills}, nil
 	}
 
 	if ci {
@@ -548,13 +593,21 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 			return nil, err
 		}
 	}
+	if len(resolvedSkills) == 0 {
+		var err error
+		resolvedSkills, err = promptSkills(opts.language)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	return &rulesConfig{Target: target, Agents: resolvedAgents}, nil
+	return &rulesConfig{Target: target, Agents: resolvedAgents, Skills: resolvedSkills}, nil
 }
 
 func install(opts installOptions) installResult {
 	result := installResult{}
 	processed := map[string]struct{}{}
+	processedSkills := map[string]struct{}{}
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 	hookMode := resolveTsHookMode(opts.projectRoot, opts.language)
 
@@ -562,6 +615,7 @@ func install(opts installOptions) installResult {
 		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{
 			Target:    opts.target,
 			Agents:    opts.agents,
+			Skills:    opts.skills,
 			Languages: []string{opts.language},
 		}); err != nil {
 			result.errors = append(result.errors, agentError{agent: "config", err: err.Error()})
@@ -633,13 +687,65 @@ func install(opts installOptions) installResult {
 		}
 	}
 
+	for _, skillID := range opts.skills {
+		if !isValidSkill(skillID, opts.language) {
+			result.errors = append(result.errors, agentError{agent: skillID, err: "Unknown skill"})
+			continue
+		}
+		dir, file, err := skillDestination(opts.projectRoot, opts.target, skillID)
+		if err != nil {
+			result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
+			continue
+		}
+		if exists(file) && !opts.force {
+			result.skippedSkills = append(result.skippedSkills, skillID)
+			processedSkills[skillID] = struct{}{}
+			continue
+		}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
+			continue
+		}
+		switch opts.target {
+		case "cursor":
+			content, buildErr := buildCursorSkillFormat(skillID, opts.language)
+			if buildErr != nil {
+				result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
+				continue
+			}
+			err = os.WriteFile(file, []byte(content), 0o644)
+		case "claude":
+			content, buildErr := buildClaudeSkill(skillID, opts.language)
+			if buildErr != nil {
+				result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
+				continue
+			}
+			err = os.WriteFile(file, content, 0o644)
+		case "opencode", "codex":
+			content, buildErr := buildSkillMarkdown(skillID, opts.language)
+			if buildErr != nil {
+				result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
+				continue
+			}
+			err = os.WriteFile(file, []byte(content), 0o644)
+		default:
+			err = fmt.Errorf("unknown target: %s", opts.target)
+		}
+		if err != nil {
+			result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
+			continue
+		}
+		result.installedSkills = append(result.installedSkills, skillID)
+		processedSkills[skillID] = struct{}{}
+	}
+
 	if opts.target == "codex" && !disableSupportFiles {
 		agentsPath := codexAgentsMDPath(opts.projectRoot)
 		if exists(agentsPath) && !opts.force && !opts.patch {
 			result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
 		} else {
 			ids := sortedKeys(processed)
-			content, err := buildCodexAgentsMD(ids, opts.language)
+			content, err := buildCodexAgentsMD(ids, sortedKeys(processedSkills), opts.language)
 			if err != nil {
 				result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 			} else {
@@ -668,7 +774,7 @@ func install(opts installOptions) installResult {
 			result.skippedSupportFiles = append(result.skippedSupportFiles, claudePath)
 		} else {
 			ids := sortedKeys(processed)
-			content, err := buildClaudeMD(ids, opts.language)
+			content, err := buildClaudeMD(ids, sortedKeys(processedSkills), opts.language)
 			if err != nil {
 				result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
 			} else {
@@ -693,7 +799,7 @@ func install(opts installOptions) installResult {
 	return result
 }
 
-func buildCodexAgentsMD(agents []string, language string) (string, error) {
+func buildCodexAgentsMD(agents []string, skills []string, language string) (string, error) {
 	lines := []string{
 		"# AGENTS.md",
 		"",
@@ -720,11 +826,25 @@ func buildCodexAgentsMD(agents []string, language string) (string, error) {
 			lines = append(lines, fmt.Sprintf("- `.codex/rules/%s.md` — %s", base, description))
 		}
 	}
+	if len(skills) > 0 {
+		lines = append(lines,
+			"",
+			"## Installed skills",
+			"",
+			"Created by Ballast v"+ballastVersion+". Do not edit this section.",
+			"",
+			"Read and use these skill files in `.codex/rules/` when they are relevant:",
+			"",
+		)
+		for _, skillID := range skills {
+			lines = append(lines, fmt.Sprintf("- `.codex/rules/%s.md` — %s", skillID, skillDescription(skillID, language)))
+		}
+	}
 	lines = append(lines, "")
 	return strings.Join(lines, "\n"), nil
 }
 
-func buildClaudeMD(agents []string, language string) (string, error) {
+func buildClaudeMD(agents []string, skills []string, language string) (string, error) {
 	lines := []string{
 		"# CLAUDE.md",
 		"",
@@ -751,8 +871,94 @@ func buildClaudeMD(agents []string, language string) (string, error) {
 			lines = append(lines, fmt.Sprintf("- `.claude/rules/%s.md` — %s", base, description))
 		}
 	}
+	if len(skills) > 0 {
+		lines = append(lines,
+			"",
+			"## Installed skills",
+			"",
+			"Created by Ballast v"+ballastVersion+". Do not edit this section.",
+			"",
+			"Read and use these skill files in `.claude/skills/` when they are relevant:",
+			"",
+		)
+		for _, skillID := range skills {
+			lines = append(lines, fmt.Sprintf("- `.claude/skills/%s.skill` — %s", skillID, skillDescription(skillID, language)))
+		}
+	}
 	lines = append(lines, "")
 	return strings.Join(lines, "\n"), nil
+}
+
+func extractDescriptionFromFrontmatter(frontmatter string) *string {
+	normalized := normalizeLineEndings(frontmatter)
+	lines := strings.Split(normalized, "\n")
+	for index, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "description:") {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "description:"))
+		if value == "" {
+			return nil
+		}
+		if value == ">" || value == "|" || value == ">-" || value == "|-" || value == ">+" || value == "|+" {
+			return extractFoldedDescription(lines, index+1, value)
+		}
+		description := strings.TrimSpace(strings.Trim(value, `"'`))
+		if description == "" {
+			return nil
+		}
+		return &description
+	}
+	match := descriptionRegex.FindStringSubmatch(normalized)
+	if len(match) < 2 {
+		return nil
+	}
+	description := strings.TrimSpace(strings.Trim(match[1], `"'`))
+	if description == "" {
+		return nil
+	}
+	return &description
+}
+
+func extractFoldedDescription(lines []string, start int, style string) *string {
+	values := []string{}
+	for index := start; index < len(lines); index++ {
+		line := lines[index]
+		if strings.TrimSpace(line) == "" {
+			if len(values) == 0 {
+				continue
+			}
+			values = append(values, "")
+			continue
+		}
+		if len(line)-len(strings.TrimLeft(line, " ")) < 2 {
+			break
+		}
+		values = append(values, strings.TrimSpace(line))
+	}
+	if len(values) == 0 {
+		return nil
+	}
+	parts := []string{}
+	if strings.HasPrefix(style, ">") {
+		for _, value := range values {
+			if value == "" {
+				continue
+			}
+			parts = append(parts, value)
+		}
+		description := strings.TrimSpace(strings.Join(parts, " "))
+		if description == "" {
+			return nil
+		}
+		return &description
+	}
+	description := strings.TrimSpace(strings.Join(values, "\n"))
+	if description == "" {
+		return nil
+	}
+	return &description
 }
 
 func codexRuleDescription(agentID, language, suffix string) (string, error) {
@@ -760,11 +966,132 @@ func codexRuleDescription(agentID, language, suffix string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	match := descriptionRegex.FindStringSubmatch(frontmatter)
-	if len(match) < 2 {
+	description := extractDescriptionFromFrontmatter(frontmatter)
+	if description == nil {
 		return "", nil
 	}
-	return strings.TrimSpace(match[1]), nil
+	return *description, nil
+}
+
+func readSkillContent(skillID, language string) (string, error) {
+	bytes, err := readSkillFile(path.Join(skillDir(skillID, language), "SKILL.md"))
+	if err != nil {
+		return "", fmt.Errorf("skill %q missing SKILL.md", skillID)
+	}
+	return string(bytes), nil
+}
+
+func splitSkillDocument(content string) (string, string) {
+	normalized := normalizeLineEndings(content)
+	match := frontmatterRegex.FindStringSubmatchIndex(normalized)
+	if match == nil || match[0] != 0 {
+		return "", strings.TrimLeft(normalized, "\n\t ")
+	}
+	frontmatter := strings.TrimRight(normalized[match[0]:match[1]], "\n")
+	body := strings.TrimLeft(normalized[match[1]:], "\n\t ")
+	return frontmatter, body
+}
+
+func skillDescription(skillID, language string) string {
+	content, err := readSkillContent(skillID, language)
+	if err != nil {
+		return "Skill " + skillID
+	}
+	frontmatter, _ := splitSkillDocument(content)
+	if frontmatter == "" {
+		return "Skill " + skillID
+	}
+	description := extractDescriptionFromFrontmatter(frontmatter)
+	if description == nil {
+		return "Skill " + skillID
+	}
+	return *description
+}
+
+func buildCursorSkillFormat(skillID, language string) (string, error) {
+	content, err := readSkillContent(skillID, language)
+	if err != nil {
+		return "", err
+	}
+	_, body := splitSkillDocument(content)
+	return fmt.Sprintf("---\ndescription: %q\nalwaysApply: false\n---\n\n%s\n", skillDescription(skillID, language), strings.TrimRight(body, "\n")), nil
+}
+
+func buildSkillMarkdown(skillID, language string) (string, error) {
+	content, err := readSkillContent(skillID, language)
+	if err != nil {
+		return "", err
+	}
+	_, body := splitSkillDocument(content)
+	return strings.TrimRight(body, "\n") + "\n", nil
+}
+
+func buildClaudeSkill(skillID, language string) ([]byte, error) {
+	content, err := readSkillContent(skillID, language)
+	if err != nil {
+		return nil, err
+	}
+	var buffer bytes.Buffer
+	archive := zip.NewWriter(&buffer)
+	writer, err := archive.Create("SKILL.md")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := writer.Write([]byte(content)); err != nil {
+		return nil, err
+	}
+	referencesDir := path.Join(skillDir(skillID, language), "references")
+	if existsSkillFile(referencesDir) {
+		if overrideRoot := repoRootOverride(); overrideRoot != "" {
+			rootDir := filepath.Join(overrideRoot, filepath.FromSlash(referencesDir))
+			err = filepath.WalkDir(rootDir, func(file string, d os.DirEntry, walkErr error) error {
+				if walkErr != nil || d.IsDir() {
+					return walkErr
+				}
+				relative, relErr := filepath.Rel(rootDir, file)
+				if relErr != nil {
+					return relErr
+				}
+				entry, createErr := archive.Create(path.Join("references", filepath.ToSlash(relative)))
+				if createErr != nil {
+					return createErr
+				}
+				data, readErr := os.ReadFile(file)
+				if readErr != nil {
+					return readErr
+				}
+				_, writeErr := entry.Write(data)
+				return writeErr
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			referenceEntries, readErr := fs.ReadDir(embeddedSkillsFS, referencesDir)
+			if readErr == nil {
+				for _, entry := range referenceEntries {
+					if entry.IsDir() {
+						continue
+					}
+					data, fileErr := readSkillFile(path.Join(referencesDir, entry.Name()))
+					if fileErr != nil {
+						return nil, fileErr
+					}
+					writer, createErr := archive.Create(path.Join("references", entry.Name()))
+					if createErr != nil {
+						return nil, createErr
+					}
+					if _, fileErr := writer.Write(data); fileErr != nil {
+						return nil, fileErr
+					}
+				}
+			}
+		}
+	}
+	if err := archive.Close(); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }
 
 func normalizeLineEndings(content string) string {
@@ -1064,20 +1391,25 @@ func patchCodexAgentsMD(existing, canonical string) string {
 	}
 	existing = normalizeLineEndings(existing)
 	canonical = normalizeLineEndings(canonical)
-	canonicalStart, canonicalEnd, ok := findSectionRange(canonical, "Installed agent rules")
-	if !ok {
-		return existing
+	current := existing
+	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
+		canonicalStart, canonicalEnd, ok := findSectionRange(canonical, heading)
+		if !ok {
+			continue
+		}
+		canonicalSection := strings.TrimRight(canonical[canonicalStart:canonicalEnd], "\n")
+		existingStart, existingEnd, ok := findSectionRange(current, heading)
+		if !ok {
+			current = strings.TrimRight(current, "\n") + "\n\n" + canonicalSection + "\n"
+			continue
+		}
+		current = strings.TrimRight(current[:existingStart], "\n") +
+			"\n\n" +
+			canonicalSection +
+			"\n\n" +
+			strings.TrimLeft(current[existingEnd:], "\n") + "\n"
 	}
-	canonicalSection := strings.TrimRight(canonical[canonicalStart:canonicalEnd], "\n")
-	existingStart, existingEnd, ok := findSectionRange(existing, "Installed agent rules")
-	if !ok {
-		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
-	}
-	return strings.TrimRight(existing[:existingStart], "\n") +
-		"\n\n" +
-		canonicalSection +
-		"\n\n" +
-		strings.TrimLeft(existing[existingEnd:], "\n") + "\n"
+	return current
 }
 
 func buildContent(agentID, target, language, suffix, hookMode string) (string, error) {
@@ -1376,7 +1708,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 	if err := json.Unmarshal(bytes, &cfg); err != nil {
 		return nil
 	}
-	if cfg.Target == "" || len(cfg.Agents) == 0 {
+	if cfg.Target == "" || (len(cfg.Agents) == 0 && len(cfg.Skills) == 0) {
 		return nil
 	}
 	return &cfg
@@ -1497,6 +1829,32 @@ func promptAgents(language string) ([]string, error) {
 	}
 }
 
+func promptSkills(language string) ([]string, error) {
+	allowed := listSkills(language)
+	if len(allowed) == 0 {
+		return nil, nil
+	}
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf("Skills (comma-separated, \"all\", or blank for none) [%s]: ", strings.Join(allowed, ", "))
+		line, err := reader.ReadString('\n')
+		if err != nil && !errors.Is(err, os.ErrClosed) {
+			if len(strings.TrimSpace(line)) == 0 {
+				return nil, err
+			}
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			return nil, nil
+		}
+		resolved := resolveSkills(splitCSV(trimmed), language)
+		if len(resolved) > 0 {
+			return resolved, nil
+		}
+		fmt.Printf("Invalid skills. Use \"all\" or comma-separated: %s\n", strings.Join(allowed, ", "))
+	}
+}
+
 func promptYesNo(question string, defaultAnswer bool) (bool, error) {
 	reader := bufio.NewReader(os.Stdin)
 	suffix := " [y/N]: "
@@ -1554,10 +1912,32 @@ func resolveAgents(tokens []string, language string) []string {
 	return out
 }
 
+func resolveSkills(tokens []string, language string) []string {
+	if len(tokens) == 0 {
+		return nil
+	}
+	for _, token := range tokens {
+		if token == "all" {
+			return listSkills(language)
+		}
+	}
+	out := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		if isValidSkill(token, language) {
+			out = append(out, token)
+		}
+	}
+	return out
+}
+
 func listAgents(_ string) []string {
 	agents := append([]string{}, commonAgents...)
 	agents = append(agents, languageAgents...)
 	return agents
+}
+
+func listSkills(_ string) []string {
+	return append([]string{}, commonSkills...)
 }
 
 func isValidAgent(agentID, language string) bool {
@@ -1569,11 +1949,27 @@ func isValidAgent(agentID, language string) bool {
 	return false
 }
 
+func isValidSkill(skillID, language string) bool {
+	for _, skill := range listSkills(language) {
+		if skill == skillID {
+			return true
+		}
+	}
+	return false
+}
+
 func agentDir(agentID, language string) string {
 	if contains(commonAgents, agentID) {
 		return path.Join("agents", "common", agentID)
 	}
 	return path.Join("agents", language, agentID)
+}
+
+func skillDir(skillID, language string) string {
+	if contains(commonSkills, skillID) {
+		return path.Join("skills", "common", skillID)
+	}
+	return path.Join("skills", language, skillID)
 }
 
 func readDirEntries(relativeDir string) ([]fs.DirEntry, error) {
@@ -1596,6 +1992,21 @@ func readAgentFile(relativePath string) ([]byte, error) {
 		return os.ReadFile(filepath.Join(overrideRoot, filepath.FromSlash(relativePath)))
 	}
 	return fs.ReadFile(embeddedAgentsFS, relativePath)
+}
+
+func readSkillFile(relativePath string) ([]byte, error) {
+	if overrideRoot := repoRootOverride(); overrideRoot != "" {
+		return os.ReadFile(filepath.Join(overrideRoot, filepath.FromSlash(relativePath)))
+	}
+	return fs.ReadFile(embeddedSkillsFS, relativePath)
+}
+
+func existsSkillFile(relativePath string) bool {
+	if overrideRoot := repoRootOverride(); overrideRoot != "" {
+		return exists(filepath.Join(overrideRoot, filepath.FromSlash(relativePath)))
+	}
+	_, err := fs.Stat(embeddedSkillsFS, relativePath)
+	return err == nil
 }
 
 func existsAgentFile(relativePath string) bool {
@@ -1671,6 +2082,26 @@ func destination(projectRoot, target, basename string) (string, string, error) {
 			dir = filepath.Join(dir, ruleSubdir)
 		}
 		return dir, filepath.Join(dir, scopedBasename+".md"), nil
+	}
+}
+
+func skillDestination(projectRoot, target, skillID string) (string, string, error) {
+	root := filepath.Clean(projectRoot)
+	switch target {
+	case "cursor":
+		dir := filepath.Join(root, ".cursor", "rules")
+		return dir, filepath.Join(dir, skillID+".mdc"), nil
+	case "claude":
+		dir := filepath.Join(root, ".claude", "skills")
+		return dir, filepath.Join(dir, skillID+".skill"), nil
+	case "opencode":
+		dir := filepath.Join(root, ".opencode", "skills")
+		return dir, filepath.Join(dir, skillID+".md"), nil
+	case "codex":
+		dir := filepath.Join(root, ".codex", "rules")
+		return dir, filepath.Join(dir, skillID+".md"), nil
+	default:
+		return "", "", fmt.Errorf("unknown target: %s", target)
 	}
 }
 

@@ -32,4 +32,4 @@ dev = [
 packages = ["ballast"]
 
 [tool.setuptools.package-data]
-ballast = ["agents/**/*"]
+ballast = ["agents/**/*", "skills/**/*"]

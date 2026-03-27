@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
 import shutil
 import subprocess
+import zipfile
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import metadata
@@ -20,6 +22,12 @@ AGENTS_BY_LANGUAGE = {
     "python": COMMON_AGENTS + LANGUAGE_AGENTS,
     "go": COMMON_AGENTS + LANGUAGE_AGENTS,
 }
+COMMON_SKILLS = ["owasp-security-scan"]
+SKILLS_BY_LANGUAGE = {
+    "typescript": COMMON_SKILLS,
+    "python": COMMON_SKILLS,
+    "go": COMMON_SKILLS,
+}
 HOOK_GUIDANCE_TOKEN = "{{BALLAST_HOOK_GUIDANCE}}"
 
 
@@ -31,8 +39,10 @@ def cli_version() -> str:
 class InstallResult:
     installed: list[str] = field(default_factory=list)
     installed_rules: list[tuple[str, str]] = field(default_factory=list)
+    installed_skills: list[str] = field(default_factory=list)
     installed_support_files: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+    skipped_skills: list[str] = field(default_factory=list)
     skipped_support_files: list[str] = field(default_factory=list)
     errors: list[tuple[str, str]] = field(default_factory=list)
 
@@ -94,6 +104,28 @@ def agent_dir(agent: str, language: str) -> Path:
     return resolve_agents_root() / language / agent
 
 
+@lru_cache(maxsize=1)
+def resolve_skills_root() -> Path:
+    root = package_root()
+    packaged = root / "skills"
+    if packaged.exists():
+        return packaged
+
+    legacy_repo_skills = Path(__file__).resolve().parents[3] / "skills"
+    if legacy_repo_skills.exists():
+        return legacy_repo_skills
+
+    raise FileNotFoundError(
+        "Unable to locate Ballast skills content. Reinstall ballast-python or set BALLAST_REPO_ROOT to a ballast repo checkout."
+    )
+
+
+def skill_dir(skill: str, language: str) -> Path:
+    if skill in COMMON_SKILLS:
+        return resolve_skills_root() / "common" / skill
+    return resolve_skills_root() / language / skill
+
+
 def resolve_project_root(cwd: Path) -> Path:
     for directory in [cwd, *cwd.parents]:
         has_pkg = (directory / "package.json").exists()
@@ -138,9 +170,11 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
         if not all(isinstance(item, str) for item in agents):
             return None
         ballast_version_value = data.get("ballastVersion")
+        skills = data.get("skills")
         return {
             "target": target,
             "agents": agents,
+            "skills": skills if isinstance(skills, list) else [],
             "ballastVersion": (
                 ballast_version_value
                 if isinstance(ballast_version_value, str)
@@ -151,7 +185,13 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
         return None
 
 
-def save_config(root: Path, language: str, target: str, agents: list[str]) -> None:
+def save_config(
+    root: Path,
+    language: str,
+    target: str,
+    agents: list[str],
+    skills: list[str] | None = None,
+) -> None:
     file_path = root / rulesrc_filename(language)
     languages: list[str] = []
     paths: dict[str, list[str]] = {}
@@ -187,6 +227,7 @@ def save_config(root: Path, language: str, target: str, agents: list[str]) -> No
             {
                 "target": target,
                 "agents": agents,
+                "skills": skills or [],
                 "ballastVersion": ballast_version(),
                 "languages": languages,
                 "paths": paths,
@@ -374,8 +415,23 @@ def parse_agent_tokens(raw: str | None, all_agents: bool, language: str) -> list
     return values
 
 
+def parse_skill_tokens(raw: str | None, all_skills: bool, language: str) -> list[str]:
+    if all_skills:
+        return list(SKILLS_BY_LANGUAGE[language])
+    if not raw:
+        return []
+    values = [item.strip() for item in raw.split(",") if item.strip()]
+    if "all" in values:
+        return list(SKILLS_BY_LANGUAGE[language])
+    return values
+
+
 def is_valid_agent(agent: str, language: str) -> bool:
     return agent in AGENTS_BY_LANGUAGE[language]
+
+
+def is_valid_skill(skill: str, language: str) -> bool:
+    return skill in SKILLS_BY_LANGUAGE[language]
 
 
 def list_rule_suffixes(agent: str, language: str) -> list[str]:
@@ -561,6 +617,55 @@ def build_content(
     return header + body
 
 
+def read_skill(skill: str, language: str) -> str:
+    return (skill_dir(skill, language) / "SKILL.md").read_text(encoding="utf-8")
+
+
+def split_skill_document(content: str) -> tuple[str | None, str]:
+    normalized = normalize_line_endings(content)
+    match = re.match(r"^---\n([\s\S]*?)\n---\n?", normalized)
+    if not match:
+        return None, normalized.lstrip()
+    return match.group(0).rstrip(), normalized[match.end() :].lstrip()
+
+
+def skill_description(skill: str, language: str) -> str:
+    frontmatter, _ = split_skill_document(read_skill(skill, language))
+    if not frontmatter:
+        return f"Skill {skill}"
+    description = extract_description_from_frontmatter(frontmatter)
+    return description or f"Skill {skill}"
+
+
+def build_cursor_skill_format(skill: str, language: str) -> str:
+    _, body = split_skill_document(read_skill(skill, language))
+    description = skill_description(skill, language).replace('"', '\\"')
+    return (
+        f'---\ndescription: "{description}"\nalwaysApply: false\n---\n\n'
+        + body.rstrip()
+        + "\n"
+    )
+
+
+def build_skill_markdown(skill: str, language: str) -> str:
+    _, body = split_skill_document(read_skill(skill, language))
+    return body.rstrip() + "\n"
+
+
+def build_claude_skill(skill: str, language: str) -> bytes:
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+        archive.writestr("SKILL.md", read_skill(skill, language))
+        references = skill_dir(skill, language) / "references"
+        if references.exists():
+            for ref in sorted(references.rglob("*")):
+                if ref.is_file():
+                    archive.write(
+                        ref, f"references/{ref.relative_to(references).as_posix()}"
+                    )
+    return output.getvalue()
+
+
 def destination(root: Path, target: str, basename: str) -> Path:
     rule_subdir = os.environ.get("BALLAST_RULE_SUBDIR", "").strip()
     if rule_subdir and not re.fullmatch(r"[A-Za-z0-9_-]+", rule_subdir):
@@ -603,10 +708,45 @@ def destination(root: Path, target: str, basename: str) -> Path:
     )
 
 
+def skill_destination(root: Path, target: str, skill: str) -> Path:
+    if target == "cursor":
+        return root / ".cursor" / "rules" / f"{skill}.mdc"
+    if target == "claude":
+        return root / ".claude" / "skills" / f"{skill}.skill"
+    if target == "opencode":
+        return root / ".opencode" / "skills" / f"{skill}.md"
+    return root / ".codex" / "rules" / f"{skill}.md"
+
+
 def extract_description_from_frontmatter(frontmatter: str) -> str | None:
+    lines = frontmatter.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.startswith("description:"):
+            continue
+        value = stripped.removeprefix("description:").strip()
+        if value in {">", "|", ">-", "|-", ">+", "|+"}:
+            values: list[str] = []
+            for candidate in lines[index + 1 :]:
+                if candidate.strip() == "":
+                    if values:
+                        values.append("")
+                    continue
+                if len(candidate) - len(candidate.lstrip(" ")) < 2:
+                    break
+                values.append(candidate.strip())
+            if not values:
+                return None
+            if value.startswith(">"):
+                folded = " ".join(item for item in values if item)
+                return folded or None
+            literal = "\n".join(values).strip()
+            return literal or None
+        value = value.strip("'\"")
+        return value or None
     match = re.search(r"(?m)^description:\s*['\"]?(.+?)['\"]?\s*$", frontmatter)
     if match:
-        value = match.group(1).strip()
+        value = match.group(1).strip().strip("'\"")
         return value or None
     return None
 
@@ -628,7 +768,7 @@ def rule_basename(agent: str, language: str, suffix: str = "") -> str:
     return f"{language}-{basename}"
 
 
-def build_codex_agents_md(agents: list[str], language: str) -> str:
+def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -> str:
     lines = [
         "# AGENTS.md",
         "",
@@ -649,11 +789,27 @@ def build_codex_agents_md(agents: list[str], language: str) -> str:
                 or f"Rules for {basename}"
             )
             lines.append(f"- `.codex/rules/{basename}.md` — {description}")
+    if skills:
+        lines.extend(
+            [
+                "",
+                "## Installed skills",
+                "",
+                f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+                "",
+                "Read and use these skill files in `.codex/rules/` when they are relevant:",
+                "",
+            ]
+        )
+        for skill in skills:
+            lines.append(
+                f"- `.codex/rules/{skill}.md` — {skill_description(skill, language)}"
+            )
     lines.append("")
     return "\n".join(lines)
 
 
-def build_claude_md(agents: list[str], language: str) -> str:
+def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
     lines = [
         "# CLAUDE.md",
         "",
@@ -674,6 +830,22 @@ def build_claude_md(agents: list[str], language: str) -> str:
                 or f"Rules for {basename}"
             )
             lines.append(f"- `.claude/rules/{basename}.md` — {description}")
+    if skills:
+        lines.extend(
+            [
+                "",
+                "## Installed skills",
+                "",
+                f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+                "",
+                "Read and use these skill files in `.claude/skills/` when they are relevant:",
+                "",
+            ]
+        )
+        for skill in skills:
+            lines.append(
+                f"- `.claude/skills/{skill}.skill` — {skill_description(skill, language)}"
+            )
     lines.append("")
     return "\n".join(lines)
 
@@ -902,22 +1074,27 @@ def patch_codex_agents_md(existing: str, canonical: str) -> str:
     if not existing.strip():
         return canonical
 
-    canonical_range = find_markdown_section_range(canonical, "Installed agent rules")
-    if not canonical_range:
-        return existing
-    canonical_section = canonical[canonical_range[0] : canonical_range[1]].rstrip()
+    next_content = existing
+    for heading in ("Installed agent rules", "Installed skills"):
+        canonical_range = find_markdown_section_range(canonical, heading)
+        if not canonical_range:
+            continue
+        canonical_section = canonical[canonical_range[0] : canonical_range[1]].rstrip()
 
-    existing_range = find_markdown_section_range(existing, "Installed agent rules")
-    if not existing_range:
-        return existing.rstrip() + "\n\n" + canonical_section + "\n"
+        existing_range = find_markdown_section_range(next_content, heading)
+        if not existing_range:
+            next_content = next_content.rstrip() + "\n\n" + canonical_section + "\n"
+            continue
 
-    return (
-        existing[: existing_range[0]].rstrip()
-        + "\n\n"
-        + canonical_section
-        + "\n\n"
-        + existing[existing_range[1] :].lstrip()
-    ).rstrip() + "\n"
+        next_content = (
+            next_content[: existing_range[0]].rstrip()
+            + "\n\n"
+            + canonical_section
+            + "\n\n"
+            + next_content[existing_range[1] :].lstrip()
+        ).rstrip() + "\n"
+
+    return next_content
 
 
 def prompt(question: str) -> str:
@@ -953,9 +1130,26 @@ def prompt_agents(language: str) -> list[str]:
     return prompt_agents(language)
 
 
+def prompt_skills(language: str) -> list[str]:
+    skill_ids = SKILLS_BY_LANGUAGE[language]
+    if not skill_ids:
+        return []
+    value = prompt(
+        f'Skills (comma-separated, "all", or blank for none) [{", ".join(skill_ids)}]: '
+    )
+    if not value:
+        return []
+    tokens = parse_skill_tokens(value, False, language)
+    resolved = [t for t in tokens if is_valid_skill(t, language)]
+    if resolved:
+        return resolved
+    print(f"Invalid skills. Use 'all' or comma-separated: {', '.join(skill_ids)}")
+    return prompt_skills(language)
+
+
 def resolve_target_and_agents(
     args: argparse.Namespace, root: Path, language: str
-) -> tuple[str, list[str]] | None:
+) -> tuple[str, list[str], list[str]] | None:
     cfg = load_config(root, language)
     ci = is_ci_mode() or bool(args.yes)
 
@@ -965,9 +1159,23 @@ def resolve_target_and_agents(
         if (args.agent or args.all)
         else None
     )
+    skills_from_flag = (
+        parse_skill_tokens(args.skill, bool(args.all_skills), language)
+        if (getattr(args, "skill", None) or bool(getattr(args, "all_skills", False)))
+        else None
+    )
 
-    if cfg and not target_from_flag and agents_from_flag is None:
-        return str(cfg["target"]), list(cfg["agents"])
+    if (
+        cfg
+        and not target_from_flag
+        and agents_from_flag is None
+        and skills_from_flag is None
+    ):
+        return (
+            str(cfg["target"]),
+            list(cfg["agents"]),
+            list(cfg.get("skills") or []),
+        )
 
     target = target_from_flag or (str(cfg["target"]) if cfg else None)
     agents = (
@@ -975,22 +1183,29 @@ def resolve_target_and_agents(
         if agents_from_flag is not None
         else (list(cfg["agents"]) if cfg else None)
     )
+    skills = (
+        skills_from_flag
+        if skills_from_flag is not None
+        else (list(cfg.get("skills") or []) if cfg else [])
+    )
 
-    if target and agents and len(agents) > 0:
-        return target, agents
+    if target and ((agents and len(agents) > 0) or len(skills) > 0):
+        return target, agents or [], skills
 
     if ci:
         return None
 
     resolved_target = target if target else prompt_target()
     resolved_agents = agents if agents and len(agents) > 0 else prompt_agents(language)
-    return resolved_target, resolved_agents
+    resolved_skills = skills if skills else prompt_skills(language)
+    return resolved_target, resolved_agents, resolved_skills
 
 
 def install(
     root: Path,
     target: str,
     agents: list[str],
+    skills: list[str],
     language: str,
     force: bool,
     patch: bool,
@@ -999,10 +1214,11 @@ def install(
 ) -> InstallResult:
     result = InstallResult()
     processed_agents: list[str] = []
+    processed_skills: list[str] = []
     disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 
     if persist:
-        save_config(root, language, target, agents)
+        save_config(root, language, target, agents, skills)
 
     for agent in agents:
         if not is_valid_agent(agent, language):
@@ -1041,13 +1257,39 @@ def install(
         except Exception as err:
             result.errors.append((agent, str(err)))
 
+    for skill in skills:
+        if not is_valid_skill(skill, language):
+            result.errors.append((skill, "Unknown skill"))
+            continue
+        try:
+            dst = skill_destination(root, target, skill)
+            if dst.exists() and not force:
+                result.skipped_skills.append(skill)
+                processed_skills.append(skill)
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if target == "cursor":
+                dst.write_text(
+                    build_cursor_skill_format(skill, language), encoding="utf-8"
+                )
+            elif target == "claude":
+                dst.write_bytes(build_claude_skill(skill, language))
+            else:
+                dst.write_text(build_skill_markdown(skill, language), encoding="utf-8")
+            result.installed_skills.append(skill)
+            processed_skills.append(skill)
+        except Exception as err:
+            result.errors.append((skill, str(err)))
+
     if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"
         if agents_md.exists() and not force and not patch:
             result.skipped_support_files.append(str(agents_md))
         else:
             try:
-                content = build_codex_agents_md(processed_agents, language)
+                content = build_codex_agents_md(
+                    processed_agents, processed_skills, language
+                )
                 next_content = (
                     patch_codex_agents_md(
                         agents_md.read_text(encoding="utf-8"), content
@@ -1067,7 +1309,7 @@ def install(
             result.skipped_support_files.append(str(claude_md))
         else:
             try:
-                content = build_claude_md(processed_agents, language)
+                content = build_claude_md(processed_agents, processed_skills, language)
                 next_content = (
                     patch_codex_agents_md(
                         claude_md.read_text(encoding="utf-8"), content
@@ -1093,12 +1335,14 @@ def run_install(args: argparse.Namespace) -> int:
     resolved = resolve_target_and_agents(args, root, language)
     if not resolved:
         print(
-            "In CI/non-interactive mode (--yes or CI env), --target and --agent (or --all) are required when config is missing."
+            "In CI/non-interactive mode (--yes or CI env), --target and at least one of --agent/--all or --skill/--all-skills are required when config is missing."
         )
-        print("Example: ballast-python install --yes --target cursor --agent linting")
+        print(
+            "Example: ballast-python install --yes --target cursor --agent linting --skill owasp-security-scan"
+        )
         return 1
 
-    target, agents = resolved
+    target, agents, skills = resolved
     if target not in TARGETS:
         print("Invalid --target. Use: cursor, claude, opencode, codex")
         return 1
@@ -1115,6 +1359,7 @@ def run_install(args: argparse.Namespace) -> int:
         root,
         target,
         agents,
+        skills,
         language,
         bool(args.force),
         bool(args.patch),
@@ -1132,6 +1377,10 @@ def run_install(args: argparse.Namespace) -> int:
         for agent, suffix in result.installed_rules:
             basename = rule_basename(agent, language, suffix)
             print(f"  {basename} -> {destination(root, target, basename)}")
+    if result.installed_skills:
+        print(f"Installed skills for {target}: {', '.join(result.installed_skills)}")
+        for skill in result.installed_skills:
+            print(f"  {skill} -> {skill_destination(root, target, skill)}")
     if result.installed_support_files:
         for file in result.installed_support_files:
             label = "CLAUDE.md" if file.endswith("CLAUDE.md") else "AGENTS.md"
@@ -1141,12 +1390,23 @@ def run_install(args: argparse.Namespace) -> int:
             "Skipped (already present; use --force to overwrite): "
             + ", ".join(result.skipped)
         )
+    if result.skipped_skills:
+        print(
+            "Skipped skills (already present; use --force to overwrite): "
+            + ", ".join(result.skipped_skills)
+        )
     if result.skipped_support_files:
         print(
             "Skipped support files (already present; use --force to overwrite): "
             + ", ".join(result.skipped_support_files)
         )
-    if not result.installed and not result.skipped and not result.errors:
+    if (
+        not result.installed
+        and not result.installed_skills
+        and not result.skipped
+        and not result.skipped_skills
+        and not result.errors
+    ):
         print("Nothing to install.")
 
     return 0
@@ -1162,7 +1422,9 @@ def parser() -> argparse.ArgumentParser:
     install_cmd.add_argument("--target", "-t")
     install_cmd.add_argument("--language", "-l", default="python")
     install_cmd.add_argument("--agent", "-a")
+    install_cmd.add_argument("--skill", "-s")
     install_cmd.add_argument("--all", action="store_true")
+    install_cmd.add_argument("--all-skills", action="store_true")
     install_cmd.add_argument("--force", "-f", action="store_true")
     install_cmd.add_argument("--patch", "-p", action="store_true")
     install_cmd.add_argument("--yes", "-y", action="store_true")

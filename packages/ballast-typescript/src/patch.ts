@@ -227,31 +227,30 @@ export function patchCodexAgentsMd(
     return canonical;
   }
 
-  const canonicalRange = findMarkdownSectionRange(
-    canonical,
-    'Installed agent rules'
-  );
-  if (!canonicalRange) {
-    return existing;
+  let next = existing;
+  for (const heading of ['Installed agent rules', 'Installed skills']) {
+    const canonicalRange = findMarkdownSectionRange(canonical, heading);
+    if (!canonicalRange) {
+      continue;
+    }
+
+    const canonicalSection = canonical
+      .slice(canonicalRange.start, canonicalRange.end)
+      .trimEnd();
+    const existingRange = findMarkdownSectionRange(next, heading);
+
+    if (!existingRange) {
+      next = `${next.trimEnd()}\n\n${canonicalSection}\n`;
+      continue;
+    }
+
+    next =
+      (
+        `${next.slice(0, existingRange.start).trimEnd()}\n\n` +
+        `${canonicalSection}\n\n` +
+        `${next.slice(existingRange.end).trimStart()}`
+      ).trimEnd() + '\n';
   }
 
-  const canonicalSection = canonical
-    .slice(canonicalRange.start, canonicalRange.end)
-    .trimEnd();
-  const existingRange = findMarkdownSectionRange(
-    existing,
-    'Installed agent rules'
-  );
-
-  if (!existingRange) {
-    return `${existing.trimEnd()}\n\n${canonicalSection}\n`;
-  }
-
-  return (
-    (
-      `${existing.slice(0, existingRange.start).trimEnd()}\n\n` +
-      `${canonicalSection}\n\n` +
-      `${existing.slice(existingRange.end).trimStart()}`
-    ).trimEnd() + '\n'
-  );
+  return next;
 }

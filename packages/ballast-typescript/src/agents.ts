@@ -7,6 +7,10 @@ function hasAgents(root: string): boolean {
   return fs.existsSync(path.join(root, 'agents', 'common'));
 }
 
+function hasSkills(root: string): boolean {
+  return fs.existsSync(path.join(root, 'skills', 'common'));
+}
+
 function resolveAgentsRoot(): string {
   const repoRootOverride = process.env.BALLAST_REPO_ROOT;
   if (repoRootOverride) {
@@ -41,6 +45,9 @@ export const COMMON_AGENT_IDS = ['local-dev', 'cicd', 'observability'] as const;
 export const LANGUAGE_AGENT_IDS = ['linting', 'logging', 'testing'] as const;
 export const AGENT_IDS = [...COMMON_AGENT_IDS, ...LANGUAGE_AGENT_IDS] as const;
 export type AgentId = (typeof AGENT_IDS)[number];
+export const COMMON_SKILL_IDS = ['owasp-security-scan'] as const;
+export const SKILL_IDS = [...COMMON_SKILL_IDS] as const;
+export type SkillId = (typeof SKILL_IDS)[number];
 
 /**
  * Resolve path to an agent directory
@@ -61,6 +68,28 @@ export function getAgentDir(
 export function listAgents(_language: Language = 'typescript'): string[] {
   void _language;
   return AGENT_IDS.slice();
+}
+
+export function getSkillDir(skillId: string): string {
+  if (!hasSkills(AGENTS_ROOT)) {
+    throw new Error(
+      `BALLAST_REPO_ROOT does not contain skills/: ${AGENTS_ROOT}`
+    );
+  }
+  return path.join(AGENTS_ROOT, 'skills', 'common', skillId);
+}
+
+export function listSkills(_language: Language = 'typescript'): string[] {
+  void _language;
+  return SKILL_IDS.slice();
+}
+
+export function isValidSkill(
+  skillId: string,
+  _language: Language = 'typescript'
+): boolean {
+  void _language;
+  return (SKILL_IDS as readonly string[]).includes(skillId);
 }
 
 /**
@@ -88,6 +117,19 @@ export function resolveAgents(
   }
   if (agents === 'all') return AGENT_IDS.slice();
   return isValidAgent(agents, language) ? [agents] : [];
+}
+
+export function resolveSkills(
+  skills: string | string[],
+  language: Language = 'typescript'
+): string[] {
+  if (Array.isArray(skills)) {
+    const hasAll = skills.some((value) => value === 'all');
+    if (hasAll) return SKILL_IDS.slice();
+    return skills.filter((value) => isValidSkill(value, language));
+  }
+  if (skills === 'all') return SKILL_IDS.slice();
+  return isValidSkill(skills, language) ? [skills] : [];
 }
 
 export { PACKAGE_ROOT };

@@ -57,7 +57,8 @@ describe('config', () => {
     test('returns parsed config when valid', () => {
       const config = {
         target: 'claude' as const,
-        agents: ['linting', 'local-dev']
+        agents: ['linting', 'local-dev'],
+        skills: ['owasp-security-scan']
       };
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),
@@ -70,6 +71,7 @@ describe('config', () => {
       const config = {
         target: 'claude' as const,
         agents: ['linting', 'local-dev'],
+        skills: ['owasp-security-scan'],
         ballastVersion: BALLAST_VERSION
       };
       fs.writeFileSync(
@@ -101,6 +103,7 @@ describe('config', () => {
       const config = {
         target: 'opencode' as const,
         agents: ['cicd'],
+        skills: ['owasp-security-scan'],
         ballastVersion: BALLAST_VERSION
       };
       saveConfig(config, tmpDir);
