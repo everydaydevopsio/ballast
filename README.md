@@ -50,6 +50,55 @@ Skill sources in this repo:
 
 - `skills/common/*`
 
+## Skills
+
+Skills are reusable task guides that Ballast installs for the target AI tool alongside the agent rules. In this repository, the shipped skill is:
+
+- `owasp-security-scan`: run an OWASP-aligned security audit across Go, TypeScript, and Python projects
+
+### Install a skill
+
+Install a specific skill with `--skill`:
+
+```bash
+pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
+```
+
+Install every available skill for the selected language with `--all-skills`:
+
+```bash
+pnpm exec ballast-typescript install --target claude --all-skills
+```
+
+Skills can be combined with agent installs in the same command:
+
+```bash
+pnpm exec ballast-typescript install --target claude --agent linting,testing --skill owasp-security-scan
+```
+
+### Use a skill
+
+After installation, invoke the skill naturally in your AI tool by naming it and asking for the task it covers. Examples:
+
+- Claude Code: ask to run `owasp-security-scan`
+- Codex: ask to use `owasp-security-scan` to audit the repo
+- OpenCode: invoke the installed skill by name for a security scan request
+- Cursor: use the installed rule/skill file as part of your repo instructions and ask for the security audit
+
+Typical prompts:
+
+```text
+Run owasp-security-scan on this repository.
+Use owasp-security-scan to audit dependencies and code security.
+```
+
+### Where skills are installed
+
+- Cursor: `.cursor/rules/<skill>.mdc`
+- Claude: `.claude/skills/<skill>.skill`
+- OpenCode: `.opencode/skills/<skill>.md`
+- Codex: `.codex/rules/<skill>.md`, with root `AGENTS.md` listing installed skills
+
 ## Install and Use (Single Language)
 
 `ballast` is the wrapper command (intended for Homebrew) that detects repo language and dispatches to the matching language CLI.
