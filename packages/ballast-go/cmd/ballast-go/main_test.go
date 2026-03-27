@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -357,6 +358,91 @@ func TestInstallCreatesClaudeSkillAndPersistsConfig(t *testing.T) {
 	}
 	if !strings.Contains(string(claudeContent), "`.claude/skills/owasp-security-scan.skill`") {
 		t.Fatalf("expected skill entry in CLAUDE.md: %s", string(claudeContent))
+	}
+}
+
+func TestResolveTargetAndAgentsReturnsSavedSkillOnlyConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	if err := saveConfig(tmpDir, "go", rulesConfig{
+		Target: "codex",
+		Skills: []string{"owasp-security-scan"},
+	}); err != nil {
+		t.Fatalf("save skill-only config: %v", err)
+	}
+
+	resolved, err := resolveTargetAndAgents(resolveOptions{
+		projectRoot: tmpDir,
+		language:    "go",
+	})
+	if err != nil {
+		t.Fatalf("resolveTargetAndAgents: %v", err)
+	}
+	if resolved == nil {
+		t.Fatal("expected resolved config, got nil")
+	}
+	if resolved.Target != "codex" || len(resolved.Agents) != 0 || !slices.Equal(resolved.Skills, []string{"owasp-security-scan"}) {
+		t.Fatalf("unexpected resolved config: %#v", resolved)
+	}
+}
+
+func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "codex",
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected installed skill, got %+v", result.installedSkills)
+	}
+	agentsMD, err := os.ReadFile(filepath.Join(tmpDir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	text := string(agentsMD)
+	if !strings.Contains(text, "## Installed skills") {
+		t.Fatalf("expected installed skills section in AGENTS.md: %s", text)
+	}
+	if !strings.Contains(text, "`.codex/rules/owasp-security-scan.md`") {
+		t.Fatalf("expected codex skill entry in AGENTS.md: %s", text)
+	}
+}
+
+func TestInstallSkipsExistingSkillWithoutForce(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(skillPath, []byte("existing skill"), 0o644); err != nil {
+		t.Fatalf("seed skill file: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "opencode",
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.skippedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected skipped skill, got %+v", result.skippedSkills)
+	}
+	content, err := os.ReadFile(skillPath)
+	if err != nil {
+		t.Fatalf("read existing skill: %v", err)
+	}
+	if string(content) != "existing skill" {
+		t.Fatalf("expected existing skill to remain untouched, got %q", string(content))
 	}
 }
 

@@ -799,6 +799,80 @@ func TestResolveMonorepoPlanInvokesOncePerLanguage(t *testing.T) {
 	}
 }
 
+func TestParseInstallSelectionIncludesSkills(t *testing.T) {
+	agents, allAgents, skills, allSkills := parseInstallSelection([]string{
+		"install",
+		"--agent", "linting,testing",
+		"--skill=owasp-security-scan",
+		"--all-skills",
+	})
+
+	if allAgents {
+		t.Fatal("expected --all to be false")
+	}
+	if !reflect.DeepEqual(agents, []string{"linting", "testing"}) {
+		t.Fatalf("expected parsed agents, got %#v", agents)
+	}
+	if !reflect.DeepEqual(skills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected parsed skills, got %#v", skills)
+	}
+	if !allSkills {
+		t.Fatal("expected --all-skills to be true")
+	}
+}
+
+func TestWithSkillSelectionReplacesExistingFlags(t *testing.T) {
+	args := withSkillSelection(
+		[]string{"install", "--target", "claude", "--skill", "old-skill", "--all-skills"},
+		[]string{"owasp-security-scan"},
+	)
+
+	got := strings.Join(args, " ")
+	if strings.Contains(got, "old-skill") {
+		t.Fatalf("expected old skill selection to be removed, got %q", got)
+	}
+	if strings.Contains(got, "--all-skills") {
+		t.Fatalf("expected --all-skills to be removed, got %q", got)
+	}
+	if !strings.Contains(got, "--skill owasp-security-scan") {
+		t.Fatalf("expected normalized skill selection, got %q", got)
+	}
+}
+
+func TestResolveMonorepoPlanSupportsSkillOnlyConfig(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "claude",
+  "skills": ["owasp-security-scan"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) != 1 {
+		t.Fatalf("expected a single common invocation for skill-only installs, got %#v", plan.Invocations)
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if !strings.Contains(got, "--skill owasp-security-scan") {
+		t.Fatalf("expected skill selection in common invocation, got %q", got)
+	}
+	if strings.Contains(got, "--agent") {
+		t.Fatalf("expected no agent flags in skill-only invocation, got %q", got)
+	}
+	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected saved config skills, got %#v", plan.Config.Skills)
+	}
+}
+
 func TestResolveMonorepoPlanIgnoresStaleRulesrcProfiles(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
