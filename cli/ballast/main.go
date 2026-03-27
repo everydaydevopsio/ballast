@@ -1194,13 +1194,13 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 
 	installTarget := findFlagValue(args, "--target", "-t")
 	installAgents, installAll, installSkills, installAllSkills := parseInstallSelection(args)
+	explicitAgentSelection := len(installAgents) > 0 || installAll
+	explicitSkillSelection := len(installSkills) > 0 || installAllSkills
 	if installTarget == "" && config != nil {
 		installTarget = config.Target
 	}
-	if len(installAgents) == 0 && !installAll && config != nil {
+	if !explicitAgentSelection && !explicitSkillSelection && config != nil {
 		installAgents = slices.Clone(config.Agents)
-	}
-	if len(installSkills) == 0 && !installAllSkills && config != nil {
 		installSkills = slices.Clone(config.Skills)
 	}
 	if installTarget == "" || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills)) {

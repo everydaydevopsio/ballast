@@ -873,6 +873,82 @@ func TestResolveMonorepoPlanSupportsSkillOnlyConfig(t *testing.T) {
 	}
 }
 
+func TestResolveMonorepoPlanSkillFlagDoesNotInheritConfiguredAgents(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "claude",
+  "agents": ["local-dev", "linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{
+		"install",
+		"--target", "codex",
+		"--skill", "owasp-security-scan",
+	})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) != 1 {
+		t.Fatalf("expected a single common invocation for skill-only install, got %#v", plan.Invocations)
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if !strings.Contains(got, "--skill owasp-security-scan") {
+		t.Fatalf("expected explicit skill selection, got %q", got)
+	}
+	if strings.Contains(got, "--agent") {
+		t.Fatalf("expected configured agents not to be inherited, got %q", got)
+	}
+	if len(plan.Config.Agents) != 0 {
+		t.Fatalf("expected saved config agents to be cleared for skill-only install, got %#v", plan.Config.Agents)
+	}
+	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected saved config skills, got %#v", plan.Config.Skills)
+	}
+}
+
+func TestResolveMonorepoPlanAgentFlagDoesNotInheritConfiguredSkills(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "claude",
+  "skills": ["owasp-security-scan"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{
+		"install",
+		"--target", "codex",
+		"--agent", "local-dev",
+	})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if strings.Contains(got, "--skill") {
+		t.Fatalf("expected configured skills not to be inherited, got %q", got)
+	}
+	if !strings.Contains(got, "--agent local-dev") {
+		t.Fatalf("expected explicit agent selection, got %q", got)
+	}
+	if len(plan.Config.Skills) != 0 {
+		t.Fatalf("expected saved config skills to be cleared for agent-only install, got %#v", plan.Config.Skills)
+	}
+}
+
 func TestResolveMonorepoPlanIgnoresStaleRulesrcProfiles(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
