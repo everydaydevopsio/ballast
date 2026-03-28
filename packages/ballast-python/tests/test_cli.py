@@ -18,7 +18,7 @@ class PatchInstallTests(unittest.TestCase):
             "5.0.2",
             Path("/tmp/project/.rulesrc.json"),
             {
-                "target": "cursor",
+                "targets": ["cursor"],
                 "agents": ["linting", "testing"],
                 "ballastVersion": "5.0.1",
             },
@@ -45,6 +45,7 @@ class PatchInstallTests(unittest.TestCase):
             "Refresh .rulesrc.json to Ballast 5.0.2: ballast install --refresh-config",
             output,
         )
+        self.assertIn("- targets: cursor", output)
 
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:
@@ -62,6 +63,21 @@ class PatchInstallTests(unittest.TestCase):
         args = cli.parser().parse_args(["doctor"])
         self.assertEqual(args.command, "doctor")
 
+    def test_parser_accepts_repeated_and_comma_separated_targets(self) -> None:
+        args = cli.parser().parse_args(
+            [
+                "install",
+                "--target",
+                "cursor,claude",
+                "--target",
+                "codex",
+                "--agent",
+                "linting",
+            ]
+        )
+
+        self.assertEqual(args.target, ["cursor,claude", "codex"])
+
     def test_destination_rejects_invalid_rule_subdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -75,6 +91,19 @@ class PatchInstallTests(unittest.TestCase):
                     os.environ.pop("BALLAST_RULE_SUBDIR", None)
                 else:
                     os.environ["BALLAST_RULE_SUBDIR"] = old
+
+    def test_load_config_supports_legacy_single_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                '{"target":"cursor","agents":["linting"]}',
+                encoding="utf-8",
+            )
+
+            config = cli.load_config(root, "python")
+
+            self.assertEqual(config["targets"], ["cursor"])
+            self.assertEqual(config["agents"], ["linting"])
 
     def test_run_install_writes_shared_rulesrc_for_explicit_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -97,14 +126,48 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn('"python"', content)
             self.assertIn('"paths": {', content)
 
+    def test_run_install_writes_multi_target_shared_rulesrc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            old_cwd = Path.cwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "cursor",
+                        "--target",
+                        "claude",
+                        "--agent",
+                        "linting",
+                        "--yes",
+                    ]
+                )
+                exit_code = cli.run_install(args)
+            finally:
+                os.chdir(old_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "python-linting.mdc").exists()
+            )
+            self.assertTrue((root / ".claude" / "rules" / "python-linting.md").exists())
+            content = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"targets": [', content)
+            self.assertIn('"cursor"', content)
+            self.assertIn('"claude"', content)
+
     def test_manual_installs_accumulate_languages_in_shared_rulesrc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
             cli.save_config(
-                root, "python", "claude", ["linting"], ["owasp-security-scan"]
+                root, "python", ["claude"], ["linting"], ["owasp-security-scan"]
             )
-            cli.save_config(root, "go", "claude", ["linting"], ["owasp-security-scan"])
+            cli.save_config(
+                root, "go", ["claude"], ["linting"], ["owasp-security-scan"]
+            )
 
             content = (root / ".rulesrc.json").read_text(encoding="utf-8")
             self.assertIn('"ballastVersion":', content)
@@ -114,6 +177,7 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn('"python": [', content)
             self.assertIn('"go": [', content)
             self.assertIn('"skills": [', content)
+            self.assertIn('"targets": [', content)
 
     def test_install_creates_skill_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -250,12 +314,35 @@ class PatchInstallTests(unittest.TestCase):
     def test_resolve_target_and_agents_uses_saved_skill_only_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            cli.save_config(root, "python", "claude", [], ["owasp-security-scan"])
+            cli.save_config(root, "python", ["claude"], [], ["owasp-security-scan"])
 
             args = cli.parser().parse_args(["install", "--yes"])
             resolved = cli.resolve_target_and_agents(args, root, "python")
 
-            self.assertEqual(resolved, ("claude", [], ["owasp-security-scan"]))
+            self.assertEqual(resolved, (["claude"], [], ["owasp-security-scan"]))
+
+    def test_resolve_target_and_agents_supports_multi_target_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cli.save_config(
+                root,
+                "python",
+                ["cursor", "claude"],
+                ["linting"],
+                ["owasp-security-scan"],
+            )
+
+            args = cli.parser().parse_args(["install", "--yes"])
+            resolved = cli.resolve_target_and_agents(args, root, "python")
+
+            self.assertEqual(
+                resolved,
+                (
+                    ["cursor", "claude"],
+                    ["linting"],
+                    ["owasp-security-scan"],
+                ),
+            )
 
     def test_install_skill_only_updates_codex_support_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
