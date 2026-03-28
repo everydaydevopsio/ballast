@@ -46,6 +46,13 @@ describe('build', () => {
       expect(listRuleSuffixes('local-dev').length).toBe(4);
     });
 
+    test('returns libraries, sdks, and apps for publishing', () => {
+      expect(listRuleSuffixes('publishing')).toContain('libraries');
+      expect(listRuleSuffixes('publishing')).toContain('sdks');
+      expect(listRuleSuffixes('publishing')).toContain('apps');
+      expect(listRuleSuffixes('publishing').length).toBe(3);
+    });
+
     test('throws for unknown agent', () => {
       expect(() => listRuleSuffixes('nonexistent')).toThrow(/content.md/);
     });
@@ -68,6 +75,9 @@ describe('build', () => {
     test('returns env content for local-dev with ruleSuffix env', () => {
       const content = getContent('local-dev', 'env');
       expect(content).toContain('Local Development Environment Agent');
+      expect(content).toContain('docker-compose.local.yaml');
+      expect(content).toContain('Makefile');
+      expect(content).toContain('make up-local');
     });
 
     test('returns mcp content for local-dev with ruleSuffix mcp', () => {
@@ -75,6 +85,37 @@ describe('build', () => {
       expect(content).toContain('GitHub MCP');
       expect(content).toContain('Jira');
       expect(content).toContain('Linear');
+    });
+
+    test('returns publishing libraries content', () => {
+      const content = getContent('publishing', 'libraries');
+      expect(content).toContain('Publishing Libraries Agent');
+      expect(content).toContain('release_type');
+      expect(content).toContain('patch');
+      expect(content).toContain('minor');
+      expect(content).toContain('major');
+      expect(content).toContain('bump_and_tag');
+      expect(content).toContain(
+        'WyriHaximus/github-action-get-previous-tag@v2'
+      );
+      expect(content).toContain('WyriHaximus/github-action-next-semvers');
+      expect(content).toContain('npm publish --access public --provenance');
+      expect(content).toContain('PyPI');
+      expect(content).toContain('GitHub Releases');
+    });
+
+    test('returns publishing apps content for web app containers and helm repos', () => {
+      const content = getContent('publishing', 'apps');
+      expect(content).toContain('release_type');
+      expect(content).toContain('v<version>');
+      expect(content).toContain(
+        'WyriHaximus/github-action-get-previous-tag@v2'
+      );
+      expect(content).toContain('WyriHaximus/github-action-next-semvers');
+      expect(content).toContain('ghcr.io');
+      expect(content).toContain('Docker Hub');
+      expect(content).toContain('Helm chart repository');
+      expect(content).toContain('image digest');
     });
 
     test('throws for unknown agent', () => {
@@ -168,6 +209,11 @@ describe('build', () => {
       const t = getTemplate('local-dev', 'cursor-frontmatter.yaml', 'mcp');
       expect(t).toContain('GitHub MCP');
       expect(t).toContain('Jira/Linear/GitHub');
+    });
+
+    test('reads rule-specific cursor frontmatter for publishing sdks', () => {
+      const t = getTemplate('publishing', 'cursor-frontmatter.yaml', 'sdks');
+      expect(t).toContain('SDK publishing specialist');
     });
 
     test('reads claude header for linting', () => {

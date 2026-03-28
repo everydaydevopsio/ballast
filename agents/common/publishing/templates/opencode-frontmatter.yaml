@@ -1,0 +1,17 @@
+description: Publishing specialist - release workflows for libraries, SDKs, and apps
+mode: subagent
+tools:
+  write: true
+  edit: true
+  bash: true
+permission:
+  edit: allow
+  bash:
+    '.github/*': allow
+    '.github/workflows/*': allow
+    'package.json': allow
+    'pyproject.toml': allow
+    'go.mod': allow
+    '.goreleaser.yaml': allow
+    'README*': allow
+    'CHANGELOG*': allow

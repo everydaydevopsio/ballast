@@ -1,6 +1,0 @@
----
-description: 'Python logging specialist for structured logging patterns'
-alwaysApply: false
-globs:
-  - '*.py'
----

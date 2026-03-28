@@ -456,17 +456,22 @@ export function buildClaudeSkill(skillId: string): Buffer {
 /**
  * Build content for Cursor (.mdc = frontmatter + content)
  */
+function normalizeFrontmatter(template: string): string {
+  const trimmed = template.trim();
+  if (trimmed.startsWith('---')) {
+    return template;
+  }
+  return `---\n${trimmed}\n---`;
+}
+
 export function buildCursorFormat(
   agentId: string,
   ruleSuffix?: string,
   language: Language = 'typescript',
   options?: BuildOptions
 ): string {
-  const frontmatter = getTemplate(
-    agentId,
-    'cursor-frontmatter.yaml',
-    ruleSuffix,
-    language
+  const frontmatter = normalizeFrontmatter(
+    getTemplate(agentId, 'cursor-frontmatter.yaml', ruleSuffix, language)
   );
   const content = getContent(agentId, ruleSuffix, language, options);
   return frontmatter + '\n' + content;
@@ -495,11 +500,8 @@ export function buildOpenCodeFormat(
   language: Language = 'typescript',
   options?: BuildOptions
 ): string {
-  const frontmatter = getTemplate(
-    agentId,
-    'opencode-frontmatter.yaml',
-    ruleSuffix,
-    language
+  const frontmatter = normalizeFrontmatter(
+    getTemplate(agentId, 'opencode-frontmatter.yaml', ruleSuffix, language)
   );
   const content = getContent(agentId, ruleSuffix, language, options);
   return frontmatter + '\n' + content;

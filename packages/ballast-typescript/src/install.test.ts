@@ -50,6 +50,7 @@ describe('install', () => {
       expect(result?.agents).toContain('local-dev');
       expect(result?.agents).toContain('cicd');
       expect(result?.agents).toContain('observability');
+      expect(result?.agents).toContain('publishing');
       expect(result?.agents).toContain('logging');
       expect(result?.agents).toContain('testing');
       expect(result?.skills).toEqual([]);
@@ -541,6 +542,48 @@ Keep my custom responsibilities.
       expect(fs.readFileSync(mcpFile, 'utf8')).toContain('GitHub MCP');
       expect(fs.readFileSync(licenseFile, 'utf8')).toContain('LICENSE');
       expect(fs.readFileSync(badgesFile, 'utf8')).toContain('README Badges');
+    });
+
+    test('installs all rules for agent with multiple rules (publishing)', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['publishing'],
+        force: false,
+        saveConfig: false
+      });
+      expect(result.installed).toEqual(['publishing']);
+      expect(result.installedRules.length).toBe(3);
+      const librariesFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'publishing-libraries.mdc'
+      );
+      const sdksFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'publishing-sdks.mdc'
+      );
+      const appsFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'publishing-apps.mdc'
+      );
+      expect(fs.existsSync(librariesFile)).toBe(true);
+      expect(fs.existsSync(sdksFile)).toBe(true);
+      expect(fs.existsSync(appsFile)).toBe(true);
+      expect(fs.readFileSync(librariesFile, 'utf8')).toContain(
+        'Publishing Libraries Agent'
+      );
+      expect(fs.readFileSync(sdksFile, 'utf8')).toContain(
+        'Publishing SDKs Agent'
+      );
+      expect(fs.readFileSync(appsFile, 'utf8')).toContain(
+        'Publishing Apps Agent'
+      );
     });
 
     test('adds to errors for unknown agent and continues with valid ones', () => {

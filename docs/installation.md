@@ -119,7 +119,7 @@ Example root config:
 ```json
 {
   "target": "cursor",
-  "agents": ["local-dev", "cicd", "observability", "linting", "logging", "testing"],
+  "agents": ["local-dev", "cicd", "observability", "publishing", "linting", "logging", "testing"],
   "skills": ["owasp-security-scan"],
   "languages": ["typescript", "python", "go"],
   "paths": {

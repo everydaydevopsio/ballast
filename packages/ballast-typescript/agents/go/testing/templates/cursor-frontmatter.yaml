@@ -1,6 +1,0 @@
----
-description: 'Go testing specialist for go test and coverage setup'
-alwaysApply: false
-globs:
-  - '*.go'
----

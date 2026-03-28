@@ -43,6 +43,7 @@ pnpm run prettier:fix     # Auto-fix formatting
 - **Package manager**: Use pnpm (not npm or yarn).
 - **Badges**: README badges (CI, Lint, Release, License, GitHub Release, npm) follow the local-dev-badges rule.
 - **Single overwrite policy**: do not overwrite existing rule files unless the user passes `--force`.
+- **Generated AI rule files**: do not edit generated dot-agent rule files such as `.codex/rules/*`, `.claude/rules/*`, `.cursor/rules/*`, or `.opencode/*` when changing Ballast behavior. Update the source agent content under `agents/` instead so Ballast generates those files.
 - **Platform first, then agents**: user can choose "all" agents.
 - **Config**: `.rulesrc.ts.json` stores `target` and `agents` so repeat runs can be non-interactive.
 - **CI**: When `CI=true` or `--yes` is set and `.rulesrc.ts.json` is missing, `--target` and `--agent` (or `--all`) are required.

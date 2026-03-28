@@ -26,6 +26,7 @@ Common agents (all languages):
 - `local-dev`
 - `cicd`
 - `observability`
+- `publishing`
 
 Language-specific agents:
 

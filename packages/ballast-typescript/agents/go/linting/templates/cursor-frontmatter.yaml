@@ -1,7 +1,0 @@
----
-description: 'Go linting specialist for gofmt and golangci-lint setup'
-alwaysApply: false
-globs:
-  - '*.go'
-  - '.golangci.yml'
----
