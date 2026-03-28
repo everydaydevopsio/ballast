@@ -24,7 +24,7 @@ import (
 var targets = []string{"cursor", "claude", "opencode", "codex"}
 var languages = []string{"typescript", "python", "go"}
 
-var commonAgents = []string{"local-dev", "cicd", "observability"}
+var commonAgents = []string{"local-dev", "cicd", "observability", "publishing"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var commonSkills = []string{"owasp-security-scan"}
 
@@ -613,7 +613,6 @@ func install(opts installOptions) installResult {
 
 	if err := ensureGitignoreEntry(opts.projectRoot, ".ballast/"); err != nil {
 		result.errors = append(result.errors, agentError{agent: "gitignore", err: err.Error()})
-		return result
 	}
 
 	if opts.saveConfig {

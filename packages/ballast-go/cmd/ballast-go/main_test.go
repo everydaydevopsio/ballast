@@ -156,6 +156,52 @@ func TestInstallAddsBallastToGitignore(t *testing.T) {
 	}
 }
 
+func TestInstallRecordsGitignoreErrorAndContinues(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(tmpDir, ".gitignore"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "cursor",
+		agents:      []string{"linting"},
+		language:    "go",
+	})
+	if len(result.errors) == 0 || result.errors[0].agent != "gitignore" {
+		t.Fatalf("expected gitignore error, got %+v", result.errors)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".cursor", "rules", "go-linting.mdc")); err != nil {
+		t.Fatalf("expected install to continue, got %v", err)
+	}
+}
+
+func TestInstallSupportsPublishingAgent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "cursor",
+		agents:      []string{"publishing"},
+		language:    "go",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Equal(result.installed, []string{"publishing"}) {
+		t.Fatalf("expected publishing install, got %+v", result.installed)
+	}
+	for _, file := range []string{
+		"publishing-libraries.mdc",
+		"publishing-sdks.mdc",
+		"publishing-apps.mdc",
+	} {
+		if _, err := os.Stat(filepath.Join(tmpDir, ".cursor", "rules", file)); err != nil {
+			t.Fatalf("expected %s to exist, got %v", file, err)
+		}
+	}
+}
+
 func TestPatchRuleContentPreservesExistingSections(t *testing.T) {
 	existing := `---
 description: Team customized linting rules

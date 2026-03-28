@@ -15,7 +15,7 @@ from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex"]
 LANGUAGES = ["typescript", "python", "go"]
-COMMON_AGENTS = ["local-dev", "cicd", "observability"]
+COMMON_AGENTS = ["local-dev", "cicd", "observability", "publishing"]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
     "typescript": COMMON_AGENTS + LANGUAGE_AGENTS,
@@ -1239,7 +1239,10 @@ def install(
     processed_skills: list[str] = []
     disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 
-    ensure_gitignore_entry(root, ".ballast/")
+    try:
+        ensure_gitignore_entry(root, ".ballast/")
+    except Exception as err:
+        result.errors.append(("gitignore", str(err)))
 
     if persist:
         save_config(root, language, target, agents, skills)

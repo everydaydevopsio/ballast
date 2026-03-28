@@ -497,6 +497,29 @@ Keep my custom responsibilities.
       );
     });
 
+    test('records a gitignore error and continues install when .gitignore is unreadable', () => {
+      fs.mkdirSync(path.join(tmpDir, '.gitignore'));
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ agent: 'gitignore' })
+        ])
+      );
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'typescript-linting.mdc')
+        )
+      ).toBe(true);
+    });
+
     test('installs multiple agents', () => {
       const result = install({
         projectRoot: tmpDir,

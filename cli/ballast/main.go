@@ -732,7 +732,7 @@ func normalizeInstallArgs(args []string, root string) ([]string, error) {
 
 func ensureLocalToolDirs(root string) error {
 	if err := ensureGitignoreEntry(root, ".ballast/"); err != nil {
-		return fmt.Errorf("update .gitignore for .ballast: %w", err)
+		fmt.Fprintf(os.Stderr, "warning: could not update .gitignore for .ballast/: %v\n", err)
 	}
 	if err := os.MkdirAll(filepath.Join(root, ".ballast", "bin"), 0o755); err != nil {
 		return fmt.Errorf("create local ballast bin dir: %w", err)

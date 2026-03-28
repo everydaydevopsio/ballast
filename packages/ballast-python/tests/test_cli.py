@@ -154,6 +154,53 @@ class PatchInstallTests(unittest.TestCase):
                 ".ballast/", (root / ".gitignore").read_text(encoding="utf-8")
             )
 
+    def test_install_records_gitignore_error_and_continues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".gitignore").mkdir()
+
+            result = cli.install(
+                root,
+                "cursor",
+                ["linting"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertTrue(any(agent == "gitignore" for agent, _ in result.errors))
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "python-linting.mdc").exists()
+            )
+
+    def test_install_supports_publishing_agent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "cursor",
+                ["publishing"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("publishing", result.installed)
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "publishing-libraries.mdc").exists()
+            )
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "publishing-sdks.mdc").exists()
+            )
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "publishing-apps.mdc").exists()
+            )
+
     def test_parse_skill_tokens_supports_all(self) -> None:
         self.assertEqual(
             cli.parse_skill_tokens(None, True, "python"),

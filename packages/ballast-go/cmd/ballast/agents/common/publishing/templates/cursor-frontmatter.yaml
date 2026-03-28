@@ -1,0 +1,12 @@
+description: 'Publishing specialist - release workflows for libraries, SDKs, and apps'
+alwaysApply: false
+globs:
+  - '.github/workflows/**'
+  - 'package.json'
+  - 'pnpm-lock.yaml'
+  - 'pyproject.toml'
+  - 'uv.lock'
+  - 'go.mod'
+  - '.goreleaser.yaml'
+  - 'README*'
+  - 'CHANGELOG*'

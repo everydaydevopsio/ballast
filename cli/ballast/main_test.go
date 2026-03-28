@@ -289,6 +289,23 @@ func TestEnsureLocalToolDirsAddsBallastToGitignore(t *testing.T) {
 	}
 }
 
+func TestEnsureLocalToolDirsContinuesWhenGitignoreCannotBeUpdated(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".gitignore"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ensureLocalToolDirs(root); err != nil {
+		t.Fatalf("expected directory creation to continue, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin")); err != nil {
+		t.Fatalf("expected .ballast/bin to exist, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "tools")); err != nil {
+		t.Fatalf("expected .ballast/tools to exist, got %v", err)
+	}
+}
+
 func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T) {
 	originalRun := runCommandFunc
 	originalEnsure := ensureInstalledFunc

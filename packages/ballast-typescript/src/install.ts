@@ -349,7 +349,14 @@ export function install(options: InstallOptions): InstallResult {
   const processedSkillIds = new Set<string>();
   const disableSupportFiles = process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
 
-  ensureGitignoreEntry(projectRoot, '.ballast/');
+  try {
+    ensureGitignoreEntry(projectRoot, '.ballast/');
+  } catch (err) {
+    errors.push({
+      agent: 'gitignore',
+      error: err instanceof Error ? err.message : String(err)
+    });
+  }
 
   if (persist) {
     saveConfig(
