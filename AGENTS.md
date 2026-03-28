@@ -44,6 +44,7 @@ pnpm run prettier:fix     # Auto-fix formatting
 - **Badges**: README badges (CI, Lint, Release, License, GitHub Release, npm) follow the local-dev-badges rule.
 - **Single overwrite policy**: do not overwrite existing rule files unless the user passes `--force`.
 - **Generated AI rule files**: do not edit generated dot-agent rule files such as `.codex/rules/*`, `.claude/rules/*`, `.cursor/rules/*`, or `.opencode/*` when changing Ballast behavior. Update the source agent content under `agents/` instead so Ballast generates those files.
+- **Cross-package sync**: when a requested change affects package behavior, generated content, installer output, support files, or CLI behavior for the language packages, keep `packages/ballast-typescript`, `packages/ballast-python`, and `packages/ballast-go` in sync unless the user explicitly scopes the change to fewer packages.
 - **Platform first, then agents**: user can choose "all" agents.
 - **Config**: `.rulesrc.ts.json` stores `target` and `agents` so repeat runs can be non-interactive.
 - **CI**: When `CI=true` or `--yes` is set and `.rulesrc.ts.json` is missing, `--target` and `--agent` (or `--all`) are required.
@@ -53,6 +54,7 @@ pnpm run prettier:fix     # Auto-fix formatting
 ## Command Sync
 
 - When you add, remove, or rename a CLI command or flag in any app (`cli/ballast`, `packages/ballast-typescript`, `packages/ballast-python`, `packages/ballast-go`), update the built-in help output in that app in the same change.
+- When you change shared installer behavior or generated support-file behavior in one language package, make the equivalent change in the other language packages in the same change unless the user explicitly says otherwise.
 - Keep command docs in sync with the shipped CLI surface. Update `README.md` and `docs/installation.md` whenever command examples, command names, or supported flags change.
 - Add or update tests that cover the command/help surface when changing CLI behavior so help text and implementation do not drift apart.
 
