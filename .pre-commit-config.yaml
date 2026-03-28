@@ -4,6 +4,7 @@ repos:
     hooks:
       - id: check-json
       - id: check-yaml
+        exclude: ^(agents/.+/templates/.*\.ya?ml|packages/ballast-typescript/(agents|skills)/|packages/ballast-python/ballast/agents/|packages/ballast-go/cmd/ballast-go/agents/|packages/ballast-go/cmd/ballast/agents/)
       - id: check-added-large-files
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -15,6 +16,7 @@ repos:
     hooks:
       - id: yamllint
         args: [--strict]
+        exclude: ^(agents/.+/templates/.*\.ya?ml|packages/ballast-typescript/(agents|skills)/|packages/ballast-python/ballast/agents/|packages/ballast-go/cmd/ballast-go/agents/|packages/ballast-go/cmd/ballast/agents/)
 
   - repo: https://github.com/ddanier/sub-pre-commit.git
     rev: v4.3.0-2
