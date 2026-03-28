@@ -603,7 +603,7 @@ Keep my custom rule text.
 	if !strings.Contains(text, "## Team Notes") {
 		t.Fatalf("expected user notes to remain: %s", text)
 	}
-	if !regexp.MustCompile(`Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
+	if !regexp.MustCompile(`Created by \[Ballast\]\(https://github\.com/everydaydevopsio/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
 		t.Fatalf("expected ballast notice to be present: %s", text)
 	}
 	if !strings.Contains(text, "`.codex/rules/go-linting.md`") {
@@ -657,7 +657,7 @@ Keep my custom rule text.
 	if !strings.Contains(text, "## Team Notes") {
 		t.Fatalf("expected user notes to remain: %s", text)
 	}
-	if !regexp.MustCompile(`Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
+	if !regexp.MustCompile(`Created by \[Ballast\]\(https://github\.com/everydaydevopsio/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
 		t.Fatalf("expected ballast notice to be present: %s", text)
 	}
 	if !strings.Contains(text, "`.claude/rules/go-linting.md`") {
@@ -670,10 +670,10 @@ Keep my custom rule text.
 
 func TestPatchCodexAgentsMDIgnoresHeadingInsideCodeFence(t *testing.T) {
 	existing := "# AGENTS.md\n\n```md\n## Installed agent rules\n```\n\n## Installed agent rules\n\nOld rules\n"
-	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast v9.9.9-test. Do not edit this section.\n\nNew rules\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\nNew rules\n"
 
 	merged := patchCodexAgentsMD(existing, canonical)
-	if !strings.Contains(merged, "Created by Ballast v9.9.9-test. Do not edit this section.") {
+	if !strings.Contains(merged, "Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.") {
 		t.Fatalf("expected canonical installed rules section to be inserted: %s", merged)
 	}
 	if !strings.Contains(merged, "```md\n## Installed agent rules\n```") {

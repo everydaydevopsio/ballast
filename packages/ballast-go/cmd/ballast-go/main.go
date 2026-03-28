@@ -807,7 +807,7 @@ func buildCodexAgentsMD(agents []string, skills []string, language string) (stri
 		"",
 		"## Installed agent rules",
 		"",
-		"Created by Ballast v" + ballastVersion + ". Do not edit this section.",
+		ballastNotice(),
 		"",
 		"Read and follow these rule files in `.codex/rules/` when they apply:",
 		"",
@@ -831,7 +831,7 @@ func buildCodexAgentsMD(agents []string, skills []string, language string) (stri
 			"",
 			"## Installed skills",
 			"",
-			"Created by Ballast v"+ballastVersion+". Do not edit this section.",
+			ballastNotice(),
 			"",
 			"Read and use these skill files in `.codex/rules/` when they are relevant:",
 			"",
@@ -852,7 +852,7 @@ func buildClaudeMD(agents []string, skills []string, language string) (string, e
 		"",
 		"## Installed agent rules",
 		"",
-		"Created by Ballast v" + ballastVersion + ". Do not edit this section.",
+		ballastNotice(),
 		"",
 		"Read and follow these rule files in `.claude/rules/` when they apply:",
 		"",
@@ -876,7 +876,7 @@ func buildClaudeMD(agents []string, skills []string, language string) (string, e
 			"",
 			"## Installed skills",
 			"",
-			"Created by Ballast v"+ballastVersion+". Do not edit this section.",
+			ballastNotice(),
 			"",
 			"Read and use these skill files in `.claude/skills/` when they are relevant:",
 			"",
@@ -887,6 +887,10 @@ func buildClaudeMD(agents []string, skills []string, language string) (string, e
 	}
 	lines = append(lines, "")
 	return strings.Join(lines, "\n"), nil
+}
+
+func ballastNotice() string {
+	return "Created by [Ballast](https://github.com/everydaydevopsio/ballast) v" + ballastVersion + ". Do not edit this section."
 }
 
 func extractDescriptionFromFrontmatter(frontmatter string) *string {

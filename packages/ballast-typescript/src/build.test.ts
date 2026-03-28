@@ -318,7 +318,7 @@ alwaysApply: false
       const content = buildCodexAgentsMd(['linting'], ['owasp-security-scan']);
       expect(content).toContain('# AGENTS.md');
       expect(content).toMatch(
-        /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
+        /Created by \[Ballast]\(https:\/\/github\.com\/everydaydevopsio\/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
       expect(content).toContain('`.codex/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
@@ -332,7 +332,7 @@ alwaysApply: false
       const content = buildClaudeMd(['linting'], ['owasp-security-scan']);
       expect(content).toContain('# CLAUDE.md');
       expect(content).toMatch(
-        /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
+        /Created by \[Ballast]\(https:\/\/github\.com\/everydaydevopsio\/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
       expect(content).toContain('`.claude/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');

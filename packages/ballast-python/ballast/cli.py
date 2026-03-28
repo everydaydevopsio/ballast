@@ -768,6 +768,13 @@ def rule_basename(agent: str, language: str, suffix: str = "") -> str:
     return f"{language}-{basename}"
 
 
+def ballast_notice() -> str:
+    return (
+        f"Created by [Ballast](https://github.com/everydaydevopsio/ballast) "
+        f"v{ballast_version()}. Do not edit this section."
+    )
+
+
 def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -> str:
     lines = [
         "# AGENTS.md",
@@ -776,7 +783,7 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
         "",
         "## Installed agent rules",
         "",
-        f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+        ballast_notice(),
         "",
         "Read and follow these rule files in `.codex/rules/` when they apply:",
         "",
@@ -795,7 +802,7 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
                 "",
                 "## Installed skills",
                 "",
-                f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+                ballast_notice(),
                 "",
                 "Read and use these skill files in `.codex/rules/` when they are relevant:",
                 "",
@@ -817,7 +824,7 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
         "",
         "## Installed agent rules",
         "",
-        f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+        ballast_notice(),
         "",
         "Read and follow these rule files in `.claude/rules/` when they apply:",
         "",
@@ -836,7 +843,7 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
                 "",
                 "## Installed skills",
                 "",
-                f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+                ballast_notice(),
                 "",
                 "Read and use these skill files in `.claude/skills/` when they are relevant:",
                 "",

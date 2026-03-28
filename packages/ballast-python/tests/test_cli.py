@@ -317,7 +317,8 @@ Read and follow these rule files in `.codex/rules/` when they apply:
             self.assertIn("## Team Notes", agents_md)
             self.assertRegex(
                 agents_md,
-                r"Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.",
+                r"Created by \[Ballast\]\(https://github\.com/everydaydevopsio/ballast\) "
+                r"v[0-9A-Za-z._-]+\. Do not edit this section\.",
             )
             self.assertIn("`.codex/rules/python-linting.md`", agents_md)
             self.assertNotIn("`.codex/rules/old.md`", agents_md)
@@ -362,7 +363,8 @@ Read and follow these rule files in `.claude/rules/` when they apply:
             self.assertIn("## Team Notes", claude_md)
             self.assertRegex(
                 claude_md,
-                r"Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.",
+                r"Created by \[Ballast\]\(https://github\.com/everydaydevopsio/ballast\) "
+                r"v[0-9A-Za-z._-]+\. Do not edit this section\.",
             )
             self.assertIn("`.claude/rules/python-linting.md`", claude_md)
             self.assertNotIn("`.claude/rules/old.md`", claude_md)
@@ -439,7 +441,7 @@ Canonical content.
 
 ## Installed agent rules
 
-Created by Ballast v9.9.9-test. Do not edit this section.
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
 
 - `.codex/rules/python-linting.md` - New rule
 """
