@@ -465,6 +465,38 @@ Keep my custom responsibilities.
       ).toContain('.ballast/');
     });
 
+    test('does not duplicate .ballast/ in an existing .gitignore', () => {
+      fs.writeFileSync(path.join(tmpDir, '.gitignore'), '.ballast/\n', 'utf8');
+
+      install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(fs.readFileSync(path.join(tmpDir, '.gitignore'), 'utf8')).toBe(
+        '.ballast/\n'
+      );
+    });
+
+    test('appends .ballast/ to an existing .gitignore without trailing newline', () => {
+      fs.writeFileSync(path.join(tmpDir, '.gitignore'), 'node_modules', 'utf8');
+
+      install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(fs.readFileSync(path.join(tmpDir, '.gitignore'), 'utf8')).toBe(
+        'node_modules\n.ballast/\n'
+      );
+    });
+
     test('installs multiple agents', () => {
       const result = install({
         projectRoot: tmpDir,

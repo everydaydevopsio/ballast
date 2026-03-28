@@ -234,6 +234,13 @@ describe('build', () => {
       expect(result).toContain('alwaysApply: false');
       expect(result).toContain('## Your Responsibilities');
     });
+
+    test('wraps plain yaml frontmatter for publishing templates', () => {
+      const result = buildCursorFormat('publishing', 'libraries');
+      expect(result).toMatch(/^---\n/);
+      expect(result).toContain("description: 'Library publishing specialist");
+      expect(result).toContain('\n---\n# Publishing Libraries Agent');
+    });
   });
 
   describe('buildClaudeFormat', () => {
@@ -251,6 +258,13 @@ describe('build', () => {
       expect(result).toMatch(/^---\n/);
       expect(result).toContain('mode: subagent');
       expect(result).toContain('## Your Responsibilities');
+    });
+
+    test('wraps plain yaml frontmatter for publishing templates', () => {
+      const result = buildOpenCodeFormat('publishing', 'apps');
+      expect(result).toMatch(/^---\n/);
+      expect(result).toContain('mode: subagent');
+      expect(result).toContain('\n---\n# Publishing Apps Agent');
     });
   });
 
