@@ -58,14 +58,14 @@ Then uploads them to release tag `v<version>`.
 ### 3. Install from GitHub Releases
 
 ```bash
-VERSION=4.0.0
+VERSION=5.2.0
 uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
 ```
 
 Or run once without global install:
 
 ```bash
-VERSION=4.0.0
+VERSION=5.2.0
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ```
 

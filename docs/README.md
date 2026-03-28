@@ -1,6 +1,6 @@
 # Ballast Documentation
 
-Ballast `v4.0.0` supports TypeScript, Python, and Go.
+Ballast `v5.2.0` supports TypeScript, Python, and Go.
 
 ## Agent Families
 
@@ -28,15 +28,27 @@ Agent | TypeScript | Python | Go | Guide
 `logging` | Yes | Yes | Yes | [agents/logging.md](agents/logging.md)
 `testing` | Yes | Yes | Yes | [agents/testing.md](agents/testing.md)
 
+## Skill Guide Index
+
+Common skills:
+
+- `owasp-security-scan`
+
+Guide index:
+
+- [skills/README.md](skills/README.md)
+- [skills/owasp-security-scan.md](skills/owasp-security-scan.md)
+
 ## Installation and Monorepos
 
-See [installation.md](installation.md) for package-specific commands and the unified monorepo workflow:
+See [installation.md](installation.md) for package-specific commands, skill installation, and the unified monorepo workflow:
 
 - `ballast install --target cursor --all --yes` for TypeScript + Python + Go monorepos
 - TypeScript single-repo linting rules use `pre-commit`; unified monorepos use Husky for TypeScript and `pre-commit` for Python/Go
 - npm (`@everydaydevopsio/ballast`)
 - uv/uvx from GitHub Releases wheel (`ballast-python`)
 - go install/go run (`ballast-go`)
+- installed skills under target-specific skill locations such as `.claude/skills/` and `.opencode/skills/`
 
 ## Publishing
 
