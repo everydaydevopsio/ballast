@@ -41,6 +41,9 @@ When the user is creating or landing a pull request as part of local development
    - When a specific GitHub review comment is addressed, reply on that review comment thread directly instead of posting a general summary comment on the PR.
    - The reply should say what was changed or why the requested change was not made.
    - Use general PR comments only for overall status or cross-cutting updates, not for resolving line-specific review feedback.
+   - This applies to Copilot review comments and human review comments alike.
+   - Do not stop at making the code change locally; if the review comment was addressed, add the thread reply.
+   - If multiple review comments were addressed, reply on each relevant thread rather than collapsing them into one PR-level summary.
 
 5. **Summarize review asks before changing code**
    - For Copilot reviews and human reviews alike, summarize the concrete asks, group duplicates, and identify which comments actually require code changes.
