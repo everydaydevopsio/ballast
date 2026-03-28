@@ -1,137 +1,258 @@
 # Ballast Architecture
 
-This document describes the architecture of **@everydaydevopsio/ballast**, a CLI that installs AI agent rules (linting, local-dev, CI/CD, observability) into the correct locations for Cursor, Claude Code, OpenCode, or Codex.
+This document describes the current architecture of the Ballast repository.
 
----
+Ballast is a monorepo that ships AI rule installers for multiple language profiles and multiple target tools. The repository contains:
+
+- a TypeScript package published to npm as `@everydaydevopsio/ballast`
+- a Python package published as release artifacts
+- a Go package published as release artifacts
+- a Go-based `ballast` wrapper CLI for Homebrew-style installs and upgrades
 
 ## Overview
 
-**One package, one command.** Add ballast as a dev dependency, run `ballast install`, and the right rule files are written for your chosen AI platform. Only agents shipped inside this package are installable; there is no discovery of external rule bundles.
+Ballast installs repo-local AI guidance into the locations expected by Cursor, Claude Code, OpenCode, and Codex.
 
----
+The source-of-truth rule and skill content lives in this repository:
+
+- `agents/common/*` for shared agents
+- `agents/typescript/*`, `agents/python/*`, `agents/go/*` for language-specific agents
+- `skills/common/*` for shared skills
+
+The TypeScript package is the reference implementation for rule assembly and install behavior. The Python and Go packages ship the same content model for their own CLIs.
 
 ## Repository Layout
 
-```
+```text
 ballast/
-├── agents/                    # Agent content and per-target templates
-│   ├── linting/
-│   │   ├── content.md         # Shared rule content
-│   │   └── templates/
-│   │       ├── cursor-frontmatter.yaml
-│   │       ├── claude-header.md
-│   │       └── opencode-frontmatter.yaml
-│   ├── local-dev/
-│   ├── cicd/
-│   └── observability/
-├── src/                       # TypeScript source
-│   ├── cli.ts                 # Entry: install command, --help, --version
-│   ├── install.ts             # Install flow: resolve target/agents, install()
-│   ├── config.ts              # .rulesrc.ts.json load/save, findProjectRoot, isCiMode
-│   ├── agents.ts              # Agent list, getAgentDir, resolveAgents
-│   ├── build.ts               # buildContent(agentId, target), getDestination()
-│   └── *.test.ts
-├── bin/
-│   └── ballast.js             # Shebang entry; requires dist/cli.js
-├── dist/                      # Compiled output (from pnpm run build)
-└── package.json
+├── agents/
+│   ├── common/                 # local-dev, cicd, observability
+│   ├── typescript/             # linting, logging, testing
+│   ├── python/                 # linting, logging, testing
+│   └── go/                     # linting, logging, testing
+├── skills/
+│   └── common/
+│       └── owasp-security-scan/
+├── cli/
+│   └── ballast/                # Go wrapper CLI used for install/upgrade/doctor flows
+├── packages/
+│   ├── ballast-typescript/     # npm package and reference installer implementation
+│   ├── ballast-python/         # Python CLI package
+│   └── ballast-go/             # Go CLI package
+├── docs/                       # user-facing docs
+└── .github/workflows/          # validation and publish workflows
 ```
 
----
+Within `packages/ballast-typescript/`:
 
-## Agents
+```text
+packages/ballast-typescript/
+├── src/
+│   ├── cli.ts                  # install + doctor command surface
+│   ├── install.ts              # target/agent/skill resolution and writes
+│   ├── build.ts                # content assembly and destination mapping
+│   ├── config.ts               # config load/save and project root detection
+│   ├── agents.ts               # agent/skill registries and lookup
+│   ├── patch.ts                # merge support for --patch
+│   └── *.test.ts
+├── agents/                     # packaged fallback copy of rule content
+├── skills/                     # packaged fallback copy of skill content
+├── bin/ballast.js              # shebang entrypoint
+└── dist/                       # compiled output
+```
 
-Each **agent** is a named set of rules (e.g. linting, local-dev, cicd, observability). Agents are defined entirely inside this repo:
+## Content Model
 
-- **`agents/<id>/content.md`** — Shared markdown content for that agent.
-- **`agents/<id>/templates/`** — Per-target wrappers:
-  - **Cursor**: `cursor-frontmatter.yaml` — prepended as frontmatter; output is `.mdc`.
-  - **Claude**: `claude-header.md` — prepended to content; output is `.md`.
-  - **OpenCode**: `opencode-frontmatter.yaml` — prepended as frontmatter; output is `.md`.
-  - **Codex**: `codex-header.md` if present (falls back to `claude-header.md`) — prepended to content; output is `.md`.
+### Agents
 
-The build layer concatenates template + content per target; there is no merge strategy (e.g. no marker-merge or append). Each install is a single generated file per agent.
+Ballast exposes these public agent IDs:
 
----
+- Common: `local-dev`, `cicd`, `observability`
+- Language-specific: `linting`, `logging`, `testing`
 
-## Targets and Destinations
+Each agent directory contains:
 
-Supported **targets** are: `cursor`, `claude`, `opencode`, `codex`.
+- `content.md` for the primary rule body
+- optional `content-<suffix>.md` files for additional rule variants
+- `templates/` files for per-target wrappers
 
-| Target   | Directory        | File pattern    |
-| -------- | ---------------- | --------------- |
-| cursor   | `.cursor/rules/` | `{agentId}.mdc` |
-| claude   | `.claude/rules/` | `{agentId}.md`  |
-| opencode | `.opencode/`     | `{agentId}.md`  |
-| codex    | `.codex/rules/`  | `{agentId}.md`  |
+Rule suffixes allow one logical agent to emit multiple installed files. The installer discovers `content.md` and any `content-*.md` variants automatically.
 
-Paths are relative to the **project root** (see Config and project root).
+### Skills
 
----
+Ballast currently ships one common skill:
 
-## Build Flow
+- `owasp-security-scan`
 
-1. **`buildContent(agentId, target)`** (in `build.ts`):
-   - Reads `agents/<id>/content.md`.
-   - Reads the appropriate template for the target.
-   - Returns `template + content` (with a newline where applicable).
+Each skill directory contains `SKILL.md` and may include a `references/` directory. Claude installs the skill as a bundled `.skill` archive; the other targets install Markdown-based skill files.
 
-2. **`getDestination(agentId, target, projectRoot)`** (in `build.ts`):
-   - Returns the directory and full file path where the built content should be written.
-   - For Codex, a root `AGENTS.md` is also written to reference the rule files.
+## Target Formats and Destinations
 
-Install then writes that content to the destination path (creating the directory if needed).
+Supported targets are:
 
----
+- `cursor`
+- `claude`
+- `opencode`
+- `codex`
+
+Rule installation paths:
+
+| Target | Directory | Extension |
+| --- | --- | --- |
+| Cursor | `.cursor/rules/` | `.mdc` |
+| Claude | `.claude/rules/` | `.md` |
+| OpenCode | `.opencode/` | `.md` |
+| Codex | `.codex/rules/` | `.md` |
+
+Skill installation paths:
+
+| Target | Directory | Format |
+| --- | --- | --- |
+| Cursor | `.cursor/rules/` | `.mdc` |
+| Claude | `.claude/skills/` | `.skill` zip bundle |
+| OpenCode | `.opencode/skills/` | `.md` |
+| Codex | `.codex/rules/` | `.md` |
+
+Support files:
+
+- Claude installs or patches a root `CLAUDE.md`
+- Codex installs or patches a root `AGENTS.md`
+
+If `BALLAST_RULE_SUBDIR` is set, installed rule files are scoped into subdirectories such as `.codex/rules/<subdir>/...`, and the emitted filenames are prefixed to avoid collisions.
+
+## Build Pipeline
+
+The TypeScript build layer assembles output by combining agent content with target-specific templates.
+
+### Rule assembly
+
+`build.ts` performs the following:
+
+1. Resolve the source directory for the selected agent and language.
+2. Load `content.md` or a `content-<suffix>.md` variant.
+3. Load the target template:
+   - Cursor: `cursor-frontmatter.yaml`
+   - Claude: `claude-header.md`
+   - OpenCode: `opencode-frontmatter.yaml`
+   - Codex: `codex-header.md`, falling back to `claude-header.md`
+4. Inject linting hook guidance for the selected language and repo shape when the content uses the `{{BALLAST_HOOK_GUIDANCE}}` token.
+5. Emit the final target file content.
+
+### Skill assembly
+
+`build.ts` also builds skills per target:
+
+- Cursor: frontmatter + skill body from `SKILL.md`
+- Claude: stored zip archive containing `SKILL.md` and any `references/*`
+- OpenCode: Markdown body from `SKILL.md`
+- Codex: Markdown body from `SKILL.md`
+
+### Support file assembly
+
+`buildCodexAgentsMd()` and `buildClaudeMd()` generate the root support files that enumerate installed rules and skills for those tools.
 
 ## Install Flow
 
-1. **Resolve project root** — `findProjectRoot()` walks up from the current working directory until it finds a directory containing `.rulesrc.ts.json` or `package.json`; that directory is the project root.
+The reference install flow lives in `packages/ballast-typescript/src/install.ts`.
 
-2. **Resolve target and agents** — `resolveTargetAndAgents()`:
-   - Loads `.rulesrc.ts.json` from the project root (if present).
-   - Uses CLI flags: `--target`, `--agent` / `--all`, `--yes`.
-   - In **interactive** mode (no `--yes`, not CI): prompts for target and agents if not fully determined.
-   - In **CI/non-interactive** mode (`CI=true` or `--yes`): if `.rulesrc.ts.json` is missing, **requires** `--target` and `--agent` (or `--all`); otherwise exits with an error and usage hint.
+1. Detect the project root using the nearest directory containing `.rulesrc.json`, a legacy `.rulesrc.<lang>.json` file, or `package.json`.
+2. Load config from `.rulesrc.json` when available. Legacy per-language config filenames are still accepted as inputs.
+3. Resolve target, agents, and skills from flags, config, or interactive prompts.
+4. In CI or `--yes` mode, require explicit install choices when no config is present.
+5. Save config back to `.rulesrc.json`, including `target`, `agents`, optional `skills`, `ballastVersion`, and merged language/path metadata when relevant.
+6. For each selected agent:
+   - enumerate all rule suffixes
+   - calculate destination paths
+   - skip existing files unless `--force` or `--patch` is set
+   - write generated content, or merge updates with `patch.ts` when `--patch` is used
+7. For each selected skill:
+   - write the target-specific skill format
+   - skip existing files unless `--force` is set
+8. For Claude and Codex:
+   - create or update `CLAUDE.md` or `AGENTS.md`
+   - optionally patch existing support files when patch mode is enabled
 
-3. **Persist config (optional)** — If the user did not pass target/agent flags, the resolved `target` and `agents` are saved to `.rulesrc.ts.json` so future runs can be non-interactive.
+## Config Model
 
-4. **Install** — For each resolved agent:
-   - Compute destination via `getDestination(agentId, target, projectRoot)`.
-   - If the destination file already exists and `--force` is not set, **skip** (no overwrite).
-   - Otherwise create the parent directory if needed, build content with `buildContent(agentId, target)`, and write the file.
+The canonical config file is `.rulesrc.json`.
 
-**Overwrite policy:** Existing rule files are never overwritten unless the user passes `--force`.
+Current saved shape:
 
----
+```json
+{
+  "target": "codex",
+  "agents": ["local-dev", "linting"],
+  "skills": ["owasp-security-scan"],
+  "ballastVersion": "5.2.0",
+  "languages": ["typescript"],
+  "paths": {
+    "typescript": ["."]
+  }
+}
+```
 
-## Config and Project Root
+Notes:
 
-- **Config file:** `.rulesrc.ts.json` in the project root.
-- **Shape:** `{ "target": "cursor" | "claude" | "opencode" | "codex", "agents": string[] }`.
-- **When saved:** When running interactively (or without `--yes`) and the user did not pass `--target` / `--agent` / `--all`, so that the next run can reuse the same choices.
-- **Project root:** First directory (walking up from the cwd) that contains `.rulesrc.ts.json` or `package.json`; if none is found, the starting cwd is used.
-
----
-
-## CI / Non-Interactive Mode
-
-- **CI detection:** `isCiMode()` is true when `CI`, `TF_BUILD`, `GITHUB_ACTIONS`, or `GITLAB_CI` is set to a truthy value, or when the user passes `--yes`.
-- **Requirement:** In CI/non-interactive mode, if `.rulesrc.ts.json` is missing, the CLI **requires** `--target` and `--agent` (or `--all`). If they are missing, it prints an error and exits with code 1.
-
----
+- `.rulesrc.ts.json`, `.rulesrc.python.json`, and `.rulesrc.go.json` are legacy compatibility filenames.
+- The installer reads legacy files, but writes the canonical `.rulesrc.json`.
+- `findProjectRoot()` still treats either canonical or legacy config files as root markers.
 
 ## CLI Surface
 
-- **Entry:** `bin/ballast.js` (shebang) runs the compiled `dist/cli.js`.
-- **Command:** `install` (default when no command is given). No other commands (e.g. no `doctor`, `diff`, `uninstall`).
-- **Options:** `--target` / `-t`, `--agent` / `-a` (comma-separated), `--all`, `--force` / `-f`, `--yes` / `-y`, `--help` / `-h`, `--version` / `-v`.
+The TypeScript CLI currently exposes:
 
----
+- `install` as the default command
+- `doctor` for local CLI/config inspection
 
-## Design Notes
+Supported install flags include:
 
-- **Copy only:** Files are always copied into the repo; there is no symlink mode.
-- **No external bundles:** Only agents under `agents/` in this package are installed; the CLI does not scan dependencies for rule packages or manifests.
-- **Platform first, then agents:** The user chooses target (platform), then which agents to install (or “all”).
-- **Repeatability:** Storing `target` and `agents` in `.rulesrc.ts.json` makes repeat runs (e.g. in CI or after `pnpm install`) non-interactive when config is present.
+- `--target`, `-t`
+- `--language`, `-l`
+- `--agent`, `-a`
+- `--skill`, `-s`
+- `--all`
+- `--all-skills`
+- `--force`, `-f`
+- `--patch`, `-p`
+- `--yes`, `-y`
+- `--help`, `-h`
+- `--version`, `-v`
+
+## Monorepo and Hook Behavior
+
+For TypeScript installs, Ballast distinguishes between standalone and monorepo layouts to tailor linting hook guidance:
+
+- standalone TypeScript repos get `pre-commit` guidance
+- TypeScript workspace monorepos get Husky guidance
+- Python and Go profiles get their own `pre-commit` guidance
+
+The detection logic uses config metadata first and falls back to workspace manifest/package discovery.
+
+## Release and Publishing Architecture
+
+GitHub Actions publish and validate the repository.
+
+Key workflows include:
+
+- `test.yml`
+- `lint.yaml`
+- `cross-language-validate.yml`
+- `examples-smoke.yml`
+- `language-packs.yml`
+- `publish.yml`
+
+`publish.yml` is the top-level release workflow. It:
+
+1. optionally bumps versions and creates a Git tag on manual dispatch
+2. publishes the TypeScript package to npm
+3. uploads Python build artifacts to the GitHub release
+4. publishes Go binaries with GoReleaser
+5. publishes the wrapper CLI with GoReleaser
+
+## Design Constraints
+
+- Ballast only installs content shipped in this repository.
+- Existing files are preserved by default.
+- `--force` overwrites generated files.
+- `--patch` merges upstream updates into existing generated files where supported.
+- Common agents stay language-agnostic at the public ID level; language-specific agents are namespaced internally by source directory and emitted filename.
