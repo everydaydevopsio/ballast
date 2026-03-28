@@ -297,6 +297,31 @@ export interface InstallResult {
   errors: Array<{ agent: string; error: string }>;
 }
 
+function ensureGitignoreEntry(projectRoot: string, entry: string): void {
+  const gitignorePath = path.join(projectRoot, '.gitignore');
+  const normalizedEntry = entry.trim();
+  if (!normalizedEntry) {
+    return;
+  }
+
+  if (!fs.existsSync(gitignorePath)) {
+    fs.writeFileSync(gitignorePath, `${normalizedEntry}\n`, 'utf8');
+    return;
+  }
+
+  const content = fs.readFileSync(gitignorePath, 'utf8');
+  const lines = content.split(/\r?\n/);
+  if (lines.some((line) => line.trim() === normalizedEntry)) {
+    return;
+  }
+  const separator = content.length === 0 || content.endsWith('\n') ? '' : '\n';
+  fs.writeFileSync(
+    gitignorePath,
+    `${content}${separator}${normalizedEntry}\n`,
+    'utf8'
+  );
+}
+
 /**
  * Install agents for the given target into projectRoot. Single policy: do not overwrite unless force.
  */
@@ -323,6 +348,8 @@ export function install(options: InstallOptions): InstallResult {
   const processedAgentIds = new Set<string>();
   const processedSkillIds = new Set<string>();
   const disableSupportFiles = process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
+
+  ensureGitignoreEntry(projectRoot, '.ballast/');
 
   if (persist) {
     saveConfig(

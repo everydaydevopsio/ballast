@@ -173,7 +173,7 @@ For single-language TypeScript installs, the linting rules should use `pre-commi
   - Python CLI (legacy): `.rulesrc.python.json`
   - Go CLI (legacy): `.rulesrc.go.json`
 
-Saved config values include `target`, `agents`, and `skills`.
+Saved config values include `target`, `agents`, and `skills`. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
 
 ## Install Paths
 

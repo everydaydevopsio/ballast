@@ -6,7 +6,7 @@
 
 Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, and Codex.
 
-Release `v4.0.0` supports three first-class language profiles in this repository:
+Release `v5.2.0` supports three first-class language profiles in this repository:
 
 - TypeScript
 - Python
@@ -157,7 +157,7 @@ pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
 ### Python
 
 ```bash
-VERSION=4.0.0
+VERSION=5.2.0
 uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
 ballast-python install --target cursor --all
 # or
@@ -169,7 +169,7 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ### Go
 
 ```bash
-VERSION=5.0.5
+VERSION=5.2.0
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -197,7 +197,7 @@ pnpm exec ballast-typescript install --target cursor --all
 ### 2. Python rules in a monorepo
 
 ```bash
-VERSION=4.0.0
+VERSION=5.2.0
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ```
 
@@ -235,9 +235,11 @@ Ballast only installs shipped agents and skills and follows the single overwrite
 
 ## Config Files
 
-- TypeScript CLI: `.rulesrc.ts.json`
-- Python CLI: `.rulesrc.python.json`
-- Go CLI: `.rulesrc.go.json`
+- Canonical shared config for the wrapper and language CLIs: `.rulesrc.json`
+- Legacy fallback configs still read for backward compatibility:
+  - TypeScript CLI: `.rulesrc.ts.json`
+  - Python CLI: `.rulesrc.python.json`
+  - Go CLI: `.rulesrc.go.json`
 - Saved settings include `target`, `agents`, and `skills`
 
 ## Install Locations

@@ -451,6 +451,20 @@ Keep my custom responsibilities.
       });
     });
 
+    test('adds .ballast/ to .gitignore during install', () => {
+      install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(
+        fs.readFileSync(path.join(tmpDir, '.gitignore'), 'utf8')
+      ).toContain('.ballast/');
+    });
+
     test('installs multiple agents', () => {
       const result = install({
         projectRoot: tmpDir,

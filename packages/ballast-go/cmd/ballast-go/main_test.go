@@ -134,6 +134,28 @@ func TestBuildDoctorReportRecommendsFixForUnknownVersion(t *testing.T) {
 	}
 }
 
+func TestInstallAddsBallastToGitignore(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "cursor",
+		agents:      []string{"linting"},
+		language:    "go",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), ".ballast/") {
+		t.Fatalf("expected .ballast/ in .gitignore, got %q", string(content))
+	}
+}
+
 func TestPatchRuleContentPreservesExistingSections(t *testing.T) {
 	existing := `---
 description: Team customized linting rules

@@ -611,6 +611,11 @@ func install(opts installOptions) installResult {
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 	hookMode := resolveTsHookMode(opts.projectRoot, opts.language)
 
+	if err := ensureGitignoreEntry(opts.projectRoot, ".ballast/"); err != nil {
+		result.errors = append(result.errors, agentError{agent: "gitignore", err: err.Error()})
+		return result
+	}
+
 	if opts.saveConfig {
 		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{
 			Target:    opts.target,
@@ -1738,6 +1743,32 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		return err
 	}
 	return os.WriteFile(filePath, bytes, 0o644)
+}
+
+func ensureGitignoreEntry(projectRoot, entry string) error {
+	normalized := strings.TrimSpace(entry)
+	if normalized == "" {
+		return nil
+	}
+	gitignorePath := filepath.Join(projectRoot, ".gitignore")
+	if !exists(gitignorePath) {
+		return os.WriteFile(gitignorePath, []byte(normalized+"\n"), 0o644)
+	}
+	content, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(normalizeLineEndings(string(content)), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == normalized {
+			return nil
+		}
+	}
+	separator := ""
+	if len(content) > 0 && !strings.HasSuffix(string(content), "\n") {
+		separator = "\n"
+	}
+	return os.WriteFile(gitignorePath, append(content, []byte(separator+normalized+"\n")...), 0o644)
 }
 
 func mergeLanguageList(existing, incoming []string) []string {

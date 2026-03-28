@@ -1,6 +1,5 @@
 # TODO
 
-- [ ] Sync `README.md`, `docs/installation.md`, and any related docs with the current config model and CLI surface:
-  - `.rulesrc.json` is the canonical config file.
-  - Legacy files such as `.rulesrc.ts.json` are compatibility inputs, not the primary documented path.
-- [ ] Audit versioned install examples in docs so TypeScript, Python, Go, and Homebrew examples all reference the same current release line.
+- [x] Fix config documentation everywhere so `.rulesrc.json` is the canonical documented path, and legacy per-language files are described only as compatibility fallbacks in `README.md`, `docs/installation.md`, `AGENTS.md`, and `CLAUDE.md`.
+- [x] Normalize release/version references so top-level docs and install examples use the same current release line.
+- [x] Sync generated support-file patch tests with the linked Ballast header format used by the builders.

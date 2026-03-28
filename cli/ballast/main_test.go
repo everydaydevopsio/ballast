@@ -273,6 +273,22 @@ func TestRunDoctorFixUsesConfigVersionForBackendInstallsInsideSourceCheckout(t *
 	}
 }
 
+func TestEnsureLocalToolDirsAddsBallastToGitignore(t *testing.T) {
+	root := t.TempDir()
+
+	if err := ensureLocalToolDirs(root); err != nil {
+		t.Fatalf("ensureLocalToolDirs failed: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(root, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), ".ballast/") {
+		t.Fatalf("expected .ballast/ in .gitignore, got %q", string(content))
+	}
+}
+
 func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T) {
 	originalRun := runCommandFunc
 	originalEnsure := ensureInstalledFunc

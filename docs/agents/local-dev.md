@@ -17,6 +17,7 @@ The local-dev agent installs multiple rules:
 - Dockerfile, `docker-compose.yaml`, and `docker-compose.local.yaml` with `develop.watch` for hot reload
 - A `Makefile` with `up`, `down`, and `logs` targets for both the base stack and local watch-mode stack
 - `.env.example` and env validation
+- PR hygiene guidance: verify Copilot/reviewer assignment, use a sub-agent to watch checks, inspect failures with `gh`, and reply directly on resolved review threads
 - License setup (MIT by default, configurable)
 - README badges for CI, release, license, and package registries
 - Optional PR/issue context when MCP servers are enabled

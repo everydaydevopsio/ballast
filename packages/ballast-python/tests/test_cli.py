@@ -135,6 +135,25 @@ class PatchInstallTests(unittest.TestCase):
             self.assertTrue(skill.exists())
             self.assertTrue(skill.read_bytes().startswith(b"PK\x03\x04"))
 
+    def test_install_adds_ballast_to_gitignore(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            cli.install(
+                root,
+                "cursor",
+                ["linting"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn(
+                ".ballast/", (root / ".gitignore").read_text(encoding="utf-8")
+            )
+
     def test_parse_skill_tokens_supports_all(self) -> None:
         self.assertEqual(
             cli.parse_skill_tokens(None, True, "python"),

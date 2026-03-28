@@ -708,6 +708,21 @@ def destination(root: Path, target: str, basename: str) -> Path:
     )
 
 
+def ensure_gitignore_entry(root: Path, entry: str) -> None:
+    normalized = entry.strip()
+    if not normalized:
+        return
+    gitignore = root / ".gitignore"
+    if not gitignore.exists():
+        gitignore.write_text(f"{normalized}\n", encoding="utf-8")
+        return
+    content = gitignore.read_text(encoding="utf-8")
+    if any(line.strip() == normalized for line in content.splitlines()):
+        return
+    separator = "" if not content or content.endswith("\n") else "\n"
+    gitignore.write_text(f"{content}{separator}{normalized}\n", encoding="utf-8")
+
+
 def skill_destination(root: Path, target: str, skill: str) -> Path:
     if target == "cursor":
         return root / ".cursor" / "rules" / f"{skill}.mdc"
@@ -1223,6 +1238,8 @@ def install(
     processed_agents: list[str] = []
     processed_skills: list[str] = []
     disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
+
+    ensure_gitignore_entry(root, ".ballast/")
 
     if persist:
         save_config(root, language, target, agents, skills)

@@ -46,8 +46,8 @@ pnpm run prettier:fix     # Auto-fix formatting
 - **Generated AI rule files**: do not edit generated dot-agent rule files such as `.codex/rules/*`, `.claude/rules/*`, `.cursor/rules/*`, or `.opencode/*` when changing Ballast behavior. Update the source agent content under `agents/` instead so Ballast generates those files.
 - **Cross-package sync**: when a requested change affects package behavior, generated content, installer output, support files, or CLI behavior for the language packages, keep `packages/ballast-typescript`, `packages/ballast-python`, and `packages/ballast-go` in sync unless the user explicitly scopes the change to fewer packages.
 - **Platform first, then agents**: user can choose "all" agents.
-- **Config**: `.rulesrc.ts.json` stores `target` and `agents` so repeat runs can be non-interactive.
-- **CI**: When `CI=true` or `--yes` is set and `.rulesrc.ts.json` is missing, `--target` and `--agent` (or `--all`) are required.
+- **Config**: `.rulesrc.json` is the canonical shared config file for wrapper and language-package installs. Legacy per-language files such as `.rulesrc.ts.json`, `.rulesrc.python.json`, and `.rulesrc.go.json` are compatibility inputs, not the primary documented path.
+- **CI**: When `CI=true` or `--yes` is set and `.rulesrc.json` is missing, `--target` and `--agent` (or `--all`) are required.
 - **Agents**: Only agents shipped in this repo are installable (no external bundle discovery).
 - **Docs sync**: When you add or update an agent, update the docs in `docs/` so they stay in sync: add or update `docs/agents/<id>.md` for that agent, and update the agent table in `docs/README.md` (and any other references, e.g. `docs/installation.md` if needed).
 
