@@ -15,6 +15,7 @@ const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
 const HOOK_GUIDANCE_TOKEN = '{{BALLAST_HOOK_GUIDANCE}}';
+const BALLAST_REPO_URL = 'https://github.com/everydaydevopsio/ballast';
 
 type HookMode = 'standalone' | 'monorepo';
 
@@ -25,6 +26,10 @@ interface BuildOptions {
 interface SkillEntry {
   name: string;
   data: Buffer;
+}
+
+function getCreatedByBallastLine(): string {
+  return `Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section.`;
 }
 
 function getRuleSubdir(): string | null {
@@ -456,17 +461,22 @@ export function buildClaudeSkill(skillId: string): Buffer {
 /**
  * Build content for Cursor (.mdc = frontmatter + content)
  */
+function normalizeFrontmatter(template: string): string {
+  const trimmed = template.trim();
+  if (trimmed.startsWith('---')) {
+    return template;
+  }
+  return `---\n${trimmed}\n---`;
+}
+
 export function buildCursorFormat(
   agentId: string,
   ruleSuffix?: string,
   language: Language = 'typescript',
   options?: BuildOptions
 ): string {
-  const frontmatter = getTemplate(
-    agentId,
-    'cursor-frontmatter.yaml',
-    ruleSuffix,
-    language
+  const frontmatter = normalizeFrontmatter(
+    getTemplate(agentId, 'cursor-frontmatter.yaml', ruleSuffix, language)
   );
   const content = getContent(agentId, ruleSuffix, language, options);
   return frontmatter + '\n' + content;
@@ -495,11 +505,8 @@ export function buildOpenCodeFormat(
   language: Language = 'typescript',
   options?: BuildOptions
 ): string {
-  const frontmatter = getTemplate(
-    agentId,
-    'opencode-frontmatter.yaml',
-    ruleSuffix,
-    language
+  const frontmatter = normalizeFrontmatter(
+    getTemplate(agentId, 'opencode-frontmatter.yaml', ruleSuffix, language)
   );
   const content = getContent(agentId, ruleSuffix, language, options);
   return frontmatter + '\n' + content;
@@ -599,7 +606,7 @@ export function buildCodexAgentsMd(
   lines.push('');
   lines.push('## Installed agent rules');
   lines.push('');
-  lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
+  lines.push(getCreatedByBallastLine());
   lines.push('');
   lines.push(
     'Read and follow these rule files in `.codex/rules/` when they apply:'
@@ -619,7 +626,7 @@ export function buildCodexAgentsMd(
     lines.push('');
     lines.push('## Installed skills');
     lines.push('');
-    lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
+    lines.push(getCreatedByBallastLine());
     lines.push('');
     lines.push(
       'Read and use these skill files in `.codex/rules/` when they are relevant:'
@@ -649,7 +656,7 @@ export function buildClaudeMd(
   lines.push('');
   lines.push('## Installed agent rules');
   lines.push('');
-  lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
+  lines.push(getCreatedByBallastLine());
   lines.push('');
   lines.push(
     'Read and follow these rule files in `.claude/rules/` when they apply:'
@@ -669,7 +676,7 @@ export function buildClaudeMd(
     lines.push('');
     lines.push('## Installed skills');
     lines.push('');
-    lines.push(`Created by Ballast v${pkg.version}. Do not edit this section.`);
+    lines.push(getCreatedByBallastLine());
     lines.push('');
     lines.push(
       'Read and use these skill files in `.claude/skills/` when they are relevant:'

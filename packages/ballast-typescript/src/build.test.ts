@@ -46,6 +46,13 @@ describe('build', () => {
       expect(listRuleSuffixes('local-dev').length).toBe(4);
     });
 
+    test('returns libraries, sdks, and apps for publishing', () => {
+      expect(listRuleSuffixes('publishing')).toContain('libraries');
+      expect(listRuleSuffixes('publishing')).toContain('sdks');
+      expect(listRuleSuffixes('publishing')).toContain('apps');
+      expect(listRuleSuffixes('publishing').length).toBe(3);
+    });
+
     test('throws for unknown agent', () => {
       expect(() => listRuleSuffixes('nonexistent')).toThrow(/content.md/);
     });
@@ -68,6 +75,9 @@ describe('build', () => {
     test('returns env content for local-dev with ruleSuffix env', () => {
       const content = getContent('local-dev', 'env');
       expect(content).toContain('Local Development Environment Agent');
+      expect(content).toContain('docker-compose.local.yaml');
+      expect(content).toContain('Makefile');
+      expect(content).toContain('make up-local');
     });
 
     test('returns mcp content for local-dev with ruleSuffix mcp', () => {
@@ -75,6 +85,37 @@ describe('build', () => {
       expect(content).toContain('GitHub MCP');
       expect(content).toContain('Jira');
       expect(content).toContain('Linear');
+    });
+
+    test('returns publishing libraries content', () => {
+      const content = getContent('publishing', 'libraries');
+      expect(content).toContain('Publishing Libraries Agent');
+      expect(content).toContain('release_type');
+      expect(content).toContain('patch');
+      expect(content).toContain('minor');
+      expect(content).toContain('major');
+      expect(content).toContain('bump_and_tag');
+      expect(content).toContain(
+        'WyriHaximus/github-action-get-previous-tag@v2'
+      );
+      expect(content).toContain('WyriHaximus/github-action-next-semvers');
+      expect(content).toContain('npm publish --access public --provenance');
+      expect(content).toContain('PyPI');
+      expect(content).toContain('GitHub Releases');
+    });
+
+    test('returns publishing apps content for web app containers and helm repos', () => {
+      const content = getContent('publishing', 'apps');
+      expect(content).toContain('release_type');
+      expect(content).toContain('v<version>');
+      expect(content).toContain(
+        'WyriHaximus/github-action-get-previous-tag@v2'
+      );
+      expect(content).toContain('WyriHaximus/github-action-next-semvers');
+      expect(content).toContain('ghcr.io');
+      expect(content).toContain('Docker Hub');
+      expect(content).toContain('Helm chart repository');
+      expect(content).toContain('image digest');
     });
 
     test('throws for unknown agent', () => {
@@ -170,6 +211,11 @@ describe('build', () => {
       expect(t).toContain('Jira/Linear/GitHub');
     });
 
+    test('reads rule-specific cursor frontmatter for publishing sdks', () => {
+      const t = getTemplate('publishing', 'cursor-frontmatter.yaml', 'sdks');
+      expect(t).toContain('SDK publishing specialist');
+    });
+
     test('reads claude header for linting', () => {
       const t = getTemplate('linting', 'claude-header.md');
       expect(t).toContain('TypeScript Linting Rules');
@@ -188,6 +234,13 @@ describe('build', () => {
       expect(result).toContain('alwaysApply: false');
       expect(result).toContain('## Your Responsibilities');
     });
+
+    test('wraps plain yaml frontmatter for publishing templates', () => {
+      const result = buildCursorFormat('publishing', 'libraries');
+      expect(result).toMatch(/^---\n/);
+      expect(result).toContain("description: 'Library publishing specialist");
+      expect(result).toContain('\n---\n# Publishing Libraries Agent');
+    });
   });
 
   describe('buildClaudeFormat', () => {
@@ -205,6 +258,13 @@ describe('build', () => {
       expect(result).toMatch(/^---\n/);
       expect(result).toContain('mode: subagent');
       expect(result).toContain('## Your Responsibilities');
+    });
+
+    test('wraps plain yaml frontmatter for publishing templates', () => {
+      const result = buildOpenCodeFormat('publishing', 'apps');
+      expect(result).toMatch(/^---\n/);
+      expect(result).toContain('mode: subagent');
+      expect(result).toContain('\n---\n# Publishing Apps Agent');
     });
   });
 
@@ -272,7 +332,7 @@ alwaysApply: false
       const content = buildCodexAgentsMd(['linting'], ['owasp-security-scan']);
       expect(content).toContain('# AGENTS.md');
       expect(content).toMatch(
-        /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
+        /Created by \[Ballast]\(https:\/\/github\.com\/everydaydevopsio\/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
       expect(content).toContain('`.codex/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
@@ -286,7 +346,7 @@ alwaysApply: false
       const content = buildClaudeMd(['linting'], ['owasp-security-scan']);
       expect(content).toContain('# CLAUDE.md');
       expect(content).toMatch(
-        /Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\./
+        /Created by \[Ballast]\(https:\/\/github\.com\/everydaydevopsio\/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
       expect(content).toContain('`.claude/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');

@@ -1,0 +1,9 @@
+description: 'Library publishing specialist - npmjs for TypeScript, PyPI for Python, GitHub tags/releases for Go'
+alwaysApply: false
+globs:
+  - '.github/workflows/**'
+  - 'package.json'
+  - 'pyproject.toml'
+  - 'go.mod'
+  - 'README*'
+  - 'CHANGELOG*'

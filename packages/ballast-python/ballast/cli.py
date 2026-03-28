@@ -15,7 +15,7 @@ from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex"]
 LANGUAGES = ["typescript", "python", "go"]
-COMMON_AGENTS = ["local-dev", "cicd", "observability"]
+COMMON_AGENTS = ["local-dev", "cicd", "observability", "publishing"]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
     "typescript": COMMON_AGENTS + LANGUAGE_AGENTS,
@@ -708,6 +708,21 @@ def destination(root: Path, target: str, basename: str) -> Path:
     )
 
 
+def ensure_gitignore_entry(root: Path, entry: str) -> None:
+    normalized = entry.strip()
+    if not normalized:
+        return
+    gitignore = root / ".gitignore"
+    if not gitignore.exists():
+        gitignore.write_text(f"{normalized}\n", encoding="utf-8")
+        return
+    content = gitignore.read_text(encoding="utf-8")
+    if any(line.strip() == normalized for line in content.splitlines()):
+        return
+    separator = "" if not content or content.endswith("\n") else "\n"
+    gitignore.write_text(f"{content}{separator}{normalized}\n", encoding="utf-8")
+
+
 def skill_destination(root: Path, target: str, skill: str) -> Path:
     if target == "cursor":
         return root / ".cursor" / "rules" / f"{skill}.mdc"
@@ -768,6 +783,13 @@ def rule_basename(agent: str, language: str, suffix: str = "") -> str:
     return f"{language}-{basename}"
 
 
+def ballast_notice() -> str:
+    return (
+        f"Created by [Ballast](https://github.com/everydaydevopsio/ballast) "
+        f"v{ballast_version()}. Do not edit this section."
+    )
+
+
 def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -> str:
     lines = [
         "# AGENTS.md",
@@ -776,7 +798,7 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
         "",
         "## Installed agent rules",
         "",
-        f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+        ballast_notice(),
         "",
         "Read and follow these rule files in `.codex/rules/` when they apply:",
         "",
@@ -795,7 +817,7 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
                 "",
                 "## Installed skills",
                 "",
-                f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+                ballast_notice(),
                 "",
                 "Read and use these skill files in `.codex/rules/` when they are relevant:",
                 "",
@@ -817,7 +839,7 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
         "",
         "## Installed agent rules",
         "",
-        f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+        ballast_notice(),
         "",
         "Read and follow these rule files in `.claude/rules/` when they apply:",
         "",
@@ -836,7 +858,7 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
                 "",
                 "## Installed skills",
                 "",
-                f"Created by Ballast v{ballast_version()}. Do not edit this section.",
+                ballast_notice(),
                 "",
                 "Read and use these skill files in `.claude/skills/` when they are relevant:",
                 "",
@@ -1216,6 +1238,11 @@ def install(
     processed_agents: list[str] = []
     processed_skills: list[str] = []
     disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
+
+    try:
+        ensure_gitignore_entry(root, ".ballast/")
+    except Exception as err:
+        result.errors.append(("gitignore", str(err)))
 
     if persist:
         save_config(root, language, target, agents, skills)

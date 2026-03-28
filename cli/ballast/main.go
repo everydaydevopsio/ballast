@@ -731,6 +731,9 @@ func normalizeInstallArgs(args []string, root string) ([]string, error) {
 }
 
 func ensureLocalToolDirs(root string) error {
+	if err := ensureGitignoreEntry(root, ".ballast/"); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not update .gitignore for .ballast/: %v\n", err)
+	}
 	if err := os.MkdirAll(filepath.Join(root, ".ballast", "bin"), 0o755); err != nil {
 		return fmt.Errorf("create local ballast bin dir: %w", err)
 	}
@@ -738,6 +741,32 @@ func ensureLocalToolDirs(root string) error {
 		return fmt.Errorf("create local ballast tools dir: %w", err)
 	}
 	return nil
+}
+
+func ensureGitignoreEntry(root string, entry string) error {
+	normalized := strings.TrimSpace(entry)
+	if normalized == "" {
+		return nil
+	}
+	gitignorePath := filepath.Join(root, ".gitignore")
+	if !fileExists(gitignorePath) {
+		return os.WriteFile(gitignorePath, []byte(normalized+"\n"), 0o644)
+	}
+	content, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == normalized {
+			return nil
+		}
+	}
+	separator := ""
+	if len(content) > 0 && !strings.HasSuffix(string(content), "\n") {
+		separator = "\n"
+	}
+	return os.WriteFile(gitignorePath, append(content, []byte(separator+normalized+"\n")...), 0o644)
 }
 
 func releasedGoInstallCommand(version string, projectRoot string) ([]string, error) {

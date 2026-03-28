@@ -1,0 +1,10 @@
+description: 'App publishing specialist - npmjs for Node apps, PyPI for Python apps, GitHub Releases for Go apps'
+alwaysApply: false
+globs:
+  - '.github/workflows/**'
+  - 'package.json'
+  - 'pyproject.toml'
+  - 'go.mod'
+  - '.goreleaser.yaml'
+  - 'README*'
+  - 'CHANGELOG*'

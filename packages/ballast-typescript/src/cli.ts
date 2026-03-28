@@ -124,7 +124,7 @@ Commands:
 Options:
   --target, -t <platform>   AI platform: cursor, claude, opencode, codex
   --language, -l <lang>     Language profile: ${LANGUAGES.join(', ')} (default: typescript)
-  --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
+  --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, publishing, logging, testing (comma-separated)
   --skill, -s <skills>      Skill(s): owasp-security-scan (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills

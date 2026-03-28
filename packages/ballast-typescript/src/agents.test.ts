@@ -15,6 +15,7 @@ describe('agents', () => {
       expect(listAgents()).toContain('local-dev');
       expect(listAgents()).toContain('cicd');
       expect(listAgents()).toContain('observability');
+      expect(listAgents()).toContain('publishing');
       expect(listAgents()).toContain('testing');
     });
   });
@@ -38,6 +39,7 @@ describe('agents', () => {
       expect(isValidAgent('local-dev')).toBe(true);
       expect(isValidAgent('cicd')).toBe(true);
       expect(isValidAgent('observability')).toBe(true);
+      expect(isValidAgent('publishing')).toBe(true);
       expect(isValidAgent('testing')).toBe(true);
     });
 

@@ -1,8 +1,0 @@
----
-description: 'Python linting specialist for Ruff/Black/mypy setup'
-alwaysApply: false
-globs:
-  - '*.py'
-  - 'pyproject.toml'
-  - 'ruff.toml'
----

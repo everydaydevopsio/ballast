@@ -135,6 +135,72 @@ class PatchInstallTests(unittest.TestCase):
             self.assertTrue(skill.exists())
             self.assertTrue(skill.read_bytes().startswith(b"PK\x03\x04"))
 
+    def test_install_adds_ballast_to_gitignore(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            cli.install(
+                root,
+                "cursor",
+                ["linting"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn(
+                ".ballast/", (root / ".gitignore").read_text(encoding="utf-8")
+            )
+
+    def test_install_records_gitignore_error_and_continues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".gitignore").mkdir()
+
+            result = cli.install(
+                root,
+                "cursor",
+                ["linting"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertTrue(any(agent == "gitignore" for agent, _ in result.errors))
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "python-linting.mdc").exists()
+            )
+
+    def test_install_supports_publishing_agent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "cursor",
+                ["publishing"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("publishing", result.installed)
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "publishing-libraries.mdc").exists()
+            )
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "publishing-sdks.mdc").exists()
+            )
+            self.assertTrue(
+                (root / ".cursor" / "rules" / "publishing-apps.mdc").exists()
+            )
+
     def test_parse_skill_tokens_supports_all(self) -> None:
         self.assertEqual(
             cli.parse_skill_tokens(None, True, "python"),
@@ -317,7 +383,8 @@ Read and follow these rule files in `.codex/rules/` when they apply:
             self.assertIn("## Team Notes", agents_md)
             self.assertRegex(
                 agents_md,
-                r"Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.",
+                r"Created by \[Ballast\]\(https://github\.com/everydaydevopsio/ballast\) "
+                r"v[0-9A-Za-z._-]+\. Do not edit this section\.",
             )
             self.assertIn("`.codex/rules/python-linting.md`", agents_md)
             self.assertNotIn("`.codex/rules/old.md`", agents_md)
@@ -362,7 +429,8 @@ Read and follow these rule files in `.claude/rules/` when they apply:
             self.assertIn("## Team Notes", claude_md)
             self.assertRegex(
                 claude_md,
-                r"Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.",
+                r"Created by \[Ballast\]\(https://github\.com/everydaydevopsio/ballast\) "
+                r"v[0-9A-Za-z._-]+\. Do not edit this section\.",
             )
             self.assertIn("`.claude/rules/python-linting.md`", claude_md)
             self.assertNotIn("`.claude/rules/old.md`", claude_md)
@@ -439,7 +507,7 @@ Canonical content.
 
 ## Installed agent rules
 
-Created by Ballast v9.9.9-test. Do not edit this section.
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
 
 - `.codex/rules/python-linting.md` - New rule
 """

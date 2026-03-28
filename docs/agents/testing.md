@@ -7,19 +7,25 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
 - **TypeScript/JavaScript**
   - Jest by default
   - Vitest for Vite-based projects
-  - Coverage thresholds and CI test steps
+  - Coverage thresholds, CI test steps, smoke tests, and optional E2E for runnable apps
 - **Python**
   - pytest for test execution
   - pytest-cov for coverage reporting
+  - Smoke tests and optional E2E for runnable apps
 - **Go**
   - `go test ./...` baseline
   - Coverage checks via `go test ./... -cover`
+  - Smoke tests and optional E2E for runnable apps
 
 ## What It Provides
 
 - Repeatable test commands for local development
 - CI checks for each language profile
 - Coverage visibility with configurable thresholds
+- Smoke tests that use the repo Dockerfile and `docker-compose.yaml` for runnable apps
+- Explicit smoke-test pass/fail output
+- A smoke-test GitHub Action and matching README badge
+- Narrow end-to-end coverage for one critical workflow when the app has a real user flow
 
 ## Monorepo Usage
 
@@ -37,3 +43,6 @@ Recommended baseline commands:
 - **"Add separate CI jobs for each language test suite"** — Better isolation
 - **"Raise coverage thresholds and make CI fail when they drop"** — Quality gate
 - **"Find and fix flaky tests in this package"** — Stability
+- **"Add smoke tests that build our app with Docker Compose and run in GitHub Actions"** — Deployability check
+- **"Add a smoke-test badge to the README"** — Status visibility
+- **"Add one stable end-to-end test for the login flow"** — Critical-path E2E

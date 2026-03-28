@@ -26,7 +26,7 @@
     "sync:content": "node ./scripts/sync-content.mjs",
     "sync:agents": "pnpm run sync:content",
     "sync:skills": "pnpm run sync:content",
-    "build": "pnpm run sync:content && tsc",
+    "build": "tsc",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint .",
@@ -34,7 +34,7 @@
     "prettier": "prettier . --check",
     "prettier:fix": "prettier . --write",
     "prepare": "husky",
-    "prepublishOnly": "pnpm run build"
+    "prepack": "pnpm run sync:content && pnpm run build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

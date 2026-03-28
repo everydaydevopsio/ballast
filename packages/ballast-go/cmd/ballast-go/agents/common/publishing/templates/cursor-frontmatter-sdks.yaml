@@ -1,0 +1,9 @@
+description: 'SDK publishing specialist - npmjs for TypeScript SDKs, PyPI for Python SDKs, GitHub tags/releases for Go SDKs'
+alwaysApply: false
+globs:
+  - '.github/workflows/**'
+  - 'package.json'
+  - 'pyproject.toml'
+  - 'go.mod'
+  - 'README*'
+  - 'CHANGELOG*'

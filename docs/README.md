@@ -9,6 +9,7 @@ Common agents (all language packs):
 - `local-dev`
 - `cicd`
 - `observability`
+- `publishing`
 
 Language-specific agents:
 
@@ -24,6 +25,7 @@ Agent | TypeScript | Python | Go | Guide
 `local-dev` | Yes | Yes | Yes | [agents/local-dev.md](agents/local-dev.md)
 `cicd` | Yes | Yes | Yes | [agents/cicd.md](agents/cicd.md)
 `observability` | Yes | Yes | Yes | [agents/observability.md](agents/observability.md)
+`publishing` | Yes | Yes | Yes | [agents/publishing.md](agents/publishing.md)
 `linting` | Yes | Yes | Yes | [agents/linting.md](agents/linting.md)
 `logging` | Yes | Yes | Yes | [agents/logging.md](agents/logging.md)
 `testing` | Yes | Yes | Yes | [agents/testing.md](agents/testing.md)

@@ -134,6 +134,74 @@ func TestBuildDoctorReportRecommendsFixForUnknownVersion(t *testing.T) {
 	}
 }
 
+func TestInstallAddsBallastToGitignore(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "cursor",
+		agents:      []string{"linting"},
+		language:    "go",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), ".ballast/") {
+		t.Fatalf("expected .ballast/ in .gitignore, got %q", string(content))
+	}
+}
+
+func TestInstallRecordsGitignoreErrorAndContinues(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(tmpDir, ".gitignore"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "cursor",
+		agents:      []string{"linting"},
+		language:    "go",
+	})
+	if len(result.errors) == 0 || result.errors[0].agent != "gitignore" {
+		t.Fatalf("expected gitignore error, got %+v", result.errors)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".cursor", "rules", "go-linting.mdc")); err != nil {
+		t.Fatalf("expected install to continue, got %v", err)
+	}
+}
+
+func TestInstallSupportsPublishingAgent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		target:      "cursor",
+		agents:      []string{"publishing"},
+		language:    "go",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Equal(result.installed, []string{"publishing"}) {
+		t.Fatalf("expected publishing install, got %+v", result.installed)
+	}
+	for _, file := range []string{
+		"publishing-libraries.mdc",
+		"publishing-sdks.mdc",
+		"publishing-apps.mdc",
+	} {
+		if _, err := os.Stat(filepath.Join(tmpDir, ".cursor", "rules", file)); err != nil {
+			t.Fatalf("expected %s to exist, got %v", file, err)
+		}
+	}
+}
+
 func TestPatchRuleContentPreservesExistingSections(t *testing.T) {
 	existing := `---
 description: Team customized linting rules
@@ -603,7 +671,7 @@ Keep my custom rule text.
 	if !strings.Contains(text, "## Team Notes") {
 		t.Fatalf("expected user notes to remain: %s", text)
 	}
-	if !regexp.MustCompile(`Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
+	if !regexp.MustCompile(`Created by \[Ballast\]\(https://github\.com/everydaydevopsio/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
 		t.Fatalf("expected ballast notice to be present: %s", text)
 	}
 	if !strings.Contains(text, "`.codex/rules/go-linting.md`") {
@@ -657,7 +725,7 @@ Keep my custom rule text.
 	if !strings.Contains(text, "## Team Notes") {
 		t.Fatalf("expected user notes to remain: %s", text)
 	}
-	if !regexp.MustCompile(`Created by Ballast v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
+	if !regexp.MustCompile(`Created by \[Ballast\]\(https://github\.com/everydaydevopsio/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\.`).MatchString(text) {
 		t.Fatalf("expected ballast notice to be present: %s", text)
 	}
 	if !strings.Contains(text, "`.claude/rules/go-linting.md`") {
@@ -670,10 +738,10 @@ Keep my custom rule text.
 
 func TestPatchCodexAgentsMDIgnoresHeadingInsideCodeFence(t *testing.T) {
 	existing := "# AGENTS.md\n\n```md\n## Installed agent rules\n```\n\n## Installed agent rules\n\nOld rules\n"
-	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast v9.9.9-test. Do not edit this section.\n\nNew rules\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\nNew rules\n"
 
 	merged := patchCodexAgentsMD(existing, canonical)
-	if !strings.Contains(merged, "Created by Ballast v9.9.9-test. Do not edit this section.") {
+	if !strings.Contains(merged, "Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.") {
 		t.Fatalf("expected canonical installed rules section to be inserted: %s", merged)
 	}
 	if !strings.Contains(merged, "```md\n## Installed agent rules\n```") {

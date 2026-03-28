@@ -41,7 +41,12 @@ const AGENTS_ROOT = resolveAgentsRoot();
 export const LANGUAGES = ['typescript', 'python', 'go'] as const;
 export type Language = (typeof LANGUAGES)[number];
 
-export const COMMON_AGENT_IDS = ['local-dev', 'cicd', 'observability'] as const;
+export const COMMON_AGENT_IDS = [
+  'local-dev',
+  'cicd',
+  'observability',
+  'publishing'
+] as const;
 export const LANGUAGE_AGENT_IDS = ['linting', 'logging', 'testing'] as const;
 export const AGENT_IDS = [...COMMON_AGENT_IDS, ...LANGUAGE_AGENT_IDS] as const;
 export type AgentId = (typeof AGENT_IDS)[number];
