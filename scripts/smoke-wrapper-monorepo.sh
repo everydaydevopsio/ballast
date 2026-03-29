@@ -31,6 +31,9 @@ verify_common_rules() {
   test -f "${monorepo}/.cursor/rules/common/local-dev-env.mdc"
   test -f "${monorepo}/.cursor/rules/common/cicd.mdc"
   test -f "${monorepo}/.cursor/rules/common/observability.mdc"
+  test -f "${monorepo}/.claude/rules/common/local-dev-env.md"
+  test -f "${monorepo}/.opencode/common/local-dev-env.md"
+  test -f "${monorepo}/.codex/rules/common/local-dev-env.md"
 }
 
 verify_language_rules() {
@@ -47,11 +50,28 @@ verify_language_rules() {
   test -f "${monorepo}/.cursor/rules/go/go-linting.mdc"
   test -f "${monorepo}/.cursor/rules/go/go-logging.mdc"
   test -f "${monorepo}/.cursor/rules/go/go-testing.mdc"
+
+  test -f "${monorepo}/.claude/rules/typescript/typescript-linting.md"
+  test -f "${monorepo}/.claude/rules/python/python-linting.md"
+  test -f "${monorepo}/.claude/rules/go/go-linting.md"
+
+  test -f "${monorepo}/.opencode/typescript/typescript-linting.md"
+  test -f "${monorepo}/.opencode/python/python-linting.md"
+  test -f "${monorepo}/.opencode/go/go-linting.md"
+
+  test -f "${monorepo}/.codex/rules/typescript/typescript-linting.md"
+  test -f "${monorepo}/.codex/rules/python/python-linting.md"
+  test -f "${monorepo}/.codex/rules/go/go-linting.md"
 }
 
 verify_rulesrc() {
   local monorepo="$1"
 
+  grep -q '"targets"' "${monorepo}/.rulesrc.json"
+  grep -q '"cursor"' "${monorepo}/.rulesrc.json"
+  grep -q '"claude"' "${monorepo}/.rulesrc.json"
+  grep -q '"opencode"' "${monorepo}/.rulesrc.json"
+  grep -q '"codex"' "${monorepo}/.rulesrc.json"
   grep -q '"languages"' "${monorepo}/.rulesrc.json"
   grep -q '"typescript"' "${monorepo}/.rulesrc.json"
   grep -q '"python"' "${monorepo}/.rulesrc.json"
@@ -61,18 +81,28 @@ verify_rulesrc() {
   grep -q '"tools/worker"' "${monorepo}/.rulesrc.json"
 }
 
+verify_support_files() {
+  local monorepo="$1"
+
+  test -f "${monorepo}/CLAUDE.md"
+  test -f "${monorepo}/AGENTS.md"
+  grep -q '`.claude/rules/typescript/typescript-linting.md`' "${monorepo}/CLAUDE.md"
+  grep -q '`.codex/rules/typescript/typescript-linting.md`' "${monorepo}/AGENTS.md"
+}
+
 main() {
   local monorepo="${WORKDIR}/ballast-wrapper-monorepo"
   make_fixture "${monorepo}"
 
   (
     cd "${monorepo}"
-    ballast install --target cursor --all --yes
+    ballast install --target cursor,claude,opencode,codex --all --all-skills --yes
   )
 
   verify_common_rules "${monorepo}"
   verify_language_rules "${monorepo}"
   verify_rulesrc "${monorepo}"
+  verify_support_files "${monorepo}"
 
   echo "Ballast wrapper monorepo smoke test passed."
 }

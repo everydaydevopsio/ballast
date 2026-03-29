@@ -14,7 +14,7 @@ export interface DoctorReport {
   currentVersion: string;
   configPath: string | null;
   configVersion: string | null;
-  configTarget: string | null;
+  configTargets: string[];
   configAgents: string[];
   installed: InstalledCliStatus[];
   recommendations: string[];
@@ -76,7 +76,7 @@ function detectInstalledCli(name: string): InstalledCliStatus {
 }
 
 function refreshConfigCommand(
-  report: Pick<DoctorReport, 'currentCli' | 'configTarget' | 'configAgents'>
+  report: Pick<DoctorReport, 'currentCli' | 'configTargets' | 'configAgents'>
 ): string | null {
   void report;
   return 'ballast install --refresh-config';
@@ -87,7 +87,7 @@ export function buildDoctorReport(
   currentVersion: string,
   configPath: string | null,
   configVersion: string | null,
-  configTarget: string | null,
+  configTargets: string[],
   configAgents: string[],
   installed: InstalledCliStatus[]
 ): DoctorReport {
@@ -121,7 +121,7 @@ export function buildDoctorReport(
   ) {
     const refresh = refreshConfigCommand({
       currentCli,
-      configTarget,
+      configTargets,
       configAgents
     });
     recommendations.push(
@@ -136,7 +136,7 @@ export function buildDoctorReport(
     currentVersion,
     configPath,
     configVersion,
-    configTarget,
+    configTargets,
     configAgents,
     installed,
     recommendations
@@ -165,7 +165,9 @@ export function formatDoctorReport(report: DoctorReport): string {
   } else {
     lines.push(`- file: ${report.configPath}`);
     lines.push(`- ballastVersion: ${report.configVersion ?? 'missing'}`);
-    if (report.configTarget) lines.push(`- target: ${report.configTarget}`);
+    if (report.configTargets.length > 0) {
+      lines.push(`- targets: ${report.configTargets.join(', ')}`);
+    }
     if (report.configAgents.length > 0) {
       lines.push(`- agents: ${report.configAgents.join(', ')}`);
     }
@@ -192,7 +194,7 @@ export function runDoctor(): number {
     BALLAST_VERSION,
     config ? configPath : null,
     config?.ballastVersion ?? null,
-    config?.target ?? null,
+    config?.targets ?? [],
     config?.agents ?? [],
     CLI_NAMES.map((name) => detectInstalledCli(name))
   );

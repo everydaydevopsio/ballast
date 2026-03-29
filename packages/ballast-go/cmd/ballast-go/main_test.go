@@ -99,7 +99,7 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 		"5.0.2",
 		"/tmp/project/.rulesrc.json",
 		&rulesConfig{
-			Target:         "cursor",
+			Targets:        []string{"cursor"},
 			Agents:         []string{"linting", "testing"},
 			BallastVersion: "5.0.1",
 		},
@@ -139,7 +139,7 @@ func TestInstallAddsBallastToGitignore(t *testing.T) {
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "cursor",
+		targets:     []string{"cursor"},
 		agents:      []string{"linting"},
 		language:    "go",
 	})
@@ -164,7 +164,7 @@ func TestInstallRecordsGitignoreErrorAndContinues(t *testing.T) {
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "cursor",
+		targets:     []string{"cursor"},
 		agents:      []string{"linting"},
 		language:    "go",
 	})
@@ -181,7 +181,7 @@ func TestInstallSupportsPublishingAgent(t *testing.T) {
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "cursor",
+		targets:     []string{"cursor"},
 		agents:      []string{"publishing"},
 		language:    "go",
 	})
@@ -276,7 +276,7 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "codex",
+		targets:     []string{"codex"},
 		agents:      []string{"linting"},
 		language:    "go",
 		force:       false,
@@ -305,6 +305,39 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "pre-commit install --hook-type pre-push") {
 		t.Fatalf("expected concrete pre-push guidance, got %s", string(content))
+	}
+}
+
+func TestInstallWritesRulesForMultipleTargets(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"cursor", "claude"},
+		agents:      []string{"linting"},
+		language:    "go",
+		force:       false,
+		saveConfig:  true,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Contains(result.installed, "linting") {
+		t.Fatalf("expected linting to be installed, got %+v", result.installed)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".cursor", "rules", "go-linting.mdc")); err != nil {
+		t.Fatalf("expected cursor rule file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".claude", "rules", "go-linting.md")); err != nil {
+		t.Fatalf("expected claude rule file: %v", err)
+	}
+	config, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(config)
+	if !strings.Contains(text, `"targets": [`+"\n"+`    "cursor",`) || !strings.Contains(text, `"claude"`) {
+		t.Fatalf("expected multi-target config, got %s", text)
 	}
 }
 
@@ -390,7 +423,7 @@ func TestInstallCreatesClaudeSkillAndPersistsConfig(t *testing.T) {
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "claude",
+		targets:     []string{"claude"},
 		skills:      []string{"owasp-security-scan"},
 		language:    "go",
 		force:       false,
@@ -433,8 +466,8 @@ func TestResolveTargetAndAgentsReturnsSavedSkillOnlyConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	if err := saveConfig(tmpDir, "go", rulesConfig{
-		Target: "codex",
-		Skills: []string{"owasp-security-scan"},
+		Targets: []string{"codex"},
+		Skills:  []string{"owasp-security-scan"},
 	}); err != nil {
 		t.Fatalf("save skill-only config: %v", err)
 	}
@@ -449,8 +482,33 @@ func TestResolveTargetAndAgentsReturnsSavedSkillOnlyConfig(t *testing.T) {
 	if resolved == nil {
 		t.Fatal("expected resolved config, got nil")
 	}
-	if resolved.Target != "codex" || len(resolved.Agents) != 0 || !slices.Equal(resolved.Skills, []string{"owasp-security-scan"}) {
+	if !slices.Equal(resolved.Targets, []string{"codex"}) || len(resolved.Agents) != 0 || !slices.Equal(resolved.Skills, []string{"owasp-security-scan"}) {
 		t.Fatalf("unexpected resolved config: %#v", resolved)
+	}
+}
+
+func TestResolveTargetAndAgentsReturnsSavedMultiTargetConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	if err := saveConfig(tmpDir, "go", rulesConfig{
+		Targets: []string{"cursor", "claude"},
+		Agents:  []string{"linting"},
+	}); err != nil {
+		t.Fatalf("save multi-target config: %v", err)
+	}
+
+	resolved, err := resolveTargetAndAgents(resolveOptions{
+		projectRoot: tmpDir,
+		language:    "go",
+	})
+	if err != nil {
+		t.Fatalf("resolveTargetAndAgents: %v", err)
+	}
+	if resolved == nil {
+		t.Fatal("expected resolved config, got nil")
+	}
+	if !slices.Equal(resolved.Targets, []string{"cursor", "claude"}) {
+		t.Fatalf("expected multi-target config, got %#v", resolved.Targets)
 	}
 }
 
@@ -459,7 +517,7 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "codex",
+		targets:     []string{"codex"},
 		skills:      []string{"owasp-security-scan"},
 		language:    "go",
 		force:       false,
@@ -496,7 +554,7 @@ func TestInstallSkipsExistingSkillWithoutForce(t *testing.T) {
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "opencode",
+		targets:     []string{"opencode"},
 		skills:      []string{"owasp-security-scan"},
 		language:    "go",
 		force:       false,
@@ -522,7 +580,7 @@ func TestValidatedRuleSubdirRejectsInvalidValues(t *testing.T) {
 	}
 }
 
-func TestRunInstallWritesSharedRulesrcForExplicitFlags(t *testing.T) {
+func TestRunInstallWritesSharedRulesrcForMultipleTargets(t *testing.T) {
 	tmpDir := t.TempDir()
 	originalWD, err := os.Getwd()
 	if err != nil {
@@ -538,7 +596,7 @@ func TestRunInstallWritesSharedRulesrcForExplicitFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exitCode := runInstall([]string{"install", "--target", "codex", "--all", "--yes"})
+	exitCode := runInstall([]string{"install", "--target", "cursor,claude", "--all", "--yes"})
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
@@ -552,6 +610,9 @@ func TestRunInstallWritesSharedRulesrcForExplicitFlags(t *testing.T) {
 	if !strings.Contains(string(content), `"ballastVersion": "`+resolveVersion()+`"`) {
 		t.Fatalf("expected ballastVersion in shared config: %s", string(content))
 	}
+	if !strings.Contains(string(content), `"targets": [`+"\n"+`    "cursor",`) || !strings.Contains(string(content), `"claude"`) {
+		t.Fatalf("expected target list in shared config: %s", string(content))
+	}
 	if !strings.Contains(string(content), `"languages": [`+"\n"+`    "go"`) {
 		t.Fatalf("expected go language in shared config: %s", string(content))
 	}
@@ -564,14 +625,14 @@ func TestSaveConfigAccumulatesLanguagesInSharedRulesrc(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	if err := saveConfig(tmpDir, "typescript", rulesConfig{
-		Target:    "claude",
+		Targets:   []string{"claude"},
 		Agents:    []string{"linting"},
 		Languages: []string{"typescript"},
 	}); err != nil {
 		t.Fatalf("save typescript config: %v", err)
 	}
 	if err := saveConfig(tmpDir, "go", rulesConfig{
-		Target:    "claude",
+		Targets:   []string{"claude"},
 		Agents:    []string{"linting"},
 		Languages: []string{"go"},
 	}); err != nil {
@@ -594,6 +655,44 @@ func TestSaveConfigAccumulatesLanguagesInSharedRulesrc(t *testing.T) {
 	}
 }
 
+func TestSaveConfigNormalizesTargetsAndOmitsLegacyField(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	if err := saveConfig(tmpDir, "go", rulesConfig{
+		Targets: []string{"cursor", "claude", "cursor"},
+		Agents:  []string{"linting"},
+	}); err != nil {
+		t.Fatalf("save multi-target config: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, `"targets": [`+"\n"+`    "cursor",`) || !strings.Contains(text, `"claude"`) {
+		t.Fatalf("expected normalized targets array in shared config: %s", text)
+	}
+	if strings.Contains(text, `"target":`) {
+		t.Fatalf("expected legacy target field to be omitted: %s", text)
+	}
+}
+
+func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := loadConfig(tmpDir, "go")
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	if !slices.Equal(cfg.Targets, []string{"cursor"}) {
+		t.Fatalf("expected legacy target to normalize into targets, got %#v", cfg.Targets)
+	}
+}
+
 func TestPatchFlagUpdatesClaudeMDSection(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
@@ -605,7 +704,7 @@ func TestPatchFlagUpdatesClaudeMDSection(t *testing.T) {
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "claude",
+		targets:     []string{"claude"},
 		agents:      []string{"linting"},
 		language:    "go",
 		force:       false,
@@ -652,7 +751,7 @@ Keep my custom rule text.
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "codex",
+		targets:     []string{"codex"},
 		agents:      []string{"linting"},
 		language:    "go",
 		force:       false,
@@ -705,7 +804,7 @@ Keep my custom rule text.
 
 	result := install(installOptions{
 		projectRoot: tmpDir,
-		target:      "claude",
+		targets:     []string{"claude"},
 		agents:      []string{"linting"},
 		language:    "go",
 		force:       false,

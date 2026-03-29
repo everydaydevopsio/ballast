@@ -56,7 +56,7 @@ describe('config', () => {
 
     test('returns parsed config when valid', () => {
       const config = {
-        target: 'claude' as const,
+        targets: ['claude'] as const,
         agents: ['linting', 'local-dev'],
         skills: ['owasp-security-scan']
       };
@@ -69,7 +69,7 @@ describe('config', () => {
 
     test('returns ballastVersion when present', () => {
       const config = {
-        target: 'claude' as const,
+        targets: ['claude'] as const,
         agents: ['linting', 'local-dev'],
         skills: ['owasp-security-scan'],
         ballastVersion: BALLAST_VERSION
@@ -96,12 +96,23 @@ describe('config', () => {
       );
       expect(loadConfig(tmpDir)).toBeNull();
     });
+
+    test('reads legacy single-target config as targets array', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({ target: 'cursor', agents: ['linting'] })
+      );
+      expect(loadConfig(tmpDir)).toEqual({
+        targets: ['cursor'],
+        agents: ['linting']
+      });
+    });
   });
 
   describe('saveConfig', () => {
     test('writes .rulesrc.json', () => {
       const config = {
-        target: 'opencode' as const,
+        targets: ['opencode' as const],
         agents: ['cicd'],
         skills: ['owasp-security-scan'],
         ballastVersion: BALLAST_VERSION
@@ -116,7 +127,7 @@ describe('config', () => {
     test('accumulates languages and default paths in shared config', () => {
       saveConfig(
         {
-          target: 'claude',
+          targets: ['claude'],
           agents: ['linting'],
           ballastVersion: BALLAST_VERSION,
           languages: ['typescript']
@@ -125,7 +136,7 @@ describe('config', () => {
       );
       saveConfig(
         {
-          target: 'claude',
+          targets: ['claude'],
           agents: ['linting'],
           ballastVersion: BALLAST_VERSION,
           languages: ['go']
@@ -137,7 +148,7 @@ describe('config', () => {
         fs.readFileSync(path.join(tmpDir, RULESRC_FILENAME), 'utf8')
       );
       expect(parsed).toEqual({
-        target: 'claude',
+        targets: ['claude'],
         agents: ['linting'],
         ballastVersion: BALLAST_VERSION,
         languages: ['typescript', 'go'],
@@ -154,7 +165,10 @@ describe('config', () => {
         path.join(tmpDir, getLegacyRulesrcFilename('typescript')),
         JSON.stringify(config)
       );
-      expect(loadConfig(tmpDir)).toEqual(config);
+      expect(loadConfig(tmpDir)).toEqual({
+        targets: ['cursor'],
+        agents: ['linting']
+      });
     });
 
     test('loads legacy language-specific rulesrc for python', () => {
@@ -163,7 +177,27 @@ describe('config', () => {
         path.join(tmpDir, getLegacyRulesrcFilename('python')),
         JSON.stringify(config)
       );
-      expect(loadConfig(tmpDir, 'python')).toEqual(config);
+      expect(loadConfig(tmpDir, 'python')).toEqual({
+        targets: ['opencode'],
+        agents: ['linting']
+      });
+    });
+
+    test('normalizes saved config to targets array', () => {
+      saveConfig(
+        {
+          targets: ['cursor', 'claude'],
+          agents: ['linting'],
+          ballastVersion: BALLAST_VERSION
+        },
+        tmpDir
+      );
+
+      const parsed = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, RULESRC_FILENAME), 'utf8')
+      );
+      expect(parsed.targets).toEqual(['cursor', 'claude']);
+      expect(parsed.target).toBeUndefined();
     });
   });
 

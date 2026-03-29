@@ -21,10 +21,17 @@ run_language_smoke() {
 
   (
     cd "${sample_dir}"
-    "${binary}" install --language "${language}" --target cursor --agent linting --yes
+    "${binary}" install --language "${language}" --target cursor,opencode,codex --agent linting --yes
   )
 
   test -f "${sample_dir}/.cursor/rules/${expected_rule}"
+  test -f "${sample_dir}/.opencode/${expected_rule/.mdc/.md}"
+  test -f "${sample_dir}/.codex/rules/${expected_rule/.mdc/.md}"
+  grep -q '"targets"' "${sample_dir}/.rulesrc.json"
+  grep -q '"cursor"' "${sample_dir}/.rulesrc.json"
+  grep -q '"opencode"' "${sample_dir}/.rulesrc.json"
+  grep -q '"codex"' "${sample_dir}/.rulesrc.json"
+  grep -q '## Installed agent rules' "${sample_dir}/AGENTS.md"
 }
 
 main() {

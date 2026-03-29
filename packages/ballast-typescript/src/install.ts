@@ -25,8 +25,14 @@ import {
   isValidSkill,
   type Language
 } from './agents';
-import { findProjectRoot, loadConfig, saveConfig, isCiMode } from './config';
-import type { Target } from './config';
+import {
+  findProjectRoot,
+  loadConfig,
+  saveConfig,
+  isCiMode,
+  normalizeTargets,
+  type Target
+} from './config';
 import { BALLAST_VERSION } from './version';
 
 function prompt(question: string): Promise<string> {
@@ -147,16 +153,15 @@ function countPackageJsonFiles(root: string): number {
   return count;
 }
 
-/**
- * Interactive: ask for target (cursor | claude | opencode | codex)
- */
-async function promptTarget(): Promise<Target> {
+async function promptTargets(): Promise<Target[]> {
   const targets = listTargets();
-  const line = await prompt(`AI platform (${targets.join(', ')}): `);
-  const t = line.toLowerCase();
-  if (targets.includes(t)) return t as Target;
+  const line = await prompt(
+    `AI platform(s) (${targets.join(', ')}, comma-separated): `
+  );
+  const resolved = normalizeTargets(line);
+  if (resolved.length > 0) return resolved;
   console.error(`Invalid target. Choose one of: ${targets.join(', ')}`);
-  return promptTarget();
+  return promptTargets();
 }
 
 /**
@@ -212,6 +217,7 @@ async function promptSkills(
 export interface ResolveTargetAndAgentsOptions {
   projectRoot?: string;
   target?: string;
+  targets?: string[];
   agents?: string | string[];
   skills?: string | string[];
   yes?: boolean;
@@ -223,29 +229,33 @@ export interface ResolveTargetAndAgentsOptions {
  */
 export async function resolveTargetAndAgents(
   options: ResolveTargetAndAgentsOptions = {}
-): Promise<{ target: Target; agents: string[]; skills: string[] } | null> {
+): Promise<{ targets: Target[]; agents: string[]; skills: string[] } | null> {
   const projectRoot = options.projectRoot ?? findProjectRoot();
   const language = options.language ?? 'typescript';
   const config = loadConfig(projectRoot, language);
   const ci = isCiMode() || options.yes;
 
-  const targetFromFlag = options.target;
+  const targetsFromFlag = normalizeTargets([
+    ...(options.targets ?? []),
+    options.target
+  ]);
   const agentsFromFlag = options.agents;
 
   if (
     config &&
-    !targetFromFlag &&
+    targetsFromFlag.length === 0 &&
     agentsFromFlag === undefined &&
     options.skills === undefined
   ) {
     return {
-      target: config.target,
+      targets: config.targets,
       agents: config.agents,
       skills: config.skills ?? []
     };
   }
 
-  const target = targetFromFlag ?? config?.target;
+  const targets =
+    targetsFromFlag.length > 0 ? targetsFromFlag : (config?.targets ?? []);
   const agents =
     agentsFromFlag != null
       ? resolveAgents(agentsFromFlag, language)
@@ -255,19 +265,22 @@ export async function resolveTargetAndAgents(
       ? resolveSkills(options.skills, language)
       : (config?.skills ?? []);
 
-  if (target && ((agents && agents.length > 0) || skills.length > 0)) {
-    return { target: target as Target, agents: agents ?? [], skills };
+  if (
+    targets.length > 0 &&
+    ((agents && agents.length > 0) || skills.length > 0)
+  ) {
+    return { targets, agents: agents ?? [], skills };
   }
 
   if (ci) {
     return null;
   }
 
-  const resolvedTarget = (target ?? (await promptTarget())) as Target;
+  const resolvedTargets = targets.length > 0 ? targets : await promptTargets();
   const resolvedAgents = agents?.length ? agents : await promptAgents(language);
   const resolvedSkills = skills.length ? skills : await promptSkills(language);
   return {
-    target: resolvedTarget,
+    targets: resolvedTargets,
     agents: resolvedAgents,
     skills: resolvedSkills
   };
@@ -361,7 +374,7 @@ export function install(options: InstallOptions): InstallResult {
   if (persist) {
     saveConfig(
       {
-        target,
+        targets: [target],
         agents,
         skills,
         ballastVersion: BALLAST_VERSION,
@@ -534,6 +547,7 @@ export function install(options: InstallOptions): InstallResult {
 export interface RunInstallOptions {
   projectRoot?: string;
   target?: string;
+  targets?: string[];
   agents?: string[];
   all?: boolean;
   skills?: string[];
@@ -576,6 +590,7 @@ export async function runInstall(
   const resolved = await resolveTargetAndAgents({
     projectRoot,
     target: options.target,
+    targets: options.targets,
     agents: agentsFromFlag,
     skills: skillsFromFlag,
     yes: options.yes,
@@ -592,91 +607,104 @@ export async function runInstall(
     return 1;
   }
 
-  const { target, agents, skills } = resolved;
-  const claudeMdPath = getClaudeMdPath(projectRoot);
-  let patchClaudeMd = false;
-  if (target === 'claude' && fs.existsSync(claudeMdPath) && !options.force) {
-    if (options.patch) {
-      patchClaudeMd = true;
-    } else if (!isCiMode() && !options.yes) {
-      patchClaudeMd = await promptYesNo(
-        `Existing CLAUDE.md found at ${claudeMdPath}. Patch the Installed agent rules section?`
+  const { targets, agents, skills } = resolved;
+  saveConfig(
+    {
+      targets,
+      agents,
+      skills,
+      ballastVersion: BALLAST_VERSION,
+      languages: [language]
+    },
+    projectRoot
+  );
+
+  for (const target of targets) {
+    const claudeMdPath = getClaudeMdPath(projectRoot);
+    let patchClaudeMd = false;
+    if (target === 'claude' && fs.existsSync(claudeMdPath) && !options.force) {
+      if (options.patch) {
+        patchClaudeMd = true;
+      } else if (!isCiMode() && !options.yes) {
+        patchClaudeMd = await promptYesNo(
+          `Existing CLAUDE.md found at ${claudeMdPath}. Patch the Installed agent rules section?`
+        );
+      }
+    }
+    const result = install({
+      projectRoot,
+      target,
+      agents,
+      skills,
+      language,
+      force: options.force ?? false,
+      patch: options.patch ?? false,
+      patchClaudeMd,
+      saveConfig: false
+    });
+
+    if (result.errors.length > 0) {
+      result.errors.forEach(({ agent, error }) => {
+        console.error(`Error installing ${agent}: ${error}`);
+      });
+      return 1;
+    }
+
+    if (result.installedRules.length > 0) {
+      console.log(`Installed for ${target}: ${result.installed.join(', ')}`);
+      result.installedRules.forEach(({ agentId, ruleSuffix }) => {
+        const { file } = getDestination(
+          agentId,
+          target,
+          projectRoot,
+          ruleSuffix || undefined,
+          language
+        );
+        const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+        console.log(`  ${label} -> ${file}`);
+      });
+    }
+    if (result.installedSkills.length > 0) {
+      console.log(
+        `Installed skills for ${target}: ${result.installedSkills.join(', ')}`
+      );
+      result.installedSkills.forEach((skillId) => {
+        const { file } = getSkillDestination(skillId, target, projectRoot);
+        console.log(`  ${skillId} -> ${file}`);
+      });
+    }
+    if (result.installedSupportFiles.length > 0) {
+      result.installedSupportFiles.forEach((file) => {
+        const label = file.endsWith('CLAUDE.md') ? 'CLAUDE.md' : 'AGENTS.md';
+        console.log(`  ${label} -> ${file}`);
+      });
+    }
+    if (result.skipped.length > 0) {
+      console.log(
+        `Skipped (already present; use --force to overwrite): ${result.skipped.join(', ')}`
       );
     }
-  }
-  const result = install({
-    projectRoot,
-    target,
-    agents,
-    skills,
-    language,
-    force: options.force ?? false,
-    patch: options.patch ?? false,
-    patchClaudeMd,
-    saveConfig: true
-  });
-
-  if (result.errors.length > 0) {
-    result.errors.forEach(({ agent, error }) => {
-      console.error(`Error installing ${agent}: ${error}`);
-    });
-    return 1;
-  }
-
-  if (result.installedRules.length > 0) {
-    console.log(`Installed for ${target}: ${result.installed.join(', ')}`);
-    result.installedRules.forEach(({ agentId, ruleSuffix }) => {
-      const { file } = getDestination(
-        agentId,
-        target,
-        projectRoot,
-        ruleSuffix || undefined,
-        language
+    if (result.skippedSupportFiles.length > 0) {
+      console.log(
+        `Skipped support files (already present; use --force to overwrite): ${result.skippedSupportFiles.join(
+          ', '
+        )}`
       );
-      const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
-      console.log(`  ${label} -> ${file}`);
-    });
-  }
-  if (result.installedSkills.length > 0) {
-    console.log(
-      `Installed skills for ${target}: ${result.installedSkills.join(', ')}`
-    );
-    result.installedSkills.forEach((skillId) => {
-      const { file } = getSkillDestination(skillId, target, projectRoot);
-      console.log(`  ${skillId} -> ${file}`);
-    });
-  }
-  if (result.installedSupportFiles.length > 0) {
-    result.installedSupportFiles.forEach((file) => {
-      const label = file.endsWith('CLAUDE.md') ? 'CLAUDE.md' : 'AGENTS.md';
-      console.log(`  ${label} -> ${file}`);
-    });
-  }
-  if (result.skipped.length > 0) {
-    console.log(
-      `Skipped (already present; use --force to overwrite): ${result.skipped.join(', ')}`
-    );
-  }
-  if (result.skippedSupportFiles.length > 0) {
-    console.log(
-      `Skipped support files (already present; use --force to overwrite): ${result.skippedSupportFiles.join(
-        ', '
-      )}`
-    );
-  }
-  if (result.skippedSkills.length > 0) {
-    console.log(
-      `Skipped skills (already present; use --force to overwrite): ${result.skippedSkills.join(', ')}`
-    );
-  }
-  if (
-    result.installed.length === 0 &&
-    result.installedSkills.length === 0 &&
-    result.skipped.length === 0 &&
-    result.skippedSkills.length === 0 &&
-    result.errors.length === 0
-  ) {
-    console.log('Nothing to install.');
+    }
+    if (result.skippedSkills.length > 0) {
+      console.log(
+        `Skipped skills (already present; use --force to overwrite): ${result.skippedSkills.join(', ')}`
+      );
+    }
+    if (
+      result.installed.length === 0 &&
+      result.installedSkills.length === 0 &&
+      result.skipped.length === 0 &&
+      result.skippedSkills.length === 0 &&
+      result.errors.length === 0
+    ) {
+      console.log('Nothing to install.');
+    }
   }
 
   return 0;
