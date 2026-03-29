@@ -4,11 +4,12 @@ import { LANGUAGES } from './agents';
 
 const RULESRC_FILENAME = '.rulesrc.json';
 const LEGACY_TYPESCRIPT_RULESRC_FILENAME = '.rulesrc.ts.json';
+const TARGETS = ['cursor', 'claude', 'opencode', 'codex'] as const;
 
-export type Target = 'cursor' | 'claude' | 'opencode' | 'codex';
+export type Target = (typeof TARGETS)[number];
 
 export interface RulesConfig {
-  target: Target;
+  targets: Target[];
   agents: string[];
   skills?: string[];
   ballastVersion?: string;
@@ -27,20 +28,49 @@ export function getLegacyRulesrcFilename(
   return `.rulesrc.${language}.json`;
 }
 
+export function parseTargets(raw: unknown): {
+  targets: Target[];
+  invalidTargets: string[];
+} {
+  const values = Array.isArray(raw) ? raw : [raw];
+  const seen = new Set<Target>();
+  const invalidSeen = new Set<string>();
+
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    for (const part of value.split(',')) {
+      const token = part.trim().toLowerCase();
+      if (!token) continue;
+      if (TARGETS.includes(token as Target)) {
+        seen.add(token as Target);
+        continue;
+      }
+      invalidSeen.add(token);
+    }
+  }
+
+  return {
+    targets: Array.from(seen),
+    invalidTargets: Array.from(invalidSeen)
+  };
+}
+
+export function normalizeTargets(raw: unknown): Target[] {
+  return parseTargets(raw).targets;
+}
+
 function hasConfigFile(dir: string): boolean {
   if (
     fs.existsSync(path.join(dir, RULESRC_FILENAME)) ||
     fs.existsSync(path.join(dir, LEGACY_TYPESCRIPT_RULESRC_FILENAME))
-  )
+  ) {
     return true;
+  }
   return LANGUAGES.some((language) =>
     fs.existsSync(path.join(dir, getLegacyRulesrcFilename(language)))
   );
 }
 
-/**
- * Find project root (directory containing rules config or package.json)
- */
 export function findProjectRoot(cwd: string = process.cwd()): string {
   let dir = path.resolve(cwd);
   const root = path.parse(dir).root;
@@ -53,9 +83,6 @@ export function findProjectRoot(cwd: string = process.cwd()): string {
   return cwd;
 }
 
-/**
- * Load rules config from project root
- */
 export function loadConfig(
   projectRoot?: string,
   language: string = 'typescript'
@@ -70,40 +97,18 @@ export function loadConfig(
     .find((candidate) => fs.existsSync(candidate));
   if (!filePath) return null;
   try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    const data = JSON.parse(raw) as unknown;
-    if (
-      !data ||
-      typeof data !== 'object' ||
-      !('target' in data) ||
-      !Array.isArray((data as RulesConfig).agents)
-    )
-      return null;
-    const config: RulesConfig = {
-      target: (data as RulesConfig).target,
-      agents: (data as RulesConfig).agents
-    };
-    if (Array.isArray((data as RulesConfig).skills)) {
-      config.skills = (data as RulesConfig).skills;
-    }
-    if (typeof (data as RulesConfig).ballastVersion === 'string') {
-      config.ballastVersion = (data as RulesConfig).ballastVersion;
-    }
-    return config;
+    return normalizeRulesConfig(JSON.parse(fs.readFileSync(filePath, 'utf8')));
   } catch {
     return null;
   }
 }
 
-/**
- * Save rules config to project root
- */
 export function saveConfig(config: RulesConfig, projectRoot?: string): void {
   const root = projectRoot ?? findProjectRoot();
   const filePath = path.join(root, getRulesrcFilename());
   const existing = loadRawConfig(filePath);
   let nextConfig: RulesConfig = {
-    target: config.target,
+    targets: normalizeTargets(config.targets),
     agents: config.agents,
     ballastVersion: config.ballastVersion ?? existing?.ballastVersion
   };
@@ -136,20 +141,61 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
 function loadRawConfig(filePath: string): RulesConfig | null {
   if (!fs.existsSync(filePath)) return null;
   try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    const data = JSON.parse(raw) as RulesConfig;
-    if (
-      !data ||
-      typeof data !== 'object' ||
-      typeof data.target !== 'string' ||
-      !Array.isArray(data.agents)
-    ) {
-      return null;
-    }
-    return data;
+    return normalizeRulesConfig(JSON.parse(fs.readFileSync(filePath, 'utf8')));
   } catch {
     return null;
   }
+}
+
+function normalizeRulesConfig(data: unknown): RulesConfig | null {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+  const record = data as {
+    target?: unknown;
+    targets?: unknown;
+    agents?: unknown;
+    skills?: unknown;
+    ballastVersion?: unknown;
+    languages?: unknown;
+    paths?: unknown;
+  };
+  const targets = normalizeTargets(record.targets ?? record.target);
+  if (targets.length === 0 || !Array.isArray(record.agents)) {
+    return null;
+  }
+  const agents = record.agents.filter(
+    (agent): agent is string => typeof agent === 'string'
+  );
+  if (agents.length !== record.agents.length) {
+    return null;
+  }
+
+  const config: RulesConfig = { targets, agents };
+  if (Array.isArray(record.skills)) {
+    config.skills = record.skills.filter(
+      (skill): skill is string => typeof skill === 'string'
+    );
+  }
+  if (typeof record.ballastVersion === 'string') {
+    config.ballastVersion = record.ballastVersion;
+  }
+  if (Array.isArray(record.languages)) {
+    config.languages = record.languages.filter(
+      (language): language is string => typeof language === 'string'
+    );
+  }
+  if (record.paths && typeof record.paths === 'object') {
+    config.paths = Object.fromEntries(
+      Object.entries(record.paths).flatMap(([key, value]) =>
+        Array.isArray(value) &&
+        value.every((item): item is string => typeof item === 'string')
+          ? [[key, value]]
+          : []
+      )
+    );
+  }
+  return config;
 }
 
 function mergeLanguages(
@@ -182,9 +228,6 @@ function mergePaths(
   return merged;
 }
 
-/**
- * Detect if running in CI (non-interactive) mode
- */
 export function isCiMode(): boolean {
   return (
     process.env.CI === 'true' ||

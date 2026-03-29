@@ -49,12 +49,21 @@ jobs:
         run: |
           set -euo pipefail
           cd "examples/smoke/${{ matrix.sample }}"
-          ballast-go install --language "${{ matrix.language }}" --target cursor --agent linting --yes
+          ballast-go install --language "${{ matrix.language }}" --target cursor,opencode,codex --agent linting --yes
 
       - name: Verify outputs
         run: |
           set -euo pipefail
+          rule_md="${{ matrix.expected_rule }}"
+          rule_md="${rule_md%.mdc}.md"
           test -f "examples/smoke/${{ matrix.sample }}/.cursor/rules/${{ matrix.expected_rule }}"
+          test -f "examples/smoke/${{ matrix.sample }}/.opencode/${rule_md}"
+          test -f "examples/smoke/${{ matrix.sample }}/.codex/rules/${rule_md}"
+          grep -q '"targets"' "examples/smoke/${{ matrix.sample }}/.rulesrc.json"
+          grep -q '"cursor"' "examples/smoke/${{ matrix.sample }}/.rulesrc.json"
+          grep -q '"opencode"' "examples/smoke/${{ matrix.sample }}/.rulesrc.json"
+          grep -q '"codex"' "examples/smoke/${{ matrix.sample }}/.rulesrc.json"
+          grep -q '## Installed agent rules' "examples/smoke/${{ matrix.sample }}/AGENTS.md"
 
   skills-smoke:
     name: skills-smoke

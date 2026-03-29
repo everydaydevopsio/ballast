@@ -29,11 +29,11 @@ describe('install', () => {
     test('with target and agents from options returns them', async () => {
       const result = await resolveTargetAndAgents({
         projectRoot: tmpDir,
-        target: 'cursor',
+        targets: ['cursor'],
         agents: ['linting']
       });
       expect(result).toEqual({
-        target: 'cursor',
+        targets: ['cursor'],
         agents: ['linting'],
         skills: []
       });
@@ -42,10 +42,10 @@ describe('install', () => {
     test('with --all expands to all agents', async () => {
       const result = await resolveTargetAndAgents({
         projectRoot: tmpDir,
-        target: 'claude',
+        targets: ['claude'],
         agents: 'all'
       });
-      expect(result?.target).toBe('claude');
+      expect(result?.targets).toEqual(['claude']);
       expect(result?.agents).toContain('linting');
       expect(result?.agents).toContain('local-dev');
       expect(result?.agents).toContain('cicd');
@@ -59,7 +59,7 @@ describe('install', () => {
     test('with saved config returns config when no flags', async () => {
       saveConfig(
         {
-          target: 'opencode',
+          targets: ['opencode'],
           agents: ['linting', 'cicd'],
           skills: ['owasp-security-scan']
         },
@@ -69,7 +69,7 @@ describe('install', () => {
         projectRoot: tmpDir
       });
       expect(result).toEqual({
-        target: 'opencode',
+        targets: ['opencode'],
         agents: ['linting', 'cicd'],
         skills: ['owasp-security-scan']
       });
@@ -89,14 +89,45 @@ describe('install', () => {
       const result = await resolveTargetAndAgents({
         projectRoot: tmpDir,
         yes: true,
-        target: 'cursor',
+        targets: ['cursor'],
         agents: ['linting']
       });
       expect(result).toEqual({
-        target: 'cursor',
+        targets: ['cursor'],
         agents: ['linting'],
         skills: []
       });
+    });
+
+    test('supports multi-target flags and saved config', async () => {
+      saveConfig(
+        {
+          targets: ['cursor', 'claude'],
+          agents: ['linting'],
+          skills: ['owasp-security-scan']
+        },
+        tmpDir
+      );
+      const result = await resolveTargetAndAgents({
+        projectRoot: tmpDir
+      });
+      expect(result).toEqual({
+        targets: ['cursor', 'claude'],
+        agents: ['linting'],
+        skills: ['owasp-security-scan']
+      });
+    });
+
+    test('rejects invalid target flags instead of ignoring them', async () => {
+      await expect(
+        resolveTargetAndAgents({
+          projectRoot: tmpDir,
+          targets: ['cursor', 'bogus'],
+          agents: ['linting']
+        })
+      ).rejects.toThrow(
+        'Invalid --target. Use: cursor, claude, opencode, codex'
+      );
     });
   });
 
@@ -133,7 +164,7 @@ describe('install', () => {
     test('uses pre-commit guidance for standalone typescript installs', () => {
       saveConfig(
         {
-          target: 'cursor',
+          targets: ['cursor'],
           agents: ['linting'],
           languages: ['typescript']
         },
@@ -164,7 +195,7 @@ describe('install', () => {
     test('uses husky guidance for monorepo typescript installs', () => {
       saveConfig(
         {
-          target: 'cursor',
+          targets: ['cursor'],
           agents: ['linting'],
           languages: ['typescript', 'python', 'go']
         },
@@ -209,7 +240,7 @@ describe('install', () => {
       );
       saveConfig(
         {
-          target: 'cursor',
+          targets: ['cursor'],
           agents: ['linting'],
           languages: ['typescript']
         },
@@ -387,9 +418,11 @@ Keep my custom responsibilities.
       });
       const config = loadConfig(tmpDir);
       expect(config).toEqual({
-        target: 'claude',
+        targets: ['claude'],
         agents: ['linting', 'local-dev'],
-        ballastVersion: BALLAST_VERSION
+        ballastVersion: BALLAST_VERSION,
+        languages: ['typescript'],
+        paths: { typescript: ['.'] }
       });
       const raw = JSON.parse(
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
@@ -410,9 +443,11 @@ Keep my custom responsibilities.
       });
       const config = loadConfig(tmpDir, 'go');
       expect(config).toEqual({
-        target: 'claude',
+        targets: ['claude'],
         agents: ['linting', 'local-dev'],
-        ballastVersion: BALLAST_VERSION
+        ballastVersion: BALLAST_VERSION,
+        languages: ['go'],
+        paths: { go: ['.'] }
       });
       const raw = JSON.parse(
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
@@ -946,6 +981,30 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
   });
 
   describe('runInstall', () => {
+    test('writes files for every requested target in one run', async () => {
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        targets: ['cursor', 'claude'],
+        agents: ['linting'],
+        yes: true
+      });
+      expect(exitCode).toBe(0);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'typescript-linting.mdc')
+        )
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.claude', 'rules', 'typescript-linting.md')
+        )
+      ).toBe(true);
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.targets).toEqual(['cursor', 'claude']);
+    });
+
     test('writes files to correct locations for given target', async () => {
       const exitCode = await runInstall({
         projectRoot: tmpDir,
@@ -965,7 +1024,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
     test('uses saved config when CLI passes empty agent and skill arrays', async () => {
       saveConfig(
         {
-          target: 'codex',
+          targets: ['codex'],
           agents: ['linting'],
           skills: ['owasp-security-scan']
         },

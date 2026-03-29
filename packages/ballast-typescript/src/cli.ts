@@ -6,7 +6,7 @@ import { runDoctor } from './doctor';
 import { BALLAST_VERSION } from './version';
 
 export interface CliOptions {
-  target?: string;
+  targets: string[];
   agents: string[];
   skills: string[];
   language: string;
@@ -30,7 +30,7 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     return { doctor: true };
   }
   const options: CliOptions = {
-    target: undefined,
+    targets: [],
     agents: [],
     skills: [],
     language: 'typescript',
@@ -44,7 +44,12 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   while (i < args.length) {
     const arg = args[i];
     if (arg === '--target' || arg === '-t') {
-      options.target = args[++i];
+      const value = args[++i];
+      if (value) {
+        options.targets = options.targets.concat(
+          value.split(',').map((s) => s.trim())
+        );
+      }
       i++;
       continue;
     }
@@ -122,7 +127,7 @@ Commands:
   doctor     Check local Ballast CLI versions and .rulesrc.json metadata
 
 Options:
-  --target, -t <platform>   AI platform: cursor, claude, opencode, codex
+  --target, -t <platforms>  AI platform(s): cursor, claude, opencode, codex (comma-separated or repeated)
   --language, -l <lang>     Language profile: ${LANGUAGES.join(', ')} (default: typescript)
   --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, publishing, logging, testing (comma-separated)
   --skill, -s <skills>      Skill(s): owasp-security-scan (comma-separated)
@@ -137,6 +142,7 @@ Options:
 Examples:
   ballast-typescript install
   ballast-typescript install --target cursor --agent linting
+  ballast-typescript install --target cursor,claude --all
   ballast-typescript install --language python --target cursor --all
   ballast-typescript install --target claude --all --force
   ballast-typescript install --target claude --skill owasp-security-scan
@@ -195,6 +201,7 @@ export async function main(): Promise<void> {
   const normalizedOptions: Parameters<typeof runInstall>[0] = {
     ...cliOptions,
     language: cliOptions.language as Language,
+    targets: cliOptions.targets,
     agents: cliOptions.agents.length > 0 ? cliOptions.agents : undefined,
     skills: cliOptions.skills.length > 0 ? cliOptions.skills : undefined
   };

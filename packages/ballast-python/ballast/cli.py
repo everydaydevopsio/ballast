@@ -83,6 +83,26 @@ def legacy_rulesrc_filename(language: str) -> str:
     return f".rulesrc.{language}.json"
 
 
+def normalize_target_tokens(raw: object | None) -> list[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        values = [raw]
+    elif isinstance(raw, list):
+        values = raw
+    else:
+        return []
+    targets: list[str] = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        for item in value.split(","):
+            token = item.strip().lower()
+            if token and token not in targets:
+                targets.append(token)
+    return targets
+
+
 @lru_cache(maxsize=1)
 def ballast_version() -> str:
     try:
@@ -163,16 +183,19 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
         data = json.loads(file_path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return None
-        target = data.get("target")
+        targets = normalize_target_tokens(data.get("targets"))
+        legacy_target = data.get("target")
+        if not targets and isinstance(legacy_target, str):
+            targets = normalize_target_tokens(legacy_target)
         agents = data.get("agents")
-        if not isinstance(target, str) or not isinstance(agents, list):
+        if not targets or not isinstance(agents, list):
             return None
         if not all(isinstance(item, str) for item in agents):
             return None
         ballast_version_value = data.get("ballastVersion")
         skills = data.get("skills")
         return {
-            "target": target,
+            "targets": targets,
             "agents": agents,
             "skills": skills if isinstance(skills, list) else [],
             "ballastVersion": (
@@ -188,7 +211,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
 def save_config(
     root: Path,
     language: str,
-    target: str,
+    target: str | list[str],
     agents: list[str],
     skills: list[str] | None = None,
 ) -> None:
@@ -222,10 +245,12 @@ def save_config(
         if item not in paths or not paths[item]:
             paths[item] = ["."]
 
+    targets = normalize_target_tokens(target)
+
     file_path.write_text(
         json.dumps(
             {
-                "target": target,
+                "targets": targets,
                 "agents": agents,
                 "skills": skills or [],
                 "ballastVersion": ballast_version(),
@@ -333,10 +358,11 @@ def build_doctor_report(
     if config_path is not None and (
         config_version is None or compare_versions(config_version, target_version) < 0
     ):
-        target = config.get("target") if isinstance(config, dict) else None
+        targets = config.get("targets") if isinstance(config, dict) else None
         agents = config.get("agents") if isinstance(config, dict) else None
         if (
-            isinstance(target, str)
+            isinstance(targets, list)
+            and all(isinstance(target, str) for target in targets)
             and isinstance(agents, list)
             and all(isinstance(agent, str) for agent in agents)
         ):
@@ -369,10 +395,12 @@ def build_doctor_report(
     else:
         lines.append(f"- file: {config_path}")
         lines.append(f"- ballastVersion: {config_version or 'missing'}")
-        target = config.get("target")
+        targets = config.get("targets")
         agents = config.get("agents")
-        if isinstance(target, str):
-            lines.append(f"- target: {target}")
+        if isinstance(targets, list) and all(
+            isinstance(target, str) for target in targets
+        ):
+            lines.append(f"- targets: {', '.join(targets)}")
         if isinstance(agents, list) and all(isinstance(agent, str) for agent in agents):
             lines.append(f"- agents: {', '.join(agents)}")
 
@@ -1131,12 +1159,15 @@ def prompt_yes_no(question: str, default: bool = False) -> bool:
     return value in {"y", "yes"}
 
 
-def prompt_target() -> str:
-    value = prompt(f"AI platform ({', '.join(TARGETS)}): ").lower()
-    if value in TARGETS:
-        return value
-    print(f"Invalid target. Choose one of: {', '.join(TARGETS)}")
-    return prompt_target()
+def prompt_targets() -> list[str]:
+    value = prompt(f"AI platform(s) ({', '.join(TARGETS)}, comma-separated): ")
+    if value.strip().lower() == "all":
+        return list(TARGETS)
+    resolved = normalize_target_tokens(value)
+    if resolved and all(target in TARGETS for target in resolved):
+        return resolved
+    print(f"Invalid targets. Choose from: {', '.join(TARGETS)}")
+    return prompt_targets()
 
 
 def prompt_agents(language: str) -> list[str]:
@@ -1169,13 +1200,23 @@ def prompt_skills(language: str) -> list[str]:
     return prompt_skills(language)
 
 
+def resolve_requested_targets(raw: object) -> list[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return normalize_target_tokens([str(item) for item in raw if item is not None])
+    if isinstance(raw, str):
+        return normalize_target_tokens(raw)
+    return normalize_target_tokens(str(raw))
+
+
 def resolve_target_and_agents(
     args: argparse.Namespace, root: Path, language: str
-) -> tuple[str, list[str], list[str]] | None:
+) -> tuple[list[str], list[str], list[str]] | None:
     cfg = load_config(root, language)
     ci = is_ci_mode() or bool(args.yes)
 
-    target_from_flag = (args.target or "").strip().lower() if args.target else None
+    target_from_flag = resolve_requested_targets(getattr(args, "target", None))
     agents_from_flag = (
         parse_agent_tokens(args.agent, bool(args.all), language)
         if (args.agent or args.all)
@@ -1194,12 +1235,12 @@ def resolve_target_and_agents(
         and skills_from_flag is None
     ):
         return (
-            str(cfg["target"]),
+            list(cfg["targets"]),
             list(cfg["agents"]),
             list(cfg.get("skills") or []),
         )
 
-    target = target_from_flag or (str(cfg["target"]) if cfg else None)
+    targets = target_from_flag or (list(cfg["targets"]) if cfg else None)
     agents = (
         agents_from_flag
         if agents_from_flag is not None
@@ -1211,16 +1252,16 @@ def resolve_target_and_agents(
         else (list(cfg.get("skills") or []) if cfg else [])
     )
 
-    if target and ((agents and len(agents) > 0) or len(skills) > 0):
-        return target, agents or [], skills
+    if targets and ((agents and len(agents) > 0) or len(skills) > 0):
+        return targets, agents or [], skills
 
     if ci:
         return None
 
-    resolved_target = target if target else prompt_target()
+    resolved_targets = targets if targets else prompt_targets()
     resolved_agents = agents if agents and len(agents) > 0 else prompt_agents(language)
     resolved_skills = skills if skills else prompt_skills(language)
-    return resolved_target, resolved_agents, resolved_skills
+    return resolved_targets, resolved_agents, resolved_skills
 
 
 def install(
@@ -1352,52 +1393,48 @@ def install(
     return result
 
 
-def run_install(args: argparse.Namespace) -> int:
-    language = (args.language or "python").strip().lower()
-    if language not in LANGUAGES:
-        print(f"Invalid --language. Use: {', '.join(LANGUAGES)}")
-        return 1
+def install_for_targets(
+    root: Path,
+    targets: list[str],
+    agents: list[str],
+    skills: list[str],
+    language: str,
+    force: bool,
+    patch: bool,
+    persist: bool,
+    patch_claude_md: bool = False,
+) -> list[tuple[str, InstallResult]]:
+    results: list[tuple[str, InstallResult]] = []
+    if persist:
+        save_config(root, language, targets, agents, skills)
 
-    root = resolve_project_root(Path.cwd())
-    resolved = resolve_target_and_agents(args, root, language)
-    if not resolved:
-        print(
-            "In CI/non-interactive mode (--yes or CI env), --target and at least one of --agent/--all or --skill/--all-skills are required when config is missing."
-        )
-        print(
-            "Example: ballast-python install --yes --target cursor --agent linting --skill owasp-security-scan"
-        )
-        return 1
-
-    target, agents, skills = resolved
-    if target not in TARGETS:
-        print("Invalid --target. Use: cursor, claude, opencode, codex")
-        return 1
-
-    patch_claude_md = False
-    if target == "claude" and (root / "CLAUDE.md").exists() and not bool(args.force):
-        if bool(args.patch):
-            patch_claude_md = True
-        elif not is_ci_mode() and not bool(args.yes):
-            patch_claude_md = prompt_yes_no(
-                f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?"
+    for target in targets:
+        results.append(
+            (
+                target,
+                install(
+                    root,
+                    target,
+                    agents,
+                    skills,
+                    language,
+                    force,
+                    patch,
+                    False,
+                    patch_claude_md,
+                ),
             )
-    result = install(
-        root,
-        target,
-        agents,
-        skills,
-        language,
-        bool(args.force),
-        bool(args.patch),
-        True,
-        patch_claude_md,
-    )
+        )
+    return results
 
+
+def print_install_result(
+    root: Path, target: str, result: InstallResult, language: str
+) -> None:
     if result.errors:
         for agent, error in result.errors:
             print(f"Error installing {agent}: {error}")
-        return 1
+        return
 
     if result.installed_rules:
         print(f"Installed for {target}: {', '.join(result.installed)}")
@@ -1427,12 +1464,88 @@ def run_install(args: argparse.Namespace) -> int:
             "Skipped support files (already present; use --force to overwrite): "
             + ", ".join(result.skipped_support_files)
         )
+
+
+def run_install(args: argparse.Namespace) -> int:
+    language = (args.language or "python").strip().lower()
+    if language not in LANGUAGES:
+        print(f"Invalid --language. Use: {', '.join(LANGUAGES)}")
+        return 1
+
+    root = resolve_project_root(Path.cwd())
+    resolved = resolve_target_and_agents(args, root, language)
+    if not resolved:
+        print(
+            "In CI/non-interactive mode (--yes or CI env), --target and at least one of --agent/--all or --skill/--all-skills are required when config is missing."
+        )
+        print(
+            "Example: ballast-python install --yes --target cursor --agent linting --skill owasp-security-scan"
+        )
+        return 1
+
+    targets, agents, skills = resolved
+    if any(target not in TARGETS for target in targets):
+        print("Invalid --target. Use: cursor, claude, opencode, codex")
+        return 1
+
+    patch_claude_md = False
+    if "claude" in targets and (root / "CLAUDE.md").exists() and not bool(args.force):
+        if bool(args.patch):
+            patch_claude_md = True
+        elif not is_ci_mode() and not bool(args.yes):
+            patch_claude_md = prompt_yes_no(
+                f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?"
+            )
+    if len(targets) == 1:
+        per_target_results = [
+            (
+                targets[0],
+                install(
+                    root,
+                    targets[0],
+                    agents,
+                    skills,
+                    language,
+                    bool(args.force),
+                    bool(args.patch),
+                    True,
+                    patch_claude_md,
+                ),
+            )
+        ]
+    else:
+        per_target_results = install_for_targets(
+            root,
+            targets,
+            agents,
+            skills,
+            language,
+            bool(args.force),
+            bool(args.patch),
+            True,
+            patch_claude_md,
+        )
+
+    combined = InstallResult()
+    for target, result in per_target_results:
+        print_install_result(root, target, result, language)
+        combined.installed.extend(result.installed)
+        combined.installed_rules.extend(result.installed_rules)
+        combined.installed_skills.extend(result.installed_skills)
+        combined.installed_support_files.extend(result.installed_support_files)
+        combined.skipped.extend(result.skipped)
+        combined.skipped_skills.extend(result.skipped_skills)
+        combined.skipped_support_files.extend(result.skipped_support_files)
+        combined.errors.extend(result.errors)
+
+    if combined.errors:
+        return 1
     if (
-        not result.installed
-        and not result.installed_skills
-        and not result.skipped
-        and not result.skipped_skills
-        and not result.errors
+        not combined.installed
+        and not combined.installed_skills
+        and not combined.skipped
+        and not combined.skipped_skills
+        and not combined.errors
     ):
         print("Nothing to install.")
 
@@ -1441,12 +1554,25 @@ def run_install(args: argparse.Namespace) -> int:
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="ballast-python", description="Install Ballast rules for Python projects"
+        prog="ballast-python",
+        description="Install Ballast rules for Python projects",
+        epilog=(
+            "Examples:\n"
+            "  ballast-python install --target cursor --agent linting\n"
+            "  ballast-python install --target cursor,claude --agent linting --yes\n"
+            "  ballast-python install --target cursor --target codex --all --yes"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("--version", action="version", version=cli_version())
     sub = p.add_subparsers(dest="command")
     install_cmd = sub.add_parser("install", help="Install rule files")
-    install_cmd.add_argument("--target", "-t")
+    install_cmd.add_argument(
+        "--target",
+        "-t",
+        action="append",
+        help="One or more targets (comma-separated or repeated): cursor, claude, opencode, codex",
+    )
     install_cmd.add_argument("--language", "-l", default="python")
     install_cmd.add_argument("--agent", "-a")
     install_cmd.add_argument("--skill", "-s")

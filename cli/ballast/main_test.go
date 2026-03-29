@@ -1160,7 +1160,7 @@ func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
 	if invocations[2].Binary != "python3" {
 		t.Fatalf("expected Python backend to use python3 local module entrypoint, got %#v", invocations[2])
 	}
-	if got := strings.Join(invocations[2].Args, " "); got != "-m ballast install --target claude --yes --agent linting,logging,testing" {
+	if got := strings.Join(invocations[2].Args, " "); got != "-m ballast install --yes --target claude --agent linting,logging,testing" {
 		t.Fatalf("unexpected Python invocation args: %q", got)
 	}
 	if invocations[2].Env["BALLAST_REPO_ROOT"] != sourceRoot {
@@ -1534,7 +1534,7 @@ func TestDetectRepoProfilesPropagatesWalkErrors(t *testing.T) {
 func TestUpdateMonorepoSupportFilesCreatesClaudeMdAtRoot(t *testing.T) {
 	root := t.TempDir()
 	plan := &monorepoPlan{
-		Target:   "claude",
+		Targets:  []string{"claude"},
 		Common:   []string{"local-dev"},
 		Language: []string{"linting"},
 		Config: monorepoConfig{

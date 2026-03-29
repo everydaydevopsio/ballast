@@ -122,6 +122,7 @@ var supportedSkills = []string{"owasp-security-scan"}
 
 type monorepoConfig struct {
 	Target         string              `json:"target,omitempty"`
+	Targets        []string            `json:"targets,omitempty"`
 	Agents         []string            `json:"agents,omitempty"`
 	Skills         []string            `json:"skills,omitempty"`
 	BallastVersion string              `json:"ballastVersion,omitempty"`
@@ -152,7 +153,7 @@ type doctorBackendStatus struct {
 type monorepoPlan struct {
 	Invocations []backendInvocation
 	Config      monorepoConfig
-	Target      string
+	Targets     []string
 	Common      []string
 	Language    []string
 }
@@ -341,6 +342,7 @@ func printUsage() {
 	fmt.Println("Examples:")
 	fmt.Println("  ballast")
 	fmt.Println("  ballast install --target cursor --all")
+	fmt.Println("  ballast install --target cursor,claude --all")
 	fmt.Println("  ballast install --target claude --skill owasp-security-scan")
 	fmt.Println("  ballast install --refresh-config")
 	fmt.Println("  ballast install-cli --language python")
@@ -660,8 +662,8 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	} else {
 		fmt.Printf("- ballastVersion: %s\n", config.BallastVersion)
 	}
-	if strings.TrimSpace(config.Target) != "" {
-		fmt.Printf("- target: %s\n", config.Target)
+	if len(config.Targets) > 0 {
+		fmt.Printf("- targets: %s\n", strings.Join(config.Targets, ", "))
 	}
 	if len(config.Agents) > 0 {
 		fmt.Printf("- agents: %s\n", strings.Join(config.Agents, ", "))
@@ -724,7 +726,7 @@ func normalizeInstallArgs(args []string, root string) ([]string, error) {
 	if !fileExists(filepath.Join(root, ".rulesrc.json")) {
 		return nil, errors.New("--refresh-config requires an existing .rulesrc.json")
 	}
-	if findFlagValue(filtered, "--target", "-t") == "" && !hasFlag(filtered, "--yes", "-y") {
+	if len(findFlagValues(filtered, "--target", "-t")) == 0 && !hasFlag(filtered, "--yes", "-y") {
 		filtered = append(filtered, "--yes")
 	}
 	return filtered, nil
@@ -984,6 +986,9 @@ func loadDoctorConfig(root string) (*monorepoConfig, error) {
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
+	if len(config.Targets) == 0 && strings.TrimSpace(config.Target) != "" {
+		config.Targets = []string{strings.TrimSpace(config.Target)}
+	}
 	return &config, nil
 }
 
@@ -1221,18 +1226,18 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, nil
 	}
 
-	installTarget := findFlagValue(args, "--target", "-t")
+	installTargets := findFlagValues(args, "--target", "-t")
 	installAgents, installAll, installSkills, installAllSkills := parseInstallSelection(args)
 	explicitAgentSelection := len(installAgents) > 0 || installAll
 	explicitSkillSelection := len(installSkills) > 0 || installAllSkills
-	if installTarget == "" && config != nil {
-		installTarget = config.Target
+	if len(installTargets) == 0 && config != nil {
+		installTargets = config.Targets
 	}
 	if !explicitAgentSelection && !explicitSkillSelection && config != nil {
 		installAgents = slices.Clone(config.Agents)
 		installSkills = slices.Clone(config.Skills)
 	}
-	if installTarget == "" || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills)) {
+	if len(installTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills)) {
 		return nil, errors.New("monorepo install requires --target and at least one of --agent/--all or --skill/--all-skills, or a root .rulesrc.json with target, agents/skills, languages, and paths")
 	}
 
@@ -1249,7 +1254,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	}
 
 	configToSave := monorepoConfig{
-		Target:         installTarget,
+		Targets:        installTargets,
 		Agents:         selectedAgents,
 		Skills:         selectedSkills,
 		BallastVersion: normalizeVersion(resolveVersion()),
@@ -1263,7 +1268,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 
 	commonSelection := filterAgents(selectedAgents, commonAgents)
 	languageSelection := filterAgents(selectedAgents, languageAgents)
-	baseArgs := stripMonorepoFlags(args)
+	baseArgs := withTargetSelection(stripMonorepoFlags(args), installTargets)
 
 	plan := make([]backendInvocation, 0, len(profiles)+1)
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
@@ -1305,7 +1310,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	return &monorepoPlan{
 		Invocations: plan,
 		Config:      configToSave,
-		Target:      installTarget,
+		Targets:     installTargets,
 		Common:      commonSelection,
 		Language:    languageSelection,
 	}, nil
@@ -1324,6 +1329,9 @@ func loadMonorepoConfig(root string) (*monorepoConfig, error) {
 	var config monorepoConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	if len(config.Targets) == 0 && strings.TrimSpace(config.Target) != "" {
+		config.Targets = []string{strings.TrimSpace(config.Target)}
 	}
 	if len(config.Languages) == 0 || len(config.Paths) == 0 {
 		return nil, nil
@@ -1520,19 +1528,29 @@ func splitAgentValues(raw string) []string {
 }
 
 func findFlagValue(args []string, longFlag string, shortFlag string) string {
+	values := findFlagValues(args, longFlag, shortFlag)
+	if len(values) == 0 {
+		return ""
+	}
+	return values[len(values)-1]
+}
+
+func findFlagValues(args []string, longFlag string, shortFlag string) []string {
+	values := []string{}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if strings.HasPrefix(arg, longFlag+"=") {
-			return strings.TrimSpace(strings.TrimPrefix(arg, longFlag+"="))
+			values = append(values, splitAgentValues(strings.TrimPrefix(arg, longFlag+"="))...)
+			continue
 		}
 		if arg == longFlag || arg == shortFlag {
 			if i+1 >= len(args) {
-				return ""
+				break
 			}
-			return strings.TrimSpace(args[i+1])
+			values = append(values, splitAgentValues(args[i+1])...)
 		}
 	}
-	return ""
+	return uniqueStrings(values)
 }
 
 func stripMonorepoFlags(args []string) []string {
@@ -1591,6 +1609,25 @@ func withSkillSelection(baseArgs []string, skills []string) []string {
 	}
 	if len(skills) > 0 {
 		filtered = append(filtered, "--skill", strings.Join(skills, ","))
+	}
+	return filtered
+}
+
+func withTargetSelection(baseArgs []string, targets []string) []string {
+	filtered := make([]string, 0, len(baseArgs))
+	for i := 0; i < len(baseArgs); i++ {
+		arg := baseArgs[i]
+		if arg == "--target" || arg == "-t" {
+			i++
+			continue
+		}
+		if strings.HasPrefix(arg, "--target=") {
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	if len(targets) > 0 {
+		filtered = append(filtered, "--target", strings.Join(targets, ","))
 	}
 	return filtered
 }
@@ -1660,25 +1697,34 @@ func envPairs(env map[string]string) []string {
 }
 
 func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) error {
-	if plan.Target != "claude" && plan.Target != "codex" {
-		return nil
-	}
-
-	path := supportFilePath(root, plan.Target)
-	content := buildMonorepoSupportFile(plan)
-	if !fileExists(path) {
-		return os.WriteFile(path, []byte(content), 0o644)
-	}
-	if hasPatchFlag(args) {
-		return os.WriteFile(path, []byte(patchInstalledRulesSection(readFile(path), content)), 0o644)
-	}
-	if isInteractiveInstall(args) {
-		approved, err := promptSupportFilePatch(path)
-		if err != nil {
-			return err
+	for _, target := range plan.Targets {
+		if target != "claude" && target != "codex" {
+			continue
 		}
-		if approved {
-			return os.WriteFile(path, []byte(patchInstalledRulesSection(readFile(path), content)), 0o644)
+		path := supportFilePath(root, target)
+		content := buildMonorepoSupportFile(plan, target)
+		if !fileExists(path) {
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				return err
+			}
+			continue
+		}
+		if hasPatchFlag(args) {
+			if err := os.WriteFile(path, []byte(patchInstalledRulesSection(readFile(path), content)), 0o644); err != nil {
+				return err
+			}
+			continue
+		}
+		if isInteractiveInstall(args) {
+			approved, err := promptSupportFilePatch(path)
+			if err != nil {
+				return err
+			}
+			if approved {
+				if err := os.WriteFile(path, []byte(patchInstalledRulesSection(readFile(path), content)), 0o644); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
@@ -1691,12 +1737,12 @@ func supportFilePath(root string, target string) string {
 	return filepath.Join(root, "AGENTS.md")
 }
 
-func buildMonorepoSupportFile(plan *monorepoPlan) string {
+func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 	title := "# AGENTS.md"
 	intro := "This file provides guidance to Codex (CLI and app) for working in this repository."
 	rulesDir := ".codex/rules"
 	extension := ".md"
-	if plan.Target == "claude" {
+	if target == "claude" {
 		title = "# CLAUDE.md"
 		intro = "This file provides guidance to Claude Code for working in this repository."
 		rulesDir = ".claude/rules"

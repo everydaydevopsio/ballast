@@ -31,7 +31,7 @@ describe('parseArgs', () => {
         'cursor'
       ])
     ).toEqual({
-      target: 'cursor',
+      targets: ['cursor'],
       agents: ['doctor'],
       skills: [],
       language: 'typescript',
@@ -54,12 +54,38 @@ describe('parseArgs', () => {
         '--all-skills'
       ])
     ).toEqual({
-      target: undefined,
+      targets: [],
       agents: [],
       skills: ['owasp-security-scan'],
       language: 'typescript',
       all: false,
       allSkills: true,
+      force: false,
+      patch: false,
+      yes: false
+    });
+  });
+
+  test('parses comma-separated and repeated target flags', () => {
+    expect(
+      parseArgs([
+        'node',
+        'ballast-typescript',
+        'install',
+        '--target',
+        'cursor,claude',
+        '--target',
+        'codex',
+        '--agent',
+        'linting'
+      ])
+    ).toEqual({
+      targets: ['cursor', 'claude', 'codex'],
+      agents: ['linting'],
+      skills: [],
+      language: 'typescript',
+      all: false,
+      allSkills: false,
       force: false,
       patch: false,
       yes: false

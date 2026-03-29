@@ -7,7 +7,7 @@ describe('doctor', () => {
       '5.0.2',
       '/tmp/project/.rulesrc.json',
       '5.0.1',
-      'cursor',
+      ['cursor'],
       ['linting', 'testing'],
       [
         {
@@ -43,7 +43,7 @@ describe('doctor', () => {
         '5.0.2',
         '/tmp/project/.rulesrc.json',
         '5.0.2',
-        'cursor',
+        ['cursor'],
         ['linting'],
         [
           {
@@ -62,6 +62,7 @@ describe('doctor', () => {
     );
 
     expect(output).toContain('Ballast doctor');
+    expect(output).toContain('- targets: cursor');
     expect(output).toContain('Recommendations:');
     expect(output).toContain('- No action needed.');
   });
