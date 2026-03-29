@@ -357,6 +357,7 @@ class PatchInstallTests(unittest.TestCase):
             args = cli.parser().parse_args(["install"])
 
             with (
+                mock.patch.object(cli, "is_ci_mode", return_value=False),
                 mock.patch.object(
                     cli, "prompt_targets", return_value=["cursor", "claude"]
                 ),
