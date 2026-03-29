@@ -28,19 +28,35 @@ export function getLegacyRulesrcFilename(
   return `.rulesrc.${language}.json`;
 }
 
-export function normalizeTargets(raw: unknown): Target[] {
+export function parseTargets(raw: unknown): {
+  targets: Target[];
+  invalidTargets: string[];
+} {
   const values = Array.isArray(raw) ? raw : [raw];
   const seen = new Set<Target>();
+  const invalidSeen = new Set<string>();
+
   for (const value of values) {
     if (typeof value !== 'string') continue;
     for (const part of value.split(',')) {
-      const target = part.trim().toLowerCase() as Target;
-      if (TARGETS.includes(target) && !seen.has(target)) {
-        seen.add(target);
+      const token = part.trim().toLowerCase();
+      if (!token) continue;
+      if (TARGETS.includes(token as Target)) {
+        seen.add(token as Target);
+        continue;
       }
+      invalidSeen.add(token);
     }
   }
-  return Array.from(seen);
+
+  return {
+    targets: Array.from(seen),
+    invalidTargets: Array.from(invalidSeen)
+  };
+}
+
+export function normalizeTargets(raw: unknown): Target[] {
+  return parseTargets(raw).targets;
 }
 
 function hasConfigFile(dir: string): boolean {

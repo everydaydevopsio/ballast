@@ -117,6 +117,18 @@ describe('install', () => {
         skills: ['owasp-security-scan']
       });
     });
+
+    test('rejects invalid target flags instead of ignoring them', async () => {
+      await expect(
+        resolveTargetAndAgents({
+          projectRoot: tmpDir,
+          targets: ['cursor', 'bogus'],
+          agents: ['linting']
+        })
+      ).rejects.toThrow(
+        'Invalid --target. Use: cursor, claude, opencode, codex'
+      );
+    });
   });
 
   describe('install', () => {

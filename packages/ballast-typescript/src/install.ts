@@ -30,7 +30,7 @@ import {
   loadConfig,
   saveConfig,
   isCiMode,
-  normalizeTargets,
+  parseTargets,
   type Target
 } from './config';
 import { BALLAST_VERSION } from './version';
@@ -158,8 +158,10 @@ async function promptTargets(): Promise<Target[]> {
   const line = await prompt(
     `AI platform(s) (${targets.join(', ')}, comma-separated): `
   );
-  const resolved = normalizeTargets(line);
-  if (resolved.length > 0) return resolved;
+  const parsed = parseTargets(line);
+  if (parsed.targets.length > 0 && parsed.invalidTargets.length === 0) {
+    return parsed.targets;
+  }
   console.error(`Invalid target. Choose one of: ${targets.join(', ')}`);
   return promptTargets();
 }
@@ -235,10 +237,14 @@ export async function resolveTargetAndAgents(
   const config = loadConfig(projectRoot, language);
   const ci = isCiMode() || options.yes;
 
-  const targetsFromFlag = normalizeTargets([
+  const parsedTargetsFromFlag = parseTargets([
     ...(options.targets ?? []),
     options.target
   ]);
+  if (parsedTargetsFromFlag.invalidTargets.length > 0) {
+    throw new Error(`Invalid --target. Use: ${listTargets().join(', ')}`);
+  }
+  const targetsFromFlag = parsedTargetsFromFlag.targets;
   const agentsFromFlag = options.agents;
 
   if (

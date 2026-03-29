@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import sys
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -104,6 +105,12 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(config["targets"], ["cursor"])
             self.assertEqual(config["agents"], ["linting"])
+
+    def test_normalize_target_tokens_ignores_non_string_items(self) -> None:
+        self.assertEqual(
+            cli.normalize_target_tokens(["cursor,claude", 7, None, "codex"]),
+            ["cursor", "claude", "codex"],
+        )
 
     def test_run_install_writes_shared_rulesrc_for_explicit_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -334,6 +341,31 @@ class PatchInstallTests(unittest.TestCase):
 
             args = cli.parser().parse_args(["install", "--yes"])
             resolved = cli.resolve_target_and_agents(args, root, "python")
+
+            self.assertEqual(
+                resolved,
+                (
+                    ["cursor", "claude"],
+                    ["linting"],
+                    ["owasp-security-scan"],
+                ),
+            )
+
+    def test_resolve_target_and_agents_prompts_for_multiple_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = cli.parser().parse_args(["install"])
+
+            with (
+                mock.patch.object(
+                    cli, "prompt_targets", return_value=["cursor", "claude"]
+                ),
+                mock.patch.object(cli, "prompt_agents", return_value=["linting"]),
+                mock.patch.object(
+                    cli, "prompt_skills", return_value=["owasp-security-scan"]
+                ),
+            ):
+                resolved = cli.resolve_target_and_agents(args, root, "python")
 
             self.assertEqual(
                 resolved,

@@ -7,7 +7,8 @@ import {
   saveConfig,
   isCiMode,
   RULESRC_FILENAME,
-  getLegacyRulesrcFilename
+  getLegacyRulesrcFilename,
+  parseTargets
 } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -105,6 +106,15 @@ describe('config', () => {
       expect(loadConfig(tmpDir)).toEqual({
         targets: ['cursor'],
         agents: ['linting']
+      });
+    });
+  });
+
+  describe('parseTargets', () => {
+    test('returns normalized targets and invalid tokens separately', () => {
+      expect(parseTargets(['cursor,claude', 'bogus', 'codex'])).toEqual({
+        targets: ['cursor', 'claude', 'codex'],
+        invalidTargets: ['bogus']
       });
     });
   });

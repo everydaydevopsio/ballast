@@ -512,6 +512,23 @@ func TestResolveTargetAndAgentsReturnsSavedMultiTargetConfig(t *testing.T) {
 	}
 }
 
+func TestResolveTargetAndAgentsRejectsInvalidTargetFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	_, err := resolveTargetAndAgents(resolveOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"cursor", "bogus"},
+		agents:      []string{"linting"},
+		language:    "go",
+	})
+	if err == nil {
+		t.Fatal("expected invalid target error, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid --target: bogus. Use: cursor, claude, opencode, codex") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 	tmpDir := t.TempDir()
 
@@ -675,6 +692,16 @@ func TestSaveConfigNormalizesTargetsAndOmitsLegacyField(t *testing.T) {
 	}
 	if strings.Contains(text, `"target":`) {
 		t.Fatalf("expected legacy target field to be omitted: %s", text)
+	}
+}
+
+func TestNormalizeTargetsDetailedReturnsInvalidTokens(t *testing.T) {
+	normalized, invalid := normalizeTargetsDetailed([]string{"cursor,claude", "bogus", "codex"})
+	if !slices.Equal(normalized, []string{"cursor", "claude", "codex"}) {
+		t.Fatalf("unexpected normalized targets: %#v", normalized)
+	}
+	if !slices.Equal(invalid, []string{"bogus"}) {
+		t.Fatalf("unexpected invalid targets: %#v", invalid)
 	}
 }
 

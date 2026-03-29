@@ -583,9 +583,12 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 		return config, nil
 	}
 
-	targets := normalizeTargets(opts.targets)
-	if len(targets) == 0 && config != nil {
-		targets = normalizeTargets(config.Targets)
+	resolvedTargets, invalidTargets := normalizeTargetsDetailed(opts.targets)
+	if len(invalidTargets) > 0 {
+		return nil, fmt.Errorf("invalid --target: %s. Use: %s", strings.Join(invalidTargets, ", "), strings.Join(targets, ", "))
+	}
+	if len(resolvedTargets) == 0 && config != nil {
+		resolvedTargets = normalizeTargets(config.Targets)
 	}
 
 	var resolvedAgents []string
@@ -601,17 +604,17 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 		resolvedSkills = slices.Clone(config.Skills)
 	}
 
-	if len(targets) > 0 && (len(resolvedAgents) > 0 || len(resolvedSkills) > 0) {
-		return &rulesConfig{Targets: targets, Agents: resolvedAgents, Skills: resolvedSkills}, nil
+	if len(resolvedTargets) > 0 && (len(resolvedAgents) > 0 || len(resolvedSkills) > 0) {
+		return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills}, nil
 	}
 
 	if ci {
 		return nil, nil
 	}
 
-	if len(targets) == 0 {
+	if len(resolvedTargets) == 0 {
 		var err error
-		targets, err = promptTargets()
+		resolvedTargets, err = promptTargets()
 		if err != nil {
 			return nil, err
 		}
@@ -631,7 +634,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 		}
 	}
 
-	return &rulesConfig{Targets: targets, Agents: resolvedAgents, Skills: resolvedSkills}, nil
+	return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills}, nil
 }
 
 func install(opts installOptions) installResult {
@@ -1931,8 +1934,8 @@ func promptTargets() ([]string, error) {
 		if strings.EqualFold(trimmed, "all") {
 			return append([]string(nil), targets...), nil
 		}
-		resolved := normalizeTargets(splitTargets(trimmed))
-		if len(resolved) > 0 {
+		resolved, invalid := normalizeTargetsDetailed(splitTargets(trimmed))
+		if len(resolved) > 0 && len(invalid) == 0 {
 			return resolved, nil
 		}
 		fmt.Printf("Invalid targets. Use comma-separated values from: %s\n", allowed)
@@ -2035,20 +2038,36 @@ func splitCSV(raw string) []string {
 }
 
 func normalizeTargets(values []string) []string {
-	seen := map[string]struct{}{}
-	normalized := make([]string, 0, len(values))
-	for _, raw := range values {
-		target := strings.ToLower(strings.TrimSpace(raw))
-		if target == "" || !contains(targets, target) {
-			continue
-		}
-		if _, ok := seen[target]; ok {
-			continue
-		}
-		seen[target] = struct{}{}
-		normalized = append(normalized, target)
-	}
+	normalized, _ := normalizeTargetsDetailed(values)
 	return normalized
+}
+
+func normalizeTargetsDetailed(values []string) ([]string, []string) {
+	seen := map[string]struct{}{}
+	invalidSeen := map[string]struct{}{}
+	normalized := make([]string, 0, len(values))
+	invalid := make([]string, 0)
+	for _, raw := range values {
+		for _, item := range splitTargets(raw) {
+			target := strings.ToLower(strings.TrimSpace(item))
+			if target == "" {
+				continue
+			}
+			if !contains(targets, target) {
+				if _, ok := invalidSeen[target]; !ok {
+					invalidSeen[target] = struct{}{}
+					invalid = append(invalid, target)
+				}
+				continue
+			}
+			if _, ok := seen[target]; ok {
+				continue
+			}
+			seen[target] = struct{}{}
+			normalized = append(normalized, target)
+		}
+	}
+	return normalized, invalid
 }
 
 func resolveAgents(tokens []string, language string) []string {

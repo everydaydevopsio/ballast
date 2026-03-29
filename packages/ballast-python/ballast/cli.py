@@ -83,12 +83,19 @@ def legacy_rulesrc_filename(language: str) -> str:
     return f".rulesrc.{language}.json"
 
 
-def normalize_target_tokens(raw: str | list[str] | None) -> list[str]:
+def normalize_target_tokens(raw: object | None) -> list[str]:
     if raw is None:
         return []
-    values = [raw] if isinstance(raw, str) else raw
+    if isinstance(raw, str):
+        values = [raw]
+    elif isinstance(raw, list):
+        values = raw
+    else:
+        return []
     targets: list[str] = []
     for value in values:
+        if not isinstance(value, str):
+            continue
         for item in value.split(","):
             token = item.strip().lower()
             if token and token not in targets:
@@ -239,8 +246,6 @@ def save_config(
             paths[item] = ["."]
 
     targets = normalize_target_tokens(target)
-    if not targets and isinstance(target, str):
-        targets = [target.strip().lower()]
 
     file_path.write_text(
         json.dumps(
@@ -1154,12 +1159,15 @@ def prompt_yes_no(question: str, default: bool = False) -> bool:
     return value in {"y", "yes"}
 
 
-def prompt_target() -> str:
-    value = prompt(f"AI platform ({', '.join(TARGETS)}): ").lower()
-    if value in TARGETS:
-        return value
-    print(f"Invalid target. Choose one of: {', '.join(TARGETS)}")
-    return prompt_target()
+def prompt_targets() -> list[str]:
+    value = prompt(f"AI platform(s) ({', '.join(TARGETS)}, comma-separated): ")
+    if value.strip().lower() == "all":
+        return list(TARGETS)
+    resolved = normalize_target_tokens(value)
+    if resolved and all(target in TARGETS for target in resolved):
+        return resolved
+    print(f"Invalid targets. Choose from: {', '.join(TARGETS)}")
+    return prompt_targets()
 
 
 def prompt_agents(language: str) -> list[str]:
@@ -1250,7 +1258,7 @@ def resolve_target_and_agents(
     if ci:
         return None
 
-    resolved_targets = targets if targets else [prompt_target()]
+    resolved_targets = targets if targets else prompt_targets()
     resolved_agents = agents if agents and len(agents) > 0 else prompt_agents(language)
     resolved_skills = skills if skills else prompt_skills(language)
     return resolved_targets, resolved_agents, resolved_skills
