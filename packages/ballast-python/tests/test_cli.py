@@ -272,6 +272,27 @@ class PatchInstallTests(unittest.TestCase):
                 (root / ".cursor" / "rules" / "publishing-apps.mdc").exists()
             )
 
+    def test_install_supports_docs_agent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "cursor",
+                ["docs"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("docs", result.installed)
+            rule = root / ".cursor" / "rules" / "docs.mdc"
+            self.assertTrue(rule.exists())
+            self.assertIn("Documentation Agent", rule.read_text(encoding="utf-8"))
+            self.assertIn("publish-docs", rule.read_text(encoding="utf-8"))
+
     def test_parse_skill_tokens_supports_all(self) -> None:
         self.assertEqual(
             cli.parse_skill_tokens(None, True, "python"),

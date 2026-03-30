@@ -1,0 +1,13 @@
+description: 'Documentation specialist - GitHub Markdown docs by default, or maintain existing Docusaurus sites with publish-docs automation'
+alwaysApply: false
+globs:
+  - 'README*'
+  - 'docs/**'
+  - '.github/workflows/**'
+  - 'package.json'
+  - 'docusaurus.config.*'
+  - 'sidebars.*'
+  - 'blog/**'
+  - 'src/pages/**'
+  - 'src/components/**'
+  - 'static/**'

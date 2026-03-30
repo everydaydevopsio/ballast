@@ -46,6 +46,10 @@ describe('build', () => {
       expect(listRuleSuffixes('local-dev').length).toBe(4);
     });
 
+    test('returns only main rule for docs', () => {
+      expect(listRuleSuffixes('docs')).toEqual(['']);
+    });
+
     test('returns libraries, sdks, and apps for publishing', () => {
       expect(listRuleSuffixes('publishing')).toContain('libraries');
       expect(listRuleSuffixes('publishing')).toContain('sdks');
@@ -85,6 +89,14 @@ describe('build', () => {
       expect(content).toContain('GitHub MCP');
       expect(content).toContain('Jira');
       expect(content).toContain('Linear');
+    });
+
+    test('returns docs content', () => {
+      const content = getContent('docs');
+      expect(content).toContain('Documentation Agent');
+      expect(content).toContain('Default to a GitHub-readable Markdown');
+      expect(content).toContain('publish-docs');
+      expect(content).toContain('Mermaid');
     });
 
     test('returns publishing libraries content', () => {
@@ -214,6 +226,12 @@ describe('build', () => {
     test('reads rule-specific cursor frontmatter for publishing sdks', () => {
       const t = getTemplate('publishing', 'cursor-frontmatter.yaml', 'sdks');
       expect(t).toContain('SDK publishing specialist');
+    });
+
+    test('reads cursor frontmatter for docs', () => {
+      const t = getTemplate('docs', 'cursor-frontmatter.yaml');
+      expect(t).toContain('Documentation specialist');
+      expect(t).toContain('docusaurus.config.*');
     });
 
     test('reads claude header for linting', () => {

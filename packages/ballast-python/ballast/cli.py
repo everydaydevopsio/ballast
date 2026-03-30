@@ -15,7 +15,7 @@ from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex"]
 LANGUAGES = ["typescript", "python", "go"]
-COMMON_AGENTS = ["local-dev", "cicd", "observability", "publishing"]
+COMMON_AGENTS = ["local-dev", "docs", "cicd", "observability", "publishing"]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
     "typescript": COMMON_AGENTS + LANGUAGE_AGENTS,

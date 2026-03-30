@@ -1,0 +1,23 @@
+---
+description: Documentation specialist - GitHub Markdown docs by default, or maintain existing Docusaurus sites with publish-docs automation
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.2
+tools:
+  write: true
+  edit: true
+  bash: true
+  read: true
+  glob: true
+  grep: true
+permission:
+  edit: allow
+  bash:
+    'git *': ask
+    'pnpm *': allow
+    'npm *': allow
+    'yarn *': allow
+    'uv *': allow
+    'go *': allow
+    '*': ask
+---
