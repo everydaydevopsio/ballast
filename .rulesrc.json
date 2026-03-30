@@ -1,6 +1,9 @@
 {
   "targets": [
-    "cursor"
+    "cursor",
+    "claude",
+    "opencode",
+    "codex"
   ],
   "agents": [
     "local-dev",

@@ -91,3 +91,5 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/go/go-linting.md` — Rules for go/linting
 - `.codex/rules/go/go-logging.md` — Rules for go/logging
 - `.codex/rules/go/go-testing.md` — Rules for go/testing
+
+These files are the canonical Codex rules for this repository. Legacy root-level files in `.codex/rules/*.md` are deprecated; do not edit or reference them.
