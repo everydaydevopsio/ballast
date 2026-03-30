@@ -18,13 +18,18 @@ run_target() {
   local sample="$1"
   local language="$2"
   local target="$3"
+  local mode="${4:-skill}"
   local dir="$ROOT/examples/smoke/$sample"
 
   rm -rf "$dir/.cursor" "$dir/.claude" "$dir/.opencode" "$dir/.codex" "$dir/AGENTS.md" "$dir/CLAUDE.md" "$dir/.rulesrc.json"
 
   (
     cd "$dir"
-    ballast-go install --language "$language" --target "$target" --skill owasp-security-scan --yes
+    if [[ "$mode" == "all-skills" ]]; then
+      ballast-go install --language "$language" --target "$target" --all-skills --yes
+    else
+      ballast-go install --language "$language" --target "$target" --skill owasp-security-scan --yes
+    fi
   )
 
   case "$target" in
@@ -52,4 +57,4 @@ run_target() {
 run_target "go-sample" "go" "cursor"
 run_target "python-sample" "python" "claude"
 run_target "typescript-sample" "typescript" "opencode"
-run_target "typescript-sample" "typescript" "codex"
+run_target "typescript-sample" "typescript" "codex" "all-skills"

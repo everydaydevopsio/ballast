@@ -66,3 +66,12 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
 - `.claude/rules/common/cicd.md` — Rules for common/cicd
 - `.claude/rules/common/observability.md` — Rules for common/observability
+- `.claude/rules/typescript/typescript-linting.md` — Rules for typescript/linting
+- `.claude/rules/typescript/typescript-logging.md` — Rules for typescript/logging
+- `.claude/rules/typescript/typescript-testing.md` — Rules for typescript/testing
+- `.claude/rules/python/python-linting.md` — Rules for python/linting
+- `.claude/rules/python/python-logging.md` — Rules for python/logging
+- `.claude/rules/python/python-testing.md` — Rules for python/testing
+- `.claude/rules/go/go-linting.md` — Rules for go/linting
+- `.claude/rules/go/go-logging.md` — Rules for go/logging
+- `.claude/rules/go/go-testing.md` — Rules for go/testing

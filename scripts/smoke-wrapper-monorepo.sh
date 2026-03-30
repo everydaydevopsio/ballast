@@ -31,6 +31,7 @@ verify_common_rules() {
   test -f "${monorepo}/.cursor/rules/common/local-dev-env.mdc"
   test -f "${monorepo}/.cursor/rules/common/cicd.mdc"
   test -f "${monorepo}/.cursor/rules/common/observability.mdc"
+  test -f "${monorepo}/.cursor/rules/common/publishing-libraries.mdc"
   test -f "${monorepo}/.claude/rules/common/local-dev-env.md"
   test -f "${monorepo}/.opencode/common/local-dev-env.md"
   test -f "${monorepo}/.codex/rules/common/local-dev-env.md"
@@ -90,19 +91,79 @@ verify_support_files() {
   grep -q '`.codex/rules/typescript/typescript-linting.md`' "${monorepo}/AGENTS.md"
 }
 
+verify_skills() {
+  local monorepo="$1"
+
+  test -f "${monorepo}/.cursor/rules/owasp-security-scan.mdc"
+  test -f "${monorepo}/.claude/skills/owasp-security-scan.skill"
+  test -f "${monorepo}/.opencode/skills/owasp-security-scan.md"
+  test -f "${monorepo}/.codex/rules/owasp-security-scan.md"
+}
+
+verify_codex_removed() {
+  local monorepo="$1"
+
+  test ! -e "${monorepo}/.codex/rules/common/local-dev-env.md"
+  test ! -e "${monorepo}/.codex/rules/typescript/typescript-linting.md"
+  test ! -e "${monorepo}/.codex/rules/owasp-security-scan.md"
+  ! grep -q '"codex"' "${monorepo}/.rulesrc.json"
+  ! grep -q '`.codex/rules/' "${monorepo}/AGENTS.md"
+  grep -q '"cursor"' "${monorepo}/.rulesrc.json"
+  grep -q '"claude"' "${monorepo}/.rulesrc.json"
+  grep -q '"opencode"' "${monorepo}/.rulesrc.json"
+}
+
+verify_refresh_preserves_removed_target() {
+  local monorepo="$1"
+
+  test ! -e "${monorepo}/.codex/rules/common/local-dev-env.md"
+  ! grep -q '"codex"' "${monorepo}/.rulesrc.json"
+}
+
+run_wrapper_language_smoke() {
+  local project="${WORKDIR}/ballast-wrapper-python"
+
+  mkdir -p "${project}"
+  cp -R "${REPO_ROOT}/examples/smoke/python-sample/." "${project}/"
+
+  (
+    cd "${project}"
+    ballast --language python install --target codex --agent linting --yes
+  )
+
+  test -f "${project}/.codex/rules/python-linting.md"
+  grep -q '"codex"' "${project}/.rulesrc.json"
+}
+
 main() {
   local monorepo="${WORKDIR}/ballast-wrapper-monorepo"
   make_fixture "${monorepo}"
 
   (
     cd "${monorepo}"
-    ballast install --target cursor,claude,opencode,codex --all --all-skills --yes
+    ballast install --target cursor --target claude,opencode --target codex --all --all-skills --yes
   )
 
   verify_common_rules "${monorepo}"
   verify_language_rules "${monorepo}"
   verify_rulesrc "${monorepo}"
   verify_support_files "${monorepo}"
+  verify_skills "${monorepo}"
+
+  (
+    cd "${monorepo}"
+    ballast install --remove-target codex --yes
+  )
+
+  verify_codex_removed "${monorepo}"
+
+  (
+    cd "${monorepo}"
+    ballast install --refresh-config
+  )
+
+  verify_refresh_preserves_removed_target "${monorepo}"
+  run_wrapper_language_smoke
 
   echo "Ballast wrapper monorepo smoke test passed."
 }

@@ -71,6 +71,15 @@ verify_rule() {
   grep -q "${expected_section}" "${rule_file}"
 }
 
+verify_force_overwrite() {
+  local rule_file="$1"
+  local expected_section="$2"
+
+  ! grep -q "Team customized linting rules" "${rule_file}"
+  ! grep -q "Keep team-specific wording." "${rule_file}"
+  grep -q "${expected_section}" "${rule_file}"
+}
+
 run_typescript_smoke() {
   local monorepo="${WORKDIR}/typescript-monorepo"
   build_monorepo_fixture "${monorepo}"
@@ -82,6 +91,13 @@ run_typescript_smoke() {
   )
 
   verify_rule "${monorepo}/.cursor/rules/typescript-linting.mdc" "## When Completed"
+
+  (
+    cd "${monorepo}"
+    node "${REPO_ROOT}/packages/ballast-typescript/dist/cli.js" install --target cursor --agent linting --force --yes
+  )
+
+  verify_force_overwrite "${monorepo}/.cursor/rules/typescript-linting.mdc" "## When Completed"
   echo "TypeScript monorepo patch smoke test passed."
 }
 
@@ -96,6 +112,13 @@ run_python_smoke() {
   )
 
   verify_rule "${monorepo}/.cursor/rules/python-linting.mdc" "## Baseline Tooling"
+
+  (
+    cd "${monorepo}"
+    PYTHONPATH="${REPO_ROOT}/packages/ballast-python" python3 -m ballast install --language python --target cursor --agent linting --force --yes
+  )
+
+  verify_force_overwrite "${monorepo}/.cursor/rules/python-linting.mdc" "## Baseline Tooling"
   echo "Python monorepo patch smoke test passed."
 }
 
@@ -110,6 +133,13 @@ run_go_smoke() {
   )
 
   verify_rule "${monorepo}/.cursor/rules/go-linting.mdc" "## Commands"
+
+  (
+    cd "${monorepo}"
+    "${REPO_ROOT}/.ci/bin/ballast-go" install --language go --target cursor --agent linting --force --yes
+  )
+
+  verify_force_overwrite "${monorepo}/.cursor/rules/go-linting.mdc" "## Commands"
   echo "Go monorepo patch smoke test passed."
 }
 
