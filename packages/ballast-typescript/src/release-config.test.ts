@@ -16,6 +16,10 @@ function readGoReleaserConfig(relativePath: string): GoReleaserConfig {
   return YAML.parse(raw) as GoReleaserConfig;
 }
 
+function readRepoFile(relativePath: string): string {
+  return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+}
+
 describe('release config', () => {
   test('Go and CLI releases publish distinct checksum asset names', () => {
     const goConfig = readGoReleaserConfig(
@@ -28,5 +32,18 @@ describe('release config', () => {
     expect(goConfig.checksum?.name_template).not.toBe(
       cliConfig.checksum?.name_template
     );
+  });
+
+  test('publish workflows pin GoReleaser to an explicit stable release', () => {
+    for (const workflowPath of [
+      '.github/workflows/publish.yml',
+      '.github/workflows/publish-go.yml',
+      '.github/workflows/publish-cli.yml'
+    ]) {
+      const workflow = readRepoFile(workflowPath);
+
+      expect(workflow).not.toContain("version: '~> v2'");
+      expect(workflow).toContain("version: 'v2.14.0'");
+    }
   });
 });

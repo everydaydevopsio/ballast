@@ -52,7 +52,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: '~> v2'
+          version: 'v2.14.0'
           workdir: packages/ballast-go
           args: release --clean --config .goreleaser.yaml
         env:
@@ -86,7 +86,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: '~> v2'
+          version: 'v2.14.0'
           workdir: packages/ballast-go
           args: release --clean --config .goreleaser.yaml
         env:
