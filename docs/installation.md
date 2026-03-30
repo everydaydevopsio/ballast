@@ -149,7 +149,8 @@ For single-language TypeScript installs, the linting rules should use `pre-commi
 
 ## Common CLI Options
 
-- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`
+- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`; adds to saved targets in `.rulesrc.json`
+- `--remove-target`: remove one or more saved targets and clean up Ballast-managed files for them
 - `--agent, -a`: comma-separated list (or `all`)
 - `--skill, -s`: comma-separated list
 - `--all`: install all available agents
@@ -160,7 +161,7 @@ For single-language TypeScript installs, the linting rules should use `pre-commi
 
 ## Wrapper Commands
 
-- `ballast install`: install rules for the detected or selected language; add `--refresh-config` to reapply saved `.rulesrc.json` settings and rewrite the config version
+- `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings
 - `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically
 - `ballast upgrade`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it
 - `ballast install-cli [--language <typescript|python|go>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release

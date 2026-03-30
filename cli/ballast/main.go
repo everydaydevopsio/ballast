@@ -23,6 +23,7 @@ const (
 )
 
 var supportedLanguages = []language{langTypeScript, langPython, langGo}
+var supportedTargets = []string{"cursor", "claude", "opencode", "codex"}
 
 type toolConfig struct {
 	binary         string
@@ -115,7 +116,7 @@ var runCommandFunc = runCommand
 var resolveInstalledVersionFunc = resolveInstalledVersion
 var collectDoctorBackendsFunc = collectDoctorBackends
 
-var commonAgents = []string{"local-dev", "cicd", "observability"}
+var commonAgents = []string{"local-dev", "cicd", "observability", "publishing"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var supportedAgents = append(slices.Clone(commonAgents), languageAgents...)
 var supportedSkills = []string{"owasp-security-scan"}
@@ -156,6 +157,8 @@ type monorepoPlan struct {
 	Targets     []string
 	Common      []string
 	Language    []string
+	Removed     []string
+	Previous    *monorepoConfig
 }
 
 func main() {
@@ -239,6 +242,10 @@ func run(args []string) int {
 				}
 			}
 			if err := saveMonorepoConfig(root, plan.Config); err != nil {
+				fmt.Println(err)
+				return 1
+			}
+			if err := cleanupRemovedMonorepoTargets(root, plan); err != nil {
 				fmt.Println(err)
 				return 1
 			}
@@ -343,6 +350,7 @@ func printUsage() {
 	fmt.Println("  ballast")
 	fmt.Println("  ballast install --target cursor --all")
 	fmt.Println("  ballast install --target cursor,claude --all")
+	fmt.Println("  ballast install --remove-target codex")
 	fmt.Println("  ballast install --target claude --skill owasp-security-scan")
 	fmt.Println("  ballast install --refresh-config")
 	fmt.Println("  ballast install-cli --language python")
@@ -355,6 +363,7 @@ func printUsage() {
 	fmt.Println("  ballast --version")
 	fmt.Println()
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
+	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
 	fmt.Println("Mixed TypeScript/Python/Go monorepos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/` and `.codex/rules/python/`).")
 }
@@ -1227,17 +1236,32 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	}
 
 	installTargets := findFlagValues(args, "--target", "-t")
+	removeTargets := findFlagValues(args, "--remove-target", "")
+	if err := validateSelectedTargets(removeTargets); err != nil {
+		return nil, err
+	}
 	installAgents, installAll, installSkills, installAllSkills := parseInstallSelection(args)
 	explicitAgentSelection := len(installAgents) > 0 || installAll
 	explicitSkillSelection := len(installSkills) > 0 || installAllSkills
-	if len(installTargets) == 0 && config != nil {
-		installTargets = config.Targets
+	existingTargets := []string{}
+	if config != nil {
+		existingTargets = slices.Clone(config.Targets)
 	}
+	if err := validateSelectedTargets(installTargets); err != nil {
+		return nil, err
+	}
+	requestedTargets := installTargets
+	if len(requestedTargets) == 0 && config != nil {
+		requestedTargets = slices.Clone(config.Targets)
+	}
+	requestedTargets = subtractStrings(requestedTargets, removeTargets)
+	savedTargets := subtractStrings(uniqueStrings(append(slices.Clone(existingTargets), installTargets...)), removeTargets)
 	if !explicitAgentSelection && !explicitSkillSelection && config != nil {
 		installAgents = slices.Clone(config.Agents)
 		installSkills = slices.Clone(config.Skills)
 	}
-	if len(installTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills)) {
+	cleanupOnly := len(removeTargets) > 0 && len(requestedTargets) == 0 && !explicitAgentSelection && !explicitSkillSelection
+	if !cleanupOnly && (len(requestedTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills))) {
 		return nil, errors.New("monorepo install requires --target and at least one of --agent/--all or --skill/--all-skills, or a root .rulesrc.json with target, agents/skills, languages, and paths")
 	}
 
@@ -1254,7 +1278,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	}
 
 	configToSave := monorepoConfig{
-		Targets:        installTargets,
+		Targets:        savedTargets,
 		Agents:         selectedAgents,
 		Skills:         selectedSkills,
 		BallastVersion: normalizeVersion(resolveVersion()),
@@ -1268,7 +1292,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 
 	commonSelection := filterAgents(selectedAgents, commonAgents)
 	languageSelection := filterAgents(selectedAgents, languageAgents)
-	baseArgs := withTargetSelection(stripMonorepoFlags(args), installTargets)
+	baseArgs := withTargetSelection(stripMonorepoFlags(args), requestedTargets)
 
 	plan := make([]backendInvocation, 0, len(profiles)+1)
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
@@ -1310,9 +1334,11 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	return &monorepoPlan{
 		Invocations: plan,
 		Config:      configToSave,
-		Targets:     installTargets,
+		Targets:     requestedTargets,
 		Common:      commonSelection,
 		Language:    languageSelection,
+		Removed:     removeTargets,
+		Previous:    config,
 	}, nil
 }
 
@@ -1561,7 +1587,14 @@ func stripMonorepoFlags(args []string) []string {
 			i++
 			continue
 		}
+		if arg == "--remove-target" {
+			i++
+			continue
+		}
 		if strings.HasPrefix(arg, "--language=") {
+			continue
+		}
+		if strings.HasPrefix(arg, "--remove-target=") {
 			continue
 		}
 		filtered = append(filtered, arg)
@@ -1642,6 +1675,37 @@ func filterAgents(selected []string, allowed []string) []string {
 		if _, ok := allowedSet[agent]; ok {
 			filtered = append(filtered, agent)
 		}
+	}
+	return uniqueStrings(filtered)
+}
+
+func validateSelectedTargets(targets []string) error {
+	invalid := []string{}
+	for _, target := range uniqueStrings(targets) {
+		if !slices.Contains(supportedTargets, target) {
+			invalid = append(invalid, target)
+		}
+	}
+	if len(invalid) > 0 {
+		return fmt.Errorf("unsupported target selection: %s (supported targets: %s)", strings.Join(invalid, ", "), strings.Join(supportedTargets, ", "))
+	}
+	return nil
+}
+
+func subtractStrings(values []string, remove []string) []string {
+	if len(remove) == 0 {
+		return uniqueStrings(values)
+	}
+	removeSet := map[string]struct{}{}
+	for _, value := range remove {
+		removeSet[value] = struct{}{}
+	}
+	filtered := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := removeSet[value]; ok {
+			continue
+		}
+		filtered = append(filtered, value)
 	}
 	return uniqueStrings(filtered)
 }
@@ -1728,6 +1792,153 @@ func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) 
 		}
 	}
 	return nil
+}
+
+func cleanupRemovedMonorepoTargets(root string, plan *monorepoPlan) error {
+	if plan == nil || len(plan.Removed) == 0 || plan.Previous == nil {
+		return nil
+	}
+	for _, target := range plan.Removed {
+		if err := removeManagedTargetFiles(root, target, plan.Previous); err != nil {
+			return err
+		}
+		if target == "claude" || target == "codex" {
+			path := supportFilePath(root, target)
+			if fileExists(path) {
+				if err := os.WriteFile(path, []byte(removeManagedSections(readFile(path))), 0o644); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func removeManagedTargetFiles(root string, target string, config *monorepoConfig) error {
+	if config == nil {
+		return nil
+	}
+	for _, file := range managedRulePaths(root, target, config) {
+		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
+	}
+	for _, file := range managedSkillPaths(root, target, config.Skills) {
+		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
+	}
+	return nil
+}
+
+func managedRulePaths(root string, target string, config *monorepoConfig) []string {
+	paths := []string{}
+	ext := targetRuleExtension(target)
+	rulesRoot := targetRulesRoot(root, target)
+	commonSelection := filterAgents(config.Agents, commonAgents)
+	languageSelection := filterAgents(config.Agents, languageAgents)
+	for _, agent := range commonSelection {
+		for _, suffix := range ruleSuffixesForAgent(agent) {
+			base := agentBaseName(agent, suffix)
+			paths = append(paths, filepath.Join(rulesRoot, "common", base+ext))
+		}
+	}
+	for _, lang := range config.Languages {
+		for _, agent := range languageSelection {
+			for _, suffix := range ruleSuffixesForAgent(agent) {
+				base := agentBaseName(agent, suffix)
+				paths = append(paths, filepath.Join(rulesRoot, lang, lang+"-"+base+ext))
+			}
+		}
+	}
+	return uniqueStrings(paths)
+}
+
+func managedSkillPaths(root string, target string, skills []string) []string {
+	paths := []string{}
+	for _, skill := range skills {
+		path := targetSkillPath(root, target, skill)
+		if strings.TrimSpace(path) != "" {
+			paths = append(paths, path)
+		}
+	}
+	return uniqueStrings(paths)
+}
+
+func targetRootDir(root string, target string) string {
+	switch target {
+	case "cursor":
+		return filepath.Join(root, ".cursor")
+	case "claude":
+		return filepath.Join(root, ".claude")
+	case "opencode":
+		return filepath.Join(root, ".opencode")
+	case "codex":
+		return filepath.Join(root, ".codex")
+	default:
+		return root
+	}
+}
+
+func targetRulesRoot(root string, target string) string {
+	switch target {
+	case "cursor":
+		return filepath.Join(root, ".cursor", "rules")
+	case "claude":
+		return filepath.Join(root, ".claude", "rules")
+	case "opencode":
+		return filepath.Join(root, ".opencode", "rules")
+	case "codex":
+		return filepath.Join(root, ".codex", "rules")
+	default:
+		return root
+	}
+}
+
+func targetRuleExtension(target string) string {
+	if target == "cursor" {
+		return ".mdc"
+	}
+	return ".md"
+}
+
+func targetSkillPath(root string, target string, skill string) string {
+	switch target {
+	case "cursor":
+		return filepath.Join(root, ".cursor", "rules", skill+".mdc")
+	case "claude":
+		return filepath.Join(root, ".claude", "skills", skill+".skill")
+	case "opencode":
+		return filepath.Join(root, ".opencode", "skills", skill+".md")
+	case "codex":
+		return filepath.Join(root, ".codex", "rules", skill+".md")
+	default:
+		return ""
+	}
+}
+
+func pruneEmptyParents(dir string, stop string) {
+	current := filepath.Clean(dir)
+	limit := filepath.Clean(stop)
+	for strings.HasPrefix(current, limit) {
+		entries, err := os.ReadDir(current)
+		if err != nil || len(entries) > 0 {
+			return
+		}
+		if err := os.Remove(current); err != nil {
+			return
+		}
+		if current == limit {
+			return
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return
+		}
+		current = parent
+	}
 }
 
 func supportFilePath(root string, target string) string {
@@ -1847,6 +2058,18 @@ func patchInstalledRulesSection(existing string, canonical string) string {
 	return strings.TrimRight(existing[:existingRange[0]], "\n") + "\n\n" +
 		canonicalSection + "\n\n" +
 		strings.TrimLeft(existing[existingRange[1]:], "\n")
+}
+
+func removeManagedSections(existing string) string {
+	next := existing
+	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
+		section := findSectionRange(next, heading)
+		if section == nil {
+			continue
+		}
+		next = strings.TrimRight(next[:section[0]], "\n") + "\n\n" + strings.TrimLeft(next[section[1]:], "\n")
+	}
+	return strings.TrimRight(next, "\n") + "\n"
 }
 
 func findSectionRange(content string, heading string) []int {
