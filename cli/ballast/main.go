@@ -336,8 +336,8 @@ func printUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  install     Install agent rules for the detected or selected language (`--refresh-config` reuses saved .rulesrc.json settings)")
 	fmt.Println("  install-cli Install or upgrade backend CLIs (latest by default, or a specific --version)")
-	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config)")
-	fmt.Println("  upgrade     Rewrite .rulesrc.json to the running ballast version and sync backend CLIs")
+	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config; add `--patch` with `--fix` to merge backend file updates during refresh)")
+	fmt.Println("  upgrade     Rewrite .rulesrc.json to the running ballast version and sync backend CLIs (`--patch` forwards patch mode to the backend refresh)")
 	fmt.Println("  help        Show help for ballast")
 	fmt.Println("  version     Print the ballast wrapper version")
 	fmt.Println()
@@ -357,6 +357,7 @@ func printUsage() {
 	fmt.Println("  ballast doctor")
 	fmt.Println("  ballast doctor --fix")
 	fmt.Println("  ballast upgrade")
+	fmt.Println("  ballast upgrade --patch")
 	fmt.Println("  ballast install-cli --language go --version 5.0.2")
 	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go monorepo")
 	fmt.Println("  ballast --language python install --target codex --agent linting")
@@ -545,7 +546,7 @@ func installCLIs(selectedLanguage language, version string) int {
 }
 
 func runDoctor(selectedLanguage language, args []string) int {
-	fix, err := parseDoctorFix(args)
+	fix, patch, err := parseDoctorFix(args)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -560,6 +561,9 @@ func runDoctor(selectedLanguage language, args []string) int {
 		}
 		if fileExists(filepath.Join(root, ".rulesrc.json")) {
 			refreshArgs := []string{"install", "--refresh-config"}
+			if patch {
+				refreshArgs = append(refreshArgs, "--patch")
+			}
 			if selectedLanguage != "" {
 				refreshArgs = append([]string{"--language", string(selectedLanguage)}, refreshArgs...)
 			}
@@ -581,8 +585,9 @@ func runDoctor(selectedLanguage language, args []string) int {
 }
 
 func runUpgrade(selectedLanguage language, args []string) int {
-	if len(args) > 0 {
-		fmt.Printf("unknown upgrade option: %s\n", args[0])
+	patch, err := parseUpgradePatch(args)
+	if err != nil {
+		fmt.Println(err)
 		return 1
 	}
 
@@ -602,7 +607,11 @@ func runUpgrade(selectedLanguage language, args []string) int {
 		fmt.Println(err)
 		return 1
 	}
-	return runDoctor(selectedLanguage, []string{"--fix"})
+	doctorArgs := []string{"--fix"}
+	if patch {
+		doctorArgs = append(doctorArgs, "--patch")
+	}
+	return runDoctor(selectedLanguage, doctorArgs)
 }
 
 func desiredDoctorInstallVersion(root string) string {
@@ -680,17 +689,36 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	fmt.Println()
 }
 
-func parseDoctorFix(args []string) (bool, error) {
+func parseDoctorFix(args []string) (bool, bool, error) {
 	fix := false
+	patch := false
 	for _, arg := range args {
 		switch arg {
 		case "--fix":
 			fix = true
+		case "--patch":
+			patch = true
 		default:
-			return false, fmt.Errorf("unknown doctor option: %s", arg)
+			return false, false, fmt.Errorf("unknown doctor option: %s", arg)
 		}
 	}
-	return fix, nil
+	if patch && !fix {
+		return false, false, errors.New("--patch requires --fix")
+	}
+	return fix, patch, nil
+}
+
+func parseUpgradePatch(args []string) (bool, error) {
+	patch := false
+	for _, arg := range args {
+		switch arg {
+		case "--patch":
+			patch = true
+		default:
+			return false, fmt.Errorf("unknown upgrade option: %s", arg)
+		}
+	}
+	return patch, nil
 }
 
 func parseInstallCLIVersion(args []string) (string, error) {

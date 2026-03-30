@@ -132,6 +132,7 @@ ballast install --target cursor --all
 ballast doctor
 ballast install-cli --language python
 ballast upgrade
+ballast upgrade --patch
 ```
 
 ### Homebrew wrapper on macOS
@@ -249,8 +250,8 @@ Ballast only installs shipped agents and skills and follows the single overwrite
 ## Wrapper Commands
 
 - `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings
-- `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically
-- `ballast upgrade`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it
+- `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically, and add `--patch` to merge backend file updates during that refresh
+- `ballast upgrade [--patch]`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it; `--patch` forwards patch mode to the backend refresh
 - `ballast install-cli [--language <typescript|python|go>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release
 
 ## Config Files
