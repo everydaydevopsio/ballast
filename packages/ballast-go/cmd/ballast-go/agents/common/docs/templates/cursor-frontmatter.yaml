@@ -1,3 +1,4 @@
+---
 description: 'Documentation specialist - GitHub Markdown docs by default, or maintain existing Docusaurus sites with publish-docs automation'
 alwaysApply: false
 globs:
@@ -11,3 +12,4 @@ globs:
   - 'src/pages/**'
   - 'src/components/**'
   - 'static/**'
+---

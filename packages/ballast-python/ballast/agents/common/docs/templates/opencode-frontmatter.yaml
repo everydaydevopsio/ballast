@@ -1,3 +1,4 @@
+---
 description: Documentation specialist - GitHub Markdown docs by default, or maintain existing Docusaurus sites with publish-docs automation
 mode: subagent
 tools:
@@ -14,3 +15,4 @@ permission:
     'uv *': allow
     'go *': allow
     '*': ask
+---

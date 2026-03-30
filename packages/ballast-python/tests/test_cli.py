@@ -292,6 +292,30 @@ class PatchInstallTests(unittest.TestCase):
             self.assertTrue(rule.exists())
             self.assertIn("Documentation Agent", rule.read_text(encoding="utf-8"))
             self.assertIn("publish-docs", rule.read_text(encoding="utf-8"))
+            self.assertTrue(rule.read_text(encoding="utf-8").startswith("---\n"))
+
+    def test_install_supports_docs_agent_for_opencode_with_frontmatter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "opencode",
+                ["docs"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("docs", result.installed)
+            rule = root / ".opencode" / "docs.md"
+            self.assertTrue(rule.exists())
+            content = rule.read_text(encoding="utf-8")
+            self.assertTrue(content.startswith("---\n"))
+            self.assertIn("mode: subagent", content)
+            self.assertIn("Documentation Agent", content)
 
     def test_parse_skill_tokens_supports_all(self) -> None:
         self.assertEqual(
