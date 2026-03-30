@@ -892,7 +892,7 @@ func TestResolveMonorepoPlanInvokesOncePerLanguage(t *testing.T) {
 	}
 }
 
-func TestResolveMonorepoPlanAllIncludesPublishing(t *testing.T) {
+func TestResolveMonorepoPlanAllIncludesExpectedCommonAgents(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
@@ -904,15 +904,18 @@ func TestResolveMonorepoPlanAllIncludesPublishing(t *testing.T) {
 	if plan == nil {
 		t.Fatal("expected monorepo plan, got nil")
 	}
-	if !slices.Contains(plan.Config.Agents, "publishing") {
-		t.Fatalf("expected saved config agents to include publishing, got %#v", plan.Config.Agents)
-	}
 	if len(plan.Invocations) == 0 {
 		t.Fatal("expected at least one backend invocation")
 	}
 	got := strings.Join(plan.Invocations[0].Args, " ")
-	if !strings.Contains(got, "--agent local-dev,cicd,observability,publishing") {
-		t.Fatalf("expected common invocation to include publishing, got %q", got)
+	if !strings.Contains(got, "--agent local-dev,docs,cicd,observability,publishing") {
+		t.Fatalf("expected common invocation to include normalized common agents, got %q", got)
+	}
+
+	for _, expectedAgent := range []string{"docs", "publishing"} {
+		if !slices.Contains(plan.Config.Agents, expectedAgent) {
+			t.Fatalf("expected saved config agents to include %s, got %#v", expectedAgent, plan.Config.Agents)
+		}
 	}
 }
 
@@ -1196,7 +1199,7 @@ func TestRunMonorepoInstallExecutesEachBackendAtRepoRoot(t *testing.T) {
 	if invocations[0].Dir != root {
 		t.Fatalf("expected root common install, got %#v", invocations[0])
 	}
-	if got := strings.Join(invocations[0].Args, " "); !strings.Contains(got, "--agent local-dev,cicd,observability") {
+	if got := strings.Join(invocations[0].Args, " "); !strings.Contains(got, "--agent local-dev,docs,cicd,observability,publishing") {
 		t.Fatalf("expected common agents in first invocation, got %q", got)
 	}
 
@@ -1946,6 +1949,22 @@ func TestBuildMonorepoSupportFileIncludesSkillsForClaude(t *testing.T) {
 	}
 	if !strings.Contains(content, "`.claude/skills/owasp-security-scan.skill`") {
 		t.Fatalf("expected claude skill entry in support file, got %q", content)
+	}
+}
+
+func TestBuildMonorepoSupportFileIncludesDocsForCodex(t *testing.T) {
+	plan := &monorepoPlan{
+		Common:   []string{"docs"},
+		Language: []string{"linting"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+		},
+	}
+
+	content := buildMonorepoSupportFile(plan, "codex")
+
+	if !strings.Contains(content, "`.codex/rules/common/docs.md`") {
+		t.Fatalf("expected docs rule entry in codex support file, got %q", content)
 	}
 }
 
