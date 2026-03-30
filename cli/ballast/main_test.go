@@ -892,7 +892,7 @@ func TestResolveMonorepoPlanInvokesOncePerLanguage(t *testing.T) {
 	}
 }
 
-func TestResolveMonorepoPlanAllIncludesPublishing(t *testing.T) {
+func TestResolveMonorepoPlanAllIncludesExpectedCommonAgents(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
@@ -904,39 +904,18 @@ func TestResolveMonorepoPlanAllIncludesPublishing(t *testing.T) {
 	if plan == nil {
 		t.Fatal("expected monorepo plan, got nil")
 	}
-	if !slices.Contains(plan.Config.Agents, "publishing") {
-		t.Fatalf("expected saved config agents to include publishing, got %#v", plan.Config.Agents)
-	}
 	if len(plan.Invocations) == 0 {
 		t.Fatal("expected at least one backend invocation")
 	}
 	got := strings.Join(plan.Invocations[0].Args, " ")
 	if !strings.Contains(got, "--agent local-dev,docs,cicd,observability,publishing") {
-		t.Fatalf("expected common invocation to include publishing, got %q", got)
+		t.Fatalf("expected common invocation to include normalized common agents, got %q", got)
 	}
-}
 
-func TestResolveMonorepoPlanAllIncludesDocs(t *testing.T) {
-	root := t.TempDir()
-	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
-	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
-
-	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--all"})
-	if err != nil {
-		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
-	}
-	if plan == nil {
-		t.Fatal("expected monorepo plan, got nil")
-	}
-	if !slices.Contains(plan.Config.Agents, "docs") {
-		t.Fatalf("expected saved config agents to include docs, got %#v", plan.Config.Agents)
-	}
-	if len(plan.Invocations) == 0 {
-		t.Fatal("expected at least one backend invocation")
-	}
-	got := strings.Join(plan.Invocations[0].Args, " ")
-	if !strings.Contains(got, "--agent local-dev,docs,cicd,observability,publishing") {
-		t.Fatalf("expected common invocation to include docs, got %q", got)
+	for _, expectedAgent := range []string{"docs", "publishing"} {
+		if !slices.Contains(plan.Config.Agents, expectedAgent) {
+			t.Fatalf("expected saved config agents to include %s, got %#v", expectedAgent, plan.Config.Agents)
+		}
 	}
 }
 
