@@ -41,9 +41,13 @@ describe('release config', () => {
       '.github/workflows/publish-cli.yml'
     ]) {
       const workflow = readRepoFile(workflowPath);
+      const goreleaserUses =
+        workflow.match(/uses:\s*goreleaser\/goreleaser-action@[^ \n]+/g) ?? [];
+      const pinnedVersions = workflow.match(/version:\s*'v2\.14\.0'/g) ?? [];
 
+      expect(goreleaserUses.length).toBeGreaterThan(0);
       expect(workflow).not.toContain("version: '~> v2'");
-      expect(workflow).toContain("version: 'v2.14.0'");
+      expect(pinnedVersions.length).toBe(goreleaserUses.length);
     }
   });
 });
