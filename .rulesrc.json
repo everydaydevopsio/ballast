@@ -1,11 +1,20 @@
 {
-  "target": "claude",
+  "targets": [
+    "cursor",
+    "claude",
+    "opencode",
+    "codex"
+  ],
   "agents": [
     "local-dev",
     "cicd",
-    "observability"
+    "observability",
+    "publishing",
+    "linting",
+    "logging",
+    "testing"
   ],
-  "ballastVersion": "5.1.2",
+  "ballastVersion": "5.3.1",
   "languages": [
     "typescript",
     "python",

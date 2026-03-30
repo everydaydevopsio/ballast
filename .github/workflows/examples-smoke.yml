@@ -49,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "examples/smoke/${{ matrix.sample }}"
-          ballast-go install --language "${{ matrix.language }}" --target cursor,opencode,codex --agent linting --yes
+          ballast-go install --language "${{ matrix.language }}" --target cursor --target opencode,codex --agent linting --yes
 
       - name: Verify outputs
         run: |

@@ -72,16 +72,24 @@ Default license for this project: **MIT**. If you add or modify license setup (L
 
 ## Installed agent rules
 
-Created by Ballast v5.0.2. Do not edit this section.
+Created by Ballast. Do not edit this section.
 
 Read and follow these rule files in `.codex/rules/` when they apply:
 
-- `.codex/rules/local-dev-badges.md` — Add standard badges (CI, Release, License, GitHub Release, npm) to the top of README.md
-- `.codex/rules/local-dev-env.md` — Local development environment specialist - reproducible dev setup, DX, and documentation
-- `.codex/rules/local-dev-license.md` — License setup - ensure LICENSE file, package.json license field, and README reference (default MIT; overridable in AGENTS.md/CLAUDE.md)
-- `.codex/rules/local-dev-mcp.md` — Optional: use GitHub MCP and issues MCP (Jira/Linear/GitHub) for local-dev context
-- `.codex/rules/cicd.md` — CI/CD specialist - pipeline design, quality gates, and deployment
-- `.codex/rules/observability.md` — Observability specialist - logging, tracing, metrics, and SLOs
-- `.codex/rules/typescript-linting.md` — TypeScript linting specialist - implements comprehensive linting and code formatting for TypeScript/JavaScript projects
-- `.codex/rules/typescript-logging.md` — Centralized logging specialist - configures Pino with Fluentd for Node/Next.js, and pino-browser to /api/logs
-- `.codex/rules/typescript-testing.md` — Testing specialist - sets up Jest (default) or Vitest for Vite projects, 50% coverage, and test step in build GitHub Action
+- `.codex/rules/common/local-dev-badges.md` — Rules for common/local-dev-badges
+- `.codex/rules/common/local-dev-env.md` — Rules for common/local-dev-env
+- `.codex/rules/common/local-dev-license.md` — Rules for common/local-dev-license
+- `.codex/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
+- `.codex/rules/common/cicd.md` — Rules for common/cicd
+- `.codex/rules/common/observability.md` — Rules for common/observability
+- `.codex/rules/typescript/typescript-linting.md` — Rules for typescript/linting
+- `.codex/rules/typescript/typescript-logging.md` — Rules for typescript/logging
+- `.codex/rules/typescript/typescript-testing.md` — Rules for typescript/testing
+- `.codex/rules/python/python-linting.md` — Rules for python/linting
+- `.codex/rules/python/python-logging.md` — Rules for python/logging
+- `.codex/rules/python/python-testing.md` — Rules for python/testing
+- `.codex/rules/go/go-linting.md` — Rules for go/linting
+- `.codex/rules/go/go-logging.md` — Rules for go/logging
+- `.codex/rules/go/go-testing.md` — Rules for go/testing
+
+These files are the canonical Codex rules for this repository. Legacy root-level files in `.codex/rules/*.md` are deprecated; do not edit or reference them.
