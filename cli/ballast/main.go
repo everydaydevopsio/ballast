@@ -1791,7 +1791,7 @@ func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) 
 			continue
 		}
 		if hasPatchFlag(args) {
-			if err := os.WriteFile(path, []byte(patchInstalledRulesSection(readFile(path), content)), 0o644); err != nil {
+			if err := os.WriteFile(path, []byte(patchManagedSupportSections(readFile(path), content)), 0o644); err != nil {
 				return err
 			}
 			continue
@@ -1802,7 +1802,7 @@ func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) 
 				return err
 			}
 			if approved {
-				if err := os.WriteFile(path, []byte(patchInstalledRulesSection(readFile(path), content)), 0o644); err != nil {
+				if err := os.WriteFile(path, []byte(patchManagedSupportSections(readFile(path), content)), 0o644); err != nil {
 					return err
 				}
 			}
@@ -1970,12 +1970,10 @@ func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 	intro := "This file provides guidance to Codex (CLI and app) for working in this repository."
 	rulesDir := ".codex/rules"
 	extension := ".md"
-	skillsDir := ".codex/rules"
 	if target == "claude" {
 		title = "# CLAUDE.md"
 		intro = "This file provides guidance to Claude Code for working in this repository."
 		rulesDir = ".claude/rules"
-		skillsDir = ".claude/skills"
 	}
 
 	lines := []string{
@@ -2012,11 +2010,11 @@ func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 			"",
 			"Created by Ballast. Do not edit this section.",
 			"",
-			fmt.Sprintf("Read and use these skill files in `%s/` when they are relevant:", skillsDir),
+			fmt.Sprintf("Read and use these skill files in `%s/` when they are relevant:", strings.TrimPrefix(filepath.Dir(targetSkillPath(rootPlaceholder, target, "example")), rootPlaceholder+"/")),
 			"",
 		)
 		for _, skill := range plan.Config.Skills {
-			skillPath := fmt.Sprintf("`.%s/%s%s`", strings.TrimPrefix(skillsDir, "."), skill, skillFileExtension(target))
+			skillPath := fmt.Sprintf("`%s`", strings.TrimPrefix(targetSkillPath(rootPlaceholder, target, skill), rootPlaceholder+"/"))
 			lines = append(lines, fmt.Sprintf("- %s — %s", skillPath, skillDescription(skill)))
 		}
 	}
@@ -2039,13 +2037,6 @@ func agentBaseName(agent string, suffix string) string {
 		return agent
 	}
 	return agent + "-" + suffix
-}
-
-func skillFileExtension(target string) string {
-	if target == "claude" {
-		return ".skill"
-	}
-	return ".md"
 }
 
 func skillDescription(skill string) string {
@@ -2104,6 +2095,33 @@ func patchInstalledRulesSection(existing string, canonical string) string {
 	canonicalSection := strings.TrimRight(canonical[canonicalRange[0]:canonicalRange[1]], "\n")
 
 	existingRange := findSectionRange(existing, "Installed agent rules")
+	if existingRange == nil {
+		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
+	}
+
+	return strings.TrimRight(existing[:existingRange[0]], "\n") + "\n\n" +
+		canonicalSection + "\n\n" +
+		strings.TrimLeft(existing[existingRange[1]:], "\n")
+}
+
+const rootPlaceholder = "__BALLAST_ROOT__"
+
+func patchManagedSupportSections(existing string, canonical string) string {
+	next := existing
+	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
+		next = patchSupportSection(next, canonical, heading)
+	}
+	return next
+}
+
+func patchSupportSection(existing string, canonical string, heading string) string {
+	canonicalRange := findSectionRange(canonical, heading)
+	if canonicalRange == nil {
+		return existing
+	}
+	canonicalSection := strings.TrimRight(canonical[canonicalRange[0]:canonicalRange[1]], "\n")
+
+	existingRange := findSectionRange(existing, heading)
 	if existingRange == nil {
 		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
 	}
