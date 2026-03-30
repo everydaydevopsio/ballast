@@ -241,15 +241,15 @@ func run(args []string) int {
 					return exitCode
 				}
 			}
-			if err := saveMonorepoConfig(root, plan.Config); err != nil {
-				fmt.Println(err)
-				return 1
-			}
 			if err := cleanupRemovedMonorepoTargets(root, plan); err != nil {
 				fmt.Println(err)
 				return 1
 			}
 			if err := updateMonorepoSupportFiles(root, plan, forwardedArgs); err != nil {
+				fmt.Println(err)
+				return 1
+			}
+			if err := saveMonorepoConfig(root, plan.Config); err != nil {
 				fmt.Println(err)
 				return 1
 			}
@@ -1255,7 +1255,13 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		requestedTargets = slices.Clone(config.Targets)
 	}
 	requestedTargets = subtractStrings(requestedTargets, removeTargets)
+	if err := validateSelectedTargets(requestedTargets); err != nil {
+		return nil, err
+	}
 	savedTargets := subtractStrings(uniqueStrings(append(slices.Clone(existingTargets), installTargets...)), removeTargets)
+	if err := validateSelectedTargets(savedTargets); err != nil {
+		return nil, err
+	}
 	if !explicitAgentSelection && !explicitSkillSelection && config != nil {
 		installAgents = slices.Clone(config.Agents)
 		installSkills = slices.Clone(config.Skills)
@@ -1288,6 +1294,17 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
+	}
+	if cleanupOnly {
+		return &monorepoPlan{
+			Invocations: nil,
+			Config:      configToSave,
+			Targets:     requestedTargets,
+			Common:      nil,
+			Language:    nil,
+			Removed:     removeTargets,
+			Previous:    config,
+		}, nil
 	}
 
 	commonSelection := filterAgents(selectedAgents, commonAgents)

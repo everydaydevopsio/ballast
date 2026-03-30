@@ -1007,6 +1007,57 @@ func TestResolveMonorepoPlanAgentFlagDoesNotInheritConfiguredSkills(t *testing.T
 	}
 }
 
+func TestResolveMonorepoPlanRemoveLastTargetCleanupOnly(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["local-dev", "linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-target", "codex", "--yes"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) != 0 {
+		t.Fatalf("expected cleanup-only plan with no backend invocations, got %#v", plan.Invocations)
+	}
+	if len(plan.Config.Targets) != 0 {
+		t.Fatalf("expected saved config targets to be empty after removing last target, got %#v", plan.Config.Targets)
+	}
+	if !reflect.DeepEqual(plan.Removed, []string{"codex"}) {
+		t.Fatalf("expected removed codex target, got %#v", plan.Removed)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidConfiguredTargets(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["cursor", "bogus"],
+  "agents": ["local-dev", "linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install"})
+	if err == nil {
+		t.Fatalf("expected invalid target error, got plan %#v", plan)
+	}
+	if !strings.Contains(err.Error(), "unsupported target selection") {
+		t.Fatalf("expected unsupported target error, got %v", err)
+	}
+}
+
 func TestResolveMonorepoPlanIgnoresStaleRulesrcProfiles(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
@@ -1706,6 +1757,55 @@ func TestRunMonorepoRemoveTargetCleansManagedRulesAndSupportFiles(t *testing.T) 
 	text := string(config)
 	if strings.Contains(text, `"codex"`) || !strings.Contains(text, `"claude"`) {
 		t.Fatalf("expected saved config targets to drop codex and keep claude, got %q", text)
+	}
+}
+
+func TestRunMonorepoRemoveTargetDoesNotPersistConfigWhenCleanupFails(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude", "codex"],
+  "agents": ["local-dev", "linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	blockingDir := filepath.Join(root, ".codex", "rules", "common", "local-dev-env.md")
+	if err := os.MkdirAll(blockingDir, 0o755); err != nil {
+		t.Fatalf("create blocking dir: %v", err)
+	}
+	mustWriteFile(t, filepath.Join(blockingDir, "child.txt"), "keep")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--remove-target", "codex", "--yes"})
+		if exitCode == 0 {
+			t.Fatal("expected cleanup failure")
+		}
+	})
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	text := string(config)
+	if !strings.Contains(text, `"codex"`) || !strings.Contains(text, `"claude"`) {
+		t.Fatalf("expected config to remain unchanged after cleanup failure, got %q", text)
 	}
 }
 
