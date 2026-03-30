@@ -1825,6 +1825,35 @@ func TestPatchInstalledRulesSectionIgnoresHeadingInsideCodeFence(t *testing.T) {
 	}
 }
 
+func TestBuildMonorepoSupportFileIncludesPublishingAndSkillsForCodex(t *testing.T) {
+	plan := &monorepoPlan{
+		Common:   []string{"local-dev", "publishing"},
+		Language: []string{"linting"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+			Skills:    []string{"owasp-security-scan"},
+		},
+	}
+
+	content := buildMonorepoSupportFile(plan, "codex")
+
+	if !strings.Contains(content, "`.codex/rules/common/publishing-libraries.md`") {
+		t.Fatalf("expected publishing libraries rule in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "`.codex/rules/common/publishing-sdks.md`") {
+		t.Fatalf("expected publishing sdks rule in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "`.codex/rules/common/publishing-apps.md`") {
+		t.Fatalf("expected publishing apps rule in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "## Installed skills") {
+		t.Fatalf("expected installed skills section in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "`.codex/rules/owasp-security-scan.md`") {
+		t.Fatalf("expected codex skill entry in support file, got %q", content)
+	}
+}
+
 func mustWriteFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

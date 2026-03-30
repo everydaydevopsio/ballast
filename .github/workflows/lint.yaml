@@ -20,11 +20,13 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v5
+        with:
+          version: 10.27.0
 
-      - name: Setup Node.js 22.x
+      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22.x
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
@@ -49,7 +51,7 @@ jobs:
       - name: Setup Python 3.12
         uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Ruff check
         working-directory: packages/ballast-python
@@ -69,7 +71,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.24.x"
+          go-version: '1.24.x'
 
       - name: Check gofmt
         working-directory: packages/ballast-go
@@ -95,7 +97,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: "1.24.x"
+          go-version: '1.24.x'
 
       - name: Check gofmt
         working-directory: cli/ballast

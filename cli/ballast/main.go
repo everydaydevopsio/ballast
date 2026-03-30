@@ -1970,10 +1970,12 @@ func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 	intro := "This file provides guidance to Codex (CLI and app) for working in this repository."
 	rulesDir := ".codex/rules"
 	extension := ".md"
+	skillsDir := ".codex/rules"
 	if target == "claude" {
 		title = "# CLAUDE.md"
 		intro = "This file provides guidance to Claude Code for working in this repository."
 		rulesDir = ".claude/rules"
+		skillsDir = ".claude/skills"
 	}
 
 	lines := []string{
@@ -2003,6 +2005,21 @@ func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 			}
 		}
 	}
+	if len(plan.Config.Skills) > 0 {
+		lines = append(lines,
+			"",
+			"## Installed skills",
+			"",
+			"Created by Ballast. Do not edit this section.",
+			"",
+			fmt.Sprintf("Read and use these skill files in `%s/` when they are relevant:", skillsDir),
+			"",
+		)
+		for _, skill := range plan.Config.Skills {
+			skillPath := fmt.Sprintf("`.%s/%s%s`", strings.TrimPrefix(skillsDir, "."), skill, skillFileExtension(target))
+			lines = append(lines, fmt.Sprintf("- %s — %s", skillPath, skillDescription(skill)))
+		}
+	}
 	lines = append(lines, "")
 	return strings.Join(lines, "\n")
 }
@@ -2010,6 +2027,9 @@ func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 func ruleSuffixesForAgent(agent string) []string {
 	if agent == "local-dev" {
 		return []string{"badges", "env", "license", "mcp"}
+	}
+	if agent == "publishing" {
+		return []string{"libraries", "sdks", "apps"}
 	}
 	return []string{""}
 }
@@ -2019,6 +2039,22 @@ func agentBaseName(agent string, suffix string) string {
 		return agent
 	}
 	return agent + "-" + suffix
+}
+
+func skillFileExtension(target string) string {
+	if target == "claude" {
+		return ".skill"
+	}
+	return ".md"
+}
+
+func skillDescription(skill string) string {
+	switch skill {
+	case "owasp-security-scan":
+		return "run an OWASP-aligned security audit across Go, TypeScript, and Python projects"
+	default:
+		return skill
+	}
 }
 
 func hasPatchFlag(args []string) bool {

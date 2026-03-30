@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@10.27.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "pnpm --filter @everydaydevopsio/ballast run build",
     "test": "pnpm --filter @everydaydevopsio/ballast run test",
