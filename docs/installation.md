@@ -2,7 +2,7 @@
 
 This guide is for AI coding agents setting up Ballast in a repository.
 
-## Supported Language Profiles (v5.2.0)
+## Supported Language Profiles (v5.3.1)
 
 - TypeScript/JavaScript: `@everydaydevopsio/ballast`
 - Python: `ballast-python` (GitHub Releases artifact)
@@ -63,7 +63,7 @@ pnpm exec ballast-typescript install --language go --target codex --agent lintin
 ### Python Package (`ballast-python`)
 
 ```bash
-VERSION=5.2.0
+VERSION=5.3.1
 uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
 ballast-python install --target cursor --all
 # or
@@ -75,7 +75,7 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ### Go Package (`ballast-go`)
 
 ```bash
-VERSION=5.2.0
+VERSION=5.3.1
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -119,7 +119,15 @@ Example root config:
 ```json
 {
   "target": "cursor",
-  "agents": ["local-dev", "cicd", "observability", "publishing", "linting", "logging", "testing"],
+  "agents": [
+    "local-dev",
+    "cicd",
+    "observability",
+    "publishing",
+    "linting",
+    "logging",
+    "testing"
+  ],
   "skills": ["owasp-security-scan"],
   "languages": ["typescript", "python", "go"],
   "paths": {
@@ -138,7 +146,7 @@ If `CLAUDE.md` or `AGENTS.md` already exists, Ballast creates the file when miss
 
 ```bash
 pnpm exec ballast-typescript install --target cursor --all
-VERSION=5.2.0
+VERSION=5.3.1
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ballast-go install --target cursor --all
 ```
@@ -178,11 +186,11 @@ Saved config values include `target`, `agents`, and `skills`. Documentation and 
 
 ## Install Paths
 
-Platform | Rules path | Skills path | File pattern
--------- | ---------- | ----------- | ------------
-Cursor | `.cursor/rules/` | `.cursor/rules/` | agents use `<agent>.mdc` or `<language>-<agent>.mdc`; skills use `<skill>.mdc`
-Claude | `.claude/rules/` | `.claude/skills/` | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.skill`
-OpenCode | `.opencode/` | `.opencode/skills/` | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`
-Codex | `.codex/rules/` | `.codex/rules/` | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`
+| Platform | Rules path       | Skills path         | File pattern                                                                   |
+| -------- | ---------------- | ------------------- | ------------------------------------------------------------------------------ |
+| Cursor   | `.cursor/rules/` | `.cursor/rules/`    | agents use `<agent>.mdc` or `<language>-<agent>.mdc`; skills use `<skill>.mdc` |
+| Claude   | `.claude/rules/` | `.claude/skills/`   | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.skill` |
+| OpenCode | `.opencode/`     | `.opencode/skills/` | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`    |
+| Codex    | `.codex/rules/`  | `.codex/rules/`     | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`    |
 
 Codex installs root `AGENTS.md` when missing (or always with `--force`) and records installed skills there.

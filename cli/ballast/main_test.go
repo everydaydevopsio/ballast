@@ -1825,6 +1825,71 @@ func TestPatchInstalledRulesSectionIgnoresHeadingInsideCodeFence(t *testing.T) {
 	}
 }
 
+func TestPatchManagedSupportSectionsUpdatesInstalledSkills(t *testing.T) {
+	existing := "# AGENTS.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/typescript-linting.md` — Rules for typescript/linting\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/old-skill.md` — Old skill\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/typescript-linting.md` — Rules for typescript/linting\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/owasp-security-scan.md` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects\n"
+
+	merged := patchManagedSupportSections(existing, canonical)
+	if !strings.Contains(merged, "## Team Notes") {
+		t.Fatalf("expected non-managed content to remain, got %q", merged)
+	}
+	if !strings.Contains(merged, "`.codex/rules/owasp-security-scan.md`") {
+		t.Fatalf("expected installed skills section to be updated, got %q", merged)
+	}
+	if strings.Contains(merged, "`.codex/rules/old-skill.md`") {
+		t.Fatalf("expected old installed skill entry to be replaced, got %q", merged)
+	}
+}
+
+func TestBuildMonorepoSupportFileIncludesPublishingAndSkillsForCodex(t *testing.T) {
+	plan := &monorepoPlan{
+		Common:   []string{"local-dev", "publishing"},
+		Language: []string{"linting"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+			Skills:    []string{"owasp-security-scan"},
+		},
+	}
+
+	content := buildMonorepoSupportFile(plan, "codex")
+
+	if !strings.Contains(content, "`.codex/rules/common/publishing-libraries.md`") {
+		t.Fatalf("expected publishing libraries rule in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "`.codex/rules/common/publishing-sdks.md`") {
+		t.Fatalf("expected publishing sdks rule in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "`.codex/rules/common/publishing-apps.md`") {
+		t.Fatalf("expected publishing apps rule in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "## Installed skills") {
+		t.Fatalf("expected installed skills section in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "`.codex/rules/owasp-security-scan.md`") {
+		t.Fatalf("expected codex skill entry in support file, got %q", content)
+	}
+}
+
+func TestBuildMonorepoSupportFileIncludesSkillsForClaude(t *testing.T) {
+	plan := &monorepoPlan{
+		Common:   []string{"local-dev", "publishing"},
+		Language: []string{"linting"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+			Skills:    []string{"owasp-security-scan"},
+		},
+	}
+
+	content := buildMonorepoSupportFile(plan, "claude")
+
+	if !strings.Contains(content, "## Installed skills") {
+		t.Fatalf("expected installed skills section in claude support file, got %q", content)
+	}
+	if !strings.Contains(content, "`.claude/skills/owasp-security-scan.skill`") {
+		t.Fatalf("expected claude skill entry in support file, got %q", content)
+	}
+}
+
 func mustWriteFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

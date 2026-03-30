@@ -3,14 +3,33 @@
 [![CI](https://github.com/everydaydevopsio/ballast/actions/workflows/test.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/test.yml)
 [![Lint](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml)
 [![Release](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml)
+[![License](https://img.shields.io/github/license/everydaydevopsio/ballast)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/everydaydevopsio/ballast)](https://github.com/everydaydevopsio/ballast/releases)
+[![npm version](https://img.shields.io/npm/v/%40everydaydevopsio%2Fballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
+[![npm downloads](https://img.shields.io/npm/dm/%40everydaydevopsio%2Fballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
 
 Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, and Codex.
 
-Release `v5.2.0` supports three first-class language profiles in this repository:
+Release `v5.3.1` supports three first-class language profiles in this repository:
 
 - TypeScript
 - Python
 - Go
+
+## Prerequisites
+
+- Node.js 22 (LTS) or 24 (Active LTS)
+- `nvm`
+- `pnpm`
+- `uv`
+
+Use the version in `.nvmrc` after cloning:
+
+```bash
+nvm install
+nvm use
+pnpm install
+```
 
 ## Packages
 
@@ -157,7 +176,7 @@ pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
 ### Python
 
 ```bash
-VERSION=5.2.0
+VERSION=5.3.1
 uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
 ballast-python install --target cursor --all
 # or
@@ -169,7 +188,7 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ### Go
 
 ```bash
-VERSION=5.2.0
+VERSION=5.3.1
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -197,7 +216,7 @@ pnpm exec ballast-typescript install --target cursor --all
 ### 2. Python rules in a monorepo
 
 ```bash
-VERSION=5.2.0
+VERSION=5.3.1
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ```
 
