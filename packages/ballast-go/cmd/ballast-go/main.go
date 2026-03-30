@@ -24,7 +24,7 @@ import (
 var targets = []string{"cursor", "claude", "opencode", "codex"}
 var languages = []string{"typescript", "python", "go"}
 
-var commonAgents = []string{"local-dev", "cicd", "observability", "publishing"}
+var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var commonSkills = []string{"owasp-security-scan"}
 
@@ -325,7 +325,7 @@ Commands:
 Options:
   --target, -t <platform>   AI platforms: %s (comma-separated or repeatable)
   --language, -l <lang>     Language profile: %s (default: go)
-  --agent, -a <agents>      Agent(s): linting, local-dev, cicd, observability, logging, testing (comma-separated)
+  --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, logging, testing (comma-separated)
   --skill, -s <skills>      Skill(s): owasp-security-scan (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills

@@ -43,6 +43,7 @@ pnpm install
 Common agents (all languages):
 
 - `local-dev`
+- `docs`
 - `cicd`
 - `observability`
 - `publishing`

@@ -13,6 +13,7 @@ describe('agents', () => {
       expect(listAgents()).toEqual([...AGENT_IDS]);
       expect(listAgents()).toContain('linting');
       expect(listAgents()).toContain('local-dev');
+      expect(listAgents()).toContain('docs');
       expect(listAgents()).toContain('cicd');
       expect(listAgents()).toContain('observability');
       expect(listAgents()).toContain('publishing');
@@ -37,6 +38,7 @@ describe('agents', () => {
     test('returns true for known agents', () => {
       expect(isValidAgent('linting')).toBe(true);
       expect(isValidAgent('local-dev')).toBe(true);
+      expect(isValidAgent('docs')).toBe(true);
       expect(isValidAgent('cicd')).toBe(true);
       expect(isValidAgent('observability')).toBe(true);
       expect(isValidAgent('publishing')).toBe(true);

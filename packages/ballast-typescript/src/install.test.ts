@@ -48,6 +48,7 @@ describe('install', () => {
       expect(result?.targets).toEqual(['claude']);
       expect(result?.agents).toContain('linting');
       expect(result?.agents).toContain('local-dev');
+      expect(result?.agents).toContain('docs');
       expect(result?.agents).toContain('cicd');
       expect(result?.agents).toContain('observability');
       expect(result?.agents).toContain('publishing');
@@ -559,12 +560,12 @@ Keep my custom responsibilities.
       const result = install({
         projectRoot: tmpDir,
         target: 'cursor',
-        agents: ['linting', 'local-dev', 'cicd'],
+        agents: ['linting', 'docs', 'cicd'],
         force: false,
         saveConfig: false
       });
       expect(result.installed).toContain('linting');
-      expect(result.installed).toContain('local-dev');
+      expect(result.installed).toContain('docs');
       expect(result.installed).toContain('cicd');
       expect(
         fs.existsSync(
@@ -572,34 +573,38 @@ Keep my custom responsibilities.
         )
       ).toBe(true);
       expect(
-        fs.existsSync(
-          path.join(tmpDir, '.cursor', 'rules', 'local-dev-env.mdc')
-        )
-      ).toBe(true);
-      expect(
-        fs.existsSync(
-          path.join(tmpDir, '.cursor', 'rules', 'local-dev-mcp.mdc')
-        )
+        fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'docs.mdc'))
       ).toBe(true);
       expect(
         fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'cicd.mdc'))
       ).toBe(true);
       expect(result.installedRules).toContainEqual({
-        agentId: 'local-dev',
-        ruleSuffix: 'env'
+        agentId: 'docs',
+        ruleSuffix: ''
       });
-      expect(result.installedRules).toContainEqual({
-        agentId: 'local-dev',
-        ruleSuffix: 'mcp'
+    });
+
+    test('installs docs rule', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['docs'],
+        force: false,
+        saveConfig: false
       });
-      expect(result.installedRules).toContainEqual({
-        agentId: 'local-dev',
-        ruleSuffix: 'license'
-      });
-      expect(result.installedRules).toContainEqual({
-        agentId: 'local-dev',
-        ruleSuffix: 'badges'
-      });
+      expect(result.installed).toEqual(['docs']);
+      expect(result.installedRules).toEqual([
+        {
+          agentId: 'docs',
+          ruleSuffix: ''
+        }
+      ]);
+      const docsFile = path.join(tmpDir, '.cursor', 'rules', 'docs.mdc');
+      expect(fs.existsSync(docsFile)).toBe(true);
+      expect(fs.readFileSync(docsFile, 'utf8')).toContain(
+        'Documentation Agent'
+      );
+      expect(fs.readFileSync(docsFile, 'utf8')).toContain('publish-docs');
     });
 
     test('installs all rules for agent with multiple rules (local-dev)', () => {

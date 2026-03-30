@@ -7,6 +7,7 @@ Ballast `v5.3.1` supports TypeScript, Python, and Go.
 Common agents (all language packs):
 
 - `local-dev`
+- `docs`
 - `cicd`
 - `observability`
 - `publishing`
@@ -23,6 +24,7 @@ Language-specific agents:
 Agent | TypeScript | Python | Go | Guide
 ----- | ---------- | ------ | -- | -----
 `local-dev` | Yes | Yes | Yes | [agents/local-dev.md](agents/local-dev.md)
+`docs` | Yes | Yes | Yes | [agents/docs.md](agents/docs.md)
 `cicd` | Yes | Yes | Yes | [agents/cicd.md](agents/cicd.md)
 `observability` | Yes | Yes | Yes | [agents/observability.md](agents/observability.md)
 `publishing` | Yes | Yes | Yes | [agents/publishing.md](agents/publishing.md)

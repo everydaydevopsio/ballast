@@ -122,6 +122,7 @@ Example root config:
   "target": "cursor",
   "agents": [
     "local-dev",
+    "docs",
     "cicd",
     "observability",
     "publishing",

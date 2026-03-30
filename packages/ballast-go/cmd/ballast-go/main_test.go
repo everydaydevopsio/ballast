@@ -202,6 +202,68 @@ func TestInstallSupportsPublishingAgent(t *testing.T) {
 	}
 }
 
+func TestInstallSupportsDocsAgent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"cursor"},
+		agents:      []string{"docs"},
+		language:    "go",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Equal(result.installed, []string{"docs"}) {
+		t.Fatalf("expected docs install, got %+v", result.installed)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".cursor", "rules", "docs.mdc"))
+	if err != nil {
+		t.Fatalf("expected docs.mdc to exist: %v", err)
+	}
+	if !strings.Contains(string(content), "Documentation Agent") {
+		t.Fatalf("expected docs content, got %q", string(content))
+	}
+	if !strings.Contains(string(content), "publish-docs") {
+		t.Fatalf("expected publish-docs guidance, got %q", string(content))
+	}
+	if !strings.HasPrefix(string(content), "---\n") {
+		t.Fatalf("expected cursor frontmatter delimiters, got %q", string(content))
+	}
+}
+
+func TestInstallSupportsDocsAgentForOpenCodeWithFrontmatter(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"opencode"},
+		agents:      []string{"docs"},
+		language:    "go",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Equal(result.installed, []string{"docs"}) {
+		t.Fatalf("expected docs install, got %+v", result.installed)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".opencode", "docs.md"))
+	if err != nil {
+		t.Fatalf("expected docs.md to exist: %v", err)
+	}
+	if !strings.HasPrefix(string(content), "---\n") {
+		t.Fatalf("expected opencode frontmatter delimiters, got %q", string(content))
+	}
+	if !strings.Contains(string(content), "mode: subagent") {
+		t.Fatalf("expected opencode mode in frontmatter, got %q", string(content))
+	}
+	if !strings.Contains(string(content), "Documentation Agent") {
+		t.Fatalf("expected docs content, got %q", string(content))
+	}
+}
+
 func TestPatchRuleContentPreservesExistingSections(t *testing.T) {
 	existing := `---
 description: Team customized linting rules

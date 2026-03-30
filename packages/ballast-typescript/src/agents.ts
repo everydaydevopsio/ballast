@@ -43,6 +43,7 @@ export type Language = (typeof LANGUAGES)[number];
 
 export const COMMON_AGENT_IDS = [
   'local-dev',
+  'docs',
   'cicd',
   'observability',
   'publishing'
