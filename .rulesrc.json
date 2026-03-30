@@ -14,7 +14,7 @@
     "logging",
     "testing"
   ],
-  "ballastVersion": "5.3.1",
+  "ballastVersion": "5.3.3",
   "languages": [
     "typescript",
     "python",

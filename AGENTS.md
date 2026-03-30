@@ -82,6 +82,9 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
 - `.codex/rules/common/cicd.md` — Rules for common/cicd
 - `.codex/rules/common/observability.md` — Rules for common/observability
+- `.codex/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
+- `.codex/rules/common/publishing-sdks.md` — Rules for common/publishing-sdks
+- `.codex/rules/common/publishing-apps.md` — Rules for common/publishing-apps
 - `.codex/rules/typescript/typescript-linting.md` — Rules for typescript/linting
 - `.codex/rules/typescript/typescript-logging.md` — Rules for typescript/logging
 - `.codex/rules/typescript/typescript-testing.md` — Rules for typescript/testing
@@ -91,5 +94,3 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/go/go-linting.md` — Rules for go/linting
 - `.codex/rules/go/go-logging.md` — Rules for go/logging
 - `.codex/rules/go/go-testing.md` — Rules for go/testing
-
-These files are the canonical Codex rules for this repository. Legacy root-level files in `.codex/rules/*.md` are deprecated; do not edit or reference them.

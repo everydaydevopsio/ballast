@@ -66,6 +66,9 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
 - `.claude/rules/common/cicd.md` — Rules for common/cicd
 - `.claude/rules/common/observability.md` — Rules for common/observability
+- `.claude/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
+- `.claude/rules/common/publishing-sdks.md` — Rules for common/publishing-sdks
+- `.claude/rules/common/publishing-apps.md` — Rules for common/publishing-apps
 - `.claude/rules/typescript/typescript-linting.md` — Rules for typescript/linting
 - `.claude/rules/typescript/typescript-logging.md` — Rules for typescript/logging
 - `.claude/rules/typescript/typescript-testing.md` — Rules for typescript/testing
