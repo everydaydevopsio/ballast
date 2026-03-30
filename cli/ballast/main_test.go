@@ -162,6 +162,19 @@ func TestRunDoctorFixPrintsMode(t *testing.T) {
 	}
 }
 
+func TestRunDoctorPatchRequiresFix(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"doctor", "--patch"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "--patch requires --fix") {
+		t.Fatalf("expected doctor --patch guidance, got %q", output)
+	}
+}
+
 func TestRunDoctorFixInstallsBackendsAndRefreshesConfig(t *testing.T) {
 	originalRun := runCommandFunc
 	originalEnsure := ensureInstalledFunc

@@ -336,7 +336,7 @@ func printUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  install     Install agent rules for the detected or selected language (`--refresh-config` reuses saved .rulesrc.json settings)")
 	fmt.Println("  install-cli Install or upgrade backend CLIs (latest by default, or a specific --version)")
-	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config; add `--patch` to merge backend file updates during refresh)")
+	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config; add `--patch` with `--fix` to merge backend file updates during refresh)")
 	fmt.Println("  upgrade     Rewrite .rulesrc.json to the running ballast version and sync backend CLIs (`--patch` forwards patch mode to the backend refresh)")
 	fmt.Println("  help        Show help for ballast")
 	fmt.Println("  version     Print the ballast wrapper version")
@@ -701,6 +701,9 @@ func parseDoctorFix(args []string) (bool, bool, error) {
 		default:
 			return false, false, fmt.Errorf("unknown doctor option: %s", arg)
 		}
+	}
+	if patch && !fix {
+		return false, false, errors.New("--patch requires --fix")
 	}
 	return fix, patch, nil
 }
