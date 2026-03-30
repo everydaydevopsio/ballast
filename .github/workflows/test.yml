@@ -60,7 +60,7 @@ jobs:
         run: pnpm --filter @everydaydevopsio/ballast run test:coverage
 
       - name: Upload TypeScript coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./packages/ballast-typescript/coverage/lcov.info
@@ -90,7 +90,7 @@ jobs:
           uv run --with coverage coverage xml -o coverage.xml
 
       - name: Upload Python coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./packages/ballast-python/coverage.xml
@@ -115,7 +115,7 @@ jobs:
         run: go test ./... -covermode=atomic -coverprofile=coverage.out
 
       - name: Upload ballast-go coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./packages/ballast-go/coverage.out
@@ -140,7 +140,7 @@ jobs:
         run: go test ./... -covermode=atomic -coverprofile=coverage.out
 
       - name: Upload ballast wrapper coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./cli/ballast/coverage.out
