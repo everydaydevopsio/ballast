@@ -1,4 +1,18 @@
 repos:
+  - repo: local
+    hooks:
+      - id: check-trailing-whitespace
+        name: check trailing whitespace
+        entry: node scripts/check-whitespace.mjs trailing-whitespace
+        language: system
+        types: [text]
+
+      - id: check-end-of-file-newline
+        name: check end of file newline
+        entry: node scripts/check-whitespace.mjs end-of-file-newline
+        language: system
+        types: [text]
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -6,8 +20,6 @@ repos:
       - id: check-yaml
         exclude: ^(agents/.+/templates/.*\.ya?ml|packages/ballast-typescript/(agents|skills)/|packages/ballast-python/ballast/agents/|packages/ballast-go/cmd/ballast-go/agents/|packages/ballast-go/cmd/ballast/agents/)
       - id: check-added-large-files
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
       - id: detect-private-key
       - id: check-merge-conflict
 
