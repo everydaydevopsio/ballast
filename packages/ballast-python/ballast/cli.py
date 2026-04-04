@@ -862,11 +862,38 @@ def ballast_notice() -> str:
     )
 
 
+def repository_facts_section() -> list[str]:
+    return [
+        "## Repository Facts",
+        "",
+        "Use this section for durable repo-specific facts that agents repeatedly need. Prefer facts stored here over re-deriving them with shell commands on every task.",
+        "",
+        "Keep only stable, reviewable metadata here. Do not store secrets, credentials, or ephemeral runtime state.",
+        "",
+        "Suggested facts to record:",
+        "",
+        "- Canonical GitHub repo: `<OWNER/REPO>`",
+        "- Default branch: `<main>`",
+        "- Primary package manager: `<pnpm | npm | yarn | uv | go>`",
+        "- Version-file locations agents should check first: `<.nvmrc, packageManager, pyproject.toml, go.mod, etc.>`",
+        "- Canonical config files: `<paths agents should read before falling back to discovery>`",
+        "- Primary CI workflows: `<workflow filenames>`",
+        "- Primary release/publish workflows: `<workflow filenames>`",
+        "- Preferred build/test/lint/format/coverage commands: `<commands>`",
+        "- Coverage threshold: `<value>`",
+        "- Generated or protected paths agents should avoid editing directly: `<paths>`",
+        "",
+        "Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.",
+    ]
+
+
 def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -> str:
     lines = [
         "# AGENTS.md",
         "",
         "This file provides guidance to Codex (CLI and app) for working in this repository.",
+        "",
+        *repository_facts_section(),
         "",
         "## Installed agent rules",
         "",
@@ -908,6 +935,8 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
         "# CLAUDE.md",
         "",
         "This file provides guidance to Claude Code for working in this repository.",
+        "",
+        *repository_facts_section(),
         "",
         "## Installed agent rules",
         "",

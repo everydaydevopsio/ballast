@@ -420,6 +420,8 @@ class PatchInstallTests(unittest.TestCase):
         content = cli.build_codex_agents_md(
             ["linting"], ["owasp-security-scan"], "python"
         )
+        self.assertIn("## Repository Facts", content)
+        self.assertIn("Canonical GitHub repo: `<OWNER/REPO>`", content)
         self.assertIn("## Installed skills", content)
         self.assertIn("`.codex/rules/owasp-security-scan.md`", content)
 

@@ -156,7 +156,7 @@ Example root config:
 
 Manual path overrides are supported by editing the root `.rulesrc.json` before the next `ballast install`.
 
-If `CLAUDE.md` or `AGENTS.md` already exists, Ballast creates the file when missing. `--patch` updates the `Installed agent rules` and `Installed skills` sections for both files; without `--patch`, the interactive installer asks before patching an existing support file.
+If `CLAUDE.md` or `AGENTS.md` already exists, Ballast creates the file when missing. New support files include a user-maintained `Repository Facts` section for durable repo metadata such as `OWNER/REPO`, default branch, canonical config paths, workflow filenames, preferred commands, coverage thresholds, and generated paths agents should not edit directly. `--patch` updates only the Ballast-managed `Installed agent rules` and `Installed skills` sections for both files; the `Repository Facts` section remains user-managed.
 
 ### Per-language fallback
 
@@ -209,4 +209,4 @@ Saved config values include `target`, `agents`, and `skills`. Documentation and 
 | OpenCode | `.opencode/`     | `.opencode/skills/` | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`    |
 | Codex    | `.codex/rules/`  | `.codex/rules/`     | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`    |
 
-Codex installs root `AGENTS.md` when missing (or always with `--force`) and records installed skills there.
+Codex installs root `AGENTS.md` when missing (or always with `--force`), records installed skills there, and scaffolds a `Repository Facts` section for durable repo metadata that agents should consult before re-deriving stable facts from the checkout.
