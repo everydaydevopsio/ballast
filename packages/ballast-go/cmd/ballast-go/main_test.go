@@ -194,6 +194,28 @@ func TestFindProjectRootSupportsAnsibleRequirementsYaml(t *testing.T) {
 	}
 }
 
+func TestFindProjectRootSupportsTerraformMarkers(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".terraform-version"), []byte("1.8.5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "versions.tf"), []byte("terraform {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(tmpDir, "modules", "network")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(nested)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != tmpDir {
+		t.Fatalf("expected terraform project root %q, got %q", tmpDir, root)
+	}
+}
+
 func TestInstallRecordsGitignoreErrorAndContinues(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(tmpDir, ".gitignore"), 0o755); err != nil {
@@ -299,6 +321,48 @@ func TestInstallSupportsDocsAgentForOpenCodeWithFrontmatter(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "Documentation Agent") {
 		t.Fatalf("expected docs content, got %q", string(content))
+	}
+}
+
+func TestInstallSupportsTerraformLanguageProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"cursor"},
+		agents:      []string{"linting"},
+		language:    "terraform",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Equal(result.installed, []string{"linting"}) {
+		t.Fatalf("expected terraform linting install, got %+v", result.installed)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".cursor", "rules", "terraform-linting.mdc"))
+	if err != nil {
+		t.Fatalf("expected terraform-linting.mdc to exist: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "Terraform linting specialist") {
+		t.Fatalf("expected terraform linting content, got %q", text)
+	}
+	if !strings.Contains(text, ".terraform-version") || !strings.Contains(text, "tfenv install") || !strings.Contains(text, "tfsec") {
+		t.Fatalf("expected terraform hook and tooling guidance, got %q", text)
+	}
+}
+
+func TestRenderHookGuidanceSupportsTerraform(t *testing.T) {
+	got := renderHookGuidance("terraform", "standalone")
+	if !strings.Contains(got, ".terraform-version") {
+		t.Fatalf("expected terraform hook guidance to mention .terraform-version, got %q", got)
+	}
+	if !strings.Contains(got, "tfenv install") {
+		t.Fatalf("expected terraform hook guidance to mention tfenv install, got %q", got)
+	}
+	if !strings.Contains(got, "terraform fmt -check -recursive") || !strings.Contains(got, "tfsec") {
+		t.Fatalf("expected terraform hook guidance to mention terraform checks, got %q", got)
 	}
 }
 

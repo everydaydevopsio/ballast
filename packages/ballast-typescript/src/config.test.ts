@@ -53,6 +53,17 @@ describe('config', () => {
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
     });
 
+    test('returns dir containing terraform project markers', () => {
+      fs.writeFileSync(path.join(tmpDir, '.terraform-version'), '1.8.5\n');
+      fs.writeFileSync(
+        path.join(tmpDir, 'versions.tf'),
+        'terraform { required_version = "~> 1.8.0" }\n'
+      );
+      const sub = path.join(tmpDir, 'modules', 'network');
+      fs.mkdirSync(sub, { recursive: true });
+      expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
+    });
+
     test('returns dir containing .rulesrc.json', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),

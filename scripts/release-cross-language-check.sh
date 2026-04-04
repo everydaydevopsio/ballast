@@ -39,6 +39,7 @@ main() {
   run_language_smoke "python-sample" "python" "ballast-python" "python-linting.mdc"
   run_language_smoke "go-sample" "go" "ballast-go" "go-linting.mdc"
   run_language_smoke "ansible-sample" "ansible" "ballast-go" "ansible-linting.mdc"
+  run_language_smoke "terraform-sample" "terraform" "ballast-go" "terraform-linting.mdc"
 
   "${REPO_ROOT}/scripts/smoke-wrapper-monorepo.sh"
 

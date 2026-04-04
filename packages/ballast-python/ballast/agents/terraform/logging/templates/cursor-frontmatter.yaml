@@ -1,0 +1,9 @@
+---
+description: 'Terraform logging specialist for safe, reviewable plan and apply output'
+alwaysApply: false
+globs:
+  - '*.tf'
+  - '*.tfvars'
+  - '*.tfvars.json'
+  - '.terraform-version'
+---

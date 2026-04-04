@@ -22,7 +22,7 @@ import (
 )
 
 var targets = []string{"cursor", "claude", "opencode", "codex"}
-var languages = []string{"typescript", "python", "go", "ansible"}
+var languages = []string{"typescript", "python", "go", "ansible", "terraform"}
 
 var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing"}
 var languageAgents = []string{"linting", "logging", "testing"}
@@ -160,8 +160,8 @@ func runInstall(args []string) int {
 	var targetFlags targetListFlag
 	fs.Var(&targetFlags, "target", "cursor|claude|opencode|codex")
 	fs.Var(&targetFlags, "t", "cursor|claude|opencode|codex")
-	language := fs.String("language", "go", "typescript|python|go|ansible")
-	fs.StringVar(language, "l", "go", "typescript|python|go|ansible")
+	language := fs.String("language", "go", "typescript|python|go|ansible|terraform")
+	fs.StringVar(language, "l", "go", "typescript|python|go|ansible|terraform")
 	agent := fs.String("agent", "", "comma-separated list")
 	fs.StringVar(agent, "a", "", "comma-separated list")
 	skill := fs.String("skill", "", "comma-separated list")
@@ -1625,6 +1625,17 @@ func renderHookGuidance(language, hookMode string) string {
 			"- Keep secrets out of logs and commits; prefer Ansible Vault or external secret stores.",
 			"- Keep the configuration current with `pre-commit autoupdate`.",
 		}, "\n")
+	case "terraform":
+		return strings.Join([]string{
+			"- Use `pre-commit` for Terraform repositories.",
+			"- Create or update `.pre-commit-config.yaml` at the repo root.",
+			"- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.",
+			"- Install hooks with `pre-commit install`.",
+			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			"- Run `terraform fmt -check -recursive`, `terraform validate`, `tflint`, and `tfsec` from the hook configuration.",
+			"- Keep `.terraform/`, state files, and plan files out of Git.",
+			"- Keep the configuration current with `pre-commit autoupdate`.",
+		}, "\n")
 	default:
 		return ""
 	}
@@ -1740,6 +1751,11 @@ func findProjectRoot(cwd string) (string, error) {
 			exists(filepath.Join(dir, "playbook.yml")) ||
 			exists(filepath.Join(dir, "requirements.yml")) ||
 			exists(filepath.Join(dir, "requirements.yaml")) ||
+			exists(filepath.Join(dir, ".terraform-version")) ||
+			exists(filepath.Join(dir, "main.tf")) ||
+			exists(filepath.Join(dir, "providers.tf")) ||
+			exists(filepath.Join(dir, "versions.tf")) ||
+			exists(filepath.Join(dir, "terraform.tf")) ||
 			hasAnyRulesConfig(dir) {
 			return dir, nil
 		}

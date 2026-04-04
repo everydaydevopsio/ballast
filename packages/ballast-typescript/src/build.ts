@@ -188,6 +188,22 @@ function renderHookGuidance(
     ].join('\n');
   }
 
+  if (language === 'terraform') {
+    return [
+      '## Git Hooks',
+      '',
+      'Use `pre-commit` for Terraform repositories.',
+      '',
+      '- Create or update `.pre-commit-config.yaml` at the repo root.',
+      '- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.',
+      '- Install hooks with `pre-commit install`.',
+      '- Install the pre-push hook with `pre-commit install --hook-type pre-push`.',
+      '- Run `terraform fmt -check -recursive`, `terraform validate`, `tflint`, and `tfsec` from the hook configuration.',
+      '- Keep `.terraform/`, state files, and plan files out of Git.',
+      '- Keep the configuration current with `pre-commit autoupdate`.'
+    ].join('\n');
+  }
+
   return '';
 }
 

@@ -1,6 +1,6 @@
 # Linting Agent
 
-The **linting** agent provides language-appropriate linting, formatting, and CI checks for TypeScript, Python, Go, and Ansible projects.
+The **linting** agent provides language-appropriate linting, formatting, and CI checks for TypeScript, Python, Go, Ansible, and Terraform projects.
 
 ## What It Sets Up by Language
 
@@ -26,6 +26,11 @@ The **linting** agent provides language-appropriate linting, formatting, and CI 
   - `yamllint` for YAML formatting and style
   - `pre-commit` hooks for lint, syntax-check, and vault-safe workflows
   - Guidance for inventories, role layout, and idempotent task design
+- **Terraform**
+  - `terraform fmt -check -recursive` for formatting
+  - `terraform validate` and `tflint` for static validation
+  - `tfsec` or `trivy config` security checks
+  - `tfenv` guidance with `.terraform-version` and `pre-commit` hooks
 
 ## What It Provides
 
@@ -40,7 +45,7 @@ In a TypeScript + Python + Go monorepo, apply linting standards per language are
 Hook strategy:
 
 - TypeScript at the monorepo root uses Husky + lint-staged.
-- Python and Go use `pre-commit` with root or package-level `.pre-commit-config.yaml` files as needed.
+- Python, Go, Ansible, and Terraform use `pre-commit` with root or package-level `.pre-commit-config.yaml` files as needed.
 - Use `pre-commit install --hook-type pre-push` for `pre-commit` repos, and use `.husky/pre-push` for TypeScript monorepos.
 - Keep every `.pre-commit-config.yaml` current with `pre-commit autoupdate` whenever hook versions change.
 
@@ -50,11 +55,13 @@ Recommended command set:
 - Python: `ruff check .` and `ruff format .`
 - Go: `gofmt -w .` and `golangci-lint run`
 - Ansible: `ansible-lint`, `yamllint .`, and `ansible-playbook --syntax-check site.yml`
+- Terraform: `tfenv install && tfenv use`, `terraform fmt -check -recursive`, `terraform validate`, `tflint --recursive`, and `tfsec .`
 
 ## Prompts to Improve Your App
 
 - **"Set up linting for all three languages in this monorepo"** — Multi-language baseline
 - **"Set up linting for our Ansible playbooks and roles"** — Playbook baseline
+- **"Set up linting, formatting, tfenv, and security checks for our Terraform repo"** — Terraform baseline
 - **"Fix lint errors in this package according to its language rules"** — Targeted cleanup
-- **"Add CI jobs so TypeScript, Python, Go, and Ansible lint checks run independently"** — Monorepo CI
+- **"Add CI jobs so TypeScript, Python, Go, Ansible, and Terraform lint checks run independently"** — Monorepo CI
 - **"Add ignore patterns for generated code in each language"** — Noise reduction

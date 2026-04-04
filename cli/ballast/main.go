@@ -21,9 +21,10 @@ const (
 	langPython     language = "python"
 	langGo         language = "go"
 	langAnsible    language = "ansible"
+	langTerraform  language = "terraform"
 )
 
-var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible}
+var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible, langTerraform}
 var installableBackendLanguages = []language{langTypeScript, langPython, langGo}
 var supportedTargets = []string{"cursor", "claude", "opencode", "codex"}
 
@@ -112,6 +113,7 @@ var toolsByLanguage = map[language]toolConfig{
 	langPython:     pythonTool,
 	langGo:         goTool,
 	langAnsible:    goTool,
+	langTerraform:  goTool,
 }
 
 var version = "dev"
@@ -368,15 +370,16 @@ func printUsage() {
 	fmt.Println("  ballast upgrade")
 	fmt.Println("  ballast upgrade --patch")
 	fmt.Println("  ballast install-cli --language go --version 5.0.2")
-	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go/Ansible repo")
+	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go/Ansible/Terraform repo")
 	fmt.Println("  ballast --language python install --target codex --agent linting")
 	fmt.Println("  ballast --language ansible install --target cursor --all")
+	fmt.Println("  ballast --language terraform install --target cursor --all")
 	fmt.Println("  ballast --version")
 	fmt.Println()
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
-	fmt.Println("Mixed TypeScript/Python/Go/Ansible repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/` and `.codex/rules/ansible/`).")
+	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/` and `.codex/rules/terraform/`).")
 }
 
 func printVersion() {
@@ -1102,9 +1105,10 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 
 func backendArgs(lang language, args []string) []string {
 	dispatched := append([]string(nil), args...)
-	if lang != langAnsible {
+	if lang != langAnsible && lang != langTerraform {
 		return dispatched
 	}
+	languageName := string(lang)
 	for i := 0; i < len(dispatched); i++ {
 		arg := dispatched[i]
 		if arg == "--language" || arg == "-l" {
@@ -1115,9 +1119,9 @@ func backendArgs(lang language, args []string) []string {
 		}
 	}
 	if len(dispatched) > 0 && !strings.HasPrefix(dispatched[0], "-") {
-		return append([]string{dispatched[0], "--language", "ansible"}, dispatched[1:]...)
+		return append([]string{dispatched[0], "--language", languageName}, dispatched[1:]...)
 	}
-	return append([]string{"--language", "ansible"}, dispatched...)
+	return append([]string{"--language", languageName}, dispatched...)
 }
 
 func mergeResolvedEnv(base map[string]string, extra map[string]string) map[string]string {
@@ -1174,6 +1178,13 @@ func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendC
 				Binary: binaryPath,
 			}
 		}
+	case langTerraform:
+		binaryPath := filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go")
+		if fileExists(binaryPath) {
+			return resolvedBackendCommand{
+				Binary: binaryPath,
+			}
+		}
 	}
 	return resolvedBackendCommand{}
 }
@@ -1196,6 +1207,11 @@ func projectLocalBackendCommand(projectRoot string, lang language) resolvedBacke
 			return resolvedBackendCommand{Binary: binary}
 		}
 	case langAnsible:
+		binary := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
+		if fileExists(binary) {
+			return resolvedBackendCommand{Binary: binary}
+		}
+	case langTerraform:
 		binary := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
 		if fileExists(binary) {
 			return resolvedBackendCommand{Binary: binary}
@@ -1232,6 +1248,8 @@ func siblingBackendBinary(lang language) (string, bool) {
 	case langGo:
 		name = "ballast-go"
 	case langAnsible:
+		name = "ballast-go"
+	case langTerraform:
 		name = "ballast-go"
 	default:
 		return "", false
@@ -1550,6 +1568,7 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 		langPython:     {},
 		langGo:         {},
 		langAnsible:    {},
+		langTerraform:  {},
 	}
 
 	if err := walkDirFunc(root, func(path string, d fs.DirEntry, err error) error {
@@ -1558,7 +1577,7 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if name == ".git" || name == "node_modules" || name == ".venv" || name == "dist" || name == "build" || name == "vendor" {
+			if name == ".git" || name == "node_modules" || name == ".venv" || name == "dist" || name == "build" || name == "vendor" || name == ".terraform" || name == ".terragrunt-cache" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -1574,6 +1593,8 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 			pathsByLanguage[langGo] = append(pathsByLanguage[langGo], dir)
 		case "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml", "requirements.yaml":
 			pathsByLanguage[langAnsible] = append(pathsByLanguage[langAnsible], dir)
+		case ".terraform-version", "main.tf", "providers.tf", "versions.tf", "terraform.tf":
+			pathsByLanguage[langTerraform] = append(pathsByLanguage[langTerraform], dir)
 		}
 		return nil
 	}); err != nil {
@@ -2328,7 +2349,7 @@ func cwdOrDot(cwd string) string {
 }
 
 func hasRootMarker(dir string) bool {
-	markers := []string{".git", "go.mod", "pyproject.toml", "package.json", "pnpm-lock.yaml", "uv.lock", "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml", "requirements.yaml"}
+	markers := []string{".git", "go.mod", "pyproject.toml", "package.json", "pnpm-lock.yaml", "uv.lock", "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml", "requirements.yaml", ".terraform-version", "main.tf", "providers.tf", "versions.tf", "terraform.tf"}
 	for _, marker := range markers {
 		if fileExists(filepath.Join(dir, marker)) {
 			return true
@@ -2343,6 +2364,7 @@ func detectLanguage(root string) language {
 		langPython:     0,
 		langGo:         0,
 		langAnsible:    0,
+		langTerraform:  0,
 	}
 
 	applyMarkerScores(root, scores)
@@ -2395,6 +2417,15 @@ func applyMarkerScores(root string, scores map[language]int) {
 	if fileExists(filepath.Join(root, "requirements.yaml")) {
 		scores[langAnsible] += 6
 	}
+	if fileExists(filepath.Join(root, ".terraform-version")) {
+		scores[langTerraform] += 10
+	}
+	if fileExists(filepath.Join(root, "versions.tf")) || fileExists(filepath.Join(root, "providers.tf")) {
+		scores[langTerraform] += 8
+	}
+	if fileExists(filepath.Join(root, "main.tf")) || fileExists(filepath.Join(root, "terraform.tf")) {
+		scores[langTerraform] += 6
+	}
 }
 
 func applyConfigScores(root string, scores map[language]int) {
@@ -2403,6 +2434,9 @@ func applyConfigScores(root string, scores map[language]int) {
 	}
 	if fileExists(filepath.Join(root, ".rulesrc.ansible.json")) {
 		scores[langAnsible] += 20
+	}
+	if fileExists(filepath.Join(root, ".rulesrc.terraform.json")) {
+		scores[langTerraform] += 20
 	}
 	if fileExists(filepath.Join(root, ".rulesrc.python.json")) {
 		scores[langPython] += 20

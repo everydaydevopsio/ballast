@@ -593,6 +593,39 @@ func TestRunInstallCLICommandInstallsGoBackendForAnsibleLanguage(t *testing.T) {
 	}
 }
 
+func TestRunInstallCLICommandInstallsGoBackendForTerraformLanguage(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "5.0.2"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".terraform-version"), "1.8.5\n")
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install-cli", "--language", "terraform", "--version", "5.0.2"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected 1 install command, got %#v", commands)
+	}
+	got := strings.Join(commands[0], " ")
+	if !strings.Contains(got, "ballast-go_5.0.2_") {
+		t.Fatalf("expected terraform install-cli to reuse ballast-go backend, got %q", got)
+	}
+}
+
 func TestRunInstallCLICreatesLocalBallastDirectories(t *testing.T) {
 	originalRun := runCommandFunc
 	t.Cleanup(func() {
@@ -730,6 +763,47 @@ func TestRunInstallCLIUsesLocalSourcesInsideSourceCheckoutForReleaseWrapper(t *t
 	}
 	if got := strings.Join(commands[2], " "); got != "go build -C "+filepath.Join(sourceRoot, "packages", "ballast-go")+" -o "+filepath.Join(sourceRoot, ".ballast", "bin", "ballast-go")+" ./cmd/ballast-go" {
 		t.Fatalf("unexpected local go install command: %q", got)
+	}
+}
+
+func TestResolveLocalBackendCommandUsesGoBinaryForTerraform(t *testing.T) {
+	repoRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go"), "")
+
+	resolved := resolveLocalBackendCommand(repoRoot, langTerraform)
+	if resolved.Binary != filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go") {
+		t.Fatalf("expected terraform local backend to reuse ballast-go binary, got %#v", resolved)
+	}
+}
+
+func TestProjectLocalBackendCommandUsesGoBinaryForTerraform(t *testing.T) {
+	projectRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "")
+
+	resolved := projectLocalBackendCommand(projectRoot, langTerraform)
+	if resolved.Binary != filepath.Join(projectRoot, ".ballast", "bin", "ballast-go") {
+		t.Fatalf("expected terraform project-local backend to reuse ballast-go binary, got %#v", resolved)
+	}
+}
+
+func TestSiblingBackendBinaryUsesGoBinaryForTerraform(t *testing.T) {
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		osExecutableFunc = originalExecutable
+	})
+
+	binDir := t.TempDir()
+	mustWriteFile(t, filepath.Join(binDir, "ballast-go"), "")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(binDir, "ballast"), nil
+	}
+
+	got, ok := siblingBackendBinary(langTerraform)
+	if !ok {
+		t.Fatal("expected terraform sibling backend binary to be found")
+	}
+	if got != filepath.Join(binDir, "ballast-go") {
+		t.Fatalf("expected terraform sibling backend to reuse ballast-go binary, got %q", got)
 	}
 }
 
@@ -889,6 +963,44 @@ func TestDetectRepoProfilesFindsAnsibleProfileFromRequirementsYaml(t *testing.T)
 	}
 }
 
+func TestDetectRepoProfilesFindsTerraformProfile(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform-version"), "1.8.5\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", "versions.tf"), "terraform {}\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langTerraform, Paths: []string{filepath.Join(root, "infra", "terraform")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected terraform profile %#v, got %#v", want, profiles)
+	}
+}
+
+func TestDetectRepoProfilesSkipsTerraformCaches(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform-version"), "1.8.5\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", "versions.tf"), "terraform {}\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform", "modules", "cached", "main.tf"), "terraform {}\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terragrunt-cache", "cached", "main.tf"), "terraform {}\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langTerraform, Paths: []string{filepath.Join(root, "infra", "terraform")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected cached terraform directories to be skipped; want %#v, got %#v", want, profiles)
+	}
+}
+
 func TestDetectLanguageSupportsAnsibleRequirementsYaml(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "requirements.yaml"), "---\n")
@@ -910,6 +1022,27 @@ func TestDetectLanguagePrefersAnsibleMarkers(t *testing.T) {
 	}
 }
 
+func TestDetectLanguageSupportsTerraformMarkers(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".terraform-version"), "1.8.5\n")
+	mustWriteFile(t, filepath.Join(root, "versions.tf"), "terraform {}\n")
+
+	got := detectLanguage(root)
+	if got != langTerraform {
+		t.Fatalf("expected terraform detection, got %q", got)
+	}
+}
+
+func TestDetectLanguageSupportsTerraformRulesConfig(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.terraform.json"), `{"target":"cursor","agents":["linting"]}`)
+
+	got := detectLanguage(root)
+	if got != langTerraform {
+		t.Fatalf("expected terraform detection from legacy config, got %q", got)
+	}
+}
+
 func TestResolveBackendCommandAddsAnsibleLanguageFlag(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
@@ -923,6 +1056,23 @@ func TestResolveBackendCommandAddsAnsibleLanguageFlag(t *testing.T) {
 		got := strings.Join(resolved.Args, " ")
 		if !strings.Contains(got, "install --language ansible --target cursor --all") {
 			t.Fatalf("expected ansible language forwarding, got %q", got)
+		}
+	})
+}
+
+func TestResolveBackendCommandAddsTerraformLanguageFlag(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".terraform-version"), "1.8.5\n")
+	mustWriteFile(t, filepath.Join(root, ".ballast", "bin", "ballast-go"), "")
+
+	withWorkingDir(t, root, func() {
+		resolved := resolveBackendCommand(langTerraform, toolsByLanguage[langTerraform], []string{"install", "--target", "cursor", "--all"}, nil)
+		if resolved.Binary != filepath.Join(root, ".ballast", "bin", "ballast-go") {
+			t.Fatalf("expected project-local ballast-go backend, got %#v", resolved)
+		}
+		got := strings.Join(resolved.Args, " ")
+		if !strings.Contains(got, "install --language terraform --target cursor --all") {
+			t.Fatalf("expected terraform language forwarding, got %q", got)
 		}
 	})
 }
