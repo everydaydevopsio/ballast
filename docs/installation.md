@@ -68,7 +68,7 @@ pnpm exec ballast-typescript install --language terraform --target codex --agent
 ### Python Package (`ballast-python`)
 
 ```bash
-VERSION=<latest-release>
+VERSION="<latest-release>"
 uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
 ballast-python install --target cursor --all
 # or
@@ -84,7 +84,7 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ### Go Package (`ballast-go`)
 
 ```bash
-VERSION=<latest-release>
+VERSION="<latest-release>"
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -162,7 +162,7 @@ If `CLAUDE.md` or `AGENTS.md` already exists, Ballast creates the file when miss
 
 ```bash
 pnpm exec ballast-typescript install --target cursor --all
-VERSION=<latest-release>
+VERSION="<latest-release>"
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ballast-go install --target cursor --all
 ```
