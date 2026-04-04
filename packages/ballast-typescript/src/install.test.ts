@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import readline from 'readline';
 import { install, resolveTargetAndAgents, runInstall } from './install';
 import { getClaudeMdPath, getDestination } from './build';
 import { findProjectRoot, saveConfig, loadConfig } from './config';
@@ -118,6 +119,31 @@ describe('install', () => {
         agents: ['linting', 'git-hooks'],
         skills: ['owasp-security-scan']
       });
+    });
+
+    test('interactive selection normalizes implicit git-hooks before returning', async () => {
+      const answers = ['cursor', 'linting', ''];
+      const createInterfaceSpy = jest
+        .spyOn(readline, 'createInterface')
+        .mockImplementation(
+          () =>
+            ({
+              question: (_prompt: string, cb: (answer: string) => void) =>
+                cb(answers.shift() ?? ''),
+              close: () => {}
+            }) as unknown as readline.Interface
+        );
+
+      const result = await resolveTargetAndAgents({
+        projectRoot: tmpDir
+      });
+
+      expect(result).toEqual({
+        targets: ['cursor'],
+        agents: ['linting', 'git-hooks'],
+        skills: []
+      });
+      createInterfaceSpy.mockRestore();
     });
 
     test('rejects invalid target flags instead of ignoring them', async () => {

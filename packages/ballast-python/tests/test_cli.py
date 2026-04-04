@@ -562,6 +562,20 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("pre-commit install", git_hooks_content)
             self.assertIn("pre-commit install --hook-type pre-push", git_hooks_content)
 
+    def test_install_writes_ansible_git_hooks_guidance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root, "codex", ["linting"], [], "ansible", False, False, False
+            )
+
+            self.assertIn("git-hooks", result.installed)
+            git_hooks = root / ".codex" / "rules" / "git-hooks.md"
+            content = git_hooks.read_text(encoding="utf-8")
+            self.assertIn("pre-commit install --hook-type pre-push", content)
+            self.assertIn("ansible-playbook --syntax-check", content)
+
     def test_patch_preserves_existing_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

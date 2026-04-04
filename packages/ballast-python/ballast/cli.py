@@ -575,6 +575,18 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Verify the hook configuration with `pre-commit run --all-files`.",
             ]
         )
+    if language == "ansible":
+        return "\n".join(
+            [
+                "- Use `pre-commit` for Ansible repositories.",
+                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                "- Install hooks with `pre-commit install`.",
+                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                "- Run `ansible-lint`, `yamllint`, and `ansible-playbook --syntax-check` from the hook configuration.",
+                "- Keep secrets out of logs and commits; prefer Ansible Vault or external secret stores.",
+                "- Keep the configuration current with `pre-commit autoupdate`.",
+            ]
+        )
     if language == "terraform":
         return "\n".join(
             [

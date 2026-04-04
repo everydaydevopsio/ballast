@@ -293,7 +293,9 @@ export async function resolveTargetAndAgents(
   }
 
   const resolvedTargets = targets.length > 0 ? targets : await promptTargets();
-  const resolvedAgents = agents?.length ? agents : await promptAgents(language);
+  const resolvedAgents = withImplicitAgents(
+    agents?.length ? agents : await promptAgents(language)
+  );
   const resolvedSkills = skills.length ? skills : await promptSkills(language);
   return {
     targets: resolvedTargets,
