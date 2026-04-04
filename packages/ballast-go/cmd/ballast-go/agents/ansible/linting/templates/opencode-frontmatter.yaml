@@ -1,0 +1,17 @@
+---
+description: Ansible linting specialist for ansible-lint, yamllint, and playbook hygiene
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.2
+tools:
+  write: true
+  edit: true
+  bash: true
+  read: true
+  glob: true
+  grep: true
+permission:
+  bash:
+    'git *': ask
+    '*': ask
+---

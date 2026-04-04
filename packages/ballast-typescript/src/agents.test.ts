@@ -90,5 +90,10 @@ describe('agents', () => {
       expect(listAgents('go')).toEqual([...AGENT_IDS]);
       expect(isValidAgent('logging', 'go')).toBe(true);
     });
+
+    test('ansible profile uses same public agent ids', () => {
+      expect(listAgents('ansible')).toEqual([...AGENT_IDS]);
+      expect(isValidAgent('linting', 'ansible')).toBe(true);
+    });
   });
 });

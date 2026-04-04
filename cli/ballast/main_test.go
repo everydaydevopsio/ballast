@@ -560,6 +560,39 @@ func TestRunInstallCLICommandInstallsAllLanguagesByDefault(t *testing.T) {
 	}
 }
 
+func TestRunInstallCLICommandInstallsGoBackendForAnsibleLanguage(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "5.0.2"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install-cli", "--language", "ansible", "--version", "5.0.2"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected 1 install command, got %#v", commands)
+	}
+	got := strings.Join(commands[0], " ")
+	if !strings.Contains(got, "ballast-go_5.0.2_") {
+		t.Fatalf("expected ansible install-cli to reuse ballast-go backend, got %q", got)
+	}
+}
+
 func TestRunInstallCLICreatesLocalBallastDirectories(t *testing.T) {
 	originalRun := runCommandFunc
 	t.Cleanup(func() {
@@ -819,6 +852,52 @@ func TestDetectRepoProfilesFindsMultiLanguageMonorepo(t *testing.T) {
 	if !reflect.DeepEqual(profiles, want) {
 		t.Fatalf("expected profiles %#v, got %#v", want, profiles)
 	}
+}
+
+func TestDetectRepoProfilesFindsAnsibleProfile(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "ansible.cfg"), "[defaults]\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "playbook.yml"), "---\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langAnsible, Paths: []string{filepath.Join(root, "infra", "ansible")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected ansible profile %#v, got %#v", want, profiles)
+	}
+}
+
+func TestDetectLanguagePrefersAnsibleMarkers(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
+	mustWriteFile(t, filepath.Join(root, "playbook.yml"), "---\n")
+
+	got := detectLanguage(root)
+	if got != langAnsible {
+		t.Fatalf("expected ansible detection, got %q", got)
+	}
+}
+
+func TestResolveBackendCommandAddsAnsibleLanguageFlag(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
+	mustWriteFile(t, filepath.Join(root, ".ballast", "bin", "ballast-go"), "")
+
+	withWorkingDir(t, root, func() {
+		resolved := resolveBackendCommand(langAnsible, toolsByLanguage[langAnsible], []string{"install", "--target", "cursor", "--all"}, nil)
+		if resolved.Binary != filepath.Join(root, ".ballast", "bin", "ballast-go") {
+			t.Fatalf("expected project-local ballast-go backend, got %#v", resolved)
+		}
+		got := strings.Join(resolved.Args, " ")
+		if !strings.Contains(got, "install --language ansible --target cursor --all") {
+			t.Fatalf("expected ansible language forwarding, got %q", got)
+		}
+	})
 }
 
 func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testing.T) {

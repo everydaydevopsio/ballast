@@ -1,0 +1,11 @@
+---
+description: 'Ansible linting specialist for ansible-lint, yamllint, and playbook hygiene'
+alwaysApply: false
+globs:
+  - '*.yml'
+  - '*.yaml'
+  - 'ansible.cfg'
+  - 'hosts.ini*'
+  - 'requirements.yml'
+  - 'requirements.yaml'
+---

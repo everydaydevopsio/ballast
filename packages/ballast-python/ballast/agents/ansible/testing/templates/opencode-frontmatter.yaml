@@ -1,0 +1,17 @@
+---
+description: Ansible testing specialist for syntax checks, check mode, and role validation
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.2
+tools:
+  write: true
+  edit: true
+  bash: true
+  read: true
+  glob: true
+  grep: true
+permission:
+  bash:
+    'git *': ask
+    '*': ask
+---

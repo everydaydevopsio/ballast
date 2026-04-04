@@ -1,6 +1,6 @@
 # Logging Agent
 
-The **logging** agent sets up structured, production-safe logging patterns for TypeScript, Python, and Go applications.
+The **logging** agent sets up structured, production-safe logging patterns for TypeScript, Python, Go, and Ansible automation.
 
 ## What It Sets Up by Language
 
@@ -14,6 +14,10 @@ The **logging** agent sets up structured, production-safe logging patterns for T
 - **Go**
   - Structured logging with `log/slog` (or `zerolog` if already adopted)
   - Standardized fields for request and error context
+- **Ansible**
+  - Callback and task-output guidance for readable execution logs
+  - `no_log: true` handling for secrets and sensitive command output
+  - Consistent task names so playbook runs are easy to audit
 
 ## What It Provides
 
@@ -36,7 +40,8 @@ Common baseline fields:
 
 ## Prompts to Improve Your App
 
-- **"Standardize logging fields across TypeScript, Python, and Go services"** — Cross-language schema
+- **"Standardize logging fields across TypeScript, Python, Go, and Ansible automation"** — Cross-language schema
 - **"Set log levels so development is verbose and production is noise-controlled"** — Environment policy
 - **"Add request/trace propagation to logs in this service"** — Correlation
 - **"Review our logs for secrets and high-cardinality fields"** — Safety check
+- **"Clean up our Ansible task output so failures are easy to audit"** — Automation visibility

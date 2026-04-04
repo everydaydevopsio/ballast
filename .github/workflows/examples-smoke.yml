@@ -27,6 +27,9 @@ jobs:
           - sample: typescript-sample
             language: typescript
             expected_rule: typescript-linting.mdc
+          - sample: ansible-sample
+            language: ansible
+            expected_rule: ansible-linting.mdc
 
     steps:
       - name: Checkout ballast repo

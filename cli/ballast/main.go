@@ -20,9 +20,11 @@ const (
 	langTypeScript language = "typescript"
 	langPython     language = "python"
 	langGo         language = "go"
+	langAnsible    language = "ansible"
 )
 
-var supportedLanguages = []language{langTypeScript, langPython, langGo}
+var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible}
+var installableBackendLanguages = []language{langTypeScript, langPython, langGo}
 var supportedTargets = []string{"cursor", "claude", "opencode", "codex"}
 
 type toolConfig struct {
@@ -55,54 +57,61 @@ func preferredInstallSourceRoot(projectRoot string, version string) string {
 	return preferredSourceRoot(projectRoot)
 }
 
-var toolsByLanguage = map[language]toolConfig{
-	langTypeScript: {
-		binary: "ballast-typescript",
-		installCommand: func(version string, projectRoot string) ([]string, error) {
-			toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
-			if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
-				return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
-			}
-			pkg := "@everydaydevopsio/ballast"
-			if releaseVersion(version) != "" {
-				pkg += "@" + releaseVersion(version)
-			}
-			return []string{"npm", "install", "--prefix", toolRoot, pkg}, nil
-		},
+var typeScriptTool = toolConfig{
+	binary: "ballast-typescript",
+	installCommand: func(version string, projectRoot string) ([]string, error) {
+		toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
+		if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
+			return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
+		}
+		pkg := "@everydaydevopsio/ballast"
+		if releaseVersion(version) != "" {
+			pkg += "@" + releaseVersion(version)
+		}
+		return []string{"npm", "install", "--prefix", toolRoot, pkg}, nil
 	},
-	langPython: {
-		binary: "ballast-python",
-		installCommand: func(version string, projectRoot string) ([]string, error) {
-			binDir := filepath.Join(projectRoot, ".ballast", "bin")
-			toolDir := filepath.Join(projectRoot, ".ballast", "tools", "python")
-			release := releaseVersion(version)
-			if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
-				return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", filepath.Join(sourceRoot, "packages", "ballast-python")}, nil
-			}
+}
+
+var pythonTool = toolConfig{
+	binary: "ballast-python",
+	installCommand: func(version string, projectRoot string) ([]string, error) {
+		binDir := filepath.Join(projectRoot, ".ballast", "bin")
+		toolDir := filepath.Join(projectRoot, ".ballast", "tools", "python")
+		release := releaseVersion(version)
+		if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
+			return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", filepath.Join(sourceRoot, "packages", "ballast-python")}, nil
+		}
+		if release == "" {
+			release = releaseVersion(resolveVersion())
 			if release == "" {
-				release = releaseVersion(resolveVersion())
-				if release == "" {
-					return nil, errors.New("ballast-python install requires a release version or a ballast source checkout")
-				}
+				return nil, errors.New("ballast-python install requires a release version or a ballast source checkout")
 			}
-			wheel := fmt.Sprintf(
-				"https://github.com/everydaydevopsio/ballast/releases/download/v%s/ballast_python-%s-py3-none-any.whl",
-				release,
-				release,
-			)
-			return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", "--from", wheel, "ballast-python"}, nil
-		},
+		}
+		wheel := fmt.Sprintf(
+			"https://github.com/everydaydevopsio/ballast/releases/download/v%s/ballast_python-%s-py3-none-any.whl",
+			release,
+			release,
+		)
+		return []string{"env", "UV_TOOL_DIR=" + toolDir, "UV_TOOL_BIN_DIR=" + binDir, "uv", "tool", "install", "--reinstall", "--from", wheel, "ballast-python"}, nil
 	},
-	langGo: {
-		binary: "ballast-go",
-		installCommand: func(version string, projectRoot string) ([]string, error) {
-			if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
-				moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
-				return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
-			}
-			return releasedGoInstallCommand(version, projectRoot)
-		},
+}
+
+var goTool = toolConfig{
+	binary: "ballast-go",
+	installCommand: func(version string, projectRoot string) ([]string, error) {
+		if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
+			moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
+			return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
+		}
+		return releasedGoInstallCommand(version, projectRoot)
 	},
+}
+
+var toolsByLanguage = map[language]toolConfig{
+	langTypeScript: typeScriptTool,
+	langPython:     pythonTool,
+	langGo:         goTool,
+	langAnsible:    goTool,
 }
 
 var version = "dev"
@@ -359,14 +368,15 @@ func printUsage() {
 	fmt.Println("  ballast upgrade")
 	fmt.Println("  ballast upgrade --patch")
 	fmt.Println("  ballast install-cli --language go --version 5.0.2")
-	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go monorepo")
+	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go/Ansible repo")
 	fmt.Println("  ballast --language python install --target codex --agent linting")
+	fmt.Println("  ballast --language ansible install --target cursor --all")
 	fmt.Println("  ballast --version")
 	fmt.Println()
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
-	fmt.Println("Mixed TypeScript/Python/Go monorepos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/` and `.codex/rules/python/`).")
+	fmt.Println("Mixed TypeScript/Python/Go/Ansible repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/` and `.codex/rules/ansible/`).")
 }
 
 func printVersion() {
@@ -518,7 +528,7 @@ func installCLIs(selectedLanguage language, version string) int {
 	if selectedLanguage != "" {
 		languagesToInstall = []language{selectedLanguage}
 	} else {
-		languagesToInstall = slices.Clone(supportedLanguages)
+		languagesToInstall = slices.Clone(installableBackendLanguages)
 	}
 
 	for _, lang := range languagesToInstall {
@@ -943,8 +953,8 @@ func resolveCommandVersionWithArgs(binary string, args []string, env map[string]
 }
 
 func collectDoctorBackends(root string) []doctorBackendStatus {
-	statuses := make([]doctorBackendStatus, 0, len(supportedLanguages))
-	for _, lang := range supportedLanguages {
+	statuses := make([]doctorBackendStatus, 0, len(installableBackendLanguages))
+	for _, lang := range installableBackendLanguages {
 		tool := toolsByLanguage[lang]
 		resolved := resolveBackendCommand(lang, tool, nil, nil)
 		statuses = append(statuses, detectDoctorBackendStatus(resolved, tool))
@@ -1038,19 +1048,20 @@ type resolvedBackendCommand struct {
 
 func resolveBackendCommand(lang language, tool toolConfig, args []string, env map[string]string) resolvedBackendCommand {
 	mergedEnv := cloneEnvMap(env)
+	dispatchedArgs := backendArgs(lang, args)
 	repoRoot := findBallastSourceRoot()
 	if repoRoot == "" {
 		projectRoot := findProjectRoot("")
 		local := projectLocalBackendCommand(projectRoot, lang)
 		if local.Binary != "" {
-			local.Args = append(local.Args, args...)
+			local.Args = append(local.Args, dispatchedArgs...)
 			local.Env = mergeResolvedEnv(mergedEnv, local.Env)
 			local.UseLocal = true
 			return local
 		}
 		return resolvedBackendCommand{
 			Binary: tool.binary,
-			Args:   append([]string(nil), args...),
+			Args:   append([]string(nil), dispatchedArgs...),
 			Env:    mergedEnv,
 		}
 	}
@@ -1059,7 +1070,7 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 	if local.Binary == "" {
 		return resolvedBackendCommand{
 			Binary: tool.binary,
-			Args:   append([]string(nil), args...),
+			Args:   append([]string(nil), dispatchedArgs...),
 			Env:    mergedEnv,
 		}
 	}
@@ -1067,7 +1078,7 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 	projectRoot := findProjectRoot("")
 	projectLocal := projectLocalBackendCommand(projectRoot, lang)
 	if projectLocal.Binary != "" {
-		projectLocal.Args = append(projectLocal.Args, args...)
+		projectLocal.Args = append(projectLocal.Args, dispatchedArgs...)
 		projectLocal.Env = mergeResolvedEnv(mergedEnv, projectLocal.Env)
 		projectLocal.UseLocal = true
 		return projectLocal
@@ -1083,10 +1094,30 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 
 	return resolvedBackendCommand{
 		Binary:   local.Binary,
-		Args:     append(append([]string(nil), local.Args...), args...),
+		Args:     append(append([]string(nil), local.Args...), dispatchedArgs...),
 		Env:      mergedEnv,
 		UseLocal: true,
 	}
+}
+
+func backendArgs(lang language, args []string) []string {
+	dispatched := append([]string(nil), args...)
+	if lang != langAnsible {
+		return dispatched
+	}
+	for i := 0; i < len(dispatched); i++ {
+		arg := dispatched[i]
+		if arg == "--language" || arg == "-l" {
+			return dispatched
+		}
+		if strings.HasPrefix(arg, "--language=") {
+			return dispatched
+		}
+	}
+	if len(dispatched) > 0 && !strings.HasPrefix(dispatched[0], "-") {
+		return append([]string{dispatched[0], "--language", "ansible"}, dispatched[1:]...)
+	}
+	return append([]string{"--language", "ansible"}, dispatched...)
 }
 
 func mergeResolvedEnv(base map[string]string, extra map[string]string) map[string]string {
@@ -1136,6 +1167,13 @@ func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendC
 				Binary: binaryPath,
 			}
 		}
+	case langAnsible:
+		binaryPath := filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go")
+		if fileExists(binaryPath) {
+			return resolvedBackendCommand{
+				Binary: binaryPath,
+			}
+		}
 	}
 	return resolvedBackendCommand{}
 }
@@ -1153,6 +1191,11 @@ func projectLocalBackendCommand(projectRoot string, lang language) resolvedBacke
 			return resolvedBackendCommand{Binary: binary}
 		}
 	case langGo:
+		binary := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
+		if fileExists(binary) {
+			return resolvedBackendCommand{Binary: binary}
+		}
+	case langAnsible:
 		binary := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
 		if fileExists(binary) {
 			return resolvedBackendCommand{Binary: binary}
@@ -1187,6 +1230,8 @@ func siblingBackendBinary(lang language) (string, bool) {
 	case langPython:
 		name = "ballast-python"
 	case langGo:
+		name = "ballast-go"
+	case langAnsible:
 		name = "ballast-go"
 	default:
 		return "", false
@@ -1504,6 +1549,7 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 		langTypeScript: {},
 		langPython:     {},
 		langGo:         {},
+		langAnsible:    {},
 	}
 
 	if err := walkDirFunc(root, func(path string, d fs.DirEntry, err error) error {
@@ -1526,6 +1572,8 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 			pathsByLanguage[langPython] = append(pathsByLanguage[langPython], dir)
 		case "go.mod":
 			pathsByLanguage[langGo] = append(pathsByLanguage[langGo], dir)
+		case "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml":
+			pathsByLanguage[langAnsible] = append(pathsByLanguage[langAnsible], dir)
 		}
 		return nil
 	}); err != nil {
@@ -2280,7 +2328,7 @@ func cwdOrDot(cwd string) string {
 }
 
 func hasRootMarker(dir string) bool {
-	markers := []string{".git", "go.mod", "pyproject.toml", "package.json", "pnpm-lock.yaml", "uv.lock"}
+	markers := []string{".git", "go.mod", "pyproject.toml", "package.json", "pnpm-lock.yaml", "uv.lock", "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml"}
 	for _, marker := range markers {
 		if fileExists(filepath.Join(dir, marker)) {
 			return true
@@ -2294,6 +2342,7 @@ func detectLanguage(root string) language {
 		langTypeScript: 0,
 		langPython:     0,
 		langGo:         0,
+		langAnsible:    0,
 	}
 
 	applyMarkerScores(root, scores)
@@ -2334,11 +2383,23 @@ func applyMarkerScores(root string, scores map[language]int) {
 	if fileExists(filepath.Join(root, "package.json")) {
 		scores[langTypeScript] += 6
 	}
+	if fileExists(filepath.Join(root, "ansible.cfg")) {
+		scores[langAnsible] += 10
+	}
+	if fileExists(filepath.Join(root, "site.yml")) || fileExists(filepath.Join(root, "playbook.yml")) {
+		scores[langAnsible] += 8
+	}
+	if fileExists(filepath.Join(root, "requirements.yml")) {
+		scores[langAnsible] += 6
+	}
 }
 
 func applyConfigScores(root string, scores map[language]int) {
 	if fileExists(filepath.Join(root, ".rulesrc.go.json")) {
 		scores[langGo] += 20
+	}
+	if fileExists(filepath.Join(root, ".rulesrc.ansible.json")) {
+		scores[langAnsible] += 20
 	}
 	if fileExists(filepath.Join(root, ".rulesrc.python.json")) {
 		scores[langPython] += 20

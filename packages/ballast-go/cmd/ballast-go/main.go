@@ -22,7 +22,7 @@ import (
 )
 
 var targets = []string{"cursor", "claude", "opencode", "codex"}
-var languages = []string{"typescript", "python", "go"}
+var languages = []string{"typescript", "python", "go", "ansible"}
 
 var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing"}
 var languageAgents = []string{"linting", "logging", "testing"}
@@ -160,8 +160,8 @@ func runInstall(args []string) int {
 	var targetFlags targetListFlag
 	fs.Var(&targetFlags, "target", "cursor|claude|opencode|codex")
 	fs.Var(&targetFlags, "t", "cursor|claude|opencode|codex")
-	language := fs.String("language", "go", "typescript|python|go")
-	fs.StringVar(language, "l", "go", "typescript|python|go")
+	language := fs.String("language", "go", "typescript|python|go|ansible")
+	fs.StringVar(language, "l", "go", "typescript|python|go|ansible")
 	agent := fs.String("agent", "", "comma-separated list")
 	fs.StringVar(agent, "a", "", "comma-separated list")
 	skill := fs.String("skill", "", "comma-separated list")
@@ -1615,6 +1615,16 @@ func renderHookGuidance(language, hookMode string) string {
 			"- Keep the configuration current with `pre-commit autoupdate`.",
 			"- Verify the hook configuration with `pre-commit run --all-files`.",
 		}, "\n")
+	case "ansible":
+		return strings.Join([]string{
+			"- Use `pre-commit` for Ansible repositories.",
+			"- Create or update `.pre-commit-config.yaml` at the repo root.",
+			"- Install hooks with `pre-commit install`.",
+			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			"- Run `ansible-lint`, `yamllint`, and `ansible-playbook --syntax-check` from the hook configuration.",
+			"- Keep secrets out of logs and commits; prefer Ansible Vault or external secret stores.",
+			"- Keep the configuration current with `pre-commit autoupdate`.",
+		}, "\n")
 	default:
 		return ""
 	}
@@ -1725,6 +1735,10 @@ func findProjectRoot(cwd string) (string, error) {
 		if exists(filepath.Join(dir, "package.json")) ||
 			exists(filepath.Join(dir, "go.mod")) ||
 			exists(filepath.Join(dir, "pyproject.toml")) ||
+			exists(filepath.Join(dir, "ansible.cfg")) ||
+			exists(filepath.Join(dir, "site.yml")) ||
+			exists(filepath.Join(dir, "playbook.yml")) ||
+			exists(filepath.Join(dir, "requirements.yml")) ||
 			hasAnyRulesConfig(dir) {
 			return dir, nil
 		}

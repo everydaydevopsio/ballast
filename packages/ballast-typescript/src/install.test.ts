@@ -162,6 +162,29 @@ describe('install', () => {
       ).toBe(true);
     });
 
+    test('writes ansible language rules when requested', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        language: 'ansible',
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installed).toContain('linting');
+      const cursorFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'ansible-linting.mdc'
+      );
+      expect(fs.existsSync(cursorFile)).toBe(true);
+      expect(fs.readFileSync(cursorFile, 'utf8')).toContain(
+        'Ansible linting specialist'
+      );
+    });
+
     test('uses pre-commit guidance for standalone typescript installs', () => {
       saveConfig(
         {
@@ -198,7 +221,7 @@ describe('install', () => {
         {
           targets: ['cursor'],
           agents: ['linting'],
-          languages: ['typescript', 'python', 'go']
+          languages: ['typescript', 'python', 'go', 'ansible']
         },
         tmpDir
       );

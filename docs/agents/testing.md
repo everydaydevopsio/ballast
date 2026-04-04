@@ -1,6 +1,6 @@
 # Testing Agent
 
-The **testing** agent sets up and maintains test workflows for TypeScript, Python, and Go projects with sensible defaults and CI integration.
+The **testing** agent sets up and maintains test workflows for TypeScript, Python, Go, and Ansible projects with sensible defaults and CI integration.
 
 ## What It Sets Up by Language
 
@@ -16,6 +16,10 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
   - `go test ./...` baseline
   - Coverage checks via `go test ./... -cover`
   - Smoke tests and optional E2E for runnable apps
+- **Ansible**
+  - `ansible-playbook --syntax-check` baseline
+  - `--check --diff` validation for change preview and idempotence
+  - Molecule or localhost playbook smoke tests for roles and inventories
 
 ## What It Provides
 
@@ -36,13 +40,15 @@ Recommended baseline commands:
 - TypeScript: `pnpm test`
 - Python: `pytest`
 - Go: `go test ./...`
+- Ansible: `ansible-playbook --syntax-check site.yml` and `ansible-playbook --check --diff site.yml`
 
 ## Prompts to Improve Your App
 
-- **"Set up tests for TypeScript, Python, and Go packages in this monorepo"** — Full multi-language setup
+- **"Set up tests for TypeScript, Python, Go, and Ansible packages in this monorepo"** — Full multi-language setup
 - **"Add separate CI jobs for each language test suite"** — Better isolation
 - **"Raise coverage thresholds and make CI fail when they drop"** — Quality gate
 - **"Find and fix flaky tests in this package"** — Stability
 - **"Add smoke tests that build our app with Docker Compose and run in GitHub Actions"** — Deployability check
 - **"Add a smoke-test badge to the README"** — Status visibility
 - **"Add one stable end-to-end test for the login flow"** — Critical-path E2E
+- **"Add Ansible syntax-check and check-mode validation to CI"** — Infrastructure safety
