@@ -766,6 +766,47 @@ func TestRunInstallCLIUsesLocalSourcesInsideSourceCheckoutForReleaseWrapper(t *t
 	}
 }
 
+func TestResolveLocalBackendCommandUsesGoBinaryForTerraform(t *testing.T) {
+	repoRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go"), "")
+
+	resolved := resolveLocalBackendCommand(repoRoot, langTerraform)
+	if resolved.Binary != filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go") {
+		t.Fatalf("expected terraform local backend to reuse ballast-go binary, got %#v", resolved)
+	}
+}
+
+func TestProjectLocalBackendCommandUsesGoBinaryForTerraform(t *testing.T) {
+	projectRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "")
+
+	resolved := projectLocalBackendCommand(projectRoot, langTerraform)
+	if resolved.Binary != filepath.Join(projectRoot, ".ballast", "bin", "ballast-go") {
+		t.Fatalf("expected terraform project-local backend to reuse ballast-go binary, got %#v", resolved)
+	}
+}
+
+func TestSiblingBackendBinaryUsesGoBinaryForTerraform(t *testing.T) {
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		osExecutableFunc = originalExecutable
+	})
+
+	binDir := t.TempDir()
+	mustWriteFile(t, filepath.Join(binDir, "ballast-go"), "")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(binDir, "ballast"), nil
+	}
+
+	got, ok := siblingBackendBinary(langTerraform)
+	if !ok {
+		t.Fatal("expected terraform sibling backend binary to be found")
+	}
+	if got != filepath.Join(binDir, "ballast-go") {
+		t.Fatalf("expected terraform sibling backend to reuse ballast-go binary, got %q", got)
+	}
+}
+
 func TestRunInstallCLIUsesPinnedReleaseVersionsInsideSourceCheckout(t *testing.T) {
 	originalRun := runCommandFunc
 	originalVersion := version
@@ -989,6 +1030,16 @@ func TestDetectLanguageSupportsTerraformMarkers(t *testing.T) {
 	got := detectLanguage(root)
 	if got != langTerraform {
 		t.Fatalf("expected terraform detection, got %q", got)
+	}
+}
+
+func TestDetectLanguageSupportsTerraformRulesConfig(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.terraform.json"), `{"target":"cursor","agents":["linting"]}`)
+
+	got := detectLanguage(root)
+	if got != langTerraform {
+		t.Fatalf("expected terraform detection from legacy config, got %q", got)
 	}
 }
 

@@ -324,6 +324,48 @@ func TestInstallSupportsDocsAgentForOpenCodeWithFrontmatter(t *testing.T) {
 	}
 }
 
+func TestInstallSupportsTerraformLanguageProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"cursor"},
+		agents:      []string{"linting"},
+		language:    "terraform",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Equal(result.installed, []string{"linting"}) {
+		t.Fatalf("expected terraform linting install, got %+v", result.installed)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".cursor", "rules", "terraform-linting.mdc"))
+	if err != nil {
+		t.Fatalf("expected terraform-linting.mdc to exist: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "Terraform linting specialist") {
+		t.Fatalf("expected terraform linting content, got %q", text)
+	}
+	if !strings.Contains(text, ".terraform-version") || !strings.Contains(text, "tfenv install") || !strings.Contains(text, "tfsec") {
+		t.Fatalf("expected terraform hook and tooling guidance, got %q", text)
+	}
+}
+
+func TestRenderHookGuidanceSupportsTerraform(t *testing.T) {
+	got := renderHookGuidance("terraform", "standalone")
+	if !strings.Contains(got, ".terraform-version") {
+		t.Fatalf("expected terraform hook guidance to mention .terraform-version, got %q", got)
+	}
+	if !strings.Contains(got, "tfenv install") {
+		t.Fatalf("expected terraform hook guidance to mention tfenv install, got %q", got)
+	}
+	if !strings.Contains(got, "terraform fmt -check -recursive") || !strings.Contains(got, "tfsec") {
+		t.Fatalf("expected terraform hook guidance to mention terraform checks, got %q", got)
+	}
+}
+
 func TestPatchRuleContentPreservesExistingSections(t *testing.T) {
 	existing := `---
 description: Team customized linting rules
