@@ -618,6 +618,9 @@ func TestInstallCreatesClaudeSkillAndPersistsConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read CLAUDE.md: %v", err)
 	}
+	if !strings.Contains(string(claudeContent), "## Repository Facts") {
+		t.Fatalf("expected repository facts section in CLAUDE.md: %s", string(claudeContent))
+	}
 	if !strings.Contains(string(claudeContent), "## Installed skills") {
 		t.Fatalf("expected installed skills section in CLAUDE.md: %s", string(claudeContent))
 	}
@@ -715,6 +718,12 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 		t.Fatalf("read AGENTS.md: %v", err)
 	}
 	text := string(agentsMD)
+	if !strings.Contains(text, "## Repository Facts") {
+		t.Fatalf("expected repository facts section in AGENTS.md: %s", text)
+	}
+	if !strings.Contains(text, "Canonical GitHub repo: `<OWNER/REPO>`") {
+		t.Fatalf("expected repository facts scaffold in AGENTS.md: %s", text)
+	}
 	if !strings.Contains(text, "## Installed skills") {
 		t.Fatalf("expected installed skills section in AGENTS.md: %s", text)
 	}

@@ -2171,6 +2171,12 @@ func TestBuildMonorepoSupportFileIncludesPublishingAndSkillsForCodex(t *testing.
 
 	content := buildMonorepoSupportFile(plan, "codex")
 
+	if !strings.Contains(content, "## Repository Facts") {
+		t.Fatalf("expected repository facts section in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "Canonical GitHub repo: `<OWNER/REPO>`") {
+		t.Fatalf("expected repository facts scaffold in codex support file, got %q", content)
+	}
 	if !strings.Contains(content, "`.codex/rules/common/publishing-libraries.md`") {
 		t.Fatalf("expected publishing libraries rule in codex support file, got %q", content)
 	}
