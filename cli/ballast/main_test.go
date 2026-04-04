@@ -872,6 +872,33 @@ func TestDetectRepoProfilesFindsAnsibleProfile(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesFindsAnsibleProfileFromRequirementsYaml(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "requirements.yaml"), "---\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langAnsible, Paths: []string{filepath.Join(root, "infra", "ansible")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected ansible profile %#v, got %#v", want, profiles)
+	}
+}
+
+func TestDetectLanguageSupportsAnsibleRequirementsYaml(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "requirements.yaml"), "---\n")
+
+	got := detectLanguage(root)
+	if got != langAnsible {
+		t.Fatalf("expected ansible detection, got %q", got)
+	}
+}
+
 func TestDetectLanguagePrefersAnsibleMarkers(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")

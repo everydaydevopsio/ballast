@@ -1739,6 +1739,7 @@ func findProjectRoot(cwd string) (string, error) {
 			exists(filepath.Join(dir, "site.yml")) ||
 			exists(filepath.Join(dir, "playbook.yml")) ||
 			exists(filepath.Join(dir, "requirements.yml")) ||
+			exists(filepath.Join(dir, "requirements.yaml")) ||
 			hasAnyRulesConfig(dir) {
 			return dir, nil
 		}

@@ -160,6 +160,7 @@ def resolve_project_root(cwd: Path) -> Path:
                 "site.yml",
                 "playbook.yml",
                 "requirements.yml",
+                "requirements.yaml",
             )
         )
         has_any_cfg = (

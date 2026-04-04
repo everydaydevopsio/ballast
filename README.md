@@ -10,7 +10,7 @@
 
 Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, and Codex.
 
-Release `v5.3.1` supports four first-class language profiles in this repository:
+This repository supports four first-class language profiles:
 
 - TypeScript
 - Python

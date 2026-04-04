@@ -2,7 +2,7 @@
 
 This guide is for AI coding agents setting up Ballast in a repository.
 
-## Supported Language Profiles (v5.3.1)
+## Supported Language Profiles
 
 - TypeScript/JavaScript: `@everydaydevopsio/ballast`
 - Python: `ballast-python` (GitHub Releases artifact)

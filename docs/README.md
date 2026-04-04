@@ -1,6 +1,6 @@
 # Ballast Documentation
 
-Ballast `v5.3.1` supports TypeScript, Python, Go, and Ansible.
+Ballast supports TypeScript, Python, Go, and Ansible.
 
 ## Agent Families
 

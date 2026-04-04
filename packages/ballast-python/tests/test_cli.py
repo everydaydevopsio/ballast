@@ -117,6 +117,17 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(resolved, root)
 
+    def test_resolve_project_root_supports_ansible_requirements_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "requirements.yaml").write_text("---\n", encoding="utf-8")
+            nested = root / "roles" / "novnc"
+            nested.mkdir(parents=True)
+
+            resolved = cli.resolve_project_root(nested)
+
+            self.assertEqual(resolved, root)
+
     def test_normalize_target_tokens_ignores_non_string_items(self) -> None:
         self.assertEqual(
             cli.normalize_target_tokens(["cursor,claude", 7, None, "codex"]),

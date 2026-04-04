@@ -79,7 +79,8 @@ function hasProjectMarker(dir: string): boolean {
     fs.existsSync(path.join(dir, 'ansible.cfg')) ||
     fs.existsSync(path.join(dir, 'site.yml')) ||
     fs.existsSync(path.join(dir, 'playbook.yml')) ||
-    fs.existsSync(path.join(dir, 'requirements.yml'))
+    fs.existsSync(path.join(dir, 'requirements.yml')) ||
+    fs.existsSync(path.join(dir, 'requirements.yaml'))
   );
 }
 

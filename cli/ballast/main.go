@@ -1572,7 +1572,7 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 			pathsByLanguage[langPython] = append(pathsByLanguage[langPython], dir)
 		case "go.mod":
 			pathsByLanguage[langGo] = append(pathsByLanguage[langGo], dir)
-		case "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml":
+		case "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml", "requirements.yaml":
 			pathsByLanguage[langAnsible] = append(pathsByLanguage[langAnsible], dir)
 		}
 		return nil
@@ -2328,7 +2328,7 @@ func cwdOrDot(cwd string) string {
 }
 
 func hasRootMarker(dir string) bool {
-	markers := []string{".git", "go.mod", "pyproject.toml", "package.json", "pnpm-lock.yaml", "uv.lock", "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml"}
+	markers := []string{".git", "go.mod", "pyproject.toml", "package.json", "pnpm-lock.yaml", "uv.lock", "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml", "requirements.yaml"}
 	for _, marker := range markers {
 		if fileExists(filepath.Join(dir, marker)) {
 			return true
@@ -2390,6 +2390,9 @@ func applyMarkerScores(root string, scores map[language]int) {
 		scores[langAnsible] += 8
 	}
 	if fileExists(filepath.Join(root, "requirements.yml")) {
+		scores[langAnsible] += 6
+	}
+	if fileExists(filepath.Join(root, "requirements.yaml")) {
 		scores[langAnsible] += 6
 	}
 }
