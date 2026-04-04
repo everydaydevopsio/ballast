@@ -39,6 +39,20 @@ describe('config', () => {
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
     });
 
+    test('returns dir containing ansible project markers', () => {
+      fs.writeFileSync(path.join(tmpDir, 'ansible.cfg'), '[defaults]\n');
+      const sub = path.join(tmpDir, 'roles', 'novnc');
+      fs.mkdirSync(sub, { recursive: true });
+      expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
+    });
+
+    test('returns dir containing ansible requirements.yaml marker', () => {
+      fs.writeFileSync(path.join(tmpDir, 'requirements.yaml'), '---\n');
+      const sub = path.join(tmpDir, 'roles', 'novnc');
+      fs.mkdirSync(sub, { recursive: true });
+      expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
+    });
+
     test('returns dir containing .rulesrc.json', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),

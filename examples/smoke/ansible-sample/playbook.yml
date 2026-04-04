@@ -1,0 +1,8 @@
+---
+- name: Example Ansible smoke playbook
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Print smoke message
+      ansible.builtin.debug:
+        msg: hello from ansible sample

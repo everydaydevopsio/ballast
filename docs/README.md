@@ -1,6 +1,6 @@
 # Ballast Documentation
 
-Ballast `v5.3.1` supports TypeScript, Python, and Go.
+Ballast supports TypeScript, Python, Go, and Ansible.
 
 ## Agent Families
 
@@ -21,16 +21,16 @@ Language-specific agents:
 ## Agent Guide Index
 
 <!-- prettier-ignore -->
-Agent | TypeScript | Python | Go | Guide
------ | ---------- | ------ | -- | -----
-`local-dev` | Yes | Yes | Yes | [agents/local-dev.md](agents/local-dev.md)
-`docs` | Yes | Yes | Yes | [agents/docs.md](agents/docs.md)
-`cicd` | Yes | Yes | Yes | [agents/cicd.md](agents/cicd.md)
-`observability` | Yes | Yes | Yes | [agents/observability.md](agents/observability.md)
-`publishing` | Yes | Yes | Yes | [agents/publishing.md](agents/publishing.md)
-`linting` | Yes | Yes | Yes | [agents/linting.md](agents/linting.md)
-`logging` | Yes | Yes | Yes | [agents/logging.md](agents/logging.md)
-`testing` | Yes | Yes | Yes | [agents/testing.md](agents/testing.md)
+Agent | TypeScript | Python | Go | Ansible | Guide
+----- | ---------- | ------ | -- | -------- | -----
+`local-dev` | Yes | Yes | Yes | Yes | [agents/local-dev.md](agents/local-dev.md)
+`docs` | Yes | Yes | Yes | Yes | [agents/docs.md](agents/docs.md)
+`cicd` | Yes | Yes | Yes | Yes | [agents/cicd.md](agents/cicd.md)
+`observability` | Yes | Yes | Yes | Yes | [agents/observability.md](agents/observability.md)
+`publishing` | Yes | Yes | Yes | Yes | [agents/publishing.md](agents/publishing.md)
+`linting` | Yes | Yes | Yes | Yes | [agents/linting.md](agents/linting.md)
+`logging` | Yes | Yes | Yes | Yes | [agents/logging.md](agents/logging.md)
+`testing` | Yes | Yes | Yes | Yes | [agents/testing.md](agents/testing.md)
 
 ## Skill Guide Index
 
@@ -47,8 +47,8 @@ Guide index:
 
 See [installation.md](installation.md) for package-specific commands, skill installation, and the unified monorepo workflow:
 
-- `ballast install --target cursor --all --yes` for TypeScript + Python + Go monorepos
-- TypeScript single-repo linting rules use `pre-commit`; unified monorepos use Husky for TypeScript and `pre-commit` for Python/Go
+- `ballast install --target cursor --all --yes` for TypeScript + Python + Go monorepos, with Ansible available through the language CLIs
+- TypeScript single-repo linting rules use `pre-commit`; unified monorepos use Husky for TypeScript and `pre-commit` for Python/Go/Ansible
 - npm (`@everydaydevopsio/ballast`)
 - uv/uvx from GitHub Releases wheel (`ballast-python`)
 - go install/go run (`ballast-go`)

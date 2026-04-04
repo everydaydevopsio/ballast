@@ -14,19 +14,21 @@ from importlib import metadata
 from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex"]
-LANGUAGES = ["typescript", "python", "go"]
+LANGUAGES = ["typescript", "python", "go", "ansible"]
 COMMON_AGENTS = ["local-dev", "docs", "cicd", "observability", "publishing"]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
     "typescript": COMMON_AGENTS + LANGUAGE_AGENTS,
     "python": COMMON_AGENTS + LANGUAGE_AGENTS,
     "go": COMMON_AGENTS + LANGUAGE_AGENTS,
+    "ansible": COMMON_AGENTS + LANGUAGE_AGENTS,
 }
 COMMON_SKILLS = ["owasp-security-scan"]
 SKILLS_BY_LANGUAGE = {
     "typescript": COMMON_SKILLS,
     "python": COMMON_SKILLS,
     "go": COMMON_SKILLS,
+    "ansible": COMMON_SKILLS,
 }
 HOOK_GUIDANCE_TOKEN = "{{BALLAST_HOOK_GUIDANCE}}"
 
@@ -151,6 +153,16 @@ def resolve_project_root(cwd: Path) -> Path:
         has_pkg = (directory / "package.json").exists()
         has_go = (directory / "go.mod").exists()
         has_pyproject = (directory / "pyproject.toml").exists()
+        has_ansible = any(
+            (directory / marker).exists()
+            for marker in (
+                "ansible.cfg",
+                "site.yml",
+                "playbook.yml",
+                "requirements.yml",
+                "requirements.yaml",
+            )
+        )
         has_any_cfg = (
             (directory / ".rulesrc.json").exists()
             or (directory / ".rulesrc.ts.json").exists()
@@ -159,7 +171,7 @@ def resolve_project_root(cwd: Path) -> Path:
                 for lang in LANGUAGES
             )
         )
-        if has_pkg or has_go or has_pyproject or has_any_cfg:
+        if has_pkg or has_go or has_pyproject or has_ansible or has_any_cfg:
             return directory
     return cwd
 

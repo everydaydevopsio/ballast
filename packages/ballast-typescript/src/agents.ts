@@ -38,7 +38,7 @@ function resolveAgentsRoot(): string {
 
 const AGENTS_ROOT = resolveAgentsRoot();
 
-export const LANGUAGES = ['typescript', 'python', 'go'] as const;
+export const LANGUAGES = ['typescript', 'python', 'go', 'ansible'] as const;
 export type Language = (typeof LANGUAGES)[number];
 
 export const COMMON_AGENT_IDS = [

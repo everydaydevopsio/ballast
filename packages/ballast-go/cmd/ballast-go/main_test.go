@@ -156,6 +156,44 @@ func TestInstallAddsBallastToGitignore(t *testing.T) {
 	}
 }
 
+func TestFindProjectRootSupportsAnsibleMarkers(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "ansible.cfg"), []byte("[defaults]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(tmpDir, "roles", "novnc")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(nested)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != tmpDir {
+		t.Fatalf("expected ansible project root %q, got %q", tmpDir, root)
+	}
+}
+
+func TestFindProjectRootSupportsAnsibleRequirementsYaml(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "requirements.yaml"), []byte("---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(tmpDir, "roles", "novnc")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(nested)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != tmpDir {
+		t.Fatalf("expected ansible project root %q, got %q", tmpDir, root)
+	}
+}
+
 func TestInstallRecordsGitignoreErrorAndContinues(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(tmpDir, ".gitignore"), 0o755); err != nil {

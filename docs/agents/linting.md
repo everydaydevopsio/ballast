@@ -1,6 +1,6 @@
 # Linting Agent
 
-The **linting** agent provides language-appropriate linting, formatting, and CI checks for TypeScript, Python, and Go projects.
+The **linting** agent provides language-appropriate linting, formatting, and CI checks for TypeScript, Python, Go, and Ansible projects.
 
 ## What It Sets Up by Language
 
@@ -21,6 +21,11 @@ The **linting** agent provides language-appropriate linting, formatting, and CI 
   - `golangci-lint` for static analysis
   - `pre-commit` with sub-config support for nested Go packages when needed
   - A `pre-push` test hook managed by `pre-commit`
+- **Ansible**
+  - `ansible-lint` for role and playbook validation
+  - `yamllint` for YAML formatting and style
+  - `pre-commit` hooks for lint, syntax-check, and vault-safe workflows
+  - Guidance for inventories, role layout, and idempotent task design
 
 ## What It Provides
 
@@ -44,10 +49,12 @@ Recommended command set:
 - TypeScript: `pnpm run lint` (or project ESLint command)
 - Python: `ruff check .` and `ruff format .`
 - Go: `gofmt -w .` and `golangci-lint run`
+- Ansible: `ansible-lint`, `yamllint .`, and `ansible-playbook --syntax-check site.yml`
 
 ## Prompts to Improve Your App
 
 - **"Set up linting for all three languages in this monorepo"** — Multi-language baseline
+- **"Set up linting for our Ansible playbooks and roles"** — Playbook baseline
 - **"Fix lint errors in this package according to its language rules"** — Targeted cleanup
-- **"Add CI jobs so TypeScript, Python, and Go lint checks run independently"** — Monorepo CI
+- **"Add CI jobs so TypeScript, Python, Go, and Ansible lint checks run independently"** — Monorepo CI
 - **"Add ignore patterns for generated code in each language"** — Noise reduction

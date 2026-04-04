@@ -71,11 +71,24 @@ function hasConfigFile(dir: string): boolean {
   );
 }
 
+function hasProjectMarker(dir: string): boolean {
+  return (
+    fs.existsSync(path.join(dir, 'package.json')) ||
+    fs.existsSync(path.join(dir, 'go.mod')) ||
+    fs.existsSync(path.join(dir, 'pyproject.toml')) ||
+    fs.existsSync(path.join(dir, 'ansible.cfg')) ||
+    fs.existsSync(path.join(dir, 'site.yml')) ||
+    fs.existsSync(path.join(dir, 'playbook.yml')) ||
+    fs.existsSync(path.join(dir, 'requirements.yml')) ||
+    fs.existsSync(path.join(dir, 'requirements.yaml'))
+  );
+}
+
 export function findProjectRoot(cwd: string = process.cwd()): string {
   let dir = path.resolve(cwd);
   const root = path.parse(dir).root;
   while (dir !== root) {
-    if (hasConfigFile(dir) || fs.existsSync(path.join(dir, 'package.json'))) {
+    if (hasConfigFile(dir) || hasProjectMarker(dir)) {
       return dir;
     }
     dir = path.dirname(dir);

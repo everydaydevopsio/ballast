@@ -106,6 +106,28 @@ class PatchInstallTests(unittest.TestCase):
             self.assertEqual(config["targets"], ["cursor"])
             self.assertEqual(config["agents"], ["linting"])
 
+    def test_resolve_project_root_supports_ansible_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "ansible.cfg").write_text("[defaults]\n", encoding="utf-8")
+            nested = root / "roles" / "novnc"
+            nested.mkdir(parents=True)
+
+            resolved = cli.resolve_project_root(nested)
+
+            self.assertEqual(resolved, root)
+
+    def test_resolve_project_root_supports_ansible_requirements_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "requirements.yaml").write_text("---\n", encoding="utf-8")
+            nested = root / "roles" / "novnc"
+            nested.mkdir(parents=True)
+
+            resolved = cli.resolve_project_root(nested)
+
+            self.assertEqual(resolved, root)
+
     def test_normalize_target_tokens_ignores_non_string_items(self) -> None:
         self.assertEqual(
             cli.normalize_target_tokens(["cursor,claude", 7, None, "codex"]),
@@ -185,6 +207,28 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn('"go": [', content)
             self.assertIn('"skills": [', content)
             self.assertIn('"targets": [', content)
+
+    def test_install_supports_ansible_language_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "codex",
+                ["linting"],
+                [],
+                "ansible",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("linting", result.installed)
+            rule = root / ".codex" / "rules" / "ansible-linting.md"
+            self.assertTrue(rule.exists())
+            self.assertIn(
+                "Ansible linting specialist", rule.read_text(encoding="utf-8")
+            )
 
     def test_install_creates_skill_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
