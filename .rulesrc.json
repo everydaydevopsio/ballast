@@ -15,12 +15,13 @@
     "logging",
     "testing"
   ],
-  "ballastVersion": "5.5.0",
+  "ballastVersion": "5.5.1",
   "languages": [
     "typescript",
     "python",
     "go",
-    "ansible"
+    "ansible",
+    "terraform"
   ],
   "paths": {
     "ansible": [
@@ -34,6 +35,9 @@
     "python": [
       "examples/smoke/python-sample",
       "packages/ballast-python"
+    ],
+    "terraform": [
+      "examples/smoke/terraform-sample"
     ],
     "typescript": [
       "examples/smoke/typescript-sample",

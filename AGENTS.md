@@ -98,3 +98,6 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/ansible/ansible-linting.md` — Rules for ansible/linting
 - `.codex/rules/ansible/ansible-logging.md` — Rules for ansible/logging
 - `.codex/rules/ansible/ansible-testing.md` — Rules for ansible/testing
+- `.codex/rules/terraform/terraform-linting.md` — Rules for terraform/linting
+- `.codex/rules/terraform/terraform-logging.md` — Rules for terraform/logging
+- `.codex/rules/terraform/terraform-testing.md` — Rules for terraform/testing
