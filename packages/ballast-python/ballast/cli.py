@@ -15,7 +15,14 @@ from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex"]
 LANGUAGES = ["typescript", "python", "go", "ansible", "terraform"]
-COMMON_AGENTS = ["local-dev", "docs", "cicd", "observability", "publishing"]
+COMMON_AGENTS = [
+    "local-dev",
+    "docs",
+    "cicd",
+    "observability",
+    "publishing",
+    "git-hooks",
+]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
     "typescript": COMMON_AGENTS + LANGUAGE_AGENTS,
@@ -32,7 +39,14 @@ SKILLS_BY_LANGUAGE = {
     "ansible": COMMON_SKILLS,
     "terraform": COMMON_SKILLS,
 }
-HOOK_GUIDANCE_TOKEN = "{{BALLAST_HOOK_GUIDANCE}}"
+GIT_HOOKS_GUIDANCE_TOKEN = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
+
+
+def with_implicit_agents(agents: list[str]) -> list[str]:
+    resolved = list(agents)
+    if "linting" in resolved and "git-hooks" not in resolved:
+        resolved.append("git-hooks")
+    return resolved
 
 
 def cli_version() -> str:
@@ -512,7 +526,7 @@ def read_content(agent: str, language: str, suffix: str = "") -> str:
     return (agent_dir(agent, language) / filename).read_text(encoding="utf-8")
 
 
-def render_hook_guidance(language: str, hook_mode: str) -> str:
+def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
     if language == "typescript":
         if hook_mode == "monorepo":
             return "\n".join(
@@ -641,13 +655,13 @@ def resolve_ts_hook_mode(root: Path, language: str) -> str:
 def apply_hook_guidance(
     content: str, agent: str, language: str, root: Path | None
 ) -> str:
-    if agent != "linting" or HOOK_GUIDANCE_TOKEN not in content:
+    if agent != "git-hooks" or GIT_HOOKS_GUIDANCE_TOKEN not in content:
         return content
     hook_mode = (
         resolve_ts_hook_mode(root, language) if root is not None else "standalone"
     )
     return content.replace(
-        HOOK_GUIDANCE_TOKEN, render_hook_guidance(language, hook_mode)
+        GIT_HOOKS_GUIDANCE_TOKEN, render_git_hooks_guidance(language, hook_mode)
     )
 
 
@@ -1309,15 +1323,15 @@ def resolve_target_and_agents(
     ):
         return (
             list(cfg["targets"]),
-            list(cfg["agents"]),
+            with_implicit_agents(list(cfg["agents"])),
             list(cfg.get("skills") or []),
         )
 
     targets = target_from_flag or (list(cfg["targets"]) if cfg else None)
     agents = (
-        agents_from_flag
+        with_implicit_agents(agents_from_flag)
         if agents_from_flag is not None
-        else (list(cfg["agents"]) if cfg else None)
+        else (with_implicit_agents(list(cfg["agents"])) if cfg else None)
     )
     skills = (
         skills_from_flag
@@ -1349,6 +1363,7 @@ def install(
     patch_claude_md: bool = False,
 ) -> InstallResult:
     result = InstallResult()
+    agents = with_implicit_agents(agents)
     processed_agents: list[str] = []
     processed_skills: list[str] = []
     disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
@@ -1478,6 +1493,7 @@ def install_for_targets(
     patch_claude_md: bool = False,
 ) -> list[tuple[str, InstallResult]]:
     results: list[tuple[str, InstallResult]] = []
+    agents = with_implicit_agents(agents)
     if persist:
         save_config(root, language, targets, agents, skills)
 

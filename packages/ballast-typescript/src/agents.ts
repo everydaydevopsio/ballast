@@ -52,7 +52,8 @@ export const COMMON_AGENT_IDS = [
   'docs',
   'cicd',
   'observability',
-  'publishing'
+  'publishing',
+  'git-hooks'
 ] as const;
 export const LANGUAGE_AGENT_IDS = ['linting', 'logging', 'testing'] as const;
 export const AGENT_IDS = [...COMMON_AGENT_IDS, ...LANGUAGE_AGENT_IDS] as const;

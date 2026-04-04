@@ -1,0 +1,6 @@
+---
+description: Git hook specialist for pre-commit, pre-push, and Husky workflows
+permission:
+  edit: allow
+  bash: allow
+---

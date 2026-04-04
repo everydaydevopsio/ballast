@@ -34,7 +34,7 @@ describe('install', () => {
       });
       expect(result).toEqual({
         targets: ['cursor'],
-        agents: ['linting'],
+        agents: ['linting', 'git-hooks'],
         skills: []
       });
     });
@@ -52,6 +52,7 @@ describe('install', () => {
       expect(result?.agents).toContain('cicd');
       expect(result?.agents).toContain('observability');
       expect(result?.agents).toContain('publishing');
+      expect(result?.agents).toContain('git-hooks');
       expect(result?.agents).toContain('logging');
       expect(result?.agents).toContain('testing');
       expect(result?.skills).toEqual([]);
@@ -71,7 +72,7 @@ describe('install', () => {
       });
       expect(result).toEqual({
         targets: ['opencode'],
-        agents: ['linting', 'cicd'],
+        agents: ['linting', 'cicd', 'git-hooks'],
         skills: ['owasp-security-scan']
       });
     });
@@ -95,7 +96,7 @@ describe('install', () => {
       });
       expect(result).toEqual({
         targets: ['cursor'],
-        agents: ['linting'],
+        agents: ['linting', 'git-hooks'],
         skills: []
       });
     });
@@ -114,7 +115,7 @@ describe('install', () => {
       });
       expect(result).toEqual({
         targets: ['cursor', 'claude'],
-        agents: ['linting'],
+        agents: ['linting', 'git-hooks'],
         skills: ['owasp-security-scan']
       });
     });
@@ -236,10 +237,23 @@ describe('install', () => {
         'typescript-linting.mdc'
       );
       const content = fs.readFileSync(cursorFile, 'utf8');
-      expect(content).toContain('.pre-commit-config.yaml');
-      expect(content).toContain('pre-commit install');
-      expect(content).toContain('pre-commit install --hook-type pre-push');
-      expect(content).not.toContain('Set Up Git Hooks with Husky');
+      expect(content).not.toContain('.pre-commit-config.yaml');
+      expect(content).not.toContain('pre-commit install');
+      expect(content).not.toContain('pre-commit install --hook-type pre-push');
+      expect(content).not.toContain('Use Husky for this monorepo.');
+
+      const gitHooksFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'git-hooks.mdc'
+      );
+      expect(fs.existsSync(gitHooksFile)).toBe(true);
+      const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
+      expect(gitHooksContent).toContain('.pre-commit-config.yaml');
+      expect(gitHooksContent).toContain(
+        'pre-commit install --hook-type pre-push'
+      );
     });
 
     test('uses husky guidance for monorepo typescript installs', () => {
@@ -267,10 +281,22 @@ describe('install', () => {
         'typescript-linting.mdc'
       );
       const content = fs.readFileSync(cursorFile, 'utf8');
-      expect(content).toContain('Set Up Git Hooks with Husky');
-      expect(content).toContain('lint-staged');
-      expect(content).toContain('.husky/pre-push');
+      expect(content).not.toContain('Use Husky for this monorepo.');
+      expect(content).not.toContain('lint-staged');
+      expect(content).not.toContain('.husky/pre-push');
       expect(content).not.toContain('pre-commit install');
+
+      const gitHooksFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'git-hooks.mdc'
+      );
+      expect(fs.existsSync(gitHooksFile)).toBe(true);
+      const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
+      expect(gitHooksContent).toContain('Use Husky for this monorepo.');
+      expect(gitHooksContent).toContain('lint-staged');
+      expect(gitHooksContent).toContain('.husky/pre-push');
     });
 
     test('uses husky guidance for typescript workspace monorepos even with one language', () => {
@@ -312,8 +338,18 @@ describe('install', () => {
         'typescript-linting.mdc'
       );
       const content = fs.readFileSync(cursorFile, 'utf8');
-      expect(content).toContain('Set Up Git Hooks with Husky');
+      expect(content).not.toContain('Set Up Git Hooks with Husky');
       expect(content).not.toContain('pre-commit install');
+
+      const gitHooksFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'git-hooks.mdc'
+      );
+      expect(fs.readFileSync(gitHooksFile, 'utf8')).toContain(
+        'Use Husky for this monorepo.'
+      );
     });
 
     test('writes python language files and uses python-specific content', () => {
@@ -352,7 +388,7 @@ describe('install', () => {
         force: false,
         saveConfig: false
       });
-      expect(result.installed).toHaveLength(0);
+      expect(result.installed).toEqual(['git-hooks']);
       expect(result.skipped).toContain('linting');
       expect(
         fs.readFileSync(path.join(cursorDir, 'typescript-linting.mdc'), 'utf8')
@@ -469,7 +505,7 @@ Keep my custom responsibilities.
       const config = loadConfig(tmpDir);
       expect(config).toEqual({
         targets: ['claude'],
-        agents: ['linting', 'local-dev'],
+        agents: ['linting', 'local-dev', 'git-hooks'],
         ballastVersion: BALLAST_VERSION,
         languages: ['typescript'],
         paths: { typescript: ['.'] }
@@ -494,7 +530,7 @@ Keep my custom responsibilities.
       const config = loadConfig(tmpDir, 'go');
       expect(config).toEqual({
         targets: ['claude'],
-        agents: ['linting', 'local-dev'],
+        agents: ['linting', 'local-dev', 'git-hooks'],
         ballastVersion: BALLAST_VERSION,
         languages: ['go'],
         paths: { go: ['.'] }
@@ -752,7 +788,7 @@ Keep my custom responsibilities.
         force: false,
         saveConfig: false
       });
-      expect(result.installed).toEqual(['linting', 'cicd']);
+      expect(result.installed).toEqual(['linting', 'cicd', 'git-hooks']);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toEqual({
         agent: 'unknown-agent',

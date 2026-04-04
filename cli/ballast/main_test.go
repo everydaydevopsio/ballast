@@ -1164,7 +1164,7 @@ func TestResolveMonorepoPlanAllIncludesExpectedCommonAgents(t *testing.T) {
 		t.Fatal("expected at least one backend invocation")
 	}
 	got := strings.Join(plan.Invocations[0].Args, " ")
-	if !strings.Contains(got, "--agent local-dev,docs,cicd,observability,publishing") {
+	if !strings.Contains(got, "--agent local-dev,docs,cicd,observability,publishing,git-hooks") {
 		t.Fatalf("expected common invocation to include normalized common agents, got %q", got)
 	}
 
@@ -1455,7 +1455,7 @@ func TestRunMonorepoInstallExecutesEachBackendAtRepoRoot(t *testing.T) {
 	if invocations[0].Dir != root {
 		t.Fatalf("expected root common install, got %#v", invocations[0])
 	}
-	if got := strings.Join(invocations[0].Args, " "); !strings.Contains(got, "--agent local-dev,docs,cicd,observability,publishing") {
+	if got := strings.Join(invocations[0].Args, " "); !strings.Contains(got, "--agent local-dev,docs,cicd,observability,publishing,git-hooks") {
 		t.Fatalf("expected common agents in first invocation, got %q", got)
 	}
 

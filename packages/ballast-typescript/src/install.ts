@@ -35,6 +35,14 @@ import {
 } from './config';
 import { BALLAST_VERSION } from './version';
 
+function withImplicitAgents(agents: string[]): string[] {
+  const next = [...agents];
+  if (next.includes('linting') && !next.includes('git-hooks')) {
+    next.push('git-hooks');
+  }
+  return next;
+}
+
 function prompt(question: string): Promise<string> {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -255,7 +263,7 @@ export async function resolveTargetAndAgents(
   ) {
     return {
       targets: config.targets,
-      agents: config.agents,
+      agents: withImplicitAgents(config.agents),
       skills: config.skills ?? []
     };
   }
@@ -264,8 +272,10 @@ export async function resolveTargetAndAgents(
     targetsFromFlag.length > 0 ? targetsFromFlag : (config?.targets ?? []);
   const agents =
     agentsFromFlag != null
-      ? resolveAgents(agentsFromFlag, language)
-      : config?.agents;
+      ? withImplicitAgents(resolveAgents(agentsFromFlag, language))
+      : config?.agents
+        ? withImplicitAgents(config.agents)
+        : config?.agents;
   const skills =
     options.skills != null
       ? resolveSkills(options.skills, language)
@@ -356,6 +366,7 @@ export function install(options: InstallOptions): InstallResult {
     patchClaudeMd = false,
     saveConfig: persist
   } = options;
+  const effectiveAgents = withImplicitAgents(agents);
   const installed: string[] = [];
   const installedRules: Array<{ agentId: string; ruleSuffix: string }> = [];
   const installedSkills: string[] = [];
@@ -381,7 +392,7 @@ export function install(options: InstallOptions): InstallResult {
     saveConfig(
       {
         targets: [target],
-        agents,
+        agents: effectiveAgents,
         skills,
         ballastVersion: BALLAST_VERSION,
         languages: [language]
@@ -391,7 +402,7 @@ export function install(options: InstallOptions): InstallResult {
   }
   const hookMode = resolveTsHookMode(projectRoot, language);
 
-  for (const agentId of agents) {
+  for (const agentId of effectiveAgents) {
     if (!isValidAgent(agentId, language)) {
       errors.push({ agent: agentId, error: 'Unknown agent' });
       continue;

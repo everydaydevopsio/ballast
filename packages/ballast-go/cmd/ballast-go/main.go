@@ -24,7 +24,7 @@ import (
 var targets = []string{"cursor", "claude", "opencode", "codex"}
 var languages = []string{"typescript", "python", "go", "ansible", "terraform"}
 
-var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing"}
+var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var commonSkills = []string{"owasp-security-scan"}
 
@@ -32,7 +32,15 @@ var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?
 var ballastVersion = "dev"
 var frontmatterRegex = regexp.MustCompile(`(?s)^\s*---\n(.*?)\n---\n?`)
 var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
-var hookGuidanceToken = "{{BALLAST_HOOK_GUIDANCE}}"
+var gitHooksGuidanceToken = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
+
+func withImplicitAgents(agents []string) []string {
+	resolved := slices.Clone(agents)
+	if contains(resolved, "linting") && !contains(resolved, "git-hooks") {
+		resolved = append(resolved, "git-hooks")
+	}
+	return resolved
+}
 
 //go:embed agents/**
 var embeddedAgentsFS embed.FS
@@ -325,7 +333,7 @@ Commands:
 Options:
   --target, -t <platform>   AI platforms: %s (comma-separated or repeatable)
   --language, -l <lang>     Language profile: %s (default: go)
-  --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, logging, testing (comma-separated)
+  --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, git-hooks, logging, testing (comma-separated)
   --skill, -s <skills>      Skill(s): owasp-security-scan (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
@@ -580,7 +588,9 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	}
 
 	if config != nil && len(opts.targets) == 0 && len(flagAgents) == 0 && len(flagSkills) == 0 {
-		return config, nil
+		next := *config
+		next.Agents = withImplicitAgents(config.Agents)
+		return &next, nil
 	}
 
 	resolvedTargets, invalidTargets := normalizeTargetsDetailed(opts.targets)
@@ -593,9 +603,9 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 
 	var resolvedAgents []string
 	if len(flagAgents) > 0 {
-		resolvedAgents = resolveAgents(flagAgents, opts.language)
+		resolvedAgents = withImplicitAgents(resolveAgents(flagAgents, opts.language))
 	} else if config != nil {
-		resolvedAgents = config.Agents
+		resolvedAgents = withImplicitAgents(config.Agents)
 	}
 	resolvedSkills := []string{}
 	if len(flagSkills) > 0 {
@@ -639,6 +649,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 
 func install(opts installOptions) installResult {
 	result := installResult{}
+	opts.agents = withImplicitAgents(opts.agents)
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 	hookMode := resolveTsHookMode(opts.projectRoot, opts.language)
 	targets := normalizeTargets(opts.targets)
@@ -1577,10 +1588,10 @@ func readContent(agentID, language, suffix, hookMode string) (string, error) {
 		return "", fmt.Errorf("agent %q has no %s", agentID, name)
 	}
 	content := string(bytes)
-	if agentID != "linting" || !strings.Contains(content, hookGuidanceToken) {
+	if agentID != "git-hooks" || !strings.Contains(content, gitHooksGuidanceToken) {
 		return content, nil
 	}
-	return strings.ReplaceAll(content, hookGuidanceToken, renderHookGuidance(language, hookMode)), nil
+	return strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode)), nil
 }
 
 func readTemplate(agentID, language, filename, suffix string) (string, error) {
@@ -1605,7 +1616,7 @@ func readTemplate(agentID, language, filename, suffix string) (string, error) {
 	return string(bytes), nil
 }
 
-func renderHookGuidance(language, hookMode string) string {
+func renderGitHooksGuidance(language, hookMode string) string {
 	switch language {
 	case "typescript":
 		if hookMode == "monorepo" {

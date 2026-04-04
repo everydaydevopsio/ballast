@@ -336,8 +336,8 @@ func TestInstallSupportsTerraformLanguageProfile(t *testing.T) {
 	if len(result.errors) > 0 {
 		t.Fatalf("unexpected install errors: %+v", result.errors)
 	}
-	if !slices.Equal(result.installed, []string{"linting"}) {
-		t.Fatalf("expected terraform linting install, got %+v", result.installed)
+	if !slices.Contains(result.installed, "linting") || !slices.Contains(result.installed, "git-hooks") {
+		t.Fatalf("expected terraform linting and git-hooks install, got %+v", result.installed)
 	}
 
 	content, err := os.ReadFile(filepath.Join(tmpDir, ".cursor", "rules", "terraform-linting.mdc"))
@@ -353,16 +353,19 @@ func TestInstallSupportsTerraformLanguageProfile(t *testing.T) {
 	}
 }
 
-func TestRenderHookGuidanceSupportsTerraform(t *testing.T) {
-	got := renderHookGuidance("terraform", "standalone")
+func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
+	got, err := readContent("git-hooks", "terraform", "", "standalone")
+	if err != nil {
+		t.Fatalf("read terraform git-hooks content: %v", err)
+	}
 	if !strings.Contains(got, ".terraform-version") {
-		t.Fatalf("expected terraform hook guidance to mention .terraform-version, got %q", got)
+		t.Fatalf("expected terraform git-hooks content to mention .terraform-version, got %q", got)
 	}
 	if !strings.Contains(got, "tfenv install") {
-		t.Fatalf("expected terraform hook guidance to mention tfenv install, got %q", got)
+		t.Fatalf("expected terraform git-hooks content to mention tfenv install, got %q", got)
 	}
 	if !strings.Contains(got, "terraform fmt -check -recursive") || !strings.Contains(got, "tfsec") {
-		t.Fatalf("expected terraform hook guidance to mention terraform checks, got %q", got)
+		t.Fatalf("expected terraform git-hooks content to mention terraform checks, got %q", got)
 	}
 }
 
@@ -449,8 +452,11 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	if len(result.errors) > 0 {
 		t.Fatalf("unexpected install errors: %+v", result.errors)
 	}
-	if len(result.installed) != 1 || result.installed[0] != "linting" {
+	if !slices.Contains(result.installed, "linting") {
 		t.Fatalf("expected linting to be installed, got %+v", result.installed)
+	}
+	if !slices.Contains(result.installed, "git-hooks") {
+		t.Fatalf("expected git-hooks to be installed with linting, got %+v", result.installed)
 	}
 
 	rulePath := filepath.Join(tmpDir, ".codex", "rules", "go-linting.md")
@@ -464,11 +470,17 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	if strings.Contains(string(content), "{{BALLAST_HOOK_GUIDANCE}}") {
 		t.Fatalf("expected hook guidance token to be replaced, got %s", string(content))
 	}
-	if !strings.Contains(string(content), "pre-commit install") {
-		t.Fatalf("expected concrete pre-commit guidance, got %s", string(content))
+	if strings.Contains(string(content), "pre-commit install") {
+		t.Fatalf("expected hook guidance to move out of linting, got %s", string(content))
 	}
-	if !strings.Contains(string(content), "pre-commit install --hook-type pre-push") {
-		t.Fatalf("expected concrete pre-push guidance, got %s", string(content))
+
+	gitHooksPath := filepath.Join(tmpDir, ".codex", "rules", "git-hooks.md")
+	gitHooksContent, err := os.ReadFile(gitHooksPath)
+	if err != nil {
+		t.Fatalf("read git-hooks.md: %v", err)
+	}
+	if !strings.Contains(string(gitHooksContent), "pre-commit install --hook-type pre-push") {
+		t.Fatalf("expected dedicated git-hooks guidance, got %s", string(gitHooksContent))
 	}
 }
 
