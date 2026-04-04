@@ -194,6 +194,28 @@ func TestFindProjectRootSupportsAnsibleRequirementsYaml(t *testing.T) {
 	}
 }
 
+func TestFindProjectRootSupportsTerraformMarkers(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".terraform-version"), []byte("1.8.5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "versions.tf"), []byte("terraform {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(tmpDir, "modules", "network")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(nested)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != tmpDir {
+		t.Fatalf("expected terraform project root %q, got %q", tmpDir, root)
+	}
+}
+
 func TestInstallRecordsGitignoreErrorAndContinues(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(tmpDir, ".gitignore"), 0o755); err != nil {

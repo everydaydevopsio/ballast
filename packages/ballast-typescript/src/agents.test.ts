@@ -95,5 +95,10 @@ describe('agents', () => {
       expect(listAgents('ansible')).toEqual([...AGENT_IDS]);
       expect(isValidAgent('linting', 'ansible')).toBe(true);
     });
+
+    test('terraform profile uses same public agent ids', () => {
+      expect(listAgents('terraform')).toEqual([...AGENT_IDS]);
+      expect(isValidAgent('logging', 'terraform')).toBe(true);
+    });
   });
 });

@@ -1,6 +1,6 @@
 # Testing Agent
 
-The **testing** agent sets up and maintains test workflows for TypeScript, Python, Go, and Ansible projects with sensible defaults and CI integration.
+The **testing** agent sets up and maintains test workflows for TypeScript, Python, Go, Ansible, and Terraform projects with sensible defaults and CI integration.
 
 ## What It Sets Up by Language
 
@@ -20,6 +20,10 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
   - `ansible-playbook --syntax-check` baseline
   - `--check --diff` validation for change preview and idempotence
   - Molecule or localhost playbook smoke tests for roles and inventories
+- **Terraform**
+  - `terraform fmt -check -recursive` and `terraform validate`
+  - `tflint` and `tfsec`/`trivy config` for lint and security coverage
+  - `terraform init -backend=false` smoke setup plus plan-review guidance
 
 ## What It Provides
 
@@ -41,6 +45,7 @@ Recommended baseline commands:
 - Python: `pytest`
 - Go: `go test ./...`
 - Ansible: `ansible-playbook --syntax-check site.yml` and `ansible-playbook --check --diff site.yml`
+- Terraform: `tfenv install && tfenv use`, `terraform init -backend=false`, `terraform validate`, `tflint --recursive`, and `tfsec .`
 
 ## Prompts to Improve Your App
 
@@ -52,3 +57,4 @@ Recommended baseline commands:
 - **"Add a smoke-test badge to the README"** — Status visibility
 - **"Add one stable end-to-end test for the login flow"** — Critical-path E2E
 - **"Add Ansible syntax-check and check-mode validation to CI"** — Infrastructure safety
+- **"Add Terraform validate, tflint, and tfsec to CI with tfenv version pinning"** — Terraform safety

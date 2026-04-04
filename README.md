@@ -10,12 +10,13 @@
 
 Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, and Codex.
 
-This repository supports four first-class language profiles:
+This repository supports five first-class language profiles:
 
 - TypeScript
 - Python
 - Go
 - Ansible
+- Terraform
 
 ## Prerequisites
 
@@ -55,6 +56,7 @@ Language-specific agents:
 - Python: `linting`, `logging`, `testing`
 - Go: `linting`, `logging`, `testing`
 - Ansible: `linting`, `logging`, `testing`
+- Terraform: `linting`, `logging`, `testing`
 
 Agent sources in this repo:
 
@@ -63,6 +65,7 @@ Agent sources in this repo:
 - `agents/python/*`
 - `agents/go/*`
 - `agents/ansible/*`
+- `agents/terraform/*`
 
 ## Skill Model
 
@@ -177,12 +180,13 @@ pnpm add -D @everydaydevopsio/ballast
 pnpm exec ballast-typescript install --target cursor --all
 pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
 pnpm exec ballast-typescript install --language ansible --target codex --agent linting
+pnpm exec ballast-typescript install --language terraform --target codex --agent linting
 ```
 
 ### Python
 
 ```bash
-VERSION=5.3.1
+VERSION=<latest-release>
 uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
 ballast-python install --target cursor --all
 # or
@@ -194,7 +198,7 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ### Go
 
 ```bash
-VERSION=5.3.1
+VERSION=<latest-release>
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -208,11 +212,12 @@ install -m 0755 /tmp/ballast-go "${HOME}/.local/bin/ballast-go"
 ballast-go install --target cursor --all
 ballast-go install --target opencode --skill owasp-security-scan
 ballast-go install --language ansible --target codex --agent testing
+ballast-go install --language terraform --target codex --agent linting
 ```
 
 ## Monorepo: Install and Use by Language
 
-In a repo that contains TypeScript, Python, Go, or Ansible projects, run Ballast once per language profile. The `ballast` wrapper can now auto-detect Ansible-only repos and mixed repos that include Ansible.
+In a repo that contains TypeScript, Python, Go, Ansible, or Terraform projects, run Ballast once per language profile. The `ballast` wrapper can auto-detect single-language repos for all five profiles and mixed repos that include them.
 
 ### 1. TypeScript rules in a monorepo
 
@@ -223,7 +228,7 @@ pnpm exec ballast-typescript install --target cursor --all
 ### 2. Python rules in a monorepo
 
 ```bash
-VERSION=5.3.1
+VERSION=<latest-release>
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
 ```
 
@@ -233,12 +238,13 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ballast-go install --target cursor --all
 ```
 
-Recommended order for one repository that uses all four language profiles:
+Recommended order for one repository that uses all five language profiles:
 
 1. Run the TypeScript command.
 2. Run the Python command.
 3. Run the Go command.
 4. If the repo also contains Ansible, run `ballast-go install --language ansible --target cursor --all`.
+5. If the repo also contains Terraform, run `ballast-go install --language terraform --target cursor --all`.
 
 Ballast only installs shipped agents and skills and follows the single overwrite policy (existing rule files are preserved unless `--force` is passed). Use `--patch` to merge new Ballast content into an existing rule file while preserving the user's version of edited sections.
 
@@ -259,7 +265,7 @@ Ballast only installs shipped agents and skills and follows the single overwrite
 - `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings
 - `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically, and add `--patch` to merge backend file updates during that refresh
 - `ballast upgrade [--patch]`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it; `--patch` forwards patch mode to the backend refresh
-- `ballast install-cli [--language <typescript|python|go|ansible>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible` selection reuses the `ballast-go` backend.
+- `ballast install-cli [--language <typescript|python|go|ansible|terraform>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible` and `terraform` selections reuse the `ballast-go` backend.
 
 ## Config Files
 

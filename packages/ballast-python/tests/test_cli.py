@@ -128,6 +128,18 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(resolved, root)
 
+    def test_resolve_project_root_supports_terraform_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".terraform-version").write_text("1.8.5\n", encoding="utf-8")
+            (root / "versions.tf").write_text("terraform {}\n", encoding="utf-8")
+            nested = root / "modules" / "network"
+            nested.mkdir(parents=True)
+
+            resolved = cli.resolve_project_root(nested)
+
+            self.assertEqual(resolved, root)
+
     def test_normalize_target_tokens_ignores_non_string_items(self) -> None:
         self.assertEqual(
             cli.normalize_target_tokens(["cursor,claude", 7, None, "codex"]),
@@ -229,6 +241,29 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn(
                 "Ansible linting specialist", rule.read_text(encoding="utf-8")
             )
+
+    def test_install_supports_terraform_language_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "codex",
+                ["linting"],
+                [],
+                "terraform",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("linting", result.installed)
+            rule = root / ".codex" / "rules" / "terraform-linting.md"
+            self.assertTrue(rule.exists())
+            content = rule.read_text(encoding="utf-8")
+            self.assertIn("Terraform linting specialist", content)
+            self.assertIn(".terraform-version", content)
+            self.assertIn("tfenv install", content)
 
     def test_install_creates_skill_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

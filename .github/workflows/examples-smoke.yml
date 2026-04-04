@@ -30,6 +30,9 @@ jobs:
           - sample: ansible-sample
             language: ansible
             expected_rule: ansible-linting.mdc
+          - sample: terraform-sample
+            language: terraform
+            expected_rule: terraform-linting.mdc
 
     steps:
       - name: Checkout ballast repo

@@ -185,6 +185,32 @@ describe('install', () => {
       );
     });
 
+    test('writes terraform language rules when requested', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        language: 'terraform',
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installed).toContain('linting');
+      const cursorFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'terraform-linting.mdc'
+      );
+      expect(fs.existsSync(cursorFile)).toBe(true);
+      const content = fs.readFileSync(cursorFile, 'utf8');
+      expect(content).toContain('Terraform linting specialist');
+      expect(content).toContain('.terraform-version');
+      expect(content).toContain('tfenv install');
+      expect(content).toContain('terraform fmt -check -recursive');
+      expect(content).toContain('tfsec');
+    });
+
     test('uses pre-commit guidance for standalone typescript installs', () => {
       saveConfig(
         {
@@ -221,7 +247,7 @@ describe('install', () => {
         {
           targets: ['cursor'],
           agents: ['linting'],
-          languages: ['typescript', 'python', 'go', 'ansible']
+          languages: ['typescript', 'python', 'go', 'ansible', 'terraform']
         },
         tmpDir
       );

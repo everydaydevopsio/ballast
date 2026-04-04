@@ -14,7 +14,7 @@ from importlib import metadata
 from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex"]
-LANGUAGES = ["typescript", "python", "go", "ansible"]
+LANGUAGES = ["typescript", "python", "go", "ansible", "terraform"]
 COMMON_AGENTS = ["local-dev", "docs", "cicd", "observability", "publishing"]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
@@ -22,6 +22,7 @@ AGENTS_BY_LANGUAGE = {
     "python": COMMON_AGENTS + LANGUAGE_AGENTS,
     "go": COMMON_AGENTS + LANGUAGE_AGENTS,
     "ansible": COMMON_AGENTS + LANGUAGE_AGENTS,
+    "terraform": COMMON_AGENTS + LANGUAGE_AGENTS,
 }
 COMMON_SKILLS = ["owasp-security-scan"]
 SKILLS_BY_LANGUAGE = {
@@ -29,6 +30,7 @@ SKILLS_BY_LANGUAGE = {
     "python": COMMON_SKILLS,
     "go": COMMON_SKILLS,
     "ansible": COMMON_SKILLS,
+    "terraform": COMMON_SKILLS,
 }
 HOOK_GUIDANCE_TOKEN = "{{BALLAST_HOOK_GUIDANCE}}"
 
@@ -163,6 +165,16 @@ def resolve_project_root(cwd: Path) -> Path:
                 "requirements.yaml",
             )
         )
+        has_terraform = any(
+            (directory / marker).exists()
+            for marker in (
+                ".terraform-version",
+                "main.tf",
+                "providers.tf",
+                "versions.tf",
+                "terraform.tf",
+            )
+        )
         has_any_cfg = (
             (directory / ".rulesrc.json").exists()
             or (directory / ".rulesrc.ts.json").exists()
@@ -171,7 +183,14 @@ def resolve_project_root(cwd: Path) -> Path:
                 for lang in LANGUAGES
             )
         )
-        if has_pkg or has_go or has_pyproject or has_ansible or has_any_cfg:
+        if (
+            has_pkg
+            or has_go
+            or has_pyproject
+            or has_ansible
+            or has_terraform
+            or has_any_cfg
+        ):
             return directory
     return cwd
 
@@ -540,6 +559,19 @@ def render_hook_guidance(language: str, hook_mode: str) -> str:
                 "- Configure the pre-push stage to run Go unit tests for each module.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
                 "- Verify the hook configuration with `pre-commit run --all-files`.",
+            ]
+        )
+    if language == "terraform":
+        return "\n".join(
+            [
+                "- Use `pre-commit` for Terraform repositories.",
+                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                "- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.",
+                "- Install hooks with `pre-commit install`.",
+                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                "- Run `terraform fmt -check -recursive`, `terraform validate`, `tflint`, and `tfsec` from the hook configuration.",
+                "- Keep `.terraform/`, state files, and plan files out of Git.",
+                "- Keep the configuration current with `pre-commit autoupdate`.",
             ]
         )
     return ""
