@@ -64,6 +64,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/common/local-dev-env.md` — Rules for common/local-dev-env
 - `.claude/rules/common/local-dev-license.md` — Rules for common/local-dev-license
 - `.claude/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
+- `.claude/rules/common/docs.md` — Rules for common/docs
 - `.claude/rules/common/cicd.md` — Rules for common/cicd
 - `.claude/rules/common/observability.md` — Rules for common/observability
 - `.claude/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
@@ -78,3 +79,6 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/go/go-linting.md` — Rules for go/linting
 - `.claude/rules/go/go-logging.md` — Rules for go/logging
 - `.claude/rules/go/go-testing.md` — Rules for go/testing
+- `.claude/rules/ansible/ansible-linting.md` — Rules for ansible/linting
+- `.claude/rules/ansible/ansible-logging.md` — Rules for ansible/logging
+- `.claude/rules/ansible/ansible-testing.md` — Rules for ansible/testing

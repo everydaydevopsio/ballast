@@ -80,6 +80,7 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/common/local-dev-env.md` — Rules for common/local-dev-env
 - `.codex/rules/common/local-dev-license.md` — Rules for common/local-dev-license
 - `.codex/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
+- `.codex/rules/common/docs.md` — Rules for common/docs
 - `.codex/rules/common/cicd.md` — Rules for common/cicd
 - `.codex/rules/common/observability.md` — Rules for common/observability
 - `.codex/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
@@ -94,3 +95,6 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/go/go-linting.md` — Rules for go/linting
 - `.codex/rules/go/go-logging.md` — Rules for go/logging
 - `.codex/rules/go/go-testing.md` — Rules for go/testing
+- `.codex/rules/ansible/ansible-linting.md` — Rules for ansible/linting
+- `.codex/rules/ansible/ansible-logging.md` — Rules for ansible/logging
+- `.codex/rules/ansible/ansible-testing.md` — Rules for ansible/testing

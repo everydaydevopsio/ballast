@@ -7,6 +7,7 @@
   ],
   "agents": [
     "local-dev",
+    "docs",
     "cicd",
     "observability",
     "publishing",
@@ -14,13 +15,17 @@
     "logging",
     "testing"
   ],
-  "ballastVersion": "5.3.3",
+  "ballastVersion": "5.5.0",
   "languages": [
     "typescript",
     "python",
-    "go"
+    "go",
+    "ansible"
   ],
   "paths": {
+    "ansible": [
+      "examples/smoke/ansible-sample"
+    ],
     "go": [
       "cli/ballast",
       "examples/smoke/go-sample",
