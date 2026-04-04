@@ -940,6 +940,26 @@ func TestDetectRepoProfilesFindsTerraformProfile(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesSkipsTerraformCaches(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform-version"), "1.8.5\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", "versions.tf"), "terraform {}\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform", "modules", "cached", "main.tf"), "terraform {}\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terragrunt-cache", "cached", "main.tf"), "terraform {}\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langTerraform, Paths: []string{filepath.Join(root, "infra", "terraform")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected cached terraform directories to be skipped; want %#v, got %#v", want, profiles)
+	}
+}
+
 func TestDetectLanguageSupportsAnsibleRequirementsYaml(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "requirements.yaml"), "---\n")

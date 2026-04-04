@@ -1577,7 +1577,7 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if name == ".git" || name == "node_modules" || name == ".venv" || name == "dist" || name == "build" || name == "vendor" {
+			if name == ".git" || name == "node_modules" || name == ".venv" || name == "dist" || name == "build" || name == "vendor" || name == ".terraform" || name == ".terragrunt-cache" {
 				return filepath.SkipDir
 			}
 			return nil
