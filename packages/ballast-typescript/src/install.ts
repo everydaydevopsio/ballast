@@ -270,12 +270,12 @@ export async function resolveTargetAndAgents(
 
   const targets =
     targetsFromFlag.length > 0 ? targetsFromFlag : (config?.targets ?? []);
-  const agents =
-    agentsFromFlag != null
-      ? withImplicitAgents(resolveAgents(agentsFromFlag, language))
-      : config?.agents
-        ? withImplicitAgents(config.agents)
-        : config?.agents;
+  let agents = config?.agents;
+  if (agentsFromFlag != null) {
+    agents = withImplicitAgents(resolveAgents(agentsFromFlag, language));
+  } else if (config?.agents) {
+    agents = withImplicitAgents(config.agents);
+  }
   const skills =
     options.skills != null
       ? resolveSkills(options.skills, language)

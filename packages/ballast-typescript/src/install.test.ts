@@ -133,17 +133,19 @@ describe('install', () => {
               close: () => {}
             }) as unknown as readline.Interface
         );
+      try {
+        const result = await resolveTargetAndAgents({
+          projectRoot: tmpDir
+        });
 
-      const result = await resolveTargetAndAgents({
-        projectRoot: tmpDir
-      });
-
-      expect(result).toEqual({
-        targets: ['cursor'],
-        agents: ['linting', 'git-hooks'],
-        skills: []
-      });
-      createInterfaceSpy.mockRestore();
+        expect(result).toEqual({
+          targets: ['cursor'],
+          agents: ['linting', 'git-hooks'],
+          skills: []
+        });
+      } finally {
+        createInterfaceSpy.mockRestore();
+      }
     });
 
     test('rejects invalid target flags instead of ignoring them', async () => {
