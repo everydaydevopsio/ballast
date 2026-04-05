@@ -1169,6 +1169,32 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       ).toBe(true);
     });
 
+    test('retains configured agents when adding a skill with empty agents array (CLI default)', async () => {
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting'],
+          skills: []
+        },
+        tmpDir
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.agents).toEqual(['linting', 'git-hooks']);
+      expect(raw.skills).toEqual(['owasp-security-scan']);
+    });
+
     test('uses saved config when CLI passes empty agent and skill arrays', async () => {
       saveConfig(
         {

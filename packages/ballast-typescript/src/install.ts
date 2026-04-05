@@ -633,7 +633,7 @@ export async function runInstall(
   const agentsToPersist =
     explicitAgentSelection || agents.length > 0
       ? agents
-      : (priorConfig?.agents ?? []);
+      : withImplicitAgents(priorConfig?.agents ?? []);
   saveConfig(
     {
       targets,
