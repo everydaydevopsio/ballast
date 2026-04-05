@@ -272,13 +272,21 @@ export async function resolveTargetAndAgents(
     targetsFromFlag.length > 0 ? targetsFromFlag : (config?.targets ?? []);
   let agents = config?.agents;
   if (agentsFromFlag != null) {
-    agents = withImplicitAgents(resolveAgents(agentsFromFlag, language));
+    const newAgents = withImplicitAgents(
+      resolveAgents(agentsFromFlag, language)
+    );
+    agents = [...new Set([...(config?.agents ?? []), ...newAgents])];
   } else if (config?.agents) {
     agents = withImplicitAgents(config.agents);
   }
   const skills =
     options.skills != null
-      ? resolveSkills(options.skills, language)
+      ? [
+          ...new Set([
+            ...(config?.skills ?? []),
+            ...resolveSkills(options.skills, language)
+          ])
+        ]
       : (config?.skills ?? []);
 
   if (
