@@ -85,3 +85,4 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/terraform/terraform-linting.md` — Rules for terraform/linting
 - `.claude/rules/terraform/terraform-logging.md` — Rules for terraform/logging
 - `.claude/rules/terraform/terraform-testing.md` — Rules for terraform/testing
+
