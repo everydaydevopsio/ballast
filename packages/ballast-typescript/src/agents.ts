@@ -58,7 +58,12 @@ export const COMMON_AGENT_IDS = [
 export const LANGUAGE_AGENT_IDS = ['linting', 'logging', 'testing'] as const;
 export const AGENT_IDS = [...COMMON_AGENT_IDS, ...LANGUAGE_AGENT_IDS] as const;
 export type AgentId = (typeof AGENT_IDS)[number];
-export const COMMON_SKILL_IDS = ['owasp-security-scan'] as const;
+export const COMMON_SKILL_IDS = [
+  'owasp-security-scan',
+  'aws-health-review',
+  'aws-live-health-review',
+  'aws-weekly-security-review'
+] as const;
 export const SKILL_IDS = [...COMMON_SKILL_IDS] as const;
 export type SkillId = (typeof SKILL_IDS)[number];
 

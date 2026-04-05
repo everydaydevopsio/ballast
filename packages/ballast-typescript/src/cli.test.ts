@@ -50,13 +50,13 @@ describe('parseArgs', () => {
         'ballast-typescript',
         'install',
         '--skill',
-        'owasp-security-scan',
+        'owasp-security-scan,aws-health-review',
         '--all-skills'
       ])
     ).toEqual({
       targets: [],
       agents: [],
-      skills: ['owasp-security-scan'],
+      skills: ['owasp-security-scan', 'aws-health-review'],
       language: 'typescript',
       all: false,
       allSkills: true,
