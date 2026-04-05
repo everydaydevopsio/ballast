@@ -45,7 +45,7 @@ Optional flags:
 ## Guardrails
 
 - Read-only only: no mutate/delete operations.
-- Always run with explicit `--profile` and `--region`.
+- Always run with an explicit AWS account context (`--profile` or `PROFILE` / `AWS_PROFILE`) and an explicit `--region`.
 - This is a baseline review, not a full compliance audit.
 - Every recommendation must include a cost impact statement.
 - If a recommendation introduces a new AWS service or enables a paid feature, include expected cost drivers (for example: per-event, per-GB, per-request, storage, or data scan).

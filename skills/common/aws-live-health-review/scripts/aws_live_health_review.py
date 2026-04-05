@@ -338,31 +338,56 @@ def run_logs_insights_query(
     if not log_groups:
         return {"status": "Complete", "results": [], "statistics": {}}
 
-    payload = run_aws(
-        profile,
-        region,
-        [
-            "logs",
-            "start-query",
-            "--start-time",
-            str(int(start.timestamp())),
-            "--end-time",
-            str(int(end.timestamp())),
-            "--query-string",
-            query,
-            "--log-group-names",
-            *log_groups,
-        ],
-    )
-    query_id = payload["queryId"]
+    chunk_size = 20
+    combined_results: list[Any] = []
+    combined_statistics: dict[str, float] = {}
+    final_status = "Complete"
 
-    for _ in range(30):
-        result = run_aws(profile, region, ["logs", "get-query-results", "--query-id", query_id])
-        status = result.get("status")
-        if status in {"Complete", "Failed", "Cancelled", "Timeout", "Unknown"}:
-            return result
-        time.sleep(1)
-    return {"status": "Timeout", "results": [], "statistics": {}}
+    for index in range(0, len(log_groups), chunk_size):
+        chunk = log_groups[index : index + chunk_size]
+        payload = run_aws(
+            profile,
+            region,
+            [
+                "logs",
+                "start-query",
+                "--start-time",
+                str(int(start.timestamp())),
+                "--end-time",
+                str(int(end.timestamp())),
+                "--query-string",
+                query,
+                "--log-group-names",
+                *chunk,
+            ],
+        )
+        query_id = payload["queryId"]
+
+        chunk_result: dict[str, Any] = {"status": "Timeout", "results": [], "statistics": {}}
+        for _ in range(30):
+            result = run_aws(profile, region, ["logs", "get-query-results", "--query-id", query_id])
+            status = result.get("status")
+            if status in {"Complete", "Failed", "Cancelled", "Timeout", "Unknown"}:
+                chunk_result = result
+                break
+            time.sleep(1)
+
+        chunk_status = str(chunk_result.get("status", "Unknown"))
+        if chunk_status != "Complete":
+            final_status = chunk_status
+
+        combined_results.extend(chunk_result.get("results", []))
+        for key, value in chunk_result.get("statistics", {}).items():
+            try:
+                combined_statistics[key] = combined_statistics.get(key, 0.0) + float(value)
+            except (TypeError, ValueError):
+                continue
+
+    return {
+        "status": final_status,
+        "results": combined_results[:20],
+        "statistics": combined_statistics,
+    }
 
 
 def summarize_logs(profile: str, region: str, logs_hours: int) -> dict[str, Any]:

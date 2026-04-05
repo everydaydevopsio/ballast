@@ -7,7 +7,10 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import csv
 import datetime as dt
+import io
 import json
 import os
 import subprocess
@@ -99,10 +102,37 @@ def permission_covers_port(permission: dict[str, Any], port: int) -> bool:
     return start <= port <= end
 
 
+def _load_approved_admin_users() -> set[str]:
+    """Load approved admin usernames from env, defaulting to empty."""
+    raw = os.getenv("AWS_WEEKLY_SECURITY_REVIEW_APPROVED_ADMIN_USERS", "")
+    return {value.strip() for value in raw.split(",") if value.strip()}
+
+
+def _get_credential_report_rows(profile: str, region: str) -> list[dict[str, str]]:
+    """Fetch the IAM credential report so MFA status can be evaluated in one call."""
+    try:
+        payload = run_aws_json(profile, region, ["iam", "get-credential-report"])
+    except AwsCommandError as exc:
+        if "CredentialReportNotPresent" not in str(exc):
+            raise
+        run_aws_json(profile, region, ["iam", "generate-credential-report"])
+        payload = run_aws_json(profile, region, ["iam", "get-credential-report"])
+
+    encoded = payload.get("Content")
+    if not encoded:
+        return []
+
+    decoded = base64.b64decode(str(encoded)).decode("utf-8")
+    return list(csv.DictReader(io.StringIO(decoded)))
+
+
 def check_root_mfa(profile: str, region: str) -> dict[str, Any]:
     summary = run_aws_json(profile, region, ["iam", "get-account-summary"])
     enabled = summary.get("SummaryMap", {}).get("AccountMFAEnabled", 0) == 1
     users = run_aws_json(profile, region, ["iam", "list-users"]).get("Users", [])
+    credential_report = {
+        str(row.get("user", "")).strip(): row for row in _get_credential_report_rows(profile, region)
+    }
 
     users_without_mfa: list[str] = []
     users_with_mfa: list[str] = []
@@ -111,17 +141,16 @@ def check_root_mfa(profile: str, region: str) -> dict[str, Any]:
         user_name = str(user.get("UserName", "")).strip()
         if not user_name:
             continue
-        devices = run_aws_json(
-            profile,
-            region,
-            ["iam", "list-mfa-devices", "--user-name", user_name],
-        ).get("MFADevices", [])
-        has_mfa = len(devices) > 0
+        report_row = credential_report.get(user_name, {})
+        mfa_value = str(report_row.get("mfa_active", "")).strip().lower()
+        has_mfa = mfa_value == "true"
         if has_mfa:
             users_with_mfa.append(user_name)
         else:
             users_without_mfa.append(user_name)
-        evidence.append(f"user={user_name} mfaEnabled={str(has_mfa).lower()} deviceCount={len(devices)}")
+        evidence.append(
+            f"user={user_name} mfaEnabled={str(has_mfa).lower()} source=credential-report"
+        )
 
     findings: list[dict[str, Any]] = []
     status = "PASS"
@@ -343,7 +372,7 @@ def check_security_group_exposure(profile: str, region: str) -> dict[str, Any]:
 
 def check_iam_user_admin_policy(profile: str, region: str) -> dict[str, Any]:
     users = run_aws_json(profile, region, ["iam", "list-users"]).get("Users", [])
-    approved_admin_users = {"rahav", "mark@wepro.ai", "weproai"}
+    approved_admin_users = _load_approved_admin_users()
     admin_access_name = "AdministratorAccess"
 
     matches: list[dict[str, Any]] = []
@@ -427,7 +456,7 @@ def check_iam_user_admin_policy(profile: str, region: str) -> dict[str, Any]:
             "findings": [],
             "evidence": evidence
             + [
-                "All users with AdministratorAccess are in the approved allowlist: rahav, mark@wepro.ai, weproai."
+                "All users with AdministratorAccess are in the configured approved allowlist."
             ],
         }
 
@@ -481,10 +510,12 @@ def check_s3_public_access_block(profile: str, region: str) -> dict[str, Any]:
             region,
             ["s3control", "get-public-access-block", "--account-id", str(account_id)],
         ).get("PublicAccessBlockConfiguration", {})
+        missing_configuration = False
     except AwsCommandError as exc:
         if "NoSuchPublicAccessBlockConfiguration" in str(exc):
             # Account-level block was never configured — treat as all flags disabled.
             block = {}
+            missing_configuration = True
         else:
             raise
 
@@ -505,14 +536,21 @@ def check_s3_public_access_block(profile: str, region: str) -> dict[str, Any]:
             "evidence": ["All four Public Access Block flags are enabled"],
         }
 
+    status = "FAIL" if missing_configuration else "WARN"
+    severity = "HIGH" if missing_configuration else "MEDIUM"
+    message = (
+        "S3 account-level Public Access Block is not configured."
+        if missing_configuration
+        else "S3 account-level Public Access Block is not fully enabled."
+    )
     return {
         "id": "s3-public-access-block-account",
         "title": "S3 account-level Public Access Block",
-        "status": "WARN",
+        "status": status,
         "findings": [
             make_finding(
-                severity="MEDIUM",
-                message="S3 account-level Public Access Block is not fully enabled.",
+                severity=severity,
+                message=message,
                 recommendation="Enable all four account-level Public Access Block settings.",
                 cost_impact=(
                     "Low direct AWS cost. Enabling account-level block settings is not billed, "
@@ -1136,10 +1174,12 @@ def scenario_cost_hint(usd: str, unit: str) -> str:
     low = rate * low_qty
     exp = rate * exp_qty
     high = rate * high_qty
-    return (
-        f"low~${low:.4f} ({low_qty:,} {unit}), "
-        f"expected~${exp:.4f} ({exp_qty:,} {unit}), "
-        f"high~${high:.4f} ({high_qty:,} {unit})"
+    return "".join(
+        [
+            f"low~${low:.4f} ({low_qty:,} {unit}), ",
+            f"expected~${exp:.4f} ({exp_qty:,} {unit}), ",
+            f"high~${high:.4f} ({high_qty:,} {unit})",
+        ]
     )
 
 

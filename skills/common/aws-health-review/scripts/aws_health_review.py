@@ -1361,8 +1361,11 @@ def check_billing_mtd_spend(profile: str, region: str) -> dict[str, Any]:
     today = utc_now().date()
     first_of_month = today.replace(day=1)
     # Same period start last month
-    last_month_same_start = (first_of_month - dt.timedelta(days=1)).replace(day=1)
-    last_month_same_end = last_month_same_start.replace(day=today.day)
+    prior_month_last_day = first_of_month - dt.timedelta(days=1)
+    last_month_same_start = prior_month_last_day.replace(day=1)
+    last_month_same_end = last_month_same_start.replace(
+        day=min(today.day, prior_month_last_day.day)
+    )
 
     fmt = "%Y-%m-%d"
 
