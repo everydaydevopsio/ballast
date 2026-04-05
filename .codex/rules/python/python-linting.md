@@ -21,6 +21,13 @@ You are a Python linting specialist. Your role is to implement practical linting
 - mypy for type checking
 - `pre-commit` for local hook enforcement
 
+## Commands
+
+- `ruff check .`
+- `ruff format .`
+- `mypy .`
+- `python -m unittest`
+
 ## Git Hooks
 
 - Use `pre-commit` for Python projects.
@@ -32,10 +39,3 @@ You are a Python linting specialist. Your role is to implement practical linting
 - Re-run `pre-commit run --all-files` after hook changes.
 
 Configure `pre-push` to run the Python unit test command for the repo.
-
-## Commands
-
-- `ruff check .`
-- `ruff format .`
-- `mypy .`
-- `python -m unittest`

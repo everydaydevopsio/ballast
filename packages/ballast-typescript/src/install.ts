@@ -596,6 +596,7 @@ export async function runInstall(
 ): Promise<number> {
   const projectRoot = options.projectRoot ?? findProjectRoot();
   const language = options.language ?? 'typescript';
+  const priorConfig = loadConfig(projectRoot, language);
   const agentsFromFlag = options.all
     ? 'all'
     : Array.isArray(options.agents) && options.agents.length === 0
@@ -627,10 +628,16 @@ export async function runInstall(
   }
 
   const { targets, agents, skills } = resolved;
+  const explicitAgentSelection =
+    Boolean(options.all) || options.agents !== undefined;
+  const agentsToPersist =
+    explicitAgentSelection || agents.length > 0
+      ? agents
+      : withImplicitAgents(priorConfig?.agents ?? []);
   saveConfig(
     {
       targets,
-      agents,
+      agents: agentsToPersist,
       skills,
       ballastVersion: BALLAST_VERSION,
       languages: [language]
