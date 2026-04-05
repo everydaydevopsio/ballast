@@ -154,6 +154,31 @@ func TestBuildDoctorReportRecommendsFixForUnknownVersion(t *testing.T) {
 	}
 }
 
+func TestBuildDoctorReportOmitsEmptyTargetsAndAgents(t *testing.T) {
+	output := buildDoctorReport(
+		"ballast-go",
+		"5.0.2",
+		"/tmp/project/.rulesrc.json",
+		&rulesConfig{
+			Skills:         []string{"owasp-security-scan"},
+			BallastVersion: "5.0.2",
+		},
+		[]installedCLIStatus{
+			{Name: "ballast-go", Version: "5.0.2", Path: "/tmp/ballast-go"},
+		},
+	)
+
+	if strings.Contains(output, "- targets: ") {
+		t.Fatalf("expected empty targets line to be omitted, got %q", output)
+	}
+	if strings.Contains(output, "- agents: ") {
+		t.Fatalf("expected empty agents line to be omitted, got %q", output)
+	}
+	if !strings.Contains(output, "- skills: owasp-security-scan") {
+		t.Fatalf("expected skills in doctor output, got %q", output)
+	}
+}
+
 func TestInstallAddsBallastToGitignore(t *testing.T) {
 	tmpDir := t.TempDir()
 

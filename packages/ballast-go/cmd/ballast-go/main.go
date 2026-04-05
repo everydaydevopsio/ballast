@@ -533,8 +533,12 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		} else {
 			lines = append(lines, fmt.Sprintf("- ballastVersion: %s", configVersion))
 		}
-		lines = append(lines, fmt.Sprintf("- targets: %s", strings.Join(config.Targets, ", ")))
-		lines = append(lines, fmt.Sprintf("- agents: %s", strings.Join(config.Agents, ", ")))
+		if len(config.Targets) > 0 {
+			lines = append(lines, fmt.Sprintf("- targets: %s", strings.Join(config.Targets, ", ")))
+		}
+		if len(config.Agents) > 0 {
+			lines = append(lines, fmt.Sprintf("- agents: %s", strings.Join(config.Agents, ", ")))
+		}
 		if len(config.Skills) > 0 {
 			lines = append(lines, fmt.Sprintf("- skills: %s", strings.Join(config.Skills, ", ")))
 		}

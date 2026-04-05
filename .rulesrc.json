@@ -5,10 +5,17 @@
     "opencode",
     "codex"
   ],
-  "skills": [
-    "owasp-security-scan"
+  "agents": [
+    "local-dev",
+    "docs",
+    "cicd",
+    "observability",
+    "publishing",
+    "linting",
+    "logging",
+    "testing"
   ],
-  "ballastVersion": "5.6.0",
+  "ballastVersion": "5.5.1",
   "languages": [
     "typescript",
     "python",
