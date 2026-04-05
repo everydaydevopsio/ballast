@@ -73,6 +73,9 @@ Agent sources in this repo:
 Common skills (all languages):
 
 - `owasp-security-scan`
+- `aws-health-review`
+- `aws-live-health-review`
+- `aws-weekly-security-review`
 
 Skill sources in this repo:
 
@@ -80,9 +83,12 @@ Skill sources in this repo:
 
 ## Skills
 
-Skills are reusable task guides that Ballast installs for the target AI tool alongside the agent rules. In this repository, the shipped skill is:
+Skills are reusable task guides that Ballast installs for the target AI tool alongside the agent rules. In this repository, the shipped skills are:
 
 - `owasp-security-scan`: run an OWASP-aligned security audit across Go, TypeScript, and Python projects
+- `aws-health-review`: run a weekly read-only AWS operational health baseline and append prioritized TODO follow-up
+- `aws-live-health-review`: generate a current-state AWS operational snapshot for EC2, RDS, ALB, alarms, and logs
+- `aws-weekly-security-review`: run a weekly read-only AWS security baseline review with prioritized findings
 
 ### Install a skill
 
@@ -90,6 +96,7 @@ Install a specific skill with `--skill`:
 
 ```bash
 pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
+pnpm exec ballast-typescript install --target codex --skill aws-health-review
 ```
 
 Install every available skill for the selected language with `--all-skills`:
@@ -102,6 +109,7 @@ Skills can be combined with agent installs in the same command:
 
 ```bash
 pnpm exec ballast-typescript install --target claude --agent linting,testing --skill owasp-security-scan
+pnpm exec ballast-typescript install --target codex --skill aws-live-health-review
 ```
 
 ### Use a skill
@@ -109,7 +117,9 @@ pnpm exec ballast-typescript install --target claude --agent linting,testing --s
 After installation, invoke the skill naturally in your AI tool by naming it and asking for the task it covers. Examples:
 
 - Claude Code: ask to run `owasp-security-scan`
+- Claude Code: ask to run `aws-weekly-security-review`
 - Codex: ask to use `owasp-security-scan` to audit the repo
+- Codex: ask to use `aws-health-review` for a weekly AWS operations baseline
 - OpenCode: invoke the installed skill by name for a security scan request
 - Cursor: use the installed rule/skill file as part of your repo instructions and ask for the security audit
 
@@ -118,6 +128,7 @@ Typical prompts:
 ```text
 Run owasp-security-scan on this repository.
 Use owasp-security-scan to audit dependencies and code security.
+Use aws-live-health-review with PROFILE=prod-readonly to summarize AWS health right now.
 ```
 
 ### Where skills are installed

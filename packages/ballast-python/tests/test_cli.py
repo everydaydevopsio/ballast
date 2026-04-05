@@ -399,11 +399,18 @@ class PatchInstallTests(unittest.TestCase):
     def test_parse_skill_tokens_supports_all(self) -> None:
         self.assertEqual(
             cli.parse_skill_tokens(None, True, "python"),
-            ["owasp-security-scan"],
+            [
+                "owasp-security-scan",
+                "aws-health-review",
+                "aws-live-health-review",
+                "aws-weekly-security-review",
+            ],
         )
         self.assertEqual(
-            cli.parse_skill_tokens("owasp-security-scan", False, "python"),
-            ["owasp-security-scan"],
+            cli.parse_skill_tokens(
+                "owasp-security-scan,aws-health-review", False, "python"
+            ),
+            ["owasp-security-scan", "aws-health-review"],
         )
 
     def test_build_cursor_skill_format_uses_folded_description_text(self) -> None:

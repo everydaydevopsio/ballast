@@ -31,7 +31,12 @@ AGENTS_BY_LANGUAGE = {
     "ansible": COMMON_AGENTS + LANGUAGE_AGENTS,
     "terraform": COMMON_AGENTS + LANGUAGE_AGENTS,
 }
-COMMON_SKILLS = ["owasp-security-scan"]
+COMMON_SKILLS = [
+    "owasp-security-scan",
+    "aws-health-review",
+    "aws-live-health-review",
+    "aws-weekly-security-review",
+]
 SKILLS_BY_LANGUAGE = {
     "typescript": COMMON_SKILLS,
     "python": COMMON_SKILLS,

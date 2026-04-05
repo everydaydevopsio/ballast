@@ -26,7 +26,12 @@ var languages = []string{"typescript", "python", "go", "ansible", "terraform"}
 
 var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks"}
 var languageAgents = []string{"linting", "logging", "testing"}
-var commonSkills = []string{"owasp-security-scan"}
+var commonSkills = []string{
+	"owasp-security-scan",
+	"aws-health-review",
+	"aws-live-health-review",
+	"aws-weekly-security-review",
+}
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
 var ballastVersion = "dev"
@@ -334,7 +339,7 @@ Options:
   --target, -t <platform>   AI platforms: %s (comma-separated or repeatable)
   --language, -l <lang>     Language profile: %s (default: go)
   --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, git-hooks, logging, testing (comma-separated)
-  --skill, -s <skills>      Skill(s): owasp-security-scan (comma-separated)
+  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
   --force                   Overwrite existing rule files
@@ -347,6 +352,7 @@ Examples:
   ballast-go install
   ballast-go install --target cursor --agent linting
   ballast-go install --target claude --skill owasp-security-scan
+  ballast-go install --target codex --skill aws-health-review
   ballast-go install --target cursor,claude --agent linting
   ballast-go install --language python --target cursor --all
   ballast-go install --target claude --all --force

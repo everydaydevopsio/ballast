@@ -39,10 +39,16 @@ Agent | TypeScript | Python | Go | Ansible | Terraform | Guide
 Common skills:
 
 - `owasp-security-scan`
+- `aws-health-review`
+- `aws-live-health-review`
+- `aws-weekly-security-review`
 
 Guide index:
 
 - [skills/README.md](skills/README.md)
+- [skills/aws-health-review.md](skills/aws-health-review.md)
+- [skills/aws-live-health-review.md](skills/aws-live-health-review.md)
+- [skills/aws-weekly-security-review.md](skills/aws-weekly-security-review.md)
 - [skills/owasp-security-scan.md](skills/owasp-security-scan.md)
 
 ## Installation and Monorepos

@@ -188,6 +188,12 @@ describe('build', () => {
       expect(content).toContain('# OWASP Security Scan Skill');
     });
 
+    test('reads aws health skill content', () => {
+      const content = getSkillContent('aws-health-review');
+      expect(content).toContain('name: aws-health-review');
+      expect(content).toContain('# AWS Health Review');
+    });
+
     test('builds cursor skill format', () => {
       const content = buildCursorSkillFormat('owasp-security-scan');
       expect(content).toContain('alwaysApply: false');
@@ -224,6 +230,12 @@ describe('build', () => {
           'owasp-security-scan.skill'
         )
       });
+    });
+
+    test('gets aws live health skill description', () => {
+      expect(getSkillDescription('aws-live-health-review')).toContain(
+        'Run a read-only AWS live health review'
+      );
     });
   });
 

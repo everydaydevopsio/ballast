@@ -130,7 +130,7 @@ Options:
   --target, -t <platforms>  AI platform(s): cursor, claude, opencode, codex (comma-separated or repeated)
   --language, -l <lang>     Language profile: ${LANGUAGES.join(', ')} (default: typescript)
   --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, logging, testing (comma-separated)
-  --skill, -s <skills>      Skill(s): owasp-security-scan (comma-separated)
+  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
   --force, -f               Overwrite existing rule files
@@ -146,6 +146,7 @@ Examples:
   ballast-typescript install --language python --target cursor --all
   ballast-typescript install --target claude --all --force
   ballast-typescript install --target claude --skill owasp-security-scan
+  ballast-typescript install --target codex --skill aws-health-review
   ballast-typescript install --target cursor --agent linting --patch
   ballast-typescript install --yes --target cursor --all
 `);
