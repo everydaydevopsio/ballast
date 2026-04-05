@@ -138,23 +138,40 @@ describe('build', () => {
       expect(() => getContent('linting', 'mcp')).toThrow(/content-mcp.md/);
     });
 
-    test('returns python-specific linting content when language is python', () => {
+    test('returns python-specific linting content without hook guidance when language is python', () => {
       const content = getContent('linting', undefined, 'python');
       expect(content).toContain('Python linting specialist');
       expect(content).toContain('Ruff');
+      expect(content).not.toContain('.pre-commit-config.yaml');
+      expect(content).not.toContain('pre-commit install');
+      expect(content).not.toContain('pre-commit install --hook-type pre-push');
+      expect(content).not.toContain('pre-commit autoupdate');
+    });
+
+    test('returns go-specific linting content without hook guidance', () => {
+      const content = getContent('linting', undefined, 'go');
+      expect(content).toContain('Go linting specialist');
+      expect(content).not.toContain('.pre-commit-config.yaml');
+      expect(content).not.toContain('sub-pre-commit');
+      expect(content).not.toContain('pre-commit install --hook-type pre-push');
+      expect(content).not.toContain('pre-commit autoupdate');
+    });
+
+    test('returns standalone git-hooks content for python', () => {
+      const content = getContent('git-hooks', undefined, 'python');
+      expect(content).toContain('Git hook specialist');
       expect(content).toContain('.pre-commit-config.yaml');
-      expect(content).toContain('pre-commit install');
       expect(content).toContain('pre-commit install --hook-type pre-push');
       expect(content).toContain('pre-commit autoupdate');
     });
 
-    test('returns go-specific linting content with pre-commit guidance', () => {
-      const content = getContent('linting', undefined, 'go');
-      expect(content).toContain('Go linting specialist');
-      expect(content).toContain('.pre-commit-config.yaml');
-      expect(content).toContain('sub-pre-commit');
-      expect(content).toContain('pre-commit install --hook-type pre-push');
-      expect(content).toContain('pre-commit autoupdate');
+    test('returns monorepo git-hooks content for typescript', () => {
+      const content = getContent('git-hooks', undefined, 'typescript', {
+        hookMode: 'monorepo'
+      });
+      expect(content).toContain('Use Husky for this monorepo.');
+      expect(content).toContain('.husky/pre-push');
+      expect(content).not.toContain('pre-commit install');
     });
 
     test('returns go-specific testing content when language is go', () => {
@@ -387,25 +404,33 @@ alwaysApply: false
       expect(result).toContain('globs:');
     });
 
-    test('standalone typescript content is consistently pre-commit based', () => {
+    test('standalone typescript linting content no longer includes hook guidance', () => {
       const result = buildContent('linting', 'codex', undefined, 'typescript', {
         hookMode: 'standalone'
       });
-      expect(result).toContain('Use `pre-commit` for this repository layout.');
-      expect(result).toContain('Install hooks with `pre-commit install`.');
-      expect(result).toContain(
+      expect(result).not.toContain(
+        'Use `pre-commit` for this repository layout.'
+      );
+      expect(result).not.toContain('Install hooks with `pre-commit install`.');
+      expect(result).not.toContain(
         'Install the pre-push hook with `pre-commit install --hook-type pre-push`.'
       );
       expect(result).not.toContain('Set Up Git Hooks with Husky');
-      expect(result).not.toContain('Set up husky and initialize it');
+      expect(result).not.toContain('Use Husky for this monorepo.');
       expect(result).not.toContain('Configure lint-staged');
     });
 
-    test('monorepo typescript content is consistently husky based', () => {
-      const result = buildContent('linting', 'codex', undefined, 'typescript', {
-        hookMode: 'monorepo'
-      });
-      expect(result).toContain('## Set Up Git Hooks with Husky');
+    test('monorepo typescript git-hooks content is husky based', () => {
+      const result = buildContent(
+        'git-hooks',
+        'codex',
+        undefined,
+        'typescript',
+        {
+          hookMode: 'monorepo'
+        }
+      );
+      expect(result).toContain('Use Husky for this monorepo.');
       expect(result).toContain('npx lint-staged');
       expect(result).toContain('.husky/pre-push');
       expect(result).not.toContain('pre-commit install');

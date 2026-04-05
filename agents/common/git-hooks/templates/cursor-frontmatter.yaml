@@ -1,0 +1,12 @@
+---
+description: 'Git hook specialist - configure pre-commit, pre-push, and Husky workflows that match the repository layout'
+alwaysApply: false
+globs:
+  - '.pre-commit-config.yaml'
+  - '.husky/**'
+  - 'package.json'
+  - 'pnpm-workspace.yaml'
+  - 'pyproject.toml'
+  - 'go.mod'
+  - '.terraform-version'
+---

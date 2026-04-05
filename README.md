@@ -49,6 +49,7 @@ Common agents (all languages):
 - `cicd`
 - `observability`
 - `publishing`
+- `git-hooks`
 
 Language-specific agents:
 

@@ -127,7 +127,7 @@ var runCommandFunc = runCommand
 var resolveInstalledVersionFunc = resolveInstalledVersion
 var collectDoctorBackendsFunc = collectDoctorBackends
 
-var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing"}
+var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var supportedAgents = append(slices.Clone(commonAgents), languageAgents...)
 var supportedSkills = []string{"owasp-security-scan"}

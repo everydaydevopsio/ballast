@@ -14,7 +14,7 @@ import pkg from '../package.json';
 const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
-const HOOK_GUIDANCE_TOKEN = '{{BALLAST_HOOK_GUIDANCE}}';
+const GIT_HOOKS_GUIDANCE_TOKEN = '{{BALLAST_GIT_HOOKS_GUIDANCE}}';
 const BALLAST_REPO_URL = 'https://github.com/everydaydevopsio/ballast';
 
 type HookMode = 'standalone' | 'monorepo';
@@ -103,21 +103,14 @@ function getHookMode(
   return 'standalone';
 }
 
-function renderHookGuidance(
-  agentId: string,
+function renderGitHooksGuidance(
   language: Language,
   options?: BuildOptions
 ): string {
-  if (agentId !== 'linting') {
-    return '';
-  }
-
-  const hookMode = getHookMode(agentId, language, options);
+  const hookMode = getHookMode('git-hooks', language, options);
   if (language === 'typescript') {
     if (hookMode === 'monorepo') {
       return [
-        '## Set Up Git Hooks with Husky',
-        '',
         'Use Husky for this monorepo.',
         '',
         '- Install and initialize Husky.',
@@ -213,12 +206,12 @@ function applyHookGuidance(
   language: Language,
   options?: BuildOptions
 ): string {
-  if (!content.includes(HOOK_GUIDANCE_TOKEN)) {
+  if (agentId !== 'git-hooks' || !content.includes(GIT_HOOKS_GUIDANCE_TOKEN)) {
     return content;
   }
   return content.replace(
-    HOOK_GUIDANCE_TOKEN,
-    renderHookGuidance(agentId, language, options)
+    GIT_HOOKS_GUIDANCE_TOKEN,
+    renderGitHooksGuidance(language, options)
   );
 }
 

@@ -472,7 +472,7 @@ class PatchInstallTests(unittest.TestCase):
                 resolved,
                 (
                     ["cursor", "claude"],
-                    ["linting"],
+                    ["linting", "git-hooks"],
                     ["owasp-security-scan"],
                 ),
             )
@@ -540,7 +540,7 @@ class PatchInstallTests(unittest.TestCase):
             self.assertTrue(rule.exists())
             self.assertIn("Python linting specialist", rule.read_text(encoding="utf-8"))
 
-    def test_install_replaces_hook_guidance_token_for_python_rules(self) -> None:
+    def test_install_moves_python_hook_guidance_to_dedicated_rule(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
@@ -552,8 +552,29 @@ class PatchInstallTests(unittest.TestCase):
             rule = root / ".codex" / "rules" / "python-linting.md"
             content = rule.read_text(encoding="utf-8")
             self.assertNotIn("{{BALLAST_HOOK_GUIDANCE}}", content)
-            self.assertIn("pre-commit install", content)
+            self.assertNotIn("pre-commit install", content)
+            self.assertNotIn("pre-commit install --hook-type pre-push", content)
+
+            git_hooks = root / ".codex" / "rules" / "git-hooks.md"
+            self.assertTrue(git_hooks.exists())
+            git_hooks_content = git_hooks.read_text(encoding="utf-8")
+            self.assertIn("Git hook specialist", git_hooks_content)
+            self.assertIn("pre-commit install", git_hooks_content)
+            self.assertIn("pre-commit install --hook-type pre-push", git_hooks_content)
+
+    def test_install_writes_ansible_git_hooks_guidance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root, "codex", ["linting"], [], "ansible", False, False, False
+            )
+
+            self.assertIn("git-hooks", result.installed)
+            git_hooks = root / ".codex" / "rules" / "git-hooks.md"
+            content = git_hooks.read_text(encoding="utf-8")
             self.assertIn("pre-commit install --hook-type pre-push", content)
+            self.assertIn("ansible-playbook --syntax-check", content)
 
     def test_patch_preserves_existing_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
