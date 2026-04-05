@@ -16,6 +16,7 @@ export interface DoctorReport {
   configVersion: string | null;
   configTargets: string[];
   configAgents: string[];
+  configSkills: string[];
   installed: InstalledCliStatus[];
   recommendations: string[];
 }
@@ -76,7 +77,10 @@ function detectInstalledCli(name: string): InstalledCliStatus {
 }
 
 function refreshConfigCommand(
-  report: Pick<DoctorReport, 'currentCli' | 'configTargets' | 'configAgents'>
+  report: Pick<
+    DoctorReport,
+    'currentCli' | 'configTargets' | 'configAgents' | 'configSkills'
+  >
 ): string | null {
   void report;
   return 'ballast install --refresh-config';
@@ -89,6 +93,7 @@ export function buildDoctorReport(
   configVersion: string | null,
   configTargets: string[],
   configAgents: string[],
+  configSkills: string[],
   installed: InstalledCliStatus[]
 ): DoctorReport {
   const targetVersion = latestVersion([
@@ -122,7 +127,8 @@ export function buildDoctorReport(
     const refresh = refreshConfigCommand({
       currentCli,
       configTargets,
-      configAgents
+      configAgents,
+      configSkills
     });
     recommendations.push(
       refresh
@@ -138,6 +144,7 @@ export function buildDoctorReport(
     configVersion,
     configTargets,
     configAgents,
+    configSkills,
     installed,
     recommendations
   };
@@ -171,6 +178,9 @@ export function formatDoctorReport(report: DoctorReport): string {
     if (report.configAgents.length > 0) {
       lines.push(`- agents: ${report.configAgents.join(', ')}`);
     }
+    if (report.configSkills.length > 0) {
+      lines.push(`- skills: ${report.configSkills.join(', ')}`);
+    }
   }
 
   lines.push('', 'Recommendations:');
@@ -196,6 +206,7 @@ export function runDoctor(): number {
     config?.ballastVersion ?? null,
     config?.targets ?? [],
     config?.agents ?? [],
+    config?.skills ?? [],
     CLI_NAMES.map((name) => detectInstalledCli(name))
   );
   process.stdout.write(formatDoctorReport(report));

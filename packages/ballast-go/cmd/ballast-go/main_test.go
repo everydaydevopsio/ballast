@@ -117,6 +117,7 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 		&rulesConfig{
 			Targets:        []string{"cursor"},
 			Agents:         []string{"linting", "testing"},
+			Skills:         []string{"owasp-security-scan"},
 			BallastVersion: "5.0.1",
 		},
 		[]installedCLIStatus{
@@ -131,6 +132,9 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 	if !strings.Contains(output, "Refresh .rulesrc.json to Ballast 5.0.2: ballast install --refresh-config") {
 		t.Fatalf("expected config refresh recommendation, got %q", output)
+	}
+	if !strings.Contains(output, "- skills: owasp-security-scan") {
+		t.Fatalf("expected skills in doctor output, got %q", output)
 	}
 }
 

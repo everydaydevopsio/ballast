@@ -535,6 +535,9 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		}
 		lines = append(lines, fmt.Sprintf("- targets: %s", strings.Join(config.Targets, ", ")))
 		lines = append(lines, fmt.Sprintf("- agents: %s", strings.Join(config.Agents, ", ")))
+		if len(config.Skills) > 0 {
+			lines = append(lines, fmt.Sprintf("- skills: %s", strings.Join(config.Skills, ", ")))
+		}
 		if configVersion == "" || compareVersions(configVersion, targetVersion) < 0 {
 			recommendations = append(
 				recommendations,

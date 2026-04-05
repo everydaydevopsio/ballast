@@ -9,6 +9,7 @@ describe('doctor', () => {
       '5.0.1',
       ['cursor'],
       ['linting', 'testing'],
+      [],
       [
         {
           name: 'ballast-typescript',
@@ -37,33 +38,34 @@ describe('doctor', () => {
   });
 
   test('formats clean reports without recommendations', () => {
-    const output = formatDoctorReport(
-      buildDoctorReport(
-        'ballast-typescript',
-        '5.0.2',
-        '/tmp/project/.rulesrc.json',
-        '5.0.2',
-        ['cursor'],
-        ['linting'],
-        [
-          {
-            name: 'ballast-typescript',
-            version: '5.0.2',
-            path: '/tmp/ballast-typescript'
-          },
-          {
-            name: 'ballast-python',
-            version: '5.0.2',
-            path: '/tmp/ballast-python'
-          },
-          { name: 'ballast-go', version: '5.0.2', path: '/tmp/ballast-go' }
-        ]
-      )
+    const report = buildDoctorReport(
+      'ballast-typescript',
+      '5.0.2',
+      '/tmp/project/.rulesrc.json',
+      '5.0.2',
+      ['cursor'],
+      ['linting'],
+      ['owasp-security-scan'],
+      [
+        {
+          name: 'ballast-typescript',
+          version: '5.0.2',
+          path: '/tmp/ballast-typescript'
+        },
+        {
+          name: 'ballast-python',
+          version: '5.0.2',
+          path: '/tmp/ballast-python'
+        },
+        { name: 'ballast-go', version: '5.0.2', path: '/tmp/ballast-go' }
+      ]
     );
+    const output = formatDoctorReport(report);
 
     expect(output).toContain('Ballast doctor');
     expect(output).toContain('- targets: cursor');
     expect(output).toContain('Recommendations:');
+    expect(output).toContain('- skills: owasp-security-scan');
     expect(output).toContain('- No action needed.');
   });
 });
