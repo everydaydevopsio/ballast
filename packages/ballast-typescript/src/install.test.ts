@@ -1139,6 +1139,36 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(fs.existsSync(path.join(tmpDir, '.rulesrc.json'))).toBe(true);
     });
 
+    test('retains configured agents when adding a skill without agent flags', async () => {
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting'],
+          skills: []
+        },
+        tmpDir
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        skills: ['owasp-security-scan'],
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.agents).toEqual(['linting', 'git-hooks']);
+      expect(raw.skills).toEqual(['owasp-security-scan']);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'owasp-security-scan.mdc')
+        )
+      ).toBe(true);
+    });
+
     test('uses saved config when CLI passes empty agent and skill arrays', async () => {
       saveConfig(
         {
