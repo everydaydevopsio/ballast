@@ -272,21 +272,28 @@ export async function resolveTargetAndAgents(
     targetsFromFlag.length > 0 ? targetsFromFlag : (config?.targets ?? []);
   let agents = config?.agents;
   if (agentsFromFlag != null) {
-    const newAgents = withImplicitAgents(
-      resolveAgents(agentsFromFlag, language)
-    );
-    agents = [...new Set([...(config?.agents ?? []), ...newAgents])];
+    const resolvedAgents = resolveAgents(agentsFromFlag, language);
+    if (resolvedAgents.length === 0) {
+      throw new Error(
+        `Invalid --agent. Use: ${listAgents(language).join(', ')}`
+      );
+    }
+    agents = [
+      ...new Set(
+        withImplicitAgents([...(config?.agents ?? []), ...resolvedAgents])
+      )
+    ];
   } else if (config?.agents) {
     agents = withImplicitAgents(config.agents);
   }
+  const resolvedNewSkills =
+    options.skills != null ? resolveSkills(options.skills, language) : null;
+  if (resolvedNewSkills !== null && resolvedNewSkills.length === 0) {
+    throw new Error(`Invalid --skill. Use: ${listSkills(language).join(', ')}`);
+  }
   const skills =
-    options.skills != null
-      ? [
-          ...new Set([
-            ...(config?.skills ?? []),
-            ...resolveSkills(options.skills, language)
-          ])
-        ]
+    resolvedNewSkills !== null
+      ? [...new Set([...(config?.skills ?? []), ...resolvedNewSkills])]
       : (config?.skills ?? []);
 
   if (
