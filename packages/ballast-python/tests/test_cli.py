@@ -21,6 +21,7 @@ class PatchInstallTests(unittest.TestCase):
             {
                 "targets": ["cursor"],
                 "agents": ["linting", "testing"],
+                "skills": ["owasp-security-scan"],
                 "ballastVersion": "5.0.1",
             },
             [
@@ -47,6 +48,7 @@ class PatchInstallTests(unittest.TestCase):
             output,
         )
         self.assertIn("- targets: cursor", output)
+        self.assertIn("- skills: owasp-security-scan", output)
 
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:

@@ -447,12 +447,15 @@ def build_doctor_report(
         lines.append(f"- ballastVersion: {config_version or 'missing'}")
         targets = config.get("targets")
         agents = config.get("agents")
+        skills = config.get("skills")
         if isinstance(targets, list) and all(
             isinstance(target, str) for target in targets
         ):
             lines.append(f"- targets: {', '.join(targets)}")
         if isinstance(agents, list) and all(isinstance(agent, str) for agent in agents):
             lines.append(f"- agents: {', '.join(agents)}")
+        if isinstance(skills, list) and all(isinstance(skill, str) for skill in skills):
+            lines.append(f"- skills: {', '.join(skills)}")
 
     lines.extend(["", "Recommendations:"])
     if recommendations:

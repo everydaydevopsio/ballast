@@ -117,6 +117,7 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 		&rulesConfig{
 			Targets:        []string{"cursor"},
 			Agents:         []string{"linting", "testing"},
+			Skills:         []string{"owasp-security-scan"},
 			BallastVersion: "5.0.1",
 		},
 		[]installedCLIStatus{
@@ -131,6 +132,9 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 	if !strings.Contains(output, "Refresh .rulesrc.json to Ballast 5.0.2: ballast install --refresh-config") {
 		t.Fatalf("expected config refresh recommendation, got %q", output)
+	}
+	if !strings.Contains(output, "- skills: owasp-security-scan") {
+		t.Fatalf("expected skills in doctor output, got %q", output)
 	}
 }
 
@@ -147,6 +151,31 @@ func TestBuildDoctorReportRecommendsFixForUnknownVersion(t *testing.T) {
 
 	if !strings.Contains(output, "Run ballast doctor --fix to install or upgrade local Ballast CLIs.") {
 		t.Fatalf("expected cli fix recommendation for unknown version, got %q", output)
+	}
+}
+
+func TestBuildDoctorReportOmitsEmptyTargetsAndAgents(t *testing.T) {
+	output := buildDoctorReport(
+		"ballast-go",
+		"5.0.2",
+		"/tmp/project/.rulesrc.json",
+		&rulesConfig{
+			Skills:         []string{"owasp-security-scan"},
+			BallastVersion: "5.0.2",
+		},
+		[]installedCLIStatus{
+			{Name: "ballast-go", Version: "5.0.2", Path: "/tmp/ballast-go"},
+		},
+	)
+
+	if strings.Contains(output, "- targets: ") {
+		t.Fatalf("expected empty targets line to be omitted, got %q", output)
+	}
+	if strings.Contains(output, "- agents: ") {
+		t.Fatalf("expected empty agents line to be omitted, got %q", output)
+	}
+	if !strings.Contains(output, "- skills: owasp-security-scan") {
+		t.Fatalf("expected skills in doctor output, got %q", output)
 	}
 }
 
