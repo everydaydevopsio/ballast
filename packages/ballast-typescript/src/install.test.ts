@@ -159,6 +159,136 @@ describe('install', () => {
         'Invalid --target. Use: cursor, claude, opencode, codex'
       );
     });
+
+    test('rejects invalid agent flags instead of silently ignoring them', async () => {
+      await expect(
+        resolveTargetAndAgents({
+          projectRoot: tmpDir,
+          targets: ['cursor'],
+          agents: ['bogus-agent']
+        })
+      ).rejects.toThrow('Invalid --agent');
+    });
+
+    test('rejects invalid skill flags instead of silently ignoring them', async () => {
+      await expect(
+        resolveTargetAndAgents({
+          projectRoot: tmpDir,
+          targets: ['cursor'],
+          agents: ['linting'],
+          skills: ['bogus-skill']
+        })
+      ).rejects.toThrow('Invalid --skill');
+    });
+
+    test('merges new agent with existing config agents', async () => {
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting'],
+          skills: ['owasp-security-scan']
+        },
+        tmpDir
+      );
+      const result = await resolveTargetAndAgents({
+        projectRoot: tmpDir,
+        targets: ['cursor'],
+        agents: ['testing']
+      });
+      expect(result?.agents).toContain('linting');
+      expect(result?.agents).toContain('testing');
+      expect(result?.agents).toContain('git-hooks');
+      expect(result?.skills).toEqual(['owasp-security-scan']);
+    });
+
+    test('merges new skill with existing config skills', async () => {
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting'],
+          skills: ['owasp-security-scan']
+        },
+        tmpDir
+      );
+      const result = await resolveTargetAndAgents({
+        projectRoot: tmpDir,
+        targets: ['cursor'],
+        agents: ['linting'],
+        skills: ['aws-health-review']
+      });
+      expect(result?.agents).toContain('linting');
+      expect(result?.skills).toContain('owasp-security-scan');
+      expect(result?.skills).toContain('aws-health-review');
+    });
+
+    test('applies withImplicitAgents to the full merged agent set', async () => {
+      // config has linting but is missing git-hooks (e.g. older or hand-edited config)
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting'],
+          skills: []
+        },
+        tmpDir
+      );
+      // force-write config without git-hooks to simulate older/hand-edited state
+      const fs = require('fs');
+      const path = require('path');
+      const rulesrc = path.join(tmpDir, '.rulesrc.json');
+      const raw = JSON.parse(fs.readFileSync(rulesrc, 'utf8'));
+      raw.agents = ['linting']; // strip git-hooks
+      fs.writeFileSync(rulesrc, JSON.stringify(raw, null, 2));
+
+      const result = await resolveTargetAndAgents({
+        projectRoot: tmpDir,
+        targets: ['cursor'],
+        agents: ['testing']
+      });
+      // git-hooks must appear even though it was missing from the saved config
+      expect(result?.agents).toContain('linting');
+      expect(result?.agents).toContain('testing');
+      expect(result?.agents).toContain('git-hooks');
+    });
+
+    test('reinstalling a subset of agents retains the rest', async () => {
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting', 'git-hooks', 'testing', 'logging'],
+          skills: ['owasp-security-scan']
+        },
+        tmpDir
+      );
+      const result = await resolveTargetAndAgents({
+        projectRoot: tmpDir,
+        targets: ['cursor'],
+        agents: ['linting']
+      });
+      expect(result?.agents).toContain('linting');
+      expect(result?.agents).toContain('testing');
+      expect(result?.agents).toContain('logging');
+      expect(result?.agents).toContain('git-hooks');
+      expect(result?.skills).toEqual(['owasp-security-scan']);
+    });
+
+    test('reinstalling a subset of skills retains the rest', async () => {
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting'],
+          skills: ['owasp-security-scan', 'aws-health-review']
+        },
+        tmpDir
+      );
+      const result = await resolveTargetAndAgents({
+        projectRoot: tmpDir,
+        targets: ['cursor'],
+        agents: ['linting'],
+        skills: ['owasp-security-scan']
+      });
+      expect(result?.skills).toContain('owasp-security-scan');
+      expect(result?.skills).toContain('aws-health-review');
+    });
   });
 
   describe('install', () => {

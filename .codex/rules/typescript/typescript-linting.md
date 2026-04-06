@@ -35,19 +35,7 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
    - prettier: "prettier . --check"
    - prettier:fix: "prettier . --write"
 
-5. **Set Up Git Hooks**
-   ## Set Up Git Hooks with Husky
-
-Use Husky for this monorepo.
-
-- Install and initialize Husky.
-- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.
-- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.
-- Keep the hook file executable with `chmod +x .husky/pre-commit`.
-- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.
-- Keep the hook in sync with the repo's linting workflow whenever the command changes.
-
-6. **Create GitHub Actions Workflow**
+5. **Create GitHub Actions Workflow**
    - Create .github/workflows/lint.yaml
    - Run on pull requests to main branch
    - Set up Node.js environment
@@ -65,11 +53,9 @@ Follow this order for a clean implementation:
 4. Create ESLint configuration (eslint.config.js or .mjs)
 5. Create Prettier configuration (.prettierrc and .prettierignore)
 6. Add NPM scripts to package.json
-7. Set up the selected hook workflow for this repository layout
-8. Install the hook command dependencies required by that workflow
-9. Create the hook entrypoint and make it executable
-10. Create GitHub Actions workflow
-11. Test the setup
+7. Coordinate with the `git-hooks` rules if the repo should enforce local hooks
+8. Create GitHub Actions workflow
+9. Test the setup
 
 ## Key Configuration Details
 
@@ -128,8 +114,6 @@ Omit the pnpm step only when the project uses npm or yarn.
 - Use tsc-files instead of tsc for faster TypeScript checking of staged files only
 - Ensure the GitHub workflow uses --frozen-lockfile for consistent dependencies
 - When the project uses pnpm, the lint workflow must specify a pnpm version in `pnpm/action-setup` (e.g. `version: 9` or parse from package.json `packageManager`); otherwise the action errors with "No pnpm version is specified"
-- Keep the Git hook workflow in sync with the repository layout. Use `pre-commit` for single-repo installs and Husky for monorepos.
-- Configure a `pre-push` hook to run the unit test command. For TypeScript repos whose tests depend on built output, run the build before the tests in `pre-push`.
 - Check the project's package.json "type" field to determine CommonJS vs ES modules
 
 ## When Completed
@@ -139,5 +123,5 @@ After implementing the linting setup:
 1. Show the user what was created/modified
 2. Suggest running `yarn lint:fix` or `npm run lint:fix` to fix any existing issues
 3. Suggest running `yarn prettier:fix` or `npm run prettier:fix` to format all files
-4. Explain how to test the pre-commit hook with a test commit
+4. Explain how to verify local linting commands before the first PR
 5. Provide guidance on creating a PR to test the GitHub Actions workflow
