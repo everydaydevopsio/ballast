@@ -1249,7 +1249,7 @@ func TestResolveMonorepoPlanSupportsSkillOnlyConfig(t *testing.T) {
 	}
 }
 
-func TestResolveMonorepoPlanSkillFlagDoesNotInheritConfiguredAgents(t *testing.T) {
+func TestResolveMonorepoPlanSkillOnlyInstallPreservesConfigAgents(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "claude",
@@ -1282,15 +1282,15 @@ func TestResolveMonorepoPlanSkillFlagDoesNotInheritConfiguredAgents(t *testing.T
 	if strings.Contains(got, "--agent") {
 		t.Fatalf("expected configured agents not to be inherited, got %q", got)
 	}
-	if len(plan.Config.Agents) != 0 {
-		t.Fatalf("expected saved config agents to be cleared for skill-only install, got %#v", plan.Config.Agents)
+	if !reflect.DeepEqual(plan.Config.Agents, []string{"local-dev", "linting"}) {
+		t.Fatalf("expected saved config to preserve existing agents, got %#v", plan.Config.Agents)
 	}
 	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan"}) {
 		t.Fatalf("expected saved config skills, got %#v", plan.Config.Skills)
 	}
 }
 
-func TestResolveMonorepoPlanAgentFlagDoesNotInheritConfiguredSkills(t *testing.T) {
+func TestResolveMonorepoPlanAgentOnlyInstallPreservesConfigSkills(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "claude",
@@ -1320,8 +1320,8 @@ func TestResolveMonorepoPlanAgentFlagDoesNotInheritConfiguredSkills(t *testing.T
 	if !strings.Contains(got, "--agent local-dev") {
 		t.Fatalf("expected explicit agent selection, got %q", got)
 	}
-	if len(plan.Config.Skills) != 0 {
-		t.Fatalf("expected saved config skills to be cleared for agent-only install, got %#v", plan.Config.Skills)
+	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected saved config to preserve existing skills, got %#v", plan.Config.Skills)
 	}
 }
 

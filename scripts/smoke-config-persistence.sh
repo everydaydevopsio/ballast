@@ -368,6 +368,92 @@ test_full_sequential() {
   echo "  ✓ test_full_sequential passed"
 }
 
+# ─── test: ballast CLI (Go wrapper) agent/skill isolation ─────────────────────
+#
+# The ballast Go CLI writes its own configToSave after calling backends.
+# These tests verify that the Go CLI does not clear agents when adding a skill
+# and does not clear skills when adding an agent.
+
+BALLAST_CLI="${REPO_ROOT}/.ballast/bin/ballast"
+
+ballast_cli() {
+  local dir="$1"; shift
+  (cd "${dir}" && "${BALLAST_CLI}" "$@")
+}
+
+assert_ballast_doctor_agents() {
+  local dir="$1"; shift
+  local output
+  output="$(cd "${dir}" && "${BALLAST_CLI}" doctor 2>&1)"
+  for agent in "$@"; do
+    echo "${output}" | grep -q "${agent}" || \
+      fail "ballast doctor did not report agent '${agent}'. Output:\n${output}"
+  done
+}
+
+assert_ballast_doctor_skills() {
+  local dir="$1"; shift
+  local output
+  output="$(cd "${dir}" && "${BALLAST_CLI}" doctor 2>&1)"
+  for skill in "$@"; do
+    echo "${output}" | grep -q "${skill}" || \
+      fail "ballast doctor did not report skill '${skill}'. Output:\n${output}"
+  done
+}
+
+test_ballast_cli_skill_retains_agents() {
+  if [ ! -x "${BALLAST_CLI}" ]; then
+    echo "  SKIP: ballast binary not found at ${BALLAST_CLI}"
+    return
+  fi
+
+  local dir="${WORKDIR}/ballast-cli-skill-retains-agents"
+  make_project "${dir}"
+
+  echo ""
+  echo "▶ test_ballast_cli_skill_retains_agents"
+
+  ballast_cli "${dir}" install --target cursor --agent linting --yes
+  assert_agents "${dir}" "linting" "git-hooks"
+  assert_no_skills "${dir}" "owasp-security-scan"
+  pass "step 1: linting installed via ballast CLI"
+
+  ballast_cli "${dir}" install --target cursor --skill owasp-security-scan --yes
+  assert_agents "${dir}" "linting" "git-hooks"
+  assert_skills "${dir}" "owasp-security-scan"
+  assert_ballast_doctor_agents "${dir}" "linting" "git-hooks"
+  assert_ballast_doctor_skills "${dir}" "owasp-security-scan"
+  pass "step 2: skill added via ballast CLI; agents preserved"
+
+  echo "  ✓ test_ballast_cli_skill_retains_agents passed"
+}
+
+test_ballast_cli_agent_retains_skills() {
+  if [ ! -x "${BALLAST_CLI}" ]; then
+    echo "  SKIP: ballast binary not found at ${BALLAST_CLI}"
+    return
+  fi
+
+  local dir="${WORKDIR}/ballast-cli-agent-retains-skills"
+  make_project "${dir}"
+
+  echo ""
+  echo "▶ test_ballast_cli_agent_retains_skills"
+
+  ballast_cli "${dir}" install --target cursor --skill owasp-security-scan --yes
+  assert_skills "${dir}" "owasp-security-scan"
+  pass "step 1: skill installed via ballast CLI"
+
+  ballast_cli "${dir}" install --target cursor --agent linting --yes
+  assert_skills "${dir}" "owasp-security-scan"
+  assert_agents "${dir}" "linting" "git-hooks"
+  assert_ballast_doctor_agents "${dir}" "linting" "git-hooks"
+  assert_ballast_doctor_skills "${dir}" "owasp-security-scan"
+  pass "step 2: agent added via ballast CLI; skills preserved"
+
+  echo "  ✓ test_ballast_cli_agent_retains_skills passed"
+}
+
 # ─── run all tests ────────────────────────────────────────────────────────────
 
 main() {
@@ -384,6 +470,8 @@ main() {
   test_reinstall_subset_agents_retained
   test_reinstall_subset_skills_retained
   test_full_sequential
+  test_ballast_cli_skill_retains_agents
+  test_ballast_cli_agent_retains_skills
 
   echo ""
   echo "All config-persistence smoke tests passed."

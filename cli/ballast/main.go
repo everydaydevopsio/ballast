@@ -699,6 +699,9 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	if len(config.Agents) > 0 {
 		fmt.Printf("- agents: %s\n", strings.Join(config.Agents, ", "))
 	}
+	if len(config.Skills) > 0 {
+		fmt.Printf("- skills: %s\n", strings.Join(config.Skills, ", "))
+	}
 	fmt.Println()
 }
 
@@ -1374,10 +1377,21 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, err
 	}
 
+	// Compute agents and skills to persist: merge explicit selection with existing
+	// config so that installing only agents never drops saved skills and vice versa.
+	persistAgents := selectedAgents
+	if !installAll && config != nil {
+		persistAgents = uniqueStrings(append(slices.Clone(config.Agents), selectedAgents...))
+	}
+	persistSkills := selectedSkills
+	if !installAllSkills && config != nil {
+		persistSkills = uniqueStrings(append(slices.Clone(config.Skills), selectedSkills...))
+	}
+
 	configToSave := monorepoConfig{
 		Targets:        savedTargets,
-		Agents:         selectedAgents,
-		Skills:         selectedSkills,
+		Agents:         persistAgents,
+		Skills:         persistSkills,
 		BallastVersion: normalizeVersion(resolveVersion()),
 		Languages:      make([]string, 0, len(profiles)),
 		Paths:          map[string][]string{},
