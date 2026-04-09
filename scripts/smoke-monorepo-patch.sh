@@ -39,10 +39,20 @@ EOF
 
 seed_existing_rule() {
   local monorepo="$1"
-  local rule_name="$2"
+  local target="$2"
+  local rule_name="$3"
+  local rule_dir=""
 
-  mkdir -p "${monorepo}/.cursor/rules"
-  cat > "${monorepo}/.cursor/rules/${rule_name}" <<'EOF'
+  case "${target}" in
+    cursor) rule_dir="${monorepo}/.cursor/rules" ;;
+    opencode) rule_dir="${monorepo}/.opencode" ;;
+    claude) rule_dir="${monorepo}/.claude/rules" ;;
+    codex) rule_dir="${monorepo}/.codex/rules" ;;
+    *) echo "Unsupported target: ${target}" >&2; exit 1 ;;
+  esac
+
+  mkdir -p "${rule_dir}"
+  cat > "${rule_dir}/${rule_name}" <<'EOF'
 ---
 description: Team customized linting rules
 alwaysApply: true
@@ -58,6 +68,55 @@ Keep team-specific wording.
 
 Keep this note.
 EOF
+}
+
+seed_existing_support_file() {
+  local monorepo="$1"
+  local target="$2"
+  local support_file=""
+  local existing_path=""
+
+  case "${target}" in
+    claude)
+      support_file="${monorepo}/CLAUDE.md"
+      existing_path='.claude/rules/old.md'
+      ;;
+    codex)
+      support_file="${monorepo}/AGENTS.md"
+      existing_path='.codex/rules/old.md'
+      ;;
+    *)
+      return
+      ;;
+  esac
+
+  cat > "${support_file}" <<EOF
+# $(basename "${support_file}")
+
+## Team Notes
+
+Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in \`${existing_path%/old.md}/\` when they apply:
+
+- \`${existing_path}\` — Old rule
+EOF
+}
+
+rule_path() {
+  local monorepo="$1"
+  local target="$2"
+  local rule_name="$3"
+
+  case "${target}" in
+    cursor) echo "${monorepo}/.cursor/rules/${rule_name}" ;;
+    opencode) echo "${monorepo}/.opencode/${rule_name}" ;;
+    claude) echo "${monorepo}/.claude/rules/${rule_name}" ;;
+    codex) echo "${monorepo}/.codex/rules/${rule_name}" ;;
+    *) echo "Unsupported target: ${target}" >&2; exit 1 ;;
+  esac
 }
 
 verify_rule() {
@@ -80,67 +139,167 @@ verify_force_overwrite() {
   grep -q "${expected_section}" "${rule_file}"
 }
 
+verify_support_file() {
+  local monorepo="$1"
+  local target="$2"
+  local rule_basename="$3"
+  local support_file=""
+  local expected_path=""
+  local old_path=""
+
+  case "${target}" in
+    claude)
+      support_file="${monorepo}/CLAUDE.md"
+      expected_path=".claude/rules/${rule_basename}"
+      old_path=".claude/rules/old.md"
+      ;;
+    codex)
+      support_file="${monorepo}/AGENTS.md"
+      expected_path=".codex/rules/${rule_basename}"
+      old_path=".codex/rules/old.md"
+      ;;
+    *)
+      return
+      ;;
+  esac
+
+  grep -q "## Team Notes" "${support_file}"
+  grep -q "Keep this section." "${support_file}"
+  grep -Fq "\`${expected_path}\`" "${support_file}"
+  ! grep -Fq "\`${old_path}\`" "${support_file}"
+}
+
+verify_forced_support_file() {
+  local monorepo="$1"
+  local target="$2"
+  local rule_basename="$3"
+  local support_file=""
+  local expected_path=""
+  local old_path=""
+
+  case "${target}" in
+    claude)
+      support_file="${monorepo}/CLAUDE.md"
+      expected_path=".claude/rules/${rule_basename}"
+      old_path=".claude/rules/old.md"
+      ;;
+    codex)
+      support_file="${monorepo}/AGENTS.md"
+      expected_path=".codex/rules/${rule_basename}"
+      old_path=".codex/rules/old.md"
+      ;;
+    *)
+      return
+      ;;
+  esac
+
+  grep -Fq "\`${expected_path}\`" "${support_file}"
+  ! grep -Fq "\`${old_path}\`" "${support_file}"
+}
+
 run_typescript_smoke() {
-  local monorepo="${WORKDIR}/typescript-monorepo"
-  build_monorepo_fixture "${monorepo}"
-  seed_existing_rule "${monorepo}" "typescript-linting.mdc"
+  local target
+  local monorepo
+  local rule_name
+  local rule_file
+  for target in cursor opencode claude codex; do
+    monorepo="${WORKDIR}/typescript-monorepo-${target}"
+    build_monorepo_fixture "${monorepo}"
+    rule_name="typescript-linting.md"
+    if [[ "${target}" == "cursor" ]]; then
+      rule_name="typescript-linting.mdc"
+    fi
+    seed_existing_rule "${monorepo}" "${target}" "${rule_name}"
+    seed_existing_support_file "${monorepo}" "${target}"
 
-  (
-    cd "${monorepo}"
-    node "${REPO_ROOT}/packages/ballast-typescript/dist/cli.js" install --target cursor --agent linting --patch --yes
-  )
+    (
+      cd "${monorepo}"
+      node "${REPO_ROOT}/packages/ballast-typescript/dist/cli.js" install --target "${target}" --agent linting --patch --yes
+    )
 
-  verify_rule "${monorepo}/.cursor/rules/typescript-linting.mdc" "## When Completed"
+    rule_file="$(rule_path "${monorepo}" "${target}" "${rule_name}")"
+    verify_rule "${rule_file}" "## When Completed"
+    verify_support_file "${monorepo}" "${target}" "${rule_name}"
 
-  (
-    cd "${monorepo}"
-    node "${REPO_ROOT}/packages/ballast-typescript/dist/cli.js" install --target cursor --agent linting --force --yes
-  )
+    (
+      cd "${monorepo}"
+      node "${REPO_ROOT}/packages/ballast-typescript/dist/cli.js" install --target "${target}" --agent linting --force --yes
+    )
 
-  verify_force_overwrite "${monorepo}/.cursor/rules/typescript-linting.mdc" "## When Completed"
-  echo "TypeScript monorepo patch smoke test passed."
+    verify_force_overwrite "${rule_file}" "## When Completed"
+    verify_forced_support_file "${monorepo}" "${target}" "${rule_name}"
+  done
+  echo "TypeScript monorepo patch smoke test passed for all targets."
 }
 
 run_python_smoke() {
-  local monorepo="${WORKDIR}/python-monorepo"
-  build_monorepo_fixture "${monorepo}"
-  seed_existing_rule "${monorepo}" "python-linting.mdc"
+  local target
+  local monorepo
+  local rule_name
+  local rule_file
+  for target in cursor opencode claude codex; do
+    monorepo="${WORKDIR}/python-monorepo-${target}"
+    build_monorepo_fixture "${monorepo}"
+    rule_name="python-linting.md"
+    if [[ "${target}" == "cursor" ]]; then
+      rule_name="python-linting.mdc"
+    fi
+    seed_existing_rule "${monorepo}" "${target}" "${rule_name}"
+    seed_existing_support_file "${monorepo}" "${target}"
 
-  (
-    cd "${monorepo}"
-    PYTHONPATH="${REPO_ROOT}/packages/ballast-python" python3 -m ballast install --language python --target cursor --agent linting --patch --yes
-  )
+    (
+      cd "${monorepo}"
+      PYTHONPATH="${REPO_ROOT}/packages/ballast-python" python3 -m ballast install --language python --target "${target}" --agent linting --patch --yes
+    )
 
-  verify_rule "${monorepo}/.cursor/rules/python-linting.mdc" "## Baseline Tooling"
+    rule_file="$(rule_path "${monorepo}" "${target}" "${rule_name}")"
+    verify_rule "${rule_file}" "## Baseline Tooling"
+    verify_support_file "${monorepo}" "${target}" "${rule_name}"
 
-  (
-    cd "${monorepo}"
-    PYTHONPATH="${REPO_ROOT}/packages/ballast-python" python3 -m ballast install --language python --target cursor --agent linting --force --yes
-  )
+    (
+      cd "${monorepo}"
+      PYTHONPATH="${REPO_ROOT}/packages/ballast-python" python3 -m ballast install --language python --target "${target}" --agent linting --force --yes
+    )
 
-  verify_force_overwrite "${monorepo}/.cursor/rules/python-linting.mdc" "## Baseline Tooling"
-  echo "Python monorepo patch smoke test passed."
+    verify_force_overwrite "${rule_file}" "## Baseline Tooling"
+    verify_forced_support_file "${monorepo}" "${target}" "${rule_name}"
+  done
+  echo "Python monorepo patch smoke test passed for all targets."
 }
 
 run_go_smoke() {
-  local monorepo="${WORKDIR}/go-monorepo"
-  build_monorepo_fixture "${monorepo}"
-  seed_existing_rule "${monorepo}" "go-linting.mdc"
+  local target
+  local monorepo
+  local rule_name
+  local rule_file
+  for target in cursor opencode claude codex; do
+    monorepo="${WORKDIR}/go-monorepo-${target}"
+    build_monorepo_fixture "${monorepo}"
+    rule_name="go-linting.md"
+    if [[ "${target}" == "cursor" ]]; then
+      rule_name="go-linting.mdc"
+    fi
+    seed_existing_rule "${monorepo}" "${target}" "${rule_name}"
+    seed_existing_support_file "${monorepo}" "${target}"
 
-  (
-    cd "${monorepo}"
-    "${REPO_ROOT}/.ci/bin/ballast-go" install --language go --target cursor --agent linting --patch --yes
-  )
+    (
+      cd "${monorepo}"
+      "${REPO_ROOT}/.ci/bin/ballast-go" install --language go --target "${target}" --agent linting --patch --yes
+    )
 
-  verify_rule "${monorepo}/.cursor/rules/go-linting.mdc" "## Commands"
+    rule_file="$(rule_path "${monorepo}" "${target}" "${rule_name}")"
+    verify_rule "${rule_file}" "## Commands"
+    verify_support_file "${monorepo}" "${target}" "${rule_name}"
 
-  (
-    cd "${monorepo}"
-    "${REPO_ROOT}/.ci/bin/ballast-go" install --language go --target cursor --agent linting --force --yes
-  )
+    (
+      cd "${monorepo}"
+      "${REPO_ROOT}/.ci/bin/ballast-go" install --language go --target "${target}" --agent linting --force --yes
+    )
 
-  verify_force_overwrite "${monorepo}/.cursor/rules/go-linting.mdc" "## Commands"
-  echo "Go monorepo patch smoke test passed."
+    verify_force_overwrite "${rule_file}" "## Commands"
+    verify_forced_support_file "${monorepo}" "${target}" "${rule_name}"
+  done
+  echo "Go monorepo patch smoke test passed for all targets."
 }
 
 run_typescript_smoke
