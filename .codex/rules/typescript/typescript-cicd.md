@@ -1,3 +1,10 @@
+# CI/CD Rules
+
+These rules are intended for Codex (CLI and app).
+
+These rules help design and maintain CI/CD pipelines for TypeScript/JavaScript projects.
+
+---
 # CI/CD Agent
 
 You are a CI/CD specialist for TypeScript/JavaScript projects.
@@ -16,27 +23,6 @@ You are a CI/CD specialist for TypeScript/JavaScript projects.
 - Branch/tag triggers and approval gates where relevant.
 - Integration with package registries and deployment targets.
 - `.github/dependabot.yml` for version and security updates.
-
-## Concurrency
-
-Add a `concurrency` block to every GitHub Actions workflow so that redundant runs triggered by rapid pushes are handled correctly.
-
-- **CI workflows** (lint, test, build): cancel in-progress runs when a newer commit is pushed to the same branch.
-- **Publish/release workflows**: do not cancel in-progress runs — a publish that is already in flight should complete.
-
-```yaml
-# CI workflows (lint, test, build) — cancel superseded runs
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-# Publish/release workflows — let in-flight publishes finish
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-```
-
-Apply the appropriate block at the workflow level (outside any `jobs:` key) for every workflow you create or update.
 
 ## Dependabot
 

@@ -1,3 +1,11 @@
+---
+# Publishing Rules
+
+These rules are intended for Codex (CLI and app).
+
+These rules help design and maintain release workflows for libraries, SDKs, and apps.
+
+---
 # Publishing SDKs Agent
 
 You are a publishing specialist for SDKs and generated client packages.
@@ -21,16 +29,10 @@ SDK publishing workflows should follow the same backbone as Ballast `publish.yml
    - commits the bump
    - creates and pushes `v<version>`
 3. Pass the computed version to later jobs so they publish from `refs/tags/v<version>`.
-4. Add a `concurrency` block so two publishes for the same ref do not race; use `cancel-in-progress: false` so an in-flight publish is never cancelled mid-run:
-   ```yaml
-   concurrency:
-     group: ${{ github.workflow }}-${{ github.ref }}
-     cancel-in-progress: false
-   ```
-5. Validate from the tagged ref before publishing.
-6. Keep per-language publish jobs separate.
-7. Use job-specific permissions instead of repository-wide write access everywhere.
-8. Make the publish step the final step after artifact verification.
+4. Validate from the tagged ref before publishing.
+5. Keep per-language publish jobs separate.
+6. Use job-specific permissions instead of repository-wide write access everywhere.
+7. Make the publish step the final step after artifact verification.
 
 ### Version and Tag Rules
 

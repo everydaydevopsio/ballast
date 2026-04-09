@@ -33,6 +33,7 @@ Before adding or changing the test runner, check for existing test tooling and f
 
 4. **Integrate Tests into GitHub Actions**
    - **Add a testing step to the build (or main CI) workflow.** Prefer adding a test step to an existing build/CI workflow (e.g. `build.yml`, `ci.yml`, or the workflow that runs build) so that every build runs tests. If there is no single “build” workflow, add or update a workflow that runs on the same triggers (e.g. push/PR to main) and include:
+     - A `concurrency` block at the workflow level to cancel redundant runs: use `cancel-in-progress: true`.
      - Checkout, setup Node (and pnpm/yarn if used), install with frozen lockfile.
      - Run the build step if the workflow is a “build” workflow.
      - **Run the test step** (e.g. `pnpm run test` or `npm run test`).
@@ -95,14 +96,24 @@ export default defineConfig({
 
 **GitHub Actions — add test step to build workflow:**
 
-- In the job that runs the build (or the main CI job), add a step after install and before or after the build step:
+- Add a `concurrency` block at the top of the workflow and add the test steps to the job:
 
 ```yaml
-- name: Run tests
-  run: pnpm run test # or npm run test / yarn test
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-- name: Run tests with coverage
-  run: pnpm run test:coverage # or npm run test:coverage / yarn test:coverage
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # ... checkout, setup Node, install ...
+
+      - name: Run tests
+        run: pnpm run test # or npm run test / yarn test
+
+      - name: Run tests with coverage
+        run: pnpm run test:coverage # or npm run test:coverage / yarn test:coverage
 ```
 
 - Use the same Node version, cache, and lockfile flags as the rest of the workflow (e.g. `--frozen-lockfile` for pnpm).
