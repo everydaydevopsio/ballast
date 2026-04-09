@@ -19,11 +19,21 @@ CLI="node ${REPO_ROOT}/packages/ballast-typescript/dist/cli.js"
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "${WORKDIR}"' EXIT
+TARGETS=(cursor claude opencode codex)
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
 
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*" >&2; exit 1; }
+
+assert_targets() {
+  local dir="$1"; shift
+  local rulesrc="${dir}/.rulesrc.json"
+  for target in "$@"; do
+    grep -q "\"${target}\"" "${rulesrc}" || \
+      fail "Expected target '${target}' in ${rulesrc} but not found. Content: $(cat "${rulesrc}")"
+  done
+}
 
 # assert_agents <dir> <agent1> [agent2 ...]
 # Checks that every listed agent appears in .rulesrc.json "agents" array.
@@ -121,159 +131,174 @@ ballast() {
 # ─── test: incremental agent additions ───────────────────────────────────────
 
 test_incremental_agent_additions() {
-  local dir="${WORKDIR}/incremental-agents"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/incremental-agents-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_incremental_agent_additions"
+    echo ""
+    echo "▶ test_incremental_agent_additions (${target})"
 
-  # Step 1: install linting
-  ballast "${dir}" install --target cursor --agent linting --yes
-  assert_agents "${dir}" "linting" "git-hooks"
-  assert_doctor_agents "${dir}" "linting" "git-hooks"
-  pass "step 1: linting installed"
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks"
+    assert_doctor_agents "${dir}" "linting" "git-hooks"
+    pass "step 1 (${target}): linting installed"
 
-  # Step 2: add testing — linting must be retained
-  ballast "${dir}" install --target cursor --agent testing --yes
-  assert_agents "${dir}" "linting" "git-hooks" "testing"
-  assert_doctor_agents "${dir}" "linting" "git-hooks" "testing"
-  pass "step 2: testing added; linting retained"
+    ballast "${dir}" install --target "${target}" --agent testing --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks" "testing"
+    assert_doctor_agents "${dir}" "linting" "git-hooks" "testing"
+    pass "step 2 (${target}): testing added; linting retained"
 
-  # Step 3: add logging — linting and testing must be retained
-  ballast "${dir}" install --target cursor --agent logging --yes
-  assert_agents "${dir}" "linting" "git-hooks" "testing" "logging"
-  assert_doctor_agents "${dir}" "linting" "git-hooks" "testing" "logging"
-  pass "step 3: logging added; linting and testing retained"
+    ballast "${dir}" install --target "${target}" --agent logging --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks" "testing" "logging"
+    assert_doctor_agents "${dir}" "linting" "git-hooks" "testing" "logging"
+    pass "step 3 (${target}): logging added; linting and testing retained"
+  done
 
-  echo "  ✓ test_incremental_agent_additions passed"
+  echo "  ✓ test_incremental_agent_additions passed for all targets"
 }
 
 # ─── test: adding all agents ─────────────────────────────────────────────────
 
 test_add_all_agents() {
-  local dir="${WORKDIR}/all-agents"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/all-agents-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_add_all_agents"
+    echo ""
+    echo "▶ test_add_all_agents (${target})"
 
-  # Start with a single agent so there is prior state
-  ballast "${dir}" install --target cursor --agent linting --yes
-  assert_agents "${dir}" "linting"
-  pass "step 1: linting installed as initial state"
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting"
+    pass "step 1 (${target}): linting installed as initial state"
 
-  # Install --all: every agent must be present
-  ballast "${dir}" install --target cursor --all --yes
-  for agent in linting git-hooks testing logging cicd local-dev observability publishing docs; do
-    assert_agents "${dir}" "${agent}"
+    ballast "${dir}" install --target "${target}" --all --yes
+    assert_targets "${dir}" "${target}"
+    for agent in linting git-hooks testing logging cicd local-dev observability publishing docs; do
+      assert_agents "${dir}" "${agent}"
+    done
+    assert_doctor_agents "${dir}" "linting"
+    pass "step 2 (${target}): --all installs every agent"
   done
-  assert_doctor_agents "${dir}" "linting"
-  pass "step 2: --all installs every agent"
 
-  echo "  ✓ test_add_all_agents passed"
+  echo "  ✓ test_add_all_agents passed for all targets"
 }
 
 # ─── test: incremental skill additions ───────────────────────────────────────
 
 test_incremental_skill_additions() {
-  local dir="${WORKDIR}/incremental-skills"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/incremental-skills-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_incremental_skill_additions"
+    echo ""
+    echo "▶ test_incremental_skill_additions (${target})"
 
-  # Establish agents first
-  ballast "${dir}" install --target cursor --agent linting --yes
+    ballast "${dir}" install --target "${target}" --agent linting --yes
 
-  # Step 1: install first skill — agents must be retained
-  ballast "${dir}" install --target cursor --skill owasp-security-scan --yes
-  assert_agents "${dir}" "linting" "git-hooks"
-  assert_skills "${dir}" "owasp-security-scan"
-  assert_doctor_agents "${dir}" "linting" "git-hooks"
-  assert_doctor_skills "${dir}" "owasp-security-scan"
-  pass "step 1: owasp-security-scan installed; agents retained"
+    ballast "${dir}" install --target "${target}" --skill owasp-security-scan --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks"
+    assert_skills "${dir}" "owasp-security-scan"
+    assert_doctor_agents "${dir}" "linting" "git-hooks"
+    assert_doctor_skills "${dir}" "owasp-security-scan"
+    pass "step 1 (${target}): owasp-security-scan installed; agents retained"
 
-  # Step 2: add a second skill — first skill and agents must be retained
-  ballast "${dir}" install --target cursor --skill aws-health-review --yes
-  assert_agents "${dir}" "linting" "git-hooks"
-  assert_skills "${dir}" "owasp-security-scan" "aws-health-review"
-  assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
-  pass "step 2: aws-health-review added; owasp-security-scan and agents retained"
+    ballast "${dir}" install --target "${target}" --skill aws-health-review --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks"
+    assert_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    pass "step 2 (${target}): aws-health-review added; owasp-security-scan and agents retained"
+  done
 
-  echo "  ✓ test_incremental_skill_additions passed"
+  echo "  ✓ test_incremental_skill_additions passed for all targets"
 }
 
 # ─── test: adding all skills ─────────────────────────────────────────────────
 
 test_add_all_skills() {
-  local dir="${WORKDIR}/all-skills"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/all-skills-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_add_all_skills"
+    echo ""
+    echo "▶ test_add_all_skills (${target})"
 
-  # Establish agents and one skill
-  ballast "${dir}" install --target cursor --agent linting --yes
-  ballast "${dir}" install --target cursor --skill owasp-security-scan --yes
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    ballast "${dir}" install --target "${target}" --skill owasp-security-scan --yes
 
-  # Install --all-skills: all skills must be present and agents must be retained
-  ballast "${dir}" install --target cursor --all-skills --yes
-  assert_agents "${dir}" "linting" "git-hooks"
-  for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
-    assert_skills "${dir}" "${skill}"
+    ballast "${dir}" install --target "${target}" --all-skills --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks"
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
+      assert_skills "${dir}" "${skill}"
+    done
+    assert_doctor_agents "${dir}" "linting"
+    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    pass "step 1 (${target}): --all-skills installs every skill; agents retained"
   done
-  assert_doctor_agents "${dir}" "linting"
-  assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
-  pass "step 1: --all-skills installs every skill; agents retained"
 
-  echo "  ✓ test_add_all_skills passed"
+  echo "  ✓ test_add_all_skills passed for all targets"
 }
 
 # ─── test: agent install does not drop skills ─────────────────────────────────
 
 test_agent_install_retains_skills() {
-  local dir="${WORKDIR}/agent-retains-skills"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/agent-retains-skills-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_agent_install_retains_skills"
+    echo ""
+    echo "▶ test_agent_install_retains_skills (${target})"
 
-  # Establish agents and skills
-  ballast "${dir}" install --target cursor --agent linting --yes
-  ballast "${dir}" install --target cursor --skill owasp-security-scan --yes
-  assert_skills "${dir}" "owasp-security-scan"
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    ballast "${dir}" install --target "${target}" --skill owasp-security-scan --yes
+    assert_targets "${dir}" "${target}"
+    assert_skills "${dir}" "owasp-security-scan"
 
-  # Add an agent without a skill flag — the skill must survive
-  ballast "${dir}" install --target cursor --agent testing --yes
-  assert_agents "${dir}" "linting" "git-hooks" "testing"
-  assert_skills "${dir}" "owasp-security-scan"
-  assert_doctor_skills "${dir}" "owasp-security-scan"
-  pass "installing an agent does not drop existing skills"
+    ballast "${dir}" install --target "${target}" --agent testing --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks" "testing"
+    assert_skills "${dir}" "owasp-security-scan"
+    assert_doctor_skills "${dir}" "owasp-security-scan"
+    pass "installing an agent does not drop existing skills (${target})"
+  done
 
-  echo "  ✓ test_agent_install_retains_skills passed"
+  echo "  ✓ test_agent_install_retains_skills passed for all targets"
 }
 
 # ─── test: skill install does not drop agents ─────────────────────────────────
 
 test_skill_install_retains_agents() {
-  local dir="${WORKDIR}/skill-retains-agents"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/skill-retains-agents-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_skill_install_retains_agents"
+    echo ""
+    echo "▶ test_skill_install_retains_agents (${target})"
 
-  # Establish multiple agents
-  ballast "${dir}" install --target cursor --agent linting --yes
-  ballast "${dir}" install --target cursor --agent testing --yes
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    ballast "${dir}" install --target "${target}" --agent testing --yes
 
-  # Add a skill without an agent flag — agents must survive
-  ballast "${dir}" install --target cursor --skill owasp-security-scan --yes
-  assert_agents "${dir}" "linting" "git-hooks" "testing"
-  assert_skills "${dir}" "owasp-security-scan"
-  assert_doctor_agents "${dir}" "linting" "git-hooks" "testing"
-  pass "installing a skill does not drop existing agents"
+    ballast "${dir}" install --target "${target}" --skill owasp-security-scan --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks" "testing"
+    assert_skills "${dir}" "owasp-security-scan"
+    assert_doctor_agents "${dir}" "linting" "git-hooks" "testing"
+    pass "installing a skill does not drop existing agents (${target})"
+  done
 
-  echo "  ✓ test_skill_install_retains_agents passed"
+  echo "  ✓ test_skill_install_retains_agents passed for all targets"
 }
 
 # ─── test: reinstalling a subset of agents does not drop the rest ────────────
@@ -281,53 +306,59 @@ test_skill_install_retains_agents() {
 # subsequent install must not drop the previously configured agents.
 
 test_reinstall_subset_agents_retained() {
-  local dir="${WORKDIR}/subset-agents"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/subset-agents-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_reinstall_subset_agents_retained"
+    echo ""
+    echo "▶ test_reinstall_subset_agents_retained (${target})"
 
-  # Install multiple agents
-  ballast "${dir}" install --target cursor --agent linting --yes
-  ballast "${dir}" install --target cursor --agent testing --yes
-  ballast "${dir}" install --target cursor --agent logging --yes
-  assert_agents "${dir}" "linting" "git-hooks" "testing" "logging"
-  pass "step 1: linting, testing, logging installed"
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    ballast "${dir}" install --target "${target}" --agent testing --yes
+    ballast "${dir}" install --target "${target}" --agent logging --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks" "testing" "logging"
+    pass "step 1 (${target}): linting, testing, logging installed"
 
-  # Reinstall specifying only linting — testing and logging must NOT be dropped
-  ballast "${dir}" install --target cursor --agent linting --yes
-  assert_agents "${dir}" "linting" "git-hooks" "testing" "logging"
-  assert_doctor_agents "${dir}" "linting" "testing" "logging"
-  pass "step 2: reinstalling linting does not drop testing or logging"
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks" "testing" "logging"
+    assert_doctor_agents "${dir}" "linting" "testing" "logging"
+    pass "step 2 (${target}): reinstalling linting does not drop testing or logging"
+  done
 
-  echo "  ✓ test_reinstall_subset_agents_retained passed"
+  echo "  ✓ test_reinstall_subset_agents_retained passed for all targets"
 }
 
 # ─── test: reinstalling a subset of skills does not drop the rest ────────────
 # This is the "removing 1 skill" scenario.
 
 test_reinstall_subset_skills_retained() {
-  local dir="${WORKDIR}/subset-skills"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/subset-skills-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_reinstall_subset_skills_retained"
+    echo ""
+    echo "▶ test_reinstall_subset_skills_retained (${target})"
 
-  # Install multiple skills
-  ballast "${dir}" install --target cursor --agent linting --yes
-  ballast "${dir}" install --target cursor --skill owasp-security-scan --yes
-  ballast "${dir}" install --target cursor --skill aws-health-review --yes
-  assert_skills "${dir}" "owasp-security-scan" "aws-health-review"
-  pass "step 1: owasp-security-scan and aws-health-review installed"
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    ballast "${dir}" install --target "${target}" --skill owasp-security-scan --yes
+    ballast "${dir}" install --target "${target}" --skill aws-health-review --yes
+    assert_targets "${dir}" "${target}"
+    assert_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    pass "step 1 (${target}): owasp-security-scan and aws-health-review installed"
 
-  # Reinstall specifying only owasp — aws-health-review must NOT be dropped
-  ballast "${dir}" install --target cursor --skill owasp-security-scan --yes
-  assert_agents "${dir}" "linting" "git-hooks"
-  assert_skills "${dir}" "owasp-security-scan" "aws-health-review"
-  assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
-  pass "step 2: reinstalling owasp does not drop aws-health-review"
+    ballast "${dir}" install --target "${target}" --skill owasp-security-scan --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting" "git-hooks"
+    assert_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    pass "step 2 (${target}): reinstalling owasp does not drop aws-health-review"
+  done
 
-  echo "  ✓ test_reinstall_subset_skills_retained passed"
+  echo "  ✓ test_reinstall_subset_skills_retained passed for all targets"
 }
 
 # ─── test: full sequential scenario ──────────────────────────────────────────
@@ -335,54 +366,57 @@ test_reinstall_subset_skills_retained() {
 # reinstall subset of skills.  At every step verify prior state is intact.
 
 test_full_sequential() {
-  local dir="${WORKDIR}/full-sequential"
-  make_project "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/full-sequential-${target}"
+    make_project "${dir}"
 
-  echo ""
-  echo "▶ test_full_sequential"
+    echo ""
+    echo "▶ test_full_sequential (${target})"
 
-  # 1. Add all agents
-  ballast "${dir}" install --target cursor --all --yes
-  for agent in linting git-hooks testing logging cicd local-dev observability publishing docs; do
-    assert_agents "${dir}" "${agent}"
-  done
-  pass "step 1: --all agents installed"
+    ballast "${dir}" install --target "${target}" --all --yes
+    assert_targets "${dir}" "${target}"
+    for agent in linting git-hooks testing logging cicd local-dev observability publishing docs; do
+      assert_agents "${dir}" "${agent}"
+    done
+    pass "step 1 (${target}): --all agents installed"
 
-  # 2. Add all skills — all agents must remain
-  ballast "${dir}" install --target cursor --all-skills --yes
-  for agent in linting git-hooks testing logging; do
-    assert_agents "${dir}" "${agent}"
-  done
-  for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
-    assert_skills "${dir}" "${skill}"
-  done
-  assert_doctor_agents "${dir}" "linting" "testing"
-  assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
-  pass "step 2: --all-skills added; all agents retained"
+    ballast "${dir}" install --target "${target}" --all-skills --yes
+    assert_targets "${dir}" "${target}"
+    for agent in linting git-hooks testing logging; do
+      assert_agents "${dir}" "${agent}"
+    done
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
+      assert_skills "${dir}" "${skill}"
+    done
+    assert_doctor_agents "${dir}" "linting" "testing"
+    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    pass "step 2 (${target}): --all-skills added; all agents retained"
 
-  # 3. Reinstall 1 agent only — all other agents and all skills must remain
-  ballast "${dir}" install --target cursor --agent linting --yes
-  for agent in linting git-hooks testing logging cicd local-dev; do
-    assert_agents "${dir}" "${agent}"
-  done
-  for skill in owasp-security-scan aws-health-review; do
-    assert_skills "${dir}" "${skill}"
-  done
-  pass "step 3: reinstall linting only; all other agents and skills retained"
+    ballast "${dir}" install --target "${target}" --agent linting --yes
+    assert_targets "${dir}" "${target}"
+    for agent in linting git-hooks testing logging cicd local-dev; do
+      assert_agents "${dir}" "${agent}"
+    done
+    for skill in owasp-security-scan aws-health-review; do
+      assert_skills "${dir}" "${skill}"
+    done
+    pass "step 3 (${target}): reinstall linting only; all other agents and skills retained"
 
-  # 4. Reinstall 1 skill only — all agents and other skills must remain
-  ballast "${dir}" install --target cursor --skill owasp-security-scan --yes
-  for agent in linting git-hooks testing logging; do
-    assert_agents "${dir}" "${agent}"
+    ballast "${dir}" install --target "${target}" --skill owasp-security-scan --yes
+    assert_targets "${dir}" "${target}"
+    for agent in linting git-hooks testing logging; do
+      assert_agents "${dir}" "${agent}"
+    done
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
+      assert_skills "${dir}" "${skill}"
+    done
+    assert_doctor_agents "${dir}" "linting" "testing"
+    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    pass "step 4 (${target}): reinstall owasp only; all agents and other skills retained"
   done
-  for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
-    assert_skills "${dir}" "${skill}"
-  done
-  assert_doctor_agents "${dir}" "linting" "testing"
-  assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
-  pass "step 4: reinstall owasp only; all agents and other skills retained"
 
-  echo "  ✓ test_full_sequential passed"
+  echo "  ✓ test_full_sequential passed for all targets"
 }
 
 # ─── test: ballast CLI (Go wrapper) agent/skill isolation ─────────────────────
