@@ -699,6 +699,9 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	if len(config.Agents) > 0 {
 		fmt.Printf("- agents: %s\n", strings.Join(config.Agents, ", "))
 	}
+	if len(config.Skills) > 0 {
+		fmt.Printf("- skills: %s\n", strings.Join(config.Skills, ", "))
+	}
 	fmt.Println()
 }
 
@@ -1374,10 +1377,30 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, err
 	}
 
+	// Compute agents and skills to persist: merge explicit selection with existing
+	// config so that installing only agents never drops saved skills and vice versa.
+	persistAgents := selectedAgents
+	if !installAll && config != nil {
+		persistAgents = uniqueStrings(append(slices.Clone(config.Agents), selectedAgents...))
+	}
+	persistSkills := selectedSkills
+	if !installAllSkills && config != nil {
+		persistSkills = uniqueStrings(append(slices.Clone(config.Skills), selectedSkills...))
+	}
+
+	// Validate merged agents and skills before saving to prevent re-persisting
+	// typos or unsupported entries from the existing config.
+	if err := validateSelectedAgents(persistAgents); err != nil {
+		return nil, err
+	}
+	if err := validateSelectedSkills(persistSkills); err != nil {
+		return nil, err
+	}
+
 	configToSave := monorepoConfig{
 		Targets:        savedTargets,
-		Agents:         selectedAgents,
-		Skills:         selectedSkills,
+		Agents:         persistAgents,
+		Skills:         persistSkills,
 		BallastVersion: normalizeVersion(resolveVersion()),
 		Languages:      make([]string, 0, len(profiles)),
 		Paths:          map[string][]string{},
@@ -2318,6 +2341,23 @@ func validateSelectedAgents(agents []string) error {
 			"unsupported agent selection: %s (supported agents: %s)",
 			strings.Join(invalid, ", "),
 			strings.Join(supportedAgents, ", "),
+		)
+	}
+	return nil
+}
+
+func validateSelectedSkills(skills []string) error {
+	invalid := []string{}
+	for _, skill := range uniqueStrings(skills) {
+		if !slices.Contains(supportedSkills, skill) {
+			invalid = append(invalid, skill)
+		}
+	}
+	if len(invalid) > 0 {
+		return fmt.Errorf(
+			"unsupported skill selection: %s (supported skills: %s)",
+			strings.Join(invalid, ", "),
+			strings.Join(supportedSkills, ", "),
 		)
 	}
 	return nil
