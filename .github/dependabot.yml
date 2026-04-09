@@ -19,6 +19,9 @@ updates:
       - dependency-name: 'typescript'
         update-types:
           - 'version-update:semver-major'
+      - dependency-name: '@types/node'
+        update-types:
+          - 'version-update:semver-major'
     groups:
       eslint:
         patterns:
