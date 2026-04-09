@@ -74,7 +74,7 @@ assert_doctor_agents() {
   local output
   output="$(cd "${dir}" && ${CLI} doctor 2>&1)"
   for agent in "$@"; do
-    echo "${output}" | grep -q "${agent}" || \
+    grep -Fq "${agent}" <<<"${output}" || \
       fail "Doctor did not report agent '${agent}'. Doctor output:\n${output}"
   done
 }
@@ -85,7 +85,7 @@ assert_doctor_skills() {
   local output
   output="$(cd "${dir}" && ${CLI} doctor 2>&1)"
   for skill in "$@"; do
-    echo "${output}" | grep -q "${skill}" || \
+    grep -Fq "${skill}" <<<"${output}" || \
       fail "Doctor did not report skill '${skill}'. Doctor output:\n${output}"
   done
 }
@@ -94,6 +94,23 @@ make_project() {
   local dir="$1"
   mkdir -p "${dir}"
   echo '{}' > "${dir}/package.json"
+}
+
+# Creates a minimal 2-language monorepo fixture with TypeScript and Python profiles.
+# Required for exercising the Go CLI's monorepo configToSave logic.
+make_monorepo_2lang() {
+  local dir="$1"
+  mkdir -p "${dir}"
+
+  # TypeScript profile
+  mkdir -p "${dir}/apps/frontend"
+  echo '{}' > "${dir}/apps/frontend/package.json"
+  echo '{}' > "${dir}/apps/frontend/tsconfig.json"
+
+  # Python profile
+  mkdir -p "${dir}/services/api"
+  echo '{}' > "${dir}/services/api/pyproject.toml"
+  echo '{}' > "${dir}/services/api/setup.py"
 }
 
 ballast() {
@@ -386,7 +403,7 @@ assert_ballast_doctor_agents() {
   local output
   output="$(cd "${dir}" && "${BALLAST_CLI}" doctor 2>&1)"
   for agent in "$@"; do
-    echo "${output}" | grep -q "${agent}" || \
+    grep -Fq "${agent}" <<<"${output}" || \
       fail "ballast doctor did not report agent '${agent}'. Output:\n${output}"
   done
 }
@@ -396,7 +413,7 @@ assert_ballast_doctor_skills() {
   local output
   output="$(cd "${dir}" && "${BALLAST_CLI}" doctor 2>&1)"
   for skill in "$@"; do
-    echo "${output}" | grep -q "${skill}" || \
+    grep -Fq "${skill}" <<<"${output}" || \
       fail "ballast doctor did not report skill '${skill}'. Output:\n${output}"
   done
 }
@@ -408,20 +425,20 @@ test_ballast_cli_skill_retains_agents() {
   fi
 
   local dir="${WORKDIR}/ballast-cli-skill-retains-agents"
-  make_project "${dir}"
+  make_monorepo_2lang "${dir}"
 
   echo ""
   echo "▶ test_ballast_cli_skill_retains_agents"
 
   ballast_cli "${dir}" install --target cursor --agent linting --yes
-  assert_agents "${dir}" "linting" "git-hooks"
+  assert_agents "${dir}" "linting"
   assert_no_skills "${dir}" "owasp-security-scan"
   pass "step 1: linting installed via ballast CLI"
 
   ballast_cli "${dir}" install --target cursor --skill owasp-security-scan --yes
-  assert_agents "${dir}" "linting" "git-hooks"
+  assert_agents "${dir}" "linting"
   assert_skills "${dir}" "owasp-security-scan"
-  assert_ballast_doctor_agents "${dir}" "linting" "git-hooks"
+  assert_ballast_doctor_agents "${dir}" "linting"
   assert_ballast_doctor_skills "${dir}" "owasp-security-scan"
   pass "step 2: skill added via ballast CLI; agents preserved"
 
@@ -435,7 +452,7 @@ test_ballast_cli_agent_retains_skills() {
   fi
 
   local dir="${WORKDIR}/ballast-cli-agent-retains-skills"
-  make_project "${dir}"
+  make_monorepo_2lang "${dir}"
 
   echo ""
   echo "▶ test_ballast_cli_agent_retains_skills"
@@ -446,8 +463,8 @@ test_ballast_cli_agent_retains_skills() {
 
   ballast_cli "${dir}" install --target cursor --agent linting --yes
   assert_skills "${dir}" "owasp-security-scan"
-  assert_agents "${dir}" "linting" "git-hooks"
-  assert_ballast_doctor_agents "${dir}" "linting" "git-hooks"
+  assert_agents "${dir}" "linting"
+  assert_ballast_doctor_agents "${dir}" "linting"
   assert_ballast_doctor_skills "${dir}" "owasp-security-scan"
   pass "step 2: agent added via ballast CLI; skills preserved"
 

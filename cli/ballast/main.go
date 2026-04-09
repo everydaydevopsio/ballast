@@ -1388,6 +1388,15 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		persistSkills = uniqueStrings(append(slices.Clone(config.Skills), selectedSkills...))
 	}
 
+	// Validate merged agents and skills before saving to prevent re-persisting
+	// typos or unsupported entries from the existing config.
+	if err := validateSelectedAgents(persistAgents); err != nil {
+		return nil, err
+	}
+	if err := validateSelectedSkills(persistSkills); err != nil {
+		return nil, err
+	}
+
 	configToSave := monorepoConfig{
 		Targets:        savedTargets,
 		Agents:         persistAgents,
@@ -2332,6 +2341,23 @@ func validateSelectedAgents(agents []string) error {
 			"unsupported agent selection: %s (supported agents: %s)",
 			strings.Join(invalid, ", "),
 			strings.Join(supportedAgents, ", "),
+		)
+	}
+	return nil
+}
+
+func validateSelectedSkills(skills []string) error {
+	invalid := []string{}
+	for _, skill := range uniqueStrings(skills) {
+		if !slices.Contains(supportedSkills, skill) {
+			invalid = append(invalid, skill)
+		}
+	}
+	if len(invalid) > 0 {
+		return fmt.Errorf(
+			"unsupported skill selection: %s (supported skills: %s)",
+			strings.Join(invalid, ", "),
+			strings.Join(supportedSkills, ", "),
 		)
 	}
 	return nil

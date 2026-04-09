@@ -1325,6 +1325,56 @@ func TestResolveMonorepoPlanAgentOnlyInstallPreservesConfigSkills(t *testing.T) 
 	}
 }
 
+func TestResolveMonorepoPlanSkillOnlyInstallRejectsInvalidPersistedAgents(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "claude",
+  "agents": ["not-an-agent"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{
+		"install",
+		"--target", "codex",
+		"--skill", "owasp-security-scan",
+	})
+	if err == nil {
+		t.Fatalf("expected unsupported agent error, got plan %#v", plan)
+	}
+	if !strings.Contains(err.Error(), "unsupported agent selection") {
+		t.Fatalf("expected unsupported agent error, got %v", err)
+	}
+}
+
+func TestResolveMonorepoPlanAgentOnlyInstallRejectsInvalidPersistedSkills(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "target": "claude",
+  "skills": ["not-a-skill"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{
+		"install",
+		"--target", "codex",
+		"--agent", "local-dev",
+	})
+	if err == nil {
+		t.Fatalf("expected unsupported skill error, got plan %#v", plan)
+	}
+	if !strings.Contains(err.Error(), "unsupported skill selection") {
+		t.Fatalf("expected unsupported skill error, got %v", err)
+	}
+}
+
 func TestResolveMonorepoPlanRemoveLastTargetCleanupOnly(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
