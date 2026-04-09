@@ -26,12 +26,21 @@ TARGETS=(cursor claude opencode codex)
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*" >&2; exit 1; }
 
+rulesrc_contents() {
+  local rulesrc="$1"
+  if [ -r "${rulesrc}" ]; then
+    cat "${rulesrc}" 2>/dev/null || true
+    return
+  fi
+  printf '<unreadable: %s>' "${rulesrc}"
+}
+
 assert_targets() {
   local dir="$1"; shift
   local rulesrc="${dir}/.rulesrc.json"
   for target in "$@"; do
     grep -q "\"${target}\"" "${rulesrc}" || \
-      fail "Expected target '${target}' in ${rulesrc} but not found. Content: $(cat "${rulesrc}")"
+      fail "Expected target '${target}' in ${rulesrc} but not found. Content: $(rulesrc_contents "${rulesrc}")"
   done
 }
 
@@ -42,7 +51,7 @@ assert_agents() {
   local rulesrc="${dir}/.rulesrc.json"
   for agent in "$@"; do
     grep -q "\"${agent}\"" "${rulesrc}" || \
-      fail "Expected agent '${agent}' in ${rulesrc} but not found. Content: $(cat "${rulesrc}")"
+      fail "Expected agent '${agent}' in ${rulesrc} but not found. Content: $(rulesrc_contents "${rulesrc}")"
   done
 }
 
@@ -53,7 +62,7 @@ assert_no_agents() {
   local rulesrc="${dir}/.rulesrc.json"
   for agent in "$@"; do
     grep -q "\"${agent}\"" "${rulesrc}" && \
-      fail "Agent '${agent}' should NOT be in ${rulesrc} but was found. Content: $(cat "${rulesrc}")" || true
+      fail "Agent '${agent}' should NOT be in ${rulesrc} but was found. Content: $(rulesrc_contents "${rulesrc}")" || true
   done
 }
 
@@ -63,7 +72,7 @@ assert_skills() {
   local rulesrc="${dir}/.rulesrc.json"
   for skill in "$@"; do
     grep -q "\"${skill}\"" "${rulesrc}" || \
-      fail "Expected skill '${skill}' in ${rulesrc} but not found. Content: $(cat "${rulesrc}")"
+      fail "Expected skill '${skill}' in ${rulesrc} but not found. Content: $(rulesrc_contents "${rulesrc}")"
   done
 }
 
@@ -73,7 +82,7 @@ assert_no_skills() {
   local rulesrc="${dir}/.rulesrc.json"
   for skill in "$@"; do
     grep -q "\"${skill}\"" "${rulesrc}" && \
-      fail "Skill '${skill}' should NOT be in ${rulesrc} but was found. Content: $(cat "${rulesrc}")" || true
+      fail "Skill '${skill}' should NOT be in ${rulesrc} but was found. Content: $(rulesrc_contents "${rulesrc}")" || true
   done
 }
 
@@ -458,25 +467,30 @@ test_ballast_cli_skill_retains_agents() {
     return
   fi
 
-  local dir="${WORKDIR}/ballast-cli-skill-retains-agents"
-  make_monorepo_2lang "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/ballast-cli-skill-retains-agents-${target}"
+    make_monorepo_2lang "${dir}"
 
-  echo ""
-  echo "▶ test_ballast_cli_skill_retains_agents"
+    echo ""
+    echo "▶ test_ballast_cli_skill_retains_agents (${target})"
 
-  ballast_cli "${dir}" install --target cursor --agent linting --yes
-  assert_agents "${dir}" "linting"
-  assert_no_skills "${dir}" "owasp-security-scan"
-  pass "step 1: linting installed via ballast CLI"
+    ballast_cli "${dir}" install --target "${target}" --agent linting --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting"
+    assert_no_skills "${dir}" "owasp-security-scan"
+    pass "step 1 (${target}): linting installed via ballast CLI"
 
-  ballast_cli "${dir}" install --target cursor --skill owasp-security-scan --yes
-  assert_agents "${dir}" "linting"
-  assert_skills "${dir}" "owasp-security-scan"
-  assert_ballast_doctor_agents "${dir}" "linting"
-  assert_ballast_doctor_skills "${dir}" "owasp-security-scan"
-  pass "step 2: skill added via ballast CLI; agents preserved"
+    ballast_cli "${dir}" install --target "${target}" --skill owasp-security-scan --yes
+    assert_targets "${dir}" "${target}"
+    assert_agents "${dir}" "linting"
+    assert_skills "${dir}" "owasp-security-scan"
+    assert_ballast_doctor_agents "${dir}" "linting"
+    assert_ballast_doctor_skills "${dir}" "owasp-security-scan"
+    pass "step 2 (${target}): skill added via ballast CLI; agents preserved"
+  done
 
-  echo "  ✓ test_ballast_cli_skill_retains_agents passed"
+  echo "  ✓ test_ballast_cli_skill_retains_agents passed for all targets"
 }
 
 test_ballast_cli_agent_retains_skills() {
@@ -485,24 +499,29 @@ test_ballast_cli_agent_retains_skills() {
     return
   fi
 
-  local dir="${WORKDIR}/ballast-cli-agent-retains-skills"
-  make_monorepo_2lang "${dir}"
+  local target
+  for target in "${TARGETS[@]}"; do
+    local dir="${WORKDIR}/ballast-cli-agent-retains-skills-${target}"
+    make_monorepo_2lang "${dir}"
 
-  echo ""
-  echo "▶ test_ballast_cli_agent_retains_skills"
+    echo ""
+    echo "▶ test_ballast_cli_agent_retains_skills (${target})"
 
-  ballast_cli "${dir}" install --target cursor --skill owasp-security-scan --yes
-  assert_skills "${dir}" "owasp-security-scan"
-  pass "step 1: skill installed via ballast CLI"
+    ballast_cli "${dir}" install --target "${target}" --skill owasp-security-scan --yes
+    assert_targets "${dir}" "${target}"
+    assert_skills "${dir}" "owasp-security-scan"
+    pass "step 1 (${target}): skill installed via ballast CLI"
 
-  ballast_cli "${dir}" install --target cursor --agent linting --yes
-  assert_skills "${dir}" "owasp-security-scan"
-  assert_agents "${dir}" "linting"
-  assert_ballast_doctor_agents "${dir}" "linting"
-  assert_ballast_doctor_skills "${dir}" "owasp-security-scan"
-  pass "step 2: agent added via ballast CLI; skills preserved"
+    ballast_cli "${dir}" install --target "${target}" --agent linting --yes
+    assert_targets "${dir}" "${target}"
+    assert_skills "${dir}" "owasp-security-scan"
+    assert_agents "${dir}" "linting"
+    assert_ballast_doctor_agents "${dir}" "linting"
+    assert_ballast_doctor_skills "${dir}" "owasp-security-scan"
+    pass "step 2 (${target}): agent added via ballast CLI; skills preserved"
+  done
 
-  echo "  ✓ test_ballast_cli_agent_retains_skills passed"
+  echo "  ✓ test_ballast_cli_agent_retains_skills passed for all targets"
 }
 
 # ─── run all tests ────────────────────────────────────────────────────────────

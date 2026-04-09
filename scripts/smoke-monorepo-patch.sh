@@ -165,8 +165,8 @@ verify_support_file() {
 
   grep -q "## Team Notes" "${support_file}"
   grep -q "Keep this section." "${support_file}"
-  grep -q "\`${expected_path}\`" "${support_file}"
-  ! grep -q "\`${old_path}\`" "${support_file}"
+  grep -Fq "\`${expected_path}\`" "${support_file}"
+  ! grep -Fq "\`${old_path}\`" "${support_file}"
 }
 
 verify_forced_support_file() {
@@ -193,8 +193,8 @@ verify_forced_support_file() {
       ;;
   esac
 
-  grep -q "\`${expected_path}\`" "${support_file}"
-  ! grep -q "\`${old_path}\`" "${support_file}"
+  grep -Fq "\`${expected_path}\`" "${support_file}"
+  ! grep -Fq "\`${old_path}\`" "${support_file}"
 }
 
 run_typescript_smoke() {
