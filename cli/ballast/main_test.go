@@ -475,6 +475,183 @@ func TestRunUpgradeForceForwardsForceToRefreshInstall(t *testing.T) {
 	}
 }
 
+func TestRunDoctorFixForwardsSelectedLanguageToRefreshInstall(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.6"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	refreshCount := 0
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		refreshCount++
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.5",
+  "target":"claude",
+  "agents":["linting"],
+  "languages":["typescript","python","go"],
+  "paths":{
+    "typescript":["packages/ballast-typescript"],
+    "python":["packages/ballast-python"],
+    "go":["packages/ballast-go"]
+  }
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"--language", "go", "doctor", "--fix"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected one backend install command for go, got %#v", commands)
+	}
+	if refreshCount != 1 {
+		t.Fatalf("expected refresh install to run once for the selected language, got %d", refreshCount)
+	}
+}
+
+func TestRunDoctorFixSkipsRefreshWhenConfigIsMissing(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.6"
+
+	runCommandFunc = func(name string, args []string) error { return nil }
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	refreshCount := 0
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		refreshCount++
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+
+	if exitCode := runDoctorFix(root, langGo, false, false); exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	if refreshCount != 0 {
+		t.Fatalf("expected no refresh install when .rulesrc.json is missing, got %d", refreshCount)
+	}
+}
+
+func TestRunDoctorFixReportsRewriteFailure(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.6"
+
+	runCommandFunc = func(name string, args []string) error { return nil }
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	refreshCount := 0
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		refreshCount++
+		if refreshCount == 1 {
+			if err := os.Chmod(filepath.Join(dir, ".rulesrc.json"), 0o444); err != nil {
+				t.Fatalf("failed to make .rulesrc.json read-only: %v", err)
+			}
+		}
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.5",
+  "target":"claude",
+  "agents":["linting"],
+  "languages":["typescript","python","go"],
+  "paths":{
+    "typescript":["packages/ballast-typescript"],
+    "python":["packages/ballast-python"],
+    "go":["packages/ballast-go"]
+  }
+}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"--language", "go", "upgrade"})
+			if exitCode != 1 {
+				t.Fatalf("expected exit code 1, got %d", exitCode)
+			}
+		})
+	})
+
+	if refreshCount != 1 {
+		t.Fatalf("expected a single refresh install before rewrite failure, got %d", refreshCount)
+	}
+	if !strings.Contains(output, "rulesrc.json") {
+		t.Fatalf("expected rewrite failure to be reported, got %q", output)
+	}
+}
+
+func TestRunUpgradeRejectsUnknownOption(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"upgrade", "--bogus"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "unknown upgrade option: --bogus") {
+		t.Fatalf("expected upgrade option error, got %q", output)
+	}
+}
+
+func TestRunUpgradeRequiresExistingConfig(t *testing.T) {
+	output := captureStdout(t, func() {
+		withWorkingDir(t, t.TempDir(), func() {
+			exitCode := run([]string{"upgrade"})
+			if exitCode != 1 {
+				t.Fatalf("expected exit code 1, got %d", exitCode)
+			}
+		})
+	})
+
+	if !strings.Contains(output, "upgrade requires an existing .rulesrc.json") {
+		t.Fatalf("expected missing config error, got %q", output)
+	}
+}
+
 func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
