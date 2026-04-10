@@ -429,6 +429,52 @@ func TestRunUpgradePatchForwardsPatchToRefreshInstall(t *testing.T) {
 	}
 }
 
+func TestRunUpgradeForceForwardsForceToRefreshInstall(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.6"
+
+	runCommandFunc = func(name string, args []string) error { return nil }
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	var invocation backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocation = backendInvocation{Binary: binary, Args: append([]string(nil), args...)}
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.5",
+  "target":"claude",
+  "agents":["local-dev"],
+  "languages":["typescript"],
+  "paths":{"typescript":["."]}
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"upgrade", "--force"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --force --yes") {
+		t.Fatalf("expected upgrade --force to refresh config via install --force --yes, got %q", got)
+	}
+}
+
 func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
