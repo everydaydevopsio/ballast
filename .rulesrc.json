@@ -1,9 +1,6 @@
 {
   "targets": [
-    "cursor",
-    "claude",
-    "codex",
-    "opencode"
+    "claude"
   ],
   "agents": [
     "local-dev",
@@ -16,10 +13,11 @@
     "logging",
     "testing"
   ],
+  "ballastVersion": "5.6.5",
   "skills": [
-    "owasp-security-scan"
+    "owasp-security-scan",
+    "github-health-check"
   ],
-  "ballastVersion": "5.6.4",
   "languages": [
     "typescript",
     "python",

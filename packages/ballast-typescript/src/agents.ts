@@ -62,7 +62,8 @@ export const COMMON_SKILL_IDS = [
   'owasp-security-scan',
   'aws-health-review',
   'aws-live-health-review',
-  'aws-weekly-security-review'
+  'aws-weekly-security-review',
+  'github-health-check'
 ] as const;
 export const SKILL_IDS = [...COMMON_SKILL_IDS] as const;
 export type SkillId = (typeof SKILL_IDS)[number];

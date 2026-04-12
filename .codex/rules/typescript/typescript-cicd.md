@@ -24,6 +24,27 @@ You are a CI/CD specialist for TypeScript/JavaScript projects.
 - Integration with package registries and deployment targets.
 - `.github/dependabot.yml` for version and security updates.
 
+## Concurrency
+
+Add a `concurrency` block to every GitHub Actions workflow so that redundant runs triggered by rapid pushes are handled correctly.
+
+- **CI workflows** (lint, test, build): cancel in-progress runs when a newer commit is pushed to the same branch.
+- **Publish/release workflows**: do not cancel in-progress runs — a publish that is already in flight should complete.
+
+```yaml
+# CI workflows (lint, test, build) — cancel superseded runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Publish/release workflows — let in-flight publishes finish
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+```
+
+Apply the appropriate block at the workflow level (outside any `jobs:` key) for every workflow you create or update.
+
 ## Dependabot
 
 Create a `.github/dependabot.yml` file for the current project. Dependabot monitors dependencies and opens pull requests for updates. Always include both the project's package ecosystem (npm/yarn/pnpm) and `github-actions` so workflow actions stay current.

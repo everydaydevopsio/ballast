@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh:*)",
+      "Bash(git fetch*)",
+      "Bash(git log*)",
+      "Bash(git rev-list*)",
+      "Bash(git branch*)",
+      "Bash(git describe*)",
+      "Bash(python3:*)"
+    ]
+  }
+}

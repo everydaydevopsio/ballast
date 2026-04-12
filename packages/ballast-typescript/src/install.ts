@@ -12,6 +12,7 @@ import {
   getCodexAgentsMdPath,
   getDestination,
   getSkillDestination,
+  getSkillClaudeSettings,
   listRuleSuffixes,
   listTargets
 } from './build';
@@ -343,6 +344,53 @@ export interface InstallResult {
   errors: Array<{ agent: string; error: string }>;
 }
 
+/**
+ * Deep-merge skill claude-settings.json into .claude/settings.json.
+ * Only merges known safe keys (permissions.allow). Creates the file if absent.
+ * Skips entries already present so installs are idempotent.
+ */
+function mergeSkillClaudeSettings(
+  projectRoot: string,
+  skillSettings: Record<string, unknown>
+): void {
+  const settingsPath = path.join(projectRoot, '.claude', 'settings.json');
+  let existing: Record<string, unknown> = {};
+  if (fs.existsSync(settingsPath)) {
+    try {
+      existing = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<
+        string,
+        unknown
+      >;
+    } catch {
+      // If unreadable/corrupt, start fresh rather than clobbering.
+      existing = {};
+    }
+  }
+
+  const incoming = skillSettings as {
+    permissions?: { allow?: string[] };
+  };
+  const incomingAllow = incoming.permissions?.allow ?? [];
+  if (incomingAllow.length === 0) return;
+
+  const existingPerms =
+    (existing.permissions as { allow?: string[] } | undefined) ?? {};
+  const existingAllow: string[] = existingPerms.allow ?? [];
+  const merged = [
+    ...existingAllow,
+    ...incomingAllow.filter((rule) => !existingAllow.includes(rule))
+  ];
+  existing.permissions = { ...existingPerms, allow: merged };
+
+  const dir = path.dirname(settingsPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    settingsPath,
+    JSON.stringify(existing, null, 2) + '\n',
+    'utf8'
+  );
+}
+
 function ensureGitignoreEntry(projectRoot: string, entry: string): void {
   const gitignorePath = path.join(projectRoot, '.gitignore');
   const normalizedEntry = entry.trim();
@@ -493,9 +541,14 @@ export function install(options: InstallOptions): InstallResult {
         case 'cursor':
           fs.writeFileSync(file, buildCursorSkillFormat(skillId), 'utf8');
           break;
-        case 'claude':
+        case 'claude': {
           fs.writeFileSync(file, buildClaudeSkill(skillId));
+          const skillSettings = getSkillClaudeSettings(skillId);
+          if (skillSettings) {
+            mergeSkillClaudeSettings(projectRoot, skillSettings);
+          }
           break;
+        }
         case 'opencode':
         case 'codex':
           fs.writeFileSync(file, buildSkillMarkdown(skillId), 'utf8');

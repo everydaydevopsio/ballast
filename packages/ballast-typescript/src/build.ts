@@ -315,6 +315,22 @@ export function getSkillContent(skillId: string): string {
   return fs.readFileSync(file, 'utf8');
 }
 
+/**
+ * Return the parsed claude-settings.json for a skill, or null if none exists.
+ * Used by the install step to merge skill-specific permissions into .claude/settings.json.
+ */
+export function getSkillClaudeSettings(
+  skillId: string
+): Record<string, unknown> | null {
+  const file = getSkillFile(skillId, 'claude-settings.json');
+  if (!fs.existsSync(file)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 function splitSkillDocument(content: string): {
   frontmatter: string | null;
   body: string;
