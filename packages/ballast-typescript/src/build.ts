@@ -324,11 +324,8 @@ export function getSkillClaudeSettings(
 ): Record<string, unknown> | null {
   const file = getSkillFile(skillId, 'claude-settings.json');
   if (!fs.existsSync(file)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+  // Let parse errors propagate so the installer can report them in errors[].
+  return JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
 }
 
 function splitSkillDocument(content: string): {

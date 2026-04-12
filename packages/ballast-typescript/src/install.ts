@@ -356,21 +356,23 @@ function mergeSkillClaudeSettings(
   const settingsPath = path.join(projectRoot, '.claude', 'settings.json');
   let existing: Record<string, unknown> = {};
   if (fs.existsSync(settingsPath)) {
-    try {
-      existing = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<
-        string,
-        unknown
-      >;
-    } catch {
-      // If unreadable/corrupt, start fresh rather than clobbering.
-      existing = {};
-    }
+    // Throw on corrupt file rather than silently overwriting user settings.
+    existing = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<
+      string,
+      unknown
+    >;
   }
 
   const incoming = skillSettings as {
-    permissions?: { allow?: string[] };
+    permissions?: { allow?: unknown };
   };
-  const incomingAllow = incoming.permissions?.allow ?? [];
+  const rawAllow = incoming.permissions?.allow;
+  // Validate that allow is an array of strings — reject anything else to
+  // avoid injecting non-string values into the permissions file.
+  if (!Array.isArray(rawAllow)) return;
+  const incomingAllow = rawAllow.filter(
+    (r): r is string => typeof r === 'string'
+  );
   if (incomingAllow.length === 0) return;
 
   const existingPerms =
@@ -545,7 +547,14 @@ export function install(options: InstallOptions): InstallResult {
           fs.writeFileSync(file, buildClaudeSkill(skillId));
           const skillSettings = getSkillClaudeSettings(skillId);
           if (skillSettings) {
-            mergeSkillClaudeSettings(projectRoot, skillSettings);
+            try {
+              mergeSkillClaudeSettings(projectRoot, skillSettings);
+            } catch (mergeErr) {
+              errors.push({
+                agent: skillId,
+                error: `Skill installed but failed to merge claude-settings.json: ${mergeErr instanceof Error ? mergeErr.message : String(mergeErr)}`
+              });
+            }
           }
           break;
         }
