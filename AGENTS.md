@@ -50,6 +50,7 @@ pnpm run prettier:fix     # Auto-fix formatting
 - **CI**: When `CI=true` or `--yes` is set and `.rulesrc.json` is missing, `--target` and `--agent` (or `--all`) are required.
 - **Agents**: Only agents shipped in this repo are installable (no external bundle discovery).
 - **Docs sync**: When you add or update an agent, update the docs in `docs/` so they stay in sync: add or update `docs/agents/<id>.md` for that agent, and update the agent table in `docs/README.md` (and any other references, e.g. `docs/installation.md` if needed).
+- **Skills sync**: When you add or update a skill, keep all of the following in sync in the same change: (1) add or update `docs/skills/<id>.md` with the skill guide; (2) add the skill to the Available Skills list and Guides section in `docs/skills/README.md`; (3) add the skill to the Skill Guide Index in `docs/README.md`; (4) add the skill to the Skill Model and Skills sections in `README.md`. The canonical list of available skills is `COMMON_SKILL_IDS` in `packages/ballast-typescript/src/agents.ts` — docs must stay in sync with it.
 
 ## Command Sync
 
@@ -68,6 +69,7 @@ Default license for this project: **MIT**. If you add or modify license setup (L
 - Keep tests next to source (`*.test.ts`); use Jest.
 - Run `pnpm run build` before relying on `packages/ballast-typescript/bin/ballast.js` or `packages/ballast-typescript/dist/`.
 - When adding or updating an agent: update `docs/agents/<id>.md` and the agent table in `docs/README.md` so docs stay in sync (see **Docs sync** under Conventions).
+- When adding or updating a skill: update `docs/skills/<id>.md`, `docs/skills/README.md`, `docs/README.md`, and `README.md` so docs stay in sync (see **Skills sync** under Conventions).
 - See **CLAUDE.md** for more detailed architecture and **rules-installer-architecture.md** for design notes.
 
 ## Installed agent rules

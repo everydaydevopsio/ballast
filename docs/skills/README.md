@@ -39,9 +39,16 @@ Skills install to the target tool's expected location:
 
 Codex also records installed skills in the root `AGENTS.md`. Claude records them in the root `CLAUDE.md`.
 
+`github-health-check`
+
+- Type: common skill
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Installed by: `--skill github-health-check` or `--all-skills`
+
 ## Guides
 
 - [owasp-security-scan.md](owasp-security-scan.md)
 - [aws-health-review.md](aws-health-review.md)
 - [aws-live-health-review.md](aws-live-health-review.md)
 - [aws-weekly-security-review.md](aws-weekly-security-review.md)
+- [github-health-check.md](github-health-check.md)
