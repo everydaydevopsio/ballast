@@ -49,7 +49,7 @@ jobs:
         run: env UV_CACHE_DIR=/tmp/uv-cache uv build packages/ballast-python --sdist --wheel
 
       - name: Publish Python artifacts to GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ inputs.version }}
           name: ballast-python v${{ inputs.version }}
@@ -83,7 +83,7 @@ jobs:
         run: env UV_CACHE_DIR=/tmp/uv-cache uv build packages/ballast-python --sdist --wheel
 
       - name: Publish Python artifacts to GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ inputs.version }}
           name: ballast-python v${{ inputs.version }}
