@@ -56,7 +56,7 @@
     "ts-jest": "^29.4.9",
     "tsc-files": "^1.1.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.58.1"
+    "typescript-eslint": "^8.58.2"
   },
   "lint-staged": {
     "**/*.js": [
