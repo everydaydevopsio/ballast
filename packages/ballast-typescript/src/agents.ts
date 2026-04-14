@@ -47,6 +47,10 @@ export const LANGUAGES = [
 ] as const;
 export type Language = (typeof LANGUAGES)[number];
 
+// Keep these lists in sync with agentRegistry / skillRegistry in
+// cli/ballast/registry.go — that file is the single source of truth.
+// When adding, removing, or deprecating an agent or skill, update registry.go
+// first, then mirror the change here.
 export const COMMON_AGENT_IDS = [
   'local-dev',
   'docs',

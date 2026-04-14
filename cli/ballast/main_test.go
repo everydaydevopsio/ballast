@@ -2568,3 +2568,48 @@ func captureStdout(t *testing.T, fn func()) string {
 
 	return buf.String()
 }
+
+func TestRegistryConsistency(t *testing.T) {
+	// Every agentRegistry entry must have a non-empty ID.
+	for _, e := range agentRegistry {
+		if e.ID == "" {
+			t.Error("agentRegistry contains an entry with an empty ID")
+		}
+	}
+	// Every skillRegistry entry must have a non-empty ID and description.
+	for _, e := range skillRegistry {
+		if e.ID == "" {
+			t.Error("skillRegistry contains an entry with an empty ID")
+		}
+		if e.Description == "" {
+			t.Errorf("skillRegistry entry %q has no description", e.ID)
+		}
+	}
+	// No duplicate IDs in agentRegistry.
+	seen := map[string]bool{}
+	for _, e := range agentRegistry {
+		if seen[e.ID] {
+			t.Errorf("agentRegistry has duplicate ID %q", e.ID)
+		}
+		seen[e.ID] = true
+	}
+	// No duplicate IDs in skillRegistry.
+	seen = map[string]bool{}
+	for _, e := range skillRegistry {
+		if seen[e.ID] {
+			t.Errorf("skillRegistry has duplicate ID %q", e.ID)
+		}
+		seen[e.ID] = true
+	}
+	// Deprecated entries must have a non-nil Deprecated field.
+	for _, e := range agentRegistry {
+		if e.Status == statusDeprecated && e.Deprecated == nil {
+			t.Errorf("agent %q is deprecated but has no deprecation info", e.ID)
+		}
+	}
+	for _, e := range skillRegistry {
+		if e.Status == statusDeprecated && e.Deprecated == nil {
+			t.Errorf("skill %q is deprecated but has no deprecation info", e.ID)
+		}
+	}
+}
