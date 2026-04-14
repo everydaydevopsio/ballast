@@ -212,10 +212,6 @@ export async function main(): Promise<void> {
   if ('doctor' in options && options.doctor) {
     process.exit(runDoctor());
   }
-  if ('list' in options && options.list) {
-    printList();
-    process.exit(0);
-  }
   const cliOptions = options as CliOptions;
   if (!LANGUAGES.includes(cliOptions.language as (typeof LANGUAGES)[number])) {
     console.error(

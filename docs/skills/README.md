@@ -28,6 +28,12 @@ Ballast ships reusable skill guides alongside its agent rules.
 - Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
 - Installed by: `--skill aws-weekly-security-review` or `--all-skills`
 
+`github-health-check`
+
+- Type: common skill
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Installed by: `--skill github-health-check` or `--all-skills`
+
 ## Installation Targets
 
 Skills install to the target tool's expected location:
@@ -38,12 +44,6 @@ Skills install to the target tool's expected location:
 - Codex: `.codex/rules/<skill>.md`
 
 Codex also records installed skills in the root `AGENTS.md`. Claude records them in the root `CLAUDE.md`.
-
-`github-health-check`
-
-- Type: common skill
-- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
-- Installed by: `--skill github-health-check` or `--all-skills`
 
 ## Guides
 
