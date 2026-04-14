@@ -1375,7 +1375,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	}
 	selectedSkills := installSkills
 	if installAllSkills {
-		selectedSkills = activeSkillIDs()
+		selectedSkills = supportedSkillIDs()
 	}
 	if err := validateSelectedAgents(selectedAgents); err != nil {
 		return nil, err
@@ -1472,7 +1472,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if len(plan) == 0 {
 		return nil, fmt.Errorf(
 			"no supported agents selected for monorepo install; supported agents: %s",
-			strings.Join(activeAgentIDs(), ", "),
+			strings.Join(supportedAgentIDs(), ", "),
 		)
 	}
 
@@ -2349,7 +2349,7 @@ func validateSelectedAgents(agents []string) error {
 		return fmt.Errorf(
 			"unsupported agent selection: %s (supported agents: %s)",
 			strings.Join(invalid, ", "),
-			strings.Join(activeAgentIDs(), ", "),
+			strings.Join(supportedAgentIDs(), ", "),
 		)
 	}
 	return nil
@@ -2366,7 +2366,7 @@ func validateSelectedSkills(skills []string) error {
 		return fmt.Errorf(
 			"unsupported skill selection: %s (supported skills: %s)",
 			strings.Join(invalid, ", "),
-			strings.Join(activeSkillIDs(), ", "),
+			strings.Join(supportedSkillIDs(), ", "),
 		)
 	}
 	return nil

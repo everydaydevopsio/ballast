@@ -4,7 +4,7 @@ package main
 //
 // When adding, removing, or deprecating an agent or skill:
 //   1. Add/update its entry here.
-//   2. For skills, update skillDescription in main.go accordingly.
+//   2. For skills, add/update the Description field in skillRegistry here.
 //   3. Keep packages/ballast-typescript/src/agents.ts in sync:
 //      - COMMON_AGENT_IDS / LANGUAGE_AGENT_IDS must match agentRegistry entries.
 //      - COMMON_SKILL_IDS must match skillRegistry entries (non-removed).
@@ -99,8 +99,8 @@ var skillRegistry = []skillEntry{
 
 // — Agent registry helpers —————————————————————————————————————————————————
 
-// activeAgentIDs returns all non-removed agent IDs.
-func activeAgentIDs() []string {
+// supportedAgentIDs returns all non-removed agent IDs (active and deprecated).
+func supportedAgentIDs() []string {
 	var ids []string
 	for _, e := range agentRegistry {
 		if e.Status != statusRemoved {
@@ -162,8 +162,8 @@ func deprecationWarningForAgent(id string) string {
 
 // — Skill registry helpers —————————————————————————————————————————————————
 
-// activeSkillIDs returns all non-removed skill IDs.
-func activeSkillIDs() []string {
+// supportedSkillIDs returns all non-removed skill IDs (active and deprecated).
+func supportedSkillIDs() []string {
 	var ids []string
 	for _, e := range skillRegistry {
 		if e.Status != statusRemoved {
