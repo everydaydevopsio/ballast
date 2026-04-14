@@ -163,7 +163,7 @@ jobs:
         run: env UV_CACHE_DIR=/tmp/uv-cache uv build packages/ballast-python --sdist --wheel
 
       - name: Publish Python artifacts to GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.bump_and_tag.outputs.version) || github.ref_name }}
           name: ${{ github.event_name == 'workflow_dispatch' && format('ballast-python v{0}', needs.bump_and_tag.outputs.version) || format('ballast-python {0}', github.ref_name) }}
