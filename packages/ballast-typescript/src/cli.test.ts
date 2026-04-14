@@ -19,6 +19,12 @@ describe('parseArgs', () => {
     });
   });
 
+  test('returns list for list command', () => {
+    expect(parseArgs(['node', 'ballast-typescript', 'list'])).toEqual({
+      list: true
+    });
+  });
+
   test('does not treat doctor as a later install argument', () => {
     expect(
       parseArgs([

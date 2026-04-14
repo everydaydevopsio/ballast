@@ -42,6 +42,7 @@ Common skills:
 - `aws-health-review`
 - `aws-live-health-review`
 - `aws-weekly-security-review`
+- `github-health-check`
 
 Guide index:
 
@@ -49,6 +50,7 @@ Guide index:
 - [skills/aws-health-review.md](skills/aws-health-review.md)
 - [skills/aws-live-health-review.md](skills/aws-live-health-review.md)
 - [skills/aws-weekly-security-review.md](skills/aws-weekly-security-review.md)
+- [skills/github-health-check.md](skills/github-health-check.md)
 - [skills/owasp-security-scan.md](skills/owasp-security-scan.md)
 
 ## Installation and Monorepos

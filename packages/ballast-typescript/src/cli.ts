@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { runInstall } from './install';
-import { LANGUAGES, Language } from './agents';
+import { LANGUAGES, Language, AGENT_IDS, SKILL_IDS } from './agents';
 import { runDoctor } from './doctor';
 import { BALLAST_VERSION } from './version';
 
@@ -21,13 +21,17 @@ export type ParseArgsResult =
   | CliOptions
   | { help: true }
   | { version: true }
-  | { doctor: true };
+  | { doctor: true }
+  | { list: true };
 
 export function parseArgs(argv: string[]): ParseArgsResult {
   const args = argv.slice(2);
   const command = args[0];
   if (command === 'doctor') {
     return { doctor: true };
+  }
+  if (command === 'list') {
+    return { list: true };
   }
   const options: CliOptions = {
     targets: [],
@@ -120,17 +124,18 @@ export function printHelp(): void {
   console.log(`
 ${pkg.name} v${pkg.version}
 
-Usage: ballast-typescript install [options]
+Usage: ballast-typescript <command> [options]
 
 Commands:
   install    Install agent rules for the chosen AI platform (default)
+  list       List available agents and skills
   doctor     Check local Ballast CLI versions and .rulesrc.json metadata
 
 Options:
   --target, -t <platforms>  AI platform(s): cursor, claude, opencode, codex (comma-separated or repeated)
   --language, -l <lang>     Language profile: ${LANGUAGES.join(', ')} (default: typescript)
-  --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, logging, testing (comma-separated)
-  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review (comma-separated)
+  --agent, -a <agents>      Agent(s) to install (comma-separated); run 'list' to see available agents
+  --skill, -s <skills>      Skill(s) to install (comma-separated); run 'list' to see available skills
   --all                     Install all agents
   --all-skills              Install all skills
   --force, -f               Overwrite existing rule files
@@ -140,15 +145,27 @@ Options:
   --version, -v             Show version
 
 Examples:
+  ballast-typescript list
   ballast-typescript install
   ballast-typescript install --target cursor --agent linting
   ballast-typescript install --target cursor,claude --all
   ballast-typescript install --language python --target cursor --all
   ballast-typescript install --target claude --all --force
   ballast-typescript install --target claude --skill owasp-security-scan
-  ballast-typescript install --target codex --skill aws-health-review
   ballast-typescript install --target cursor --agent linting --patch
   ballast-typescript install --yes --target cursor --all
+`);
+}
+
+export function printList(): void {
+  console.log(`
+Agents
+------
+${AGENT_IDS.map((id) => `  ${id}`).join('\n')}
+
+Skills
+------
+${SKILL_IDS.map((id) => `  ${id}`).join('\n')}
 `);
 }
 
@@ -173,6 +190,10 @@ export async function main(): Promise<void> {
   if (!isInstall) {
     if (command === 'doctor') {
       process.exit(runDoctor());
+    }
+    if (command === 'list') {
+      printList();
+      process.exit(0);
     }
     console.error(`Unknown command: ${command}`);
     console.error('Run ballast-typescript --help for usage.');
