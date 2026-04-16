@@ -27,10 +27,16 @@ Use a release workflow structure similar to Ballast `publish.yml`:
    - commits the version bump
    - creates and pushes `v<version>`
 3. Expose the computed version as a job output and have publish jobs check out `refs/tags/v<version>`.
-4. Check out the release tag, not the branch head.
-5. Run build verification before publish.
-6. Publish per language or distribution target in separate jobs.
-7. Use only the permissions required by each job.
+4. Add a `concurrency` block so two publishes for the same ref do not race; use `cancel-in-progress: false` so an in-flight publish is never cancelled mid-run:
+   ```yaml
+   concurrency:
+     group: ${{ github.workflow }}-${{ github.ref }}
+     cancel-in-progress: false
+   ```
+5. Check out the release tag, not the branch head.
+6. Run build verification before publish.
+7. Publish per language or distribution target in separate jobs.
+8. Use only the permissions required by each job.
 
 ### Version and Tag Rules
 

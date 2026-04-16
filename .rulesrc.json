@@ -19,7 +19,7 @@
   "skills": [
     "owasp-security-scan"
   ],
-  "ballastVersion": "5.6.4",
+  "ballastVersion": "5.6.8",
   "languages": [
     "typescript",
     "python",

@@ -36,6 +36,7 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
 5. **Create GitHub Actions Workflow**
    - Create .github/workflows/lint.yaml
    - Run on pull requests to main branch
+   - Add a `concurrency` block so redundant runs on the same branch are cancelled: use `cancel-in-progress: true`
    - Set up Node.js environment
    - **If the project uses pnpm** (e.g. pnpm-lock.yaml present or package.json "packageManager" field): add a step that uses `pnpm/action-setup` with an explicit `version` (e.g. from package.json `packageManager` like `pnpm@9.0.0`, or a sensible default such as `9`). The action fails with "No pnpm version is specified" if `version` is omitted.
    - Install dependencies with frozen lockfile
@@ -82,25 +83,35 @@ export default [
 ];
 ```
 
-**GitHub Actions (when project uses pnpm):** If the project uses pnpm (pnpm-lock.yaml or package.json "packageManager"), include a pnpm setup step with an explicit version before setup-node:
+**GitHub Actions (when project uses pnpm):** If the project uses pnpm (pnpm-lock.yaml or package.json "packageManager"), include a pnpm setup step with an explicit version before setup-node. Always include a `concurrency` block to cancel redundant runs:
 
 ```yaml
-- name: Setup pnpm
-  uses: pnpm/action-setup@v4
-  with:
-    version: 9 # or read from package.json "packageManager" (e.g. pnpm@9.0.0 → 9)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-- name: Setup Node.js
-  uses: actions/setup-node@v6
-  with:
-    node-version: '20'
-    cache: 'pnpm'
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-- name: Install dependencies
-  run: pnpm install --frozen-lockfile
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9 # or read from package.json "packageManager" (e.g. pnpm@9.0.0 → 9)
 
-- name: Lint
-  run: pnpm run lint
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
 ```
 
 Omit the pnpm step only when the project uses npm or yarn.
