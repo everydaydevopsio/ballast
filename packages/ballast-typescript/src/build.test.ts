@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import {
   getContent,
@@ -182,6 +183,19 @@ describe('build', () => {
   });
 
   describe('skills', () => {
+    test('common skill ids are all packaged in the typescript bundle', () => {
+      const packagedSkills = path.join(__dirname, '..', 'skills', 'common');
+      expect(
+        [
+          'owasp-security-scan',
+          'aws-health-review',
+          'aws-live-health-review',
+          'aws-weekly-security-review',
+          'github-health-check'
+        ].every((skillId) => fs.existsSync(path.join(packagedSkills, skillId)))
+      ).toBe(true);
+    });
+
     test('reads skill content', () => {
       const content = getSkillContent('owasp-security-scan');
       expect(content).toContain('name: owasp-security-scan');
@@ -192,6 +206,12 @@ describe('build', () => {
       const content = getSkillContent('aws-health-review');
       expect(content).toContain('name: aws-health-review');
       expect(content).toContain('# AWS Health Review');
+    });
+
+    test('reads github health skill content', () => {
+      const content = getSkillContent('github-health-check');
+      expect(content).toContain('name: github-health-check');
+      expect(content).toContain('# GitHub Repository Health Check Skill');
     });
 
     test('builds cursor skill format', () => {

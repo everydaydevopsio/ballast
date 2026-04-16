@@ -406,13 +406,16 @@ class PatchInstallTests(unittest.TestCase):
                 "aws-health-review",
                 "aws-live-health-review",
                 "aws-weekly-security-review",
+                "github-health-check",
             ],
         )
         self.assertEqual(
             cli.parse_skill_tokens(
-                "owasp-security-scan,aws-health-review", False, "python"
+                "owasp-security-scan,aws-health-review,github-health-check",
+                False,
+                "python",
             ),
-            ["owasp-security-scan", "aws-health-review"],
+            ["owasp-security-scan", "aws-health-review", "github-health-check"],
         )
 
     def test_build_cursor_skill_format_uses_folded_description_text(self) -> None:
