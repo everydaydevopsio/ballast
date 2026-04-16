@@ -558,8 +558,14 @@ alwaysApply: false
   });
 
   describe('listTargets', () => {
-    test('returns cursor, claude, opencode, codex', () => {
-      expect(listTargets()).toEqual(['cursor', 'claude', 'opencode', 'codex']);
+    test('returns cursor, claude, opencode, codex, gemini', () => {
+      expect(listTargets()).toEqual([
+        'cursor',
+        'claude',
+        'opencode',
+        'codex',
+        'gemini'
+      ]);
     });
   });
 });
