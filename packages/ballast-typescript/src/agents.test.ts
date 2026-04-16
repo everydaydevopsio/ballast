@@ -4,7 +4,11 @@ import {
   getAgentDir,
   isValidAgent,
   resolveAgents,
-  AGENT_IDS
+  AGENT_IDS,
+  SKILL_IDS,
+  listSkills,
+  isValidSkill,
+  resolveSkills
 } from './agents';
 
 describe('agents', () => {
@@ -101,6 +105,33 @@ describe('agents', () => {
     test('terraform profile uses same public agent ids', () => {
       expect(listAgents('terraform')).toEqual([...AGENT_IDS]);
       expect(isValidAgent('logging', 'terraform')).toBe(true);
+    });
+  });
+
+  describe('skills', () => {
+    test('returns all skill ids', () => {
+      expect(listSkills()).toEqual([...SKILL_IDS]);
+      expect(listSkills()).toContain('owasp-security-scan');
+      expect(listSkills()).toContain('aws-health-review');
+      expect(listSkills()).toContain('aws-live-health-review');
+      expect(listSkills()).toContain('aws-weekly-security-review');
+      expect(listSkills()).toContain('github-health-check');
+    });
+
+    test('validates known skills', () => {
+      expect(isValidSkill('owasp-security-scan')).toBe(true);
+      expect(isValidSkill('aws-health-review')).toBe(true);
+      expect(isValidSkill('aws-live-health-review')).toBe(true);
+      expect(isValidSkill('aws-weekly-security-review')).toBe(true);
+      expect(isValidSkill('github-health-check')).toBe(true);
+      expect(isValidSkill('unknown')).toBe(false);
+    });
+
+    test('resolves skill selections including all', () => {
+      expect(resolveSkills('all')).toEqual([...SKILL_IDS]);
+      expect(
+        resolveSkills(['owasp-security-scan', 'github-health-check', 'nope'])
+      ).toEqual(['owasp-security-scan', 'github-health-check']);
     });
   });
 });

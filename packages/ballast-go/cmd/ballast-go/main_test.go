@@ -81,15 +81,19 @@ func TestRunInstallHelpFlag(t *testing.T) {
 	if !strings.Contains(output, "aws-health-review") {
 		t.Fatalf("expected new skills in help output, got %q", output)
 	}
+	if !strings.Contains(output, "github-health-check") {
+		t.Fatalf("expected github-health-check in help output, got %q", output)
+	}
 }
 
-func TestListSkillsIncludesAWSReviews(t *testing.T) {
+func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 	got := listSkills("go")
 	want := []string{
 		"owasp-security-scan",
 		"aws-health-review",
 		"aws-live-health-review",
 		"aws-weekly-security-review",
+		"github-health-check",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)

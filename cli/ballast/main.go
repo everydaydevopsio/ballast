@@ -127,11 +127,6 @@ var runCommandFunc = runCommand
 var resolveInstalledVersionFunc = resolveInstalledVersion
 var collectDoctorBackendsFunc = collectDoctorBackends
 
-var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks"}
-var languageAgents = []string{"linting", "logging", "testing"}
-var supportedAgents = append(slices.Clone(commonAgents), languageAgents...)
-var supportedSkills = []string{"owasp-security-scan"}
-
 type monorepoConfig struct {
 	Target         string              `json:"target,omitempty"`
 	Targets        []string            `json:"targets,omitempty"`
@@ -1376,14 +1371,24 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 
 	selectedAgents := installAgents
 	if installAll {
-		selectedAgents = append(slices.Clone(commonAgents), languageAgents...)
+		selectedAgents = append(commonAgentIDs(), languageAgentIDs()...)
 	}
 	selectedSkills := installSkills
 	if installAllSkills {
-		selectedSkills = slices.Clone(supportedSkills)
+		selectedSkills = supportedSkillIDs()
 	}
 	if err := validateSelectedAgents(selectedAgents); err != nil {
 		return nil, err
+	}
+	for _, agent := range selectedAgents {
+		if w := deprecationWarningForAgent(agent); w != "" {
+			fmt.Fprintln(os.Stderr, "warning:", w)
+		}
+	}
+	for _, skill := range selectedSkills {
+		if w := deprecationWarningForSkill(skill); w != "" {
+			fmt.Fprintln(os.Stderr, "warning:", w)
+		}
 	}
 
 	// Compute agents and skills to persist: merge explicit selection with existing
@@ -1430,8 +1435,8 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		}, nil
 	}
 
-	commonSelection := filterAgents(selectedAgents, commonAgents)
-	languageSelection := filterAgents(selectedAgents, languageAgents)
+	commonSelection := filterAgents(selectedAgents, commonAgentIDs())
+	languageSelection := filterAgents(selectedAgents, languageAgentIDs())
 	baseArgs := withTargetSelection(stripMonorepoFlags(args), requestedTargets)
 
 	plan := make([]backendInvocation, 0, len(profiles)+1)
@@ -1467,7 +1472,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if len(plan) == 0 {
 		return nil, fmt.Errorf(
 			"no supported agents selected for monorepo install; supported agents: %s",
-			strings.Join(supportedAgents, ", "),
+			strings.Join(supportedAgentIDs(), ", "),
 		)
 	}
 
@@ -1983,8 +1988,8 @@ func managedRulePaths(root string, target string, config *monorepoConfig) []stri
 	paths := []string{}
 	ext := targetRuleExtension(target)
 	rulesRoot := targetRulesRoot(root, target)
-	commonSelection := filterAgents(config.Agents, commonAgents)
-	languageSelection := filterAgents(config.Agents, languageAgents)
+	commonSelection := filterAgents(config.Agents, commonAgentIDs())
+	languageSelection := filterAgents(config.Agents, languageAgentIDs())
 	for _, agent := range commonSelection {
 		for _, suffix := range ruleSuffixesForAgent(agent) {
 			base := agentBaseName(agent, suffix)
@@ -2190,12 +2195,7 @@ func agentBaseName(agent string, suffix string) string {
 }
 
 func skillDescription(skill string) string {
-	switch skill {
-	case "owasp-security-scan":
-		return "run an OWASP-aligned security audit across Go, TypeScript, and Python projects"
-	default:
-		return skill
-	}
+	return skillDescriptionFromRegistry(skill)
 }
 
 func hasPatchFlag(args []string) bool {
@@ -2341,7 +2341,7 @@ func indexNextHeading(content string) int {
 func validateSelectedAgents(agents []string) error {
 	invalid := []string{}
 	for _, agent := range uniqueStrings(agents) {
-		if !slices.Contains(supportedAgents, agent) {
+		if !isValidAgent(agent) {
 			invalid = append(invalid, agent)
 		}
 	}
@@ -2349,7 +2349,7 @@ func validateSelectedAgents(agents []string) error {
 		return fmt.Errorf(
 			"unsupported agent selection: %s (supported agents: %s)",
 			strings.Join(invalid, ", "),
-			strings.Join(supportedAgents, ", "),
+			strings.Join(supportedAgentIDs(), ", "),
 		)
 	}
 	return nil
@@ -2358,7 +2358,7 @@ func validateSelectedAgents(agents []string) error {
 func validateSelectedSkills(skills []string) error {
 	invalid := []string{}
 	for _, skill := range uniqueStrings(skills) {
-		if !slices.Contains(supportedSkills, skill) {
+		if !isValidSkill(skill) {
 			invalid = append(invalid, skill)
 		}
 	}
@@ -2366,7 +2366,7 @@ func validateSelectedSkills(skills []string) error {
 		return fmt.Errorf(
 			"unsupported skill selection: %s (supported skills: %s)",
 			strings.Join(invalid, ", "),
-			strings.Join(supportedSkills, ", "),
+			strings.Join(supportedSkillIDs(), ", "),
 		)
 	}
 	return nil

@@ -13,6 +13,14 @@ repos:
         language: system
         types: [text]
 
+      - id: ballast-unit-tests-pre-push
+        name: pre-push unit tests for cli and language packages
+        entry: scripts/run-unit-tests-pre-push.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: ["pre-push"]
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -41,27 +49,11 @@ repos:
         stages: ["pre-commit"]
 
       - id: sub-pre-commit
-        alias: ballast-typescript-pre-push
-        name: "pre-push for packages/ballast-typescript/"
-        args: ["-p", "packages/ballast-typescript"]
-        pass_filenames: false
-        always_run: true
-        stages: ["pre-push"]
-
-      - id: sub-pre-commit
         alias: ballast-python
         name: "pre-commit for packages/ballast-python/"
         args: ["-p", "packages/ballast-python"]
         files: "^packages/ballast-python/.*"
         stages: ["pre-commit"]
-
-      - id: sub-pre-commit
-        alias: ballast-python-pre-push
-        name: "pre-push for packages/ballast-python/"
-        args: ["-p", "packages/ballast-python"]
-        pass_filenames: false
-        always_run: true
-        stages: ["pre-push"]
 
       - id: sub-pre-commit
         alias: ballast-go
@@ -71,24 +63,8 @@ repos:
         stages: ["pre-commit"]
 
       - id: sub-pre-commit
-        alias: ballast-go-pre-push
-        name: "pre-push for packages/ballast-go/"
-        args: ["-p", "packages/ballast-go"]
-        pass_filenames: false
-        always_run: true
-        stages: ["pre-push"]
-
-      - id: sub-pre-commit
         alias: ballast-cli
         name: "pre-commit for cli/ballast/"
         args: ["-p", "cli/ballast"]
         files: "^cli/ballast/.*"
         stages: ["pre-commit"]
-
-      - id: sub-pre-commit
-        alias: ballast-cli-pre-push
-        name: "pre-push for cli/ballast/"
-        args: ["-p", "cli/ballast"]
-        pass_filenames: false
-        always_run: true
-        stages: ["pre-push"]

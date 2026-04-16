@@ -5,6 +5,8 @@ import YAML from 'yaml';
 type PreCommitHook = {
   id?: string;
   repo?: string;
+  entry?: string;
+  stages?: string[];
 };
 
 type PreCommitRepo = {
@@ -37,5 +39,17 @@ describe('root pre-commit config', () => {
     expect(hookIds).not.toContain('end-of-file-fixer');
     expect(hookIds).toContain('check-trailing-whitespace');
     expect(hookIds).toContain('check-end-of-file-newline');
+  });
+
+  test('runs all package and cli unit tests at pre-push', () => {
+    const config = readPreCommitConfig();
+    const hooks = config.repos.flatMap((repo) => repo.hooks ?? []);
+    const unitTestHook = hooks.find(
+      (hook) => hook.id === 'ballast-unit-tests-pre-push'
+    );
+
+    expect(unitTestHook).toBeTruthy();
+    expect(unitTestHook?.entry).toBe('scripts/run-unit-tests-pre-push.sh');
+    expect(unitTestHook?.stages).toContain('pre-push');
   });
 });

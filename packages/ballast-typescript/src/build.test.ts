@@ -23,6 +23,7 @@ import {
   getSkillDestination,
   listTargets
 } from './build';
+import { COMMON_SKILL_IDS } from './agents';
 
 describe('build', () => {
   describe('listRuleSuffixes', () => {
@@ -182,6 +183,13 @@ describe('build', () => {
   });
 
   describe('skills', () => {
+    test('reads content for every common skill id', () => {
+      for (const skillId of COMMON_SKILL_IDS) {
+        const content = getSkillContent(skillId);
+        expect(content).toContain(`name: ${skillId}`);
+      }
+    });
+
     test('reads skill content', () => {
       const content = getSkillContent('owasp-security-scan');
       expect(content).toContain('name: owasp-security-scan');
@@ -192,6 +200,12 @@ describe('build', () => {
       const content = getSkillContent('aws-health-review');
       expect(content).toContain('name: aws-health-review');
       expect(content).toContain('# AWS Health Review');
+    });
+
+    test('reads github health skill content', () => {
+      const content = getSkillContent('github-health-check');
+      expect(content).toContain('name: github-health-check');
+      expect(content).toContain('# GitHub Repository Health Check Skill');
     });
 
     test('builds cursor skill format', () => {
