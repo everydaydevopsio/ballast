@@ -1,4 +1,3 @@
-import fs from 'fs';
 import path from 'path';
 import {
   getContent,
@@ -24,6 +23,7 @@ import {
   getSkillDestination,
   listTargets
 } from './build';
+import { COMMON_SKILL_IDS } from './agents';
 
 describe('build', () => {
   describe('listRuleSuffixes', () => {
@@ -183,17 +183,11 @@ describe('build', () => {
   });
 
   describe('skills', () => {
-    test('common skill ids are all packaged in the typescript bundle', () => {
-      const packagedSkills = path.join(__dirname, '..', 'skills', 'common');
-      expect(
-        [
-          'owasp-security-scan',
-          'aws-health-review',
-          'aws-live-health-review',
-          'aws-weekly-security-review',
-          'github-health-check'
-        ].every((skillId) => fs.existsSync(path.join(packagedSkills, skillId)))
-      ).toBe(true);
+    test('reads content for every common skill id', () => {
+      for (const skillId of COMMON_SKILL_IDS) {
+        const content = getSkillContent(skillId);
+        expect(content).toContain(`name: ${skillId}`);
+      }
     });
 
     test('reads skill content', () => {
