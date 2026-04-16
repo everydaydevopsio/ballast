@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added Gemini CLI as a supported target with `GEMINI.md` support file
+- `GEMINI.md` uses `@./AGENTS.md` import for shared repository guidance
+- Gemini rule files are installed to `.gemini/rules/` and skills to `.gemini/rules/`
+- Support for `gemini` target in TypeScript, Python, and Go CLI implementations
+
 ## [3.0.0] - 2026-01-30
 
 ### Added

@@ -13,7 +13,7 @@ from functools import lru_cache
 from importlib import metadata
 from pathlib import Path
 
-TARGETS = ["cursor", "claude", "opencode", "codex"]
+TARGETS = ["cursor", "claude", "opencode", "codex", "gemini"]
 LANGUAGES = ["typescript", "python", "go", "ansible", "terraform"]
 COMMON_AGENTS = [
     "local-dev",
@@ -711,6 +711,15 @@ def build_content(
         )
     if target == "claude":
         return read_template(agent, language, "claude-header.md", suffix) + body
+    if target == "gemini":
+        try:
+            header = read_template(agent, language, "gemini-header.md", suffix)
+        except FileNotFoundError:
+            try:
+                header = read_template(agent, language, "codex-header.md", suffix)
+            except FileNotFoundError:
+                header = read_template(agent, language, "claude-header.md", suffix)
+        return header + body
     if target == "opencode":
         return (
             read_template(agent, language, "opencode-frontmatter.yaml", suffix)
@@ -800,6 +809,13 @@ def destination(root: Path, target: str, basename: str) -> Path:
             if rule_subdir
             else (base / f"{scoped_basename}.md")
         )
+    if target == "gemini":
+        base = root / ".gemini" / "rules"
+        return (
+            (base / rule_subdir / f"{scoped_basename}.md")
+            if rule_subdir
+            else (base / f"{scoped_basename}.md")
+        )
     if target == "opencode":
         base = root / ".opencode"
         return (
@@ -835,6 +851,8 @@ def skill_destination(root: Path, target: str, skill: str) -> Path:
         return root / ".cursor" / "rules" / f"{skill}.mdc"
     if target == "claude":
         return root / ".claude" / "skills" / f"{skill}.skill"
+    if target == "gemini":
+        return root / ".gemini" / "rules" / f"{skill}.md"
     if target == "opencode":
         return root / ".opencode" / "skills" / f"{skill}.md"
     return root / ".codex" / "rules" / f"{skill}.md"
@@ -1003,6 +1021,49 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
         for skill in skills:
             lines.append(
                 f"- `.claude/skills/{skill}.skill` — {skill_description(skill, language)}"
+            )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_gemini_md(agents: list[str], skills: list[str], language: str) -> str:
+    lines = [
+        "# GEMINI.md",
+        "",
+        "This file provides guidance to Gemini CLI for working in this repository.",
+        "",
+        "@./AGENTS.md",
+        "",
+        "## Installed agent rules",
+        "",
+        ballast_notice(),
+        "",
+        "Read and follow these rule files in `.gemini/rules/` when they apply:",
+        "",
+    ]
+    for agent in agents:
+        for suffix in list_rule_suffixes(agent, language):
+            basename = rule_basename(agent, language, suffix)
+            description = (
+                get_codex_rule_description(agent, language, suffix)
+                or f"Rules for {basename}"
+            )
+            lines.append(f"- `.gemini/rules/{basename}.md` — {description}")
+    if skills:
+        lines.extend(
+            [
+                "",
+                "## Installed skills",
+                "",
+                ballast_notice(),
+                "",
+                "Read and use these skill files in `.gemini/rules/` when they are relevant:",
+                "",
+            ]
+        )
+        for skill in skills:
+            lines.append(
+                f"- `.gemini/rules/{skill}.md` — {skill_description(skill, language)}"
             )
     lines.append("")
     return "\n".join(lines)
@@ -1382,6 +1443,7 @@ def install(
     patch: bool,
     persist: bool,
     patch_claude_md: bool = False,
+    patch_gemini_md: bool = False,
 ) -> InstallResult:
     result = InstallResult()
     agents = with_implicit_agents(agents)
@@ -1458,6 +1520,46 @@ def install(
         except Exception as err:
             result.errors.append((skill, str(err)))
 
+    if target == "claude" and not disable_support_files:
+        claude_md = root / "CLAUDE.md"
+        should_patch_claude_md = patch or patch_claude_md
+        if claude_md.exists() and not force and not should_patch_claude_md:
+            result.skipped_support_files.append(str(claude_md))
+        else:
+            try:
+                content = build_claude_md(processed_agents, processed_skills, language)
+                next_content = (
+                    patch_codex_agents_md(
+                        claude_md.read_text(encoding="utf-8"), content
+                    )
+                    if claude_md.exists() and not force and should_patch_claude_md
+                    else content
+                )
+                claude_md.write_text(next_content, encoding="utf-8")
+                result.installed_support_files.append(str(claude_md))
+            except Exception as err:
+                result.errors.append(("claude", str(err)))
+
+    if target == "gemini" and not disable_support_files:
+        gemini_md = root / "GEMINI.md"
+        should_patch_gemini_md = patch or patch_gemini_md
+        if gemini_md.exists() and not force and not should_patch_gemini_md:
+            result.skipped_support_files.append(str(gemini_md))
+        else:
+            try:
+                content = build_gemini_md(processed_agents, processed_skills, language)
+                next_content = (
+                    patch_codex_agents_md(
+                        gemini_md.read_text(encoding="utf-8"), content
+                    )
+                    if gemini_md.exists() and not force and should_patch_gemini_md
+                    else content
+                )
+                gemini_md.write_text(next_content, encoding="utf-8")
+                result.installed_support_files.append(str(gemini_md))
+            except Exception as err:
+                result.errors.append(("gemini", str(err)))
+
     if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"
         if agents_md.exists() and not force and not patch:
@@ -1479,26 +1581,6 @@ def install(
             except Exception as err:
                 result.errors.append(("codex", str(err)))
 
-    if target == "claude" and not disable_support_files:
-        claude_md = root / "CLAUDE.md"
-        should_patch_claude_md = patch or patch_claude_md
-        if claude_md.exists() and not force and not should_patch_claude_md:
-            result.skipped_support_files.append(str(claude_md))
-        else:
-            try:
-                content = build_claude_md(processed_agents, processed_skills, language)
-                next_content = (
-                    patch_codex_agents_md(
-                        claude_md.read_text(encoding="utf-8"), content
-                    )
-                    if claude_md.exists() and not force and should_patch_claude_md
-                    else content
-                )
-                claude_md.write_text(next_content, encoding="utf-8")
-                result.installed_support_files.append(str(claude_md))
-            except Exception as err:
-                result.errors.append(("claude", str(err)))
-
     return result
 
 
@@ -1512,6 +1594,7 @@ def install_for_targets(
     patch: bool,
     persist: bool,
     patch_claude_md: bool = False,
+    patch_gemini_md: bool = False,
 ) -> list[tuple[str, InstallResult]]:
     results: list[tuple[str, InstallResult]] = []
     agents = with_implicit_agents(agents)
@@ -1532,6 +1615,7 @@ def install_for_targets(
                     patch,
                     False,
                     patch_claude_md,
+                    patch_gemini_md,
                 ),
             )
         )
@@ -1557,7 +1641,11 @@ def print_install_result(
             print(f"  {skill} -> {skill_destination(root, target, skill)}")
     if result.installed_support_files:
         for file in result.installed_support_files:
-            label = "CLAUDE.md" if file.endswith("CLAUDE.md") else "AGENTS.md"
+            label = "AGENTS.md"
+            if file.endswith("CLAUDE.md"):
+                label = "CLAUDE.md"
+            elif file.endswith("GEMINI.md"):
+                label = "GEMINI.md"
             print(f"  {label} -> {file}")
     if result.skipped:
         print(
@@ -1606,6 +1694,16 @@ def run_install(args: argparse.Namespace) -> int:
             patch_claude_md = prompt_yes_no(
                 f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?"
             )
+
+    patch_gemini_md = False
+    if "gemini" in targets and (root / "GEMINI.md").exists() and not bool(args.force):
+        if bool(args.patch):
+            patch_gemini_md = True
+        elif not is_ci_mode() and not bool(args.yes):
+            patch_gemini_md = prompt_yes_no(
+                f"Existing GEMINI.md found at {root / 'GEMINI.md'}. Patch the Installed agent rules section?"
+            )
+
     if len(targets) == 1:
         per_target_results = [
             (
@@ -1620,6 +1718,7 @@ def run_install(args: argparse.Namespace) -> int:
                     bool(args.patch),
                     True,
                     patch_claude_md,
+                    patch_gemini_md,
                 ),
             )
         ]
@@ -1634,6 +1733,7 @@ def run_install(args: argparse.Namespace) -> int:
             bool(args.patch),
             True,
             patch_claude_md,
+            patch_gemini_md,
         )
 
     combined = InstallResult()
@@ -1681,7 +1781,7 @@ def parser() -> argparse.ArgumentParser:
         "--target",
         "-t",
         action="append",
-        help="One or more targets (comma-separated or repeated): cursor, claude, opencode, codex",
+        help="One or more targets (comma-separated or repeated): cursor, claude, opencode, codex, gemini",
     )
     install_cmd.add_argument("--language", "-l", default="python")
     install_cmd.add_argument("--agent", "-a")

@@ -47,6 +47,7 @@ seed_existing_rule() {
     cursor) rule_dir="${monorepo}/.cursor/rules" ;;
     opencode) rule_dir="${monorepo}/.opencode" ;;
     claude) rule_dir="${monorepo}/.claude/rules" ;;
+    gemini) echo "${monorepo}/.gemini/rules/${rule_name}" ;;
     codex) rule_dir="${monorepo}/.codex/rules" ;;
     *) echo "Unsupported target: ${target}" >&2; exit 1 ;;
   esac
@@ -77,10 +78,6 @@ seed_existing_support_file() {
   local existing_path=""
 
   case "${target}" in
-    claude)
-      support_file="${monorepo}/CLAUDE.md"
-      existing_path='.claude/rules/old.md'
-      ;;
     codex)
       support_file="${monorepo}/AGENTS.md"
       existing_path='.codex/rules/old.md'
@@ -88,10 +85,11 @@ seed_existing_support_file() {
     *)
       return
       ;;
-  esac
+    esac
 
-  cat > "${support_file}" <<EOF
-# $(basename "${support_file}")
+    cat > "${support_file}" <<EOF
+    # $(basename "${support_file}")
+
 
 ## Team Notes
 
@@ -113,7 +111,8 @@ rule_path() {
   case "${target}" in
     cursor) echo "${monorepo}/.cursor/rules/${rule_name}" ;;
     opencode) echo "${monorepo}/.opencode/${rule_name}" ;;
-    claude) echo "${monorepo}/.claude/rules/${rule_name}" ;;
+    gemini) echo "${monorepo}/.gemini/rules/${rule_name}" ;;
+    gemini) echo "${monorepo}/.gemini/rules/${rule_name}" ;;
     codex) echo "${monorepo}/.codex/rules/${rule_name}" ;;
     *) echo "Unsupported target: ${target}" >&2; exit 1 ;;
   esac

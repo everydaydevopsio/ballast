@@ -11,7 +11,7 @@ import type { Target } from './config';
 import type { Language } from './agents';
 import pkg from '../package.json';
 
-const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex'];
+const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex', 'gemini'];
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
 const GIT_HOOKS_GUIDANCE_TOKEN = '{{BALLAST_GIT_HOOKS_GUIDANCE}}';
@@ -759,6 +759,72 @@ export function buildClaudeMd(
 }
 
 /**
+ * Build content for Gemini (header + content)
+ */
+export function buildGeminiFormat(
+  agentId: string,
+  ruleSuffix?: string,
+  language: Language = 'typescript',
+  options?: BuildOptions
+): string {
+  const header = getCodexHeader(agentId, ruleSuffix, language);
+  const content = getContent(agentId, ruleSuffix, language, options);
+  return header + content;
+}
+
+export function buildGeminiMd(
+  agents: string[],
+  skills: string[] = [],
+  language: Language = 'typescript'
+): string {
+  const lines: string[] = [];
+  lines.push('# GEMINI.md');
+  lines.push('');
+  lines.push(
+    'This file provides guidance to Gemini CLI for working in this repository.'
+  );
+  lines.push('');
+  lines.push('@./AGENTS.md');
+  lines.push('');
+  lines.push('## Installed agent rules');
+  lines.push('');
+  lines.push(getCreatedByBallastLine());
+  lines.push('');
+  lines.push(
+    'Read and follow these rule files in `.gemini/rules/` when they apply:'
+  );
+  lines.push('');
+  for (const agentId of agents) {
+    const suffixes = listRuleSuffixes(agentId, language);
+    for (const ruleSuffix of suffixes) {
+      const basename = getRuleBasename(agentId, language, ruleSuffix);
+      const description =
+        getCodexRuleDescription(agentId, ruleSuffix, language) ??
+        `Rules for ${basename}`;
+      lines.push(`- \`.gemini/rules/${basename}.md\` — ${description}`);
+    }
+  }
+  if (skills.length > 0) {
+    lines.push('');
+    lines.push('## Installed skills');
+    lines.push('');
+    lines.push(getCreatedByBallastLine());
+    lines.push('');
+    lines.push(
+      'Read and use these skill files in `.gemini/rules/` when they are relevant:'
+    );
+    lines.push('');
+    for (const skillId of skills) {
+      lines.push(
+        `- \`.gemini/rules/${skillId}.md\` — ${getSkillDescription(skillId)}`
+      );
+    }
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+/**
  * Build content for the given agent, target, and optional rule suffix
  */
 export function buildContent(
@@ -773,6 +839,8 @@ export function buildContent(
       return buildCursorFormat(agentId, ruleSuffix, language, options);
     case 'claude':
       return buildClaudeFormat(agentId, ruleSuffix, language, options);
+    case 'gemini':
+      return buildGeminiFormat(agentId, ruleSuffix, language, options);
     case 'opencode':
       return buildOpenCodeFormat(agentId, ruleSuffix, language, options);
     case 'codex':
@@ -811,6 +879,13 @@ export function getDestination(
       const file = path.join(dir, `${basename}.md`);
       return { dir, file };
     }
+    case 'gemini': {
+      const dir = ruleSubdir
+        ? path.join(root, '.gemini', 'rules', ruleSubdir)
+        : path.join(root, '.gemini', 'rules');
+      const file = path.join(dir, `${basename}.md`);
+      return { dir, file };
+    }
     case 'opencode': {
       const dir = ruleSubdir
         ? path.join(root, '.opencode', ruleSubdir)
@@ -845,6 +920,10 @@ export function getSkillDestination(
       const dir = path.join(root, '.claude', 'skills');
       return { dir, file: path.join(dir, `${skillId}.skill`) };
     }
+    case 'gemini': {
+      const dir = path.join(root, '.gemini', 'rules');
+      return { dir, file: path.join(dir, `${skillId}.md`) };
+    }
     case 'opencode': {
       const dir = path.join(root, '.opencode', 'skills');
       return { dir, file: path.join(dir, `${skillId}.md`) };
@@ -867,6 +946,10 @@ export function getCodexAgentsMdPath(projectRoot: string): string {
 
 export function getClaudeMdPath(projectRoot: string): string {
   return path.join(path.resolve(projectRoot), 'CLAUDE.md');
+}
+
+export function getGeminiMdPath(projectRoot: string): string {
+  return path.join(path.resolve(projectRoot), 'GEMINI.md');
 }
 
 /**

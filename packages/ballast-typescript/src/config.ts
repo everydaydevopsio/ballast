@@ -4,7 +4,7 @@ import { LANGUAGES } from './agents';
 
 const RULESRC_FILENAME = '.rulesrc.json';
 const LEGACY_TYPESCRIPT_RULESRC_FILENAME = '.rulesrc.ts.json';
-const TARGETS = ['cursor', 'claude', 'opencode', 'codex'] as const;
+const TARGETS = ['cursor', 'claude', 'opencode', 'codex', 'gemini'] as const;
 
 export type Target = (typeof TARGETS)[number];
 

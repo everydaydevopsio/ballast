@@ -40,10 +40,11 @@ Skills install to the target tool's expected location:
 
 - Cursor: `.cursor/rules/<skill>.mdc`
 - Claude: `.claude/skills/<skill>.skill`
+- Gemini: `.gemini/rules/<skill>.md`
 - OpenCode: `.opencode/skills/<skill>.md`
 - Codex: `.codex/rules/<skill>.md`
 
-Codex also records installed skills in the root `AGENTS.md`. Claude records them in the root `CLAUDE.md`.
+Codex also records installed skills in the root `AGENTS.md`. Claude records them in the root `CLAUDE.md`. Gemini records them in the root `GEMINI.md`.
 
 ## Guides
 

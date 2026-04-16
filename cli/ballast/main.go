@@ -26,7 +26,7 @@ const (
 
 var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible, langTerraform}
 var installableBackendLanguages = []language{langTypeScript, langPython, langGo}
-var supportedTargets = []string{"cursor", "claude", "opencode", "codex"}
+var supportedTargets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
 
 type toolConfig struct {
 	binary         string
@@ -334,7 +334,7 @@ func parseLanguageArg(args []string) (language, []string, error) {
 }
 
 func printUsage() {
-	fmt.Println("ballast installs AI agent rules for Cursor, Claude Code, OpenCode, and Codex.")
+	fmt.Println("ballast installs AI agent rules for Cursor, Claude Code, OpenCode, Codex, and Gemini CLI.")
 	fmt.Println()
 	fmt.Println("Usage:")
 	fmt.Println("  ballast [flags] <command> [command flags]")
@@ -356,6 +356,7 @@ func printUsage() {
 	fmt.Println("  ballast")
 	fmt.Println("  ballast install --target cursor --all")
 	fmt.Println("  ballast install --target cursor,claude --all")
+	fmt.Println("  ballast install --target gemini --all")
 	fmt.Println("  ballast install --remove-target codex")
 	fmt.Println("  ballast install --target claude --skill owasp-security-scan")
 	fmt.Println("  ballast install --refresh-config")
@@ -375,7 +376,7 @@ func printUsage() {
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
-	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/` and `.codex/rules/terraform/`).")
+	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/terraform/`).")
 }
 
 func printVersion() {
@@ -1913,7 +1914,7 @@ func envPairs(env map[string]string) []string {
 
 func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) error {
 	for _, target := range plan.Targets {
-		if target != "claude" && target != "codex" {
+		if target != "claude" && target != "codex" && target != "gemini" {
 			continue
 		}
 		path := supportFilePath(root, target)
@@ -1953,7 +1954,7 @@ func cleanupRemovedMonorepoTargets(root string, plan *monorepoPlan) error {
 		if err := removeManagedTargetFiles(root, target, plan.Previous); err != nil {
 			return err
 		}
-		if target == "claude" || target == "codex" {
+		if target == "claude" || target == "codex" || target == "gemini" {
 			path := supportFilePath(root, target)
 			if fileExists(path) {
 				if err := os.WriteFile(path, []byte(removeManagedSections(readFile(path))), 0o644); err != nil {
@@ -2024,6 +2025,8 @@ func targetRootDir(root string, target string) string {
 		return filepath.Join(root, ".cursor")
 	case "claude":
 		return filepath.Join(root, ".claude")
+	case "gemini":
+		return filepath.Join(root, ".gemini")
 	case "opencode":
 		return filepath.Join(root, ".opencode")
 	case "codex":
@@ -2039,6 +2042,8 @@ func targetRulesRoot(root string, target string) string {
 		return filepath.Join(root, ".cursor", "rules")
 	case "claude":
 		return filepath.Join(root, ".claude", "rules")
+	case "gemini":
+		return filepath.Join(root, ".gemini", "rules")
 	case "opencode":
 		return filepath.Join(root, ".opencode", "rules")
 	case "codex":
@@ -2061,6 +2066,8 @@ func targetSkillPath(root string, target string, skill string) string {
 		return filepath.Join(root, ".cursor", "rules", skill+".mdc")
 	case "claude":
 		return filepath.Join(root, ".claude", "skills", skill+".skill")
+	case "gemini":
+		return filepath.Join(root, ".gemini", "rules", skill+".md")
 	case "opencode":
 		return filepath.Join(root, ".opencode", "skills", skill+".md")
 	case "codex":
@@ -2096,6 +2103,9 @@ func supportFilePath(root string, target string) string {
 	if target == "claude" {
 		return filepath.Join(root, "CLAUDE.md")
 	}
+	if target == "gemini" {
+		return filepath.Join(root, "GEMINI.md")
+	}
 	return filepath.Join(root, "AGENTS.md")
 }
 
@@ -2109,40 +2119,55 @@ func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 		intro = "This file provides guidance to Claude Code for working in this repository."
 		rulesDir = ".claude/rules"
 	}
+	if target == "gemini" {
+		title = "# GEMINI.md"
+		intro = "This file provides guidance to Gemini CLI for working in this repository."
+		rulesDir = ".gemini/rules"
+	}
 
 	lines := []string{
 		title,
 		"",
 		intro,
 		"",
-		"## Repository Facts",
-		"",
-		"Use this section for durable repo-specific facts that agents repeatedly need. Prefer facts stored here over re-deriving them with shell commands on every task.",
-		"",
-		"Keep only stable, reviewable metadata here. Do not store secrets, credentials, or ephemeral runtime state.",
-		"",
-		"Suggested facts to record:",
-		"",
-		"- Canonical GitHub repo: `<OWNER/REPO>`",
-		"- Default branch: `<main>`",
-		"- Primary package manager: `<pnpm | npm | yarn | uv | go>`",
-		"- Version-file locations agents should check first: `<.nvmrc, packageManager, pyproject.toml, go.mod, etc.>`",
-		"- Canonical config files: `<paths agents should read before falling back to discovery>`",
-		"- Primary CI workflows: `<workflow filenames>`",
-		"- Primary release/publish workflows: `<workflow filenames>`",
-		"- Preferred build/test/lint/format/coverage commands: `<commands>`",
-		"- Coverage threshold: `<value>`",
-		"- Generated or protected paths agents should avoid editing directly: `<paths>`",
-		"",
-		"Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.",
-		"",
+	}
+
+	if target == "gemini" {
+		lines = append(lines, "@./AGENTS.md", "")
+	} else {
+		lines = append(lines,
+			"## Repository Facts",
+			"",
+			"Use this section for durable repo-specific facts that agents repeatedly need. Prefer facts stored here over re-deriving them with shell commands on every task.",
+			"",
+			"Keep only stable, reviewable metadata here. Do not store secrets, credentials, or ephemeral runtime state.",
+			"",
+			"Suggested facts to record:",
+			"",
+			"- Canonical GitHub repo: `<OWNER/REPO>`",
+			"- Default branch: `<main>`",
+			"- Primary package manager: `<pnpm | npm | yarn | uv | go>`",
+			"- Version-file locations agents should check first: `<.nvmrc, packageManager, pyproject.toml, go.mod, etc.>`",
+			"- Canonical config files: `<paths agents should read before falling back to discovery>`",
+			"- Primary CI workflows: `<workflow filenames>`",
+			"- Primary release/publish workflows: `<workflow filenames>`",
+			"- Preferred build/test/lint/format/coverage commands: `<commands>`",
+			"- Coverage threshold: `<value>`",
+			"- Generated or protected paths agents should avoid editing directly: `<paths>`",
+			"",
+			"Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.",
+			"",
+		)
+	}
+
+	lines = append(lines,
 		"## Installed agent rules",
 		"",
 		"Created by Ballast. Do not edit this section.",
 		"",
 		fmt.Sprintf("Read and follow these rule files in `%s/` when they apply:", rulesDir),
 		"",
-	}
+	)
 
 	for _, agent := range plan.Common {
 		for _, suffix := range ruleSuffixesForAgent(agent) {
