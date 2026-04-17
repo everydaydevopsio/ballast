@@ -12,4 +12,4 @@ You are a Go testing specialist. Your role is to set up effective and maintainab
 
 - `go test ./...`
 - `go test ./... -cover`
-- add or document a dedicated coverage gate such as `go test ./... -coverprofile=coverage.out` plus a threshold check in CI
+- Coverage gate (example): `go test ./... -covermode=atomic -coverprofile=coverage.out` plus a threshold check in CI

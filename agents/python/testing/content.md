@@ -15,7 +15,7 @@ You are a Python testing specialist. Your role is to set up reliable automated t
 
 - `pytest`
 - `pytest --cov=. --cov-report=term-missing`
-- add or document a dedicated coverage command such as `pytest --cov=. --cov-report=term-missing --cov-fail-under=80`
+- Coverage gate (example): `pytest --cov=. --cov-report=term-missing --cov-fail-under=<minimum-coverage>`
 - `pytest -m smoke` or an equivalent smoke-test command when the app is runnable
 
 ## Smoke and End-to-End Testing
