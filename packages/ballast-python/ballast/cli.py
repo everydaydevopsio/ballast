@@ -716,9 +716,9 @@ def build_content(
             header = read_template(agent, language, "gemini-header.md", suffix)
         except FileNotFoundError:
             try:
-                header = read_template(agent, language, "codex-header.md", suffix)
-            except FileNotFoundError:
                 header = read_template(agent, language, "claude-header.md", suffix)
+            except FileNotFoundError:
+                header = read_template(agent, language, "codex-header.md", suffix)
         return header + body
     if target == "opencode":
         return (
@@ -944,7 +944,7 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
     lines = [
         "# AGENTS.md",
         "",
-        "This file provides guidance to Codex (CLI and app) for working in this repository.",
+        "This file provides shared repository guidance for agent tools that read AGENTS.md.",
         "",
         *repository_facts_section(),
         "",
@@ -1542,6 +1542,7 @@ def install(
 
     if target == "gemini" and not disable_support_files:
         gemini_md = root / "GEMINI.md"
+        agents_md = root / "AGENTS.md"
         should_patch_gemini_md = patch or patch_gemini_md
         if gemini_md.exists() and not force and not should_patch_gemini_md:
             result.skipped_support_files.append(str(gemini_md))
@@ -1559,6 +1560,16 @@ def install(
                 result.installed_support_files.append(str(gemini_md))
             except Exception as err:
                 result.errors.append(("gemini", str(err)))
+
+        if not agents_md.exists():
+            try:
+                agents_md.write_text(
+                    build_codex_agents_md(processed_agents, processed_skills, language),
+                    encoding="utf-8",
+                )
+                result.installed_support_files.append(str(agents_md))
+            except Exception as err:
+                result.errors.append(("codex", str(err)))
 
     if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"
@@ -1683,7 +1694,7 @@ def run_install(args: argparse.Namespace) -> int:
 
     targets, agents, skills = resolved
     if any(target not in TARGETS for target in targets):
-        print("Invalid --target. Use: cursor, claude, opencode, codex")
+        print(f"Invalid --target. Use: {', '.join(TARGETS)}")
         return 1
 
     patch_claude_md = False

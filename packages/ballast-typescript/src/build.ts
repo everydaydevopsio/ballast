@@ -574,6 +574,41 @@ function getCodexHeader(
   }
 }
 
+function getGeminiHeader(
+  agentId: string,
+  ruleSuffix?: string,
+  language: Language = 'typescript'
+): string {
+  let geminiError: unknown;
+  try {
+    return getTemplate(agentId, 'gemini-header.md', ruleSuffix, language);
+  } catch (err) {
+    geminiError = err;
+  }
+  try {
+    return getTemplate(agentId, 'claude-header.md', ruleSuffix, language);
+  } catch (claudeError) {
+    try {
+      return getTemplate(agentId, 'codex-header.md', ruleSuffix, language);
+    } catch (codexError) {
+      const geminiMsg =
+        geminiError instanceof Error
+          ? geminiError.message
+          : String(geminiError);
+      const claudeMsg =
+        claudeError instanceof Error
+          ? claudeError.message
+          : String(claudeError);
+      const codexMsg =
+        codexError instanceof Error ? codexError.message : String(codexError);
+      throw new Error(
+        `Agent "${agentId}" missing Gemini header: tried gemini-header.md (${geminiMsg}), fallback claude-header.md (${claudeMsg}), and fallback codex-header.md (${codexMsg})`,
+        { cause: codexError }
+      );
+    }
+  }
+}
+
 /**
  * Build content for Codex (header + content)
  */
@@ -663,7 +698,7 @@ export function buildCodexAgentsMd(
   lines.push('# AGENTS.md');
   lines.push('');
   lines.push(
-    'This file provides guidance to Codex (CLI and app) for working in this repository.'
+    'This file provides shared repository guidance for agent tools that read AGENTS.md.'
   );
   lines.push('');
   lines.push(...getRepositoryFactsSection());
@@ -767,7 +802,7 @@ export function buildGeminiFormat(
   language: Language = 'typescript',
   options?: BuildOptions
 ): string {
-  const header = getCodexHeader(agentId, ruleSuffix, language);
+  const header = getGeminiHeader(agentId, ruleSuffix, language);
   const content = getContent(agentId, ruleSuffix, language, options);
   return header + content;
 }

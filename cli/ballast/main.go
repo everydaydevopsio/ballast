@@ -1942,6 +1942,14 @@ func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) 
 				}
 			}
 		}
+		if target == "gemini" {
+			agentsPath := supportFilePath(root, "codex")
+			if !fileExists(agentsPath) {
+				if err := os.WriteFile(agentsPath, []byte(buildMonorepoSupportFile(plan, "codex")), 0o644); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -2111,7 +2119,7 @@ func supportFilePath(root string, target string) string {
 
 func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 	title := "# AGENTS.md"
-	intro := "This file provides guidance to Codex (CLI and app) for working in this repository."
+	intro := "This file provides shared repository guidance for agent tools that read AGENTS.md."
 	rulesDir := ".codex/rules"
 	extension := ".md"
 	if target == "claude" {

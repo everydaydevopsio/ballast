@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import io
 import os
 import tempfile
 import unittest
 from pathlib import Path
 import sys
+from contextlib import redirect_stdout
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -80,6 +82,12 @@ class PatchInstallTests(unittest.TestCase):
         )
 
         self.assertEqual(args.target, ["cursor,claude", "codex"])
+
+    def test_build_content_for_gemini_prefers_non_codex_header(self) -> None:
+        content = cli.build_content("linting", "gemini", "python")
+
+        self.assertIn("# Python Linting Rules", content)
+        self.assertNotIn("Codex (CLI and app)", content)
 
     def test_destination_rejects_invalid_rule_subdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -437,6 +445,16 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("## Installed skills", content)
         self.assertIn("`.codex/rules/owasp-security-scan.md`", content)
 
+    def test_build_gemini_md_includes_agents_import_and_rules(self) -> None:
+        content = cli.build_gemini_md(["linting"], ["owasp-security-scan"], "python")
+
+        self.assertIn("# GEMINI.md", content)
+        self.assertIn("@./AGENTS.md", content)
+        self.assertIn("## Installed agent rules", content)
+        self.assertIn("`.gemini/rules/python-linting.md`", content)
+        self.assertIn("## Installed skills", content)
+        self.assertIn("`.gemini/rules/owasp-security-scan.md`", content)
+
     def test_skill_destination_returns_expected_paths(self) -> None:
         root = Path("/tmp/project")
         self.assertEqual(
@@ -713,6 +731,106 @@ Read and follow these rule files in `.claude/rules/` when they apply:
             )
             self.assertIn("`.claude/rules/python-linting.md`", claude_md)
             self.assertNotIn("`.claude/rules/old.md`", claude_md)
+
+    def test_install_creates_gemini_and_agents_support_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root, "gemini", ["linting"], [], "python", False, False, False
+            )
+
+            self.assertIn("linting", result.installed)
+            gemini_md = (root / "GEMINI.md").read_text(encoding="utf-8")
+            self.assertIn("@./AGENTS.md", gemini_md)
+            self.assertIn("`.gemini/rules/python-linting.md`", gemini_md)
+
+            agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn("## Repository Facts", agents_md)
+            self.assertIn("`.codex/rules/python-linting.md`", agents_md)
+
+    def test_install_skips_existing_gemini_md_without_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "GEMINI.md").write_text(
+                """# GEMINI.md
+
+## Team Notes
+
+Keep this section.
+""",
+                encoding="utf-8",
+            )
+
+            result = cli.install(
+                root, "gemini", ["linting"], [], "python", False, False, False
+            )
+
+            self.assertIn(str(root / "GEMINI.md"), result.skipped_support_files)
+            gemini_md = (root / "GEMINI.md").read_text(encoding="utf-8")
+            self.assertIn("## Team Notes", gemini_md)
+            self.assertTrue((root / "AGENTS.md").exists())
+
+    def test_patch_updates_gemini_md_section_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rule = root / ".gemini" / "rules" / "python-linting.md"
+            rule.parent.mkdir(parents=True, exist_ok=True)
+            rule.write_text(
+                """# Python Linting Rules
+
+Team intro.
+
+## Your Responsibilities
+
+Keep my custom rule text.
+""",
+                encoding="utf-8",
+            )
+            (root / "GEMINI.md").write_text(
+                """# GEMINI.md
+
+## Team Notes
+
+Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in `.gemini/rules/` when they apply:
+
+- `.gemini/rules/old.md` - Old rule
+""",
+                encoding="utf-8",
+            )
+
+            cli.install(root, "gemini", ["linting"], [], "python", False, True, False)
+
+            gemini_md = (root / "GEMINI.md").read_text(encoding="utf-8")
+            self.assertIn("## Team Notes", gemini_md)
+            self.assertIn("Keep this section.", gemini_md)
+            self.assertIn("`.gemini/rules/python-linting.md`", gemini_md)
+            self.assertNotIn("`.gemini/rules/old.md`", gemini_md)
+
+    def test_run_install_invalid_target_message_lists_gemini(self) -> None:
+        args = cli.parser().parse_args(["install", "--yes"])
+
+        with (
+            mock.patch.object(
+                cli,
+                "resolve_target_and_agents",
+                return_value=(["bogus"], ["linting"], []),
+            ),
+            io.StringIO() as buf,
+            redirect_stdout(buf),
+        ):
+            exit_code = cli.run_install(args)
+            output = buf.getvalue()
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn(
+            "Invalid --target. Use: cursor, claude, opencode, codex, gemini",
+            output,
+        )
 
     def test_patch_flag_updates_claude_md_section(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

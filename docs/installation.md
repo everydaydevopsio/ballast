@@ -161,7 +161,7 @@ Example root config:
 
 Manual path overrides are supported by editing the root `.rulesrc.json` before the next `ballast install`.
 
-If `CLAUDE.md`, `GEMINI.md`, or `AGENTS.md` already exists, Ballast creates the file when missing. New support files include a user-maintained `Repository Facts` section for durable repo metadata such as `OWNER/REPO`, default branch, canonical config paths, workflow filenames, preferred commands, coverage thresholds, and generated paths agents should not edit directly. `--patch` updates only the Ballast-managed `Installed agent rules` and `Installed skills` sections for these files; the `Repository Facts` section remains user-managed.
+If `CLAUDE.md`, `GEMINI.md`, or `AGENTS.md` already exists, Ballast creates the file when missing. New `CLAUDE.md` and `AGENTS.md` support files include a user-managed `Repository Facts` section for durable repo metadata such as `OWNER/REPO`, default branch, canonical config paths, workflow filenames, preferred commands, coverage thresholds, and generated paths agents should not edit directly. Gemini installs generate `GEMINI.md` and ensure `AGENTS.md` exists so the shared repository facts remain available through the `@./AGENTS.md` include. `--patch` updates only the Ballast-managed `Installed agent rules` and `Installed skills` sections for these files; the `Repository Facts` section remains user-managed.
 
 ### Per-language fallback
 

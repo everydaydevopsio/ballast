@@ -156,7 +156,7 @@ describe('install', () => {
           agents: ['linting']
         })
       ).rejects.toThrow(
-        'Invalid --target. Use: cursor, claude, opencode, codex'
+        'Invalid --target. Use: cursor, claude, opencode, codex, gemini'
       );
     });
 
@@ -1168,6 +1168,55 @@ Read and follow these rule files in \`.gemini/rules/\` when they apply:
         expect(geminiMd).toContain('Keep this section.');
         expect(geminiMd).toContain('`.gemini/rules/typescript-linting.md`');
         expect(geminiMd).not.toContain('`.gemini/rules/old.md`');
+      });
+
+      test('gemini creates GEMINI.md and AGENTS.md when missing', () => {
+        install({
+          projectRoot: tmpDir,
+          target: 'gemini',
+          agents: ['linting'],
+          force: false,
+          saveConfig: false
+        });
+
+        const geminiMd = fs.readFileSync(getGeminiMdPath(tmpDir), 'utf8');
+        expect(geminiMd).toContain('@./AGENTS.md');
+        expect(geminiMd).toContain('`.gemini/rules/typescript-linting.md`');
+
+        const agentsMd = fs.readFileSync(
+          path.join(tmpDir, 'AGENTS.md'),
+          'utf8'
+        );
+        expect(agentsMd).toContain('## Repository Facts');
+        expect(agentsMd).toContain('`.codex/rules/typescript-linting.md`');
+      });
+
+      test('gemini skips existing GEMINI.md unless patch is approved', () => {
+        fs.writeFileSync(
+          path.join(tmpDir, 'GEMINI.md'),
+          `# GEMINI.md
+
+## Team Notes
+
+Keep this section.
+`
+        );
+
+        const result = install({
+          projectRoot: tmpDir,
+          target: 'gemini',
+          agents: ['linting'],
+          force: false,
+          saveConfig: false
+        });
+
+        expect(result.skippedSupportFiles).toContain(
+          path.join(tmpDir, 'GEMINI.md')
+        );
+        expect(
+          fs.readFileSync(path.join(tmpDir, 'GEMINI.md'), 'utf8')
+        ).toContain('## Team Notes');
+        expect(fs.existsSync(path.join(tmpDir, 'AGENTS.md'))).toBe(true);
       });
 
       test('codex: writes to .codex/rules/<agent>.md and AGENTS.md', () => {
