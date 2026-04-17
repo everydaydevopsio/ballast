@@ -100,6 +100,15 @@ verify_skills() {
   test -f "${monorepo}/.codex/rules/owasp-security-scan.md"
 }
 
+verify_skill_patch_keeps_support_rules() {
+  local monorepo="$1"
+
+  grep -q '`.claude/rules/typescript/typescript-linting.md`' "${monorepo}/CLAUDE.md"
+  grep -q '`.claude/skills/github-health-check.skill`' "${monorepo}/CLAUDE.md"
+  grep -q '`.codex/rules/typescript/typescript-linting.md`' "${monorepo}/AGENTS.md"
+  grep -q '`.codex/rules/github-health-check.md`' "${monorepo}/AGENTS.md"
+}
+
 verify_codex_removed() {
   local monorepo="$1"
 
@@ -141,7 +150,7 @@ main() {
 
   (
     cd "${monorepo}"
-    ballast install --target cursor --target claude,opencode --target codex --all --all-skills --yes
+    ballast install --target cursor --target claude,opencode --target codex --all --skill owasp-security-scan --yes
   )
 
   verify_common_rules "${monorepo}"
@@ -149,6 +158,13 @@ main() {
   verify_rulesrc "${monorepo}"
   verify_support_files "${monorepo}"
   verify_skills "${monorepo}"
+
+  (
+    cd "${monorepo}"
+    ballast install --target claude --target codex --skill github-health-check --patch --yes
+  )
+
+  verify_skill_patch_keeps_support_rules "${monorepo}"
 
   (
     cd "${monorepo}"

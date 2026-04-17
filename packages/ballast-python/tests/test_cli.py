@@ -686,6 +686,40 @@ Read and follow these rule files in `.codex/rules/` when they apply:
             self.assertIn("`.codex/rules/python-linting.md`", agents_md)
             self.assertNotIn("`.codex/rules/old.md`", agents_md)
 
+    def test_skill_only_patch_keeps_codex_rule_references_from_rulesrc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cli.save_config(
+                root,
+                "python",
+                "codex",
+                ["linting"],
+                ["owasp-security-scan"],
+            )
+            (root / "AGENTS.md").write_text(
+                cli.build_codex_agents_md(
+                    ["linting"], ["owasp-security-scan"], "python"
+                ),
+                encoding="utf-8",
+            )
+
+            result = cli.install(
+                root,
+                "codex",
+                [],
+                ["owasp-security-scan", "github-health-check"],
+                "python",
+                False,
+                True,
+                False,
+            )
+
+            self.assertEqual(result.errors, [])
+            agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn("`.codex/rules/python-linting.md`", agents_md)
+            self.assertIn("`.codex/rules/owasp-security-scan.md`", agents_md)
+            self.assertNotIn("`.codex/rules/github-health-check.md`", agents_md)
+
     def test_patch_updates_claude_md_section_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

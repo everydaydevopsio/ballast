@@ -1042,6 +1042,55 @@ Keep my custom rule text.
 	}
 }
 
+func TestSkillOnlyPatchKeepsCodexRuleReferencesFromRulesrc(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveConfig(tmpDir, "go", rulesConfig{
+		Targets: []string{"codex"},
+		Agents:  []string{"linting"},
+		Skills:  []string{"owasp-security-scan"},
+	}); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+
+	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
+	initial, err := buildCodexAgentsMD([]string{"linting"}, []string{"owasp-security-scan"}, "go")
+	if err != nil {
+		t.Fatalf("build AGENTS.md: %v", err)
+	}
+	if err := os.WriteFile(agentsMD, []byte(initial), 0o644); err != nil {
+		t.Fatalf("seed AGENTS.md: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex"},
+		agents:      []string{},
+		skills:      []string{"owasp-security-scan", "github-health-check"},
+		language:    "go",
+		force:       false,
+		patch:       true,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	content, err := os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "`.codex/rules/go-linting.md`") {
+		t.Fatalf("expected config-backed agent entry to remain: %s", text)
+	}
+	if !strings.Contains(text, "`.codex/rules/owasp-security-scan.md`") {
+		t.Fatalf("expected saved skill entry to remain: %s", text)
+	}
+	if strings.Contains(text, "`.codex/rules/github-health-check.md`") {
+		t.Fatalf("expected unsaved skill entry to stay absent: %s", text)
+	}
+}
+
 func TestInstallPatchUpdatesClaudeMDSectionOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	rulePath := filepath.Join(tmpDir, ".claude", "rules", "go-linting.md")

@@ -1361,9 +1361,11 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if err := validateSelectedTargets(savedTargets); err != nil {
 		return nil, err
 	}
-	if !explicitAgentSelection && !explicitSkillSelection && config != nil {
+	if !explicitAgentSelection && config != nil {
 		installAgents = slices.Clone(config.Agents)
-		installSkills = slices.Clone(config.Skills)
+		if !explicitSkillSelection {
+			installSkills = slices.Clone(config.Skills)
+		}
 	}
 	cleanupOnly := len(removeTargets) > 0 && len(requestedTargets) == 0 && !explicitAgentSelection && !explicitSkillSelection
 	if !cleanupOnly && (len(requestedTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills))) {
