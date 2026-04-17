@@ -78,17 +78,25 @@ seed_existing_support_file() {
   local existing_path=""
 
   case "${target}" in
+    claude)
+      support_file="${monorepo}/CLAUDE.md"
+      existing_path='.claude/rules/old.md'
+      ;;
     codex)
       support_file="${monorepo}/AGENTS.md"
       existing_path='.codex/rules/old.md'
       ;;
+    gemini)
+      support_file="${monorepo}/GEMINI.md"
+      existing_path='.gemini/rules/old.md'
+      ;;
     *)
       return
       ;;
-    esac
+  esac
 
-    cat > "${support_file}" <<EOF
-    # $(basename "${support_file}")
+  cat > "${support_file}" <<EOF
+# $(basename "${support_file}")
 
 
 ## Team Notes
@@ -157,6 +165,11 @@ verify_support_file() {
       expected_path=".codex/rules/${rule_basename}"
       old_path=".codex/rules/old.md"
       ;;
+    gemini)
+      support_file="${monorepo}/GEMINI.md"
+      expected_path=".gemini/rules/${rule_basename}"
+      old_path=".gemini/rules/old.md"
+      ;;
     *)
       return
       ;;
@@ -187,6 +200,11 @@ verify_forced_support_file() {
       expected_path=".codex/rules/${rule_basename}"
       old_path=".codex/rules/old.md"
       ;;
+    gemini)
+      support_file="${monorepo}/GEMINI.md"
+      expected_path=".gemini/rules/${rule_basename}"
+      old_path=".gemini/rules/old.md"
+      ;;
     *)
       return
       ;;
@@ -201,7 +219,7 @@ run_typescript_smoke() {
   local monorepo
   local rule_name
   local rule_file
-  for target in cursor opencode claude codex; do
+  for target in cursor opencode claude codex gemini; do
     monorepo="${WORKDIR}/typescript-monorepo-${target}"
     build_monorepo_fixture "${monorepo}"
     rule_name="typescript-linting.md"
@@ -236,7 +254,7 @@ run_python_smoke() {
   local monorepo
   local rule_name
   local rule_file
-  for target in cursor opencode claude codex; do
+  for target in cursor opencode claude codex gemini; do
     monorepo="${WORKDIR}/python-monorepo-${target}"
     build_monorepo_fixture "${monorepo}"
     rule_name="python-linting.md"

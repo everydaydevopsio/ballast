@@ -179,6 +179,7 @@ export function patchRuleContent(
     }
     case 'claude':
     case 'codex':
+    case 'gemini':
       return mergeMarkdownBodies(existing, canonical);
     default:
       return canonical;

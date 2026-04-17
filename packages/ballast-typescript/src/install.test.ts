@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 import readline from 'readline';
 import { install, resolveTargetAndAgents, runInstall } from './install';
-import { getClaudeMdPath, getDestination } from './build';
+import { getClaudeMdPath, getDestination, getGeminiMdPath } from './build';
 import { findProjectRoot, saveConfig, loadConfig } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -1117,6 +1117,59 @@ Read and follow these rule files in \`.claude/rules/\` when they apply:
         expect(dir).toBe(path.join(tmpDir, '.opencode'));
       });
 
+      test('gemini patch updates installed rules section without removing user notes', () => {
+        const geminiDir = path.join(tmpDir, '.gemini', 'rules');
+        fs.mkdirSync(geminiDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(geminiDir, 'typescript-linting.md'),
+          `# TypeScript Linting Rules
+
+Team intro.
+
+## Your Responsibilities
+
+Keep my custom rule text.
+`
+        );
+        fs.writeFileSync(
+          path.join(tmpDir, 'GEMINI.md'),
+          `# GEMINI.md
+
+## Team Notes
+
+Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in \`.gemini/rules/\` when they apply:
+
+- \`.gemini/rules/old.md\` — Old rule
+`
+        );
+
+        install({
+          projectRoot: tmpDir,
+          target: 'gemini',
+          agents: ['linting'],
+          patch: true,
+          force: false,
+          saveConfig: false
+        });
+
+        const geminiRule = fs.readFileSync(
+          path.join(geminiDir, 'typescript-linting.md'),
+          'utf8'
+        );
+        expect(geminiRule).toContain('Keep my custom rule text.');
+        expect(geminiRule).toContain('## When Completed');
+
+        const geminiMd = fs.readFileSync(getGeminiMdPath(tmpDir), 'utf8');
+        expect(geminiMd).toContain('## Team Notes');
+        expect(geminiMd).toContain('Keep this section.');
+        expect(geminiMd).toContain('`.gemini/rules/typescript-linting.md`');
+        expect(geminiMd).not.toContain('`.gemini/rules/old.md`');
+      });
+
       test('codex: writes to .codex/rules/<agent>.md and AGENTS.md', () => {
         install({
           projectRoot: tmpDir,
@@ -1196,13 +1249,14 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
 
       test('written path matches getDestination for each target', () => {
         const targets: Array<{
-          target: 'cursor' | 'claude' | 'opencode' | 'codex';
+          target: 'cursor' | 'claude' | 'opencode' | 'codex' | 'gemini';
           ext: string;
         }> = [
           { target: 'cursor', ext: 'mdc' },
           { target: 'claude', ext: 'md' },
           { target: 'opencode', ext: 'md' },
-          { target: 'codex', ext: 'md' }
+          { target: 'codex', ext: 'md' },
+          { target: 'gemini', ext: 'md' }
         ];
         for (const { target, ext } of targets) {
           const subDir = path.join(tmpDir, target);
