@@ -10,11 +10,11 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
   - Coverage thresholds, CI test steps, smoke tests, and optional E2E for runnable apps
 - **Python**
   - pytest for test execution
-  - pytest-cov for coverage reporting
+  - pytest-cov for coverage reporting and fail-under thresholds
   - Smoke tests and optional E2E for runnable apps
 - **Go**
   - `go test ./...` baseline
-  - Coverage checks via `go test ./... -cover`
+  - Coverage checks as part of the default test workflow, including CI coverage gates
   - Smoke tests and optional E2E for runnable apps
 - **Ansible**
   - `ansible-playbook --syntax-check` baseline
