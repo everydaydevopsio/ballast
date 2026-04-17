@@ -44,10 +44,11 @@ seed_existing_rule() {
   local rule_dir=""
 
   case "${target}" in
-    cursor) rule_dir="${monorepo}/.cursor/rules" ;;
-    opencode) rule_dir="${monorepo}/.opencode" ;;
     claude) rule_dir="${monorepo}/.claude/rules" ;;
     codex) rule_dir="${monorepo}/.codex/rules" ;;
+    cursor) rule_dir="${monorepo}/.cursor/rules" ;;
+    gemini) rule_dir="${monorepo}/.gemini/rules" ;;
+    opencode) rule_dir="${monorepo}/.opencode" ;;
     *) echo "Unsupported target: ${target}" >&2; exit 1 ;;
   esac
 
@@ -85,6 +86,10 @@ seed_existing_support_file() {
       support_file="${monorepo}/AGENTS.md"
       existing_path='.codex/rules/old.md'
       ;;
+    gemini)
+      support_file="${monorepo}/GEMINI.md"
+      existing_path='.gemini/rules/old.md'
+      ;;
     *)
       return
       ;;
@@ -92,6 +97,7 @@ seed_existing_support_file() {
 
   cat > "${support_file}" <<EOF
 # $(basename "${support_file}")
+
 
 ## Team Notes
 
@@ -111,10 +117,11 @@ rule_path() {
   local rule_name="$3"
 
   case "${target}" in
-    cursor) echo "${monorepo}/.cursor/rules/${rule_name}" ;;
-    opencode) echo "${monorepo}/.opencode/${rule_name}" ;;
     claude) echo "${monorepo}/.claude/rules/${rule_name}" ;;
     codex) echo "${monorepo}/.codex/rules/${rule_name}" ;;
+    cursor) echo "${monorepo}/.cursor/rules/${rule_name}" ;;
+    gemini) echo "${monorepo}/.gemini/rules/${rule_name}" ;;
+    opencode) echo "${monorepo}/.opencode/${rule_name}" ;;
     *) echo "Unsupported target: ${target}" >&2; exit 1 ;;
   esac
 }
@@ -158,6 +165,11 @@ verify_support_file() {
       expected_path=".codex/rules/${rule_basename}"
       old_path=".codex/rules/old.md"
       ;;
+    gemini)
+      support_file="${monorepo}/GEMINI.md"
+      expected_path=".gemini/rules/${rule_basename}"
+      old_path=".gemini/rules/old.md"
+      ;;
     *)
       return
       ;;
@@ -188,6 +200,11 @@ verify_forced_support_file() {
       expected_path=".codex/rules/${rule_basename}"
       old_path=".codex/rules/old.md"
       ;;
+    gemini)
+      support_file="${monorepo}/GEMINI.md"
+      expected_path=".gemini/rules/${rule_basename}"
+      old_path=".gemini/rules/old.md"
+      ;;
     *)
       return
       ;;
@@ -202,7 +219,7 @@ run_typescript_smoke() {
   local monorepo
   local rule_name
   local rule_file
-  for target in cursor opencode claude codex; do
+  for target in cursor opencode claude codex gemini; do
     monorepo="${WORKDIR}/typescript-monorepo-${target}"
     build_monorepo_fixture "${monorepo}"
     rule_name="typescript-linting.md"
@@ -237,7 +254,7 @@ run_python_smoke() {
   local monorepo
   local rule_name
   local rule_file
-  for target in cursor opencode claude codex; do
+  for target in cursor opencode claude codex gemini; do
     monorepo="${WORKDIR}/python-monorepo-${target}"
     build_monorepo_fixture "${monorepo}"
     rule_name="python-linting.md"

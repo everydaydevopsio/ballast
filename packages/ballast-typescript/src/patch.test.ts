@@ -38,6 +38,42 @@ Canonical completion checklist.
       expect(merged).toContain('Keep this section.');
     });
 
+    test('preserves existing markdown sections for gemini rules', () => {
+      const existing = `# TypeScript Linting Rules
+
+Custom intro for this repo.
+
+## Your Responsibilities
+
+User customized responsibilities.
+
+## Team Overrides
+
+Keep this section.
+`;
+
+      const canonical = `# TypeScript Linting Rules
+
+Canonical intro.
+
+## Your Responsibilities
+
+Canonical responsibilities.
+
+## When Completed
+
+Canonical completion checklist.
+`;
+
+      const merged = patchRuleContent(existing, canonical, 'gemini');
+      expect(merged).toContain('Custom intro for this repo.');
+      expect(merged).toContain('User customized responsibilities.');
+      expect(merged).toContain('## When Completed');
+      expect(merged).toContain('Canonical completion checklist.');
+      expect(merged).toContain('## Team Overrides');
+      expect(merged).toContain('Keep this section.');
+    });
+
     test('merges frontmatter with user values taking precedence', () => {
       const existing = `---
 description: User description

@@ -5,10 +5,12 @@ import {
   buildContent,
   buildClaudeSkill,
   buildClaudeMd,
+  buildGeminiMd,
   buildCursorSkillFormat,
   buildCodexAgentsMd,
   buildSkillMarkdown,
   getClaudeMdPath,
+  getGeminiMdPath,
   getCodexAgentsMdPath,
   getDestination,
   getSkillDestination,
@@ -329,6 +331,7 @@ export interface InstallOptions {
   force?: boolean;
   patch?: boolean;
   patchClaudeMd?: boolean;
+  patchGeminiMd?: boolean;
   saveConfig?: boolean;
 }
 
@@ -431,6 +434,7 @@ export function install(options: InstallOptions): InstallResult {
     force = false,
     patch = false,
     patchClaudeMd = false,
+    patchGeminiMd = false,
     saveConfig: persist
   } = options;
   const effectiveAgents = withImplicitAgents(agents);
@@ -560,6 +564,7 @@ export function install(options: InstallOptions): InstallResult {
         }
         case 'opencode':
         case 'codex':
+        case 'gemini':
           fs.writeFileSync(file, buildSkillMarkdown(skillId), 'utf8');
           break;
         default:
@@ -596,6 +601,51 @@ export function install(options: InstallOptions): InstallResult {
       } catch (err) {
         errors.push({
           agent: 'claude',
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+  }
+
+  if (!disableSupportFiles && target === 'gemini') {
+    const geminiMdPath = getGeminiMdPath(projectRoot);
+    const agentsMdPath = getCodexAgentsMdPath(projectRoot);
+    const shouldPatchGeminiMd = patch || patchGeminiMd;
+    if (fs.existsSync(geminiMdPath) && !force && !shouldPatchGeminiMd) {
+      skippedSupportFiles.push(geminiMdPath);
+    } else {
+      try {
+        const content = buildGeminiMd(
+          Array.from(processedAgentIds),
+          Array.from(processedSkillIds),
+          language
+        );
+        const nextContent =
+          fs.existsSync(geminiMdPath) && !force && shouldPatchGeminiMd
+            ? patchCodexAgentsMd(fs.readFileSync(geminiMdPath, 'utf8'), content)
+            : content;
+        fs.writeFileSync(geminiMdPath, nextContent, 'utf8');
+        installedSupportFiles.push(geminiMdPath);
+      } catch (err) {
+        errors.push({
+          agent: 'gemini',
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+
+    if (!fs.existsSync(agentsMdPath)) {
+      try {
+        const agentsContent = buildCodexAgentsMd(
+          Array.from(processedAgentIds),
+          Array.from(processedSkillIds),
+          language
+        );
+        fs.writeFileSync(agentsMdPath, agentsContent, 'utf8');
+        installedSupportFiles.push(agentsMdPath);
+      } catch (err) {
+        errors.push({
+          agent: 'codex',
           error: err instanceof Error ? err.message : String(err)
         });
       }
@@ -734,6 +784,19 @@ export async function runInstall(
         );
       }
     }
+
+    const geminiMdPath = getGeminiMdPath(projectRoot);
+    let patchGeminiMd = false;
+    if (target === 'gemini' && fs.existsSync(geminiMdPath) && !options.force) {
+      if (options.patch) {
+        patchGeminiMd = true;
+      } else if (!isCiMode() && !options.yes) {
+        patchGeminiMd = await promptYesNo(
+          `Existing GEMINI.md found at ${geminiMdPath}. Patch the Installed agent rules section?`
+        );
+      }
+    }
+
     const result = install({
       projectRoot,
       target,
@@ -743,6 +806,7 @@ export async function runInstall(
       force: options.force ?? false,
       patch: options.patch ?? false,
       patchClaudeMd,
+      patchGeminiMd,
       saveConfig: false
     });
 
@@ -778,7 +842,9 @@ export async function runInstall(
     }
     if (result.installedSupportFiles.length > 0) {
       result.installedSupportFiles.forEach((file) => {
-        const label = file.endsWith('CLAUDE.md') ? 'CLAUDE.md' : 'AGENTS.md';
+        let label = 'AGENTS.md';
+        if (file.endsWith('CLAUDE.md')) label = 'CLAUDE.md';
+        if (file.endsWith('GEMINI.md')) label = 'GEMINI.md';
         console.log(`  ${label} -> ${file}`);
       });
     }

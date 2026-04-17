@@ -14,6 +14,7 @@ import {
   buildSkillMarkdown,
   buildClaudeMd,
   buildCodexAgentsMd,
+  buildGeminiMd,
   getClaudeMdPath,
   getCodexAgentsMdPath,
   getCodexRuleDescription,
@@ -423,6 +424,22 @@ alwaysApply: false
     });
   });
 
+  describe('buildGeminiMd', () => {
+    test('lists gemini rule files with shared AGENTS include and skills', () => {
+      const content = buildGeminiMd(['linting'], ['owasp-security-scan']);
+      expect(content).toContain('# GEMINI.md');
+      expect(content).toContain('@./AGENTS.md');
+      expect(content).toMatch(
+        /Created by \[Ballast]\(https:\/\/github\.com\/everydaydevopsio\/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\./
+      );
+      expect(content).toContain('## Installed agent rules');
+      expect(content).toContain('`.gemini/rules/typescript-linting.md`');
+      expect(content).toContain('TypeScript linting specialist');
+      expect(content).toContain('## Installed skills');
+      expect(content).toContain('`.gemini/rules/owasp-security-scan.md`');
+    });
+  });
+
   describe('buildContent', () => {
     test('cursor returns mdc-style content', () => {
       const result = buildContent('linting', 'cursor');
@@ -558,8 +575,14 @@ alwaysApply: false
   });
 
   describe('listTargets', () => {
-    test('returns cursor, claude, opencode, codex', () => {
-      expect(listTargets()).toEqual(['cursor', 'claude', 'opencode', 'codex']);
+    test('returns cursor, claude, opencode, codex, gemini', () => {
+      expect(listTargets()).toEqual([
+        'cursor',
+        'claude',
+        'opencode',
+        'codex',
+        'gemini'
+      ]);
     });
   });
 });
