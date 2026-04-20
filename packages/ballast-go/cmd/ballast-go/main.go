@@ -48,6 +48,18 @@ func withImplicitAgents(agents []string) []string {
 	return resolved
 }
 
+func uniqueStrings(s []string) []string {
+	seen := make(map[string]struct{}, len(s))
+	out := make([]string, 0, len(s))
+	for _, v := range s {
+		if _, ok := seen[v]; !ok {
+			seen[v] = struct{}{}
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 //go:embed agents/**
 var embeddedAgentsFS embed.FS
 
@@ -688,6 +700,15 @@ func install(opts installOptions) installResult {
 		}
 	}
 
+	supportAgents := slices.Clone(opts.agents)
+	supportSkills := slices.Clone(opts.skills)
+	if config := loadConfig(opts.projectRoot, opts.language); config != nil {
+		supportAgents = withImplicitAgents(config.Agents)
+		supportSkills = slices.Clone(config.Skills)
+	}
+	supportAgents = uniqueStrings(supportAgents)
+	supportSkills = uniqueStrings(supportSkills)
+
 	for _, target := range targets {
 		processed := map[string]struct{}{}
 		processedSkills := map[string]struct{}{}
@@ -819,8 +840,7 @@ func install(opts installOptions) installResult {
 					result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
 				}
 			} else {
-				ids := sortedKeys(processed)
-				content, err := buildCodexAgentsMD(ids, sortedKeys(processedSkills), opts.language)
+				content, err := buildCodexAgentsMD(supportAgents, supportSkills, opts.language)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 				} else {
@@ -850,8 +870,7 @@ func install(opts installOptions) installResult {
 					result.skippedSupportFiles = append(result.skippedSupportFiles, claudePath)
 				}
 			} else {
-				ids := sortedKeys(processed)
-				content, err := buildClaudeMD(ids, sortedKeys(processedSkills), opts.language)
+				content, err := buildClaudeMD(supportAgents, supportSkills, opts.language)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
 				} else {

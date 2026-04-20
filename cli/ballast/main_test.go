@@ -1495,15 +1495,24 @@ func TestResolveMonorepoPlanSkillOnlyInstallPreservesConfigAgents(t *testing.T) 
 	if plan == nil {
 		t.Fatal("expected monorepo plan, got nil")
 	}
-	if len(plan.Invocations) != 1 {
-		t.Fatalf("expected a single common invocation for skill-only install, got %#v", plan.Invocations)
+	if len(plan.Invocations) != 3 {
+		t.Fatalf("expected common and per-language invocations, got %#v", plan.Invocations)
 	}
-	got := strings.Join(plan.Invocations[0].Args, " ")
-	if !strings.Contains(got, "--skill owasp-security-scan") {
-		t.Fatalf("expected explicit skill selection, got %q", got)
+	commonArgs := strings.Join(plan.Invocations[0].Args, " ")
+	if !strings.Contains(commonArgs, "--agent local-dev") || !strings.Contains(commonArgs, "--skill owasp-security-scan") {
+		t.Fatalf("expected common invocation to keep configured common agents and requested skill, got %q", commonArgs)
 	}
-	if strings.Contains(got, "--agent") {
-		t.Fatalf("expected configured agents not to be inherited, got %q", got)
+	languageArgs := []string{
+		strings.Join(plan.Invocations[1].Args, " "),
+		strings.Join(plan.Invocations[2].Args, " "),
+	}
+	for _, got := range languageArgs {
+		if !strings.Contains(got, "--agent linting") {
+			t.Fatalf("expected language invocation to keep configured language agents, got %q", got)
+		}
+		if strings.Contains(got, "--skill") {
+			t.Fatalf("expected language invocation to omit skill flags, got %q", got)
+		}
 	}
 	if !reflect.DeepEqual(plan.Config.Agents, []string{"local-dev", "linting"}) {
 		t.Fatalf("expected saved config to preserve existing agents, got %#v", plan.Config.Agents)
@@ -1595,6 +1604,51 @@ func TestResolveMonorepoPlanAgentOnlyInstallRejectsInvalidPersistedSkills(t *tes
 	}
 	if !strings.Contains(err.Error(), "unsupported skill selection") {
 		t.Fatalf("expected unsupported skill error, got %v", err)
+	}
+}
+
+func TestResolveMonorepoPlanSkillOnlyInstallRetainsConfiguredAgents(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude", "codex"],
+  "agents": ["local-dev", "linting"],
+  "skills": ["owasp-security-scan"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{
+		"install",
+		"--target", "claude,codex",
+		"--skill", "github-health-check",
+		"--patch",
+		"--yes",
+	})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) == 0 {
+		t.Fatal("expected backend invocations")
+	}
+	combinedArgs := make([]string, 0, len(plan.Invocations))
+	for _, invocation := range plan.Invocations {
+		combinedArgs = append(combinedArgs, strings.Join(invocation.Args, " "))
+	}
+	joined := strings.Join(combinedArgs, "\n")
+	if !strings.Contains(joined, "--agent local-dev") || !strings.Contains(joined, "--agent linting") {
+		t.Fatalf("expected configured agents in skill-only invocations, got %q", joined)
+	}
+	if !strings.Contains(joined, "--skill github-health-check") {
+		t.Fatalf("expected requested skill in invocation, got %q", joined)
 	}
 }
 

@@ -3,7 +3,12 @@ import path from 'path';
 import os from 'os';
 import readline from 'readline';
 import { install, resolveTargetAndAgents, runInstall } from './install';
-import { getClaudeMdPath, getDestination, getGeminiMdPath } from './build';
+import {
+  buildCodexAgentsMd,
+  getClaudeMdPath,
+  getDestination,
+  getGeminiMdPath
+} from './build';
 import { findProjectRoot, saveConfig, loadConfig } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -1294,6 +1299,40 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         expect(agentsMd).toContain('Keep this section.');
         expect(agentsMd).toContain('`.codex/rules/typescript-linting.md`');
         expect(agentsMd).not.toContain('`.codex/rules/old.md`');
+      });
+
+      test('codex patch keeps rules in AGENTS.md for config-backed skill-only updates', () => {
+        saveConfig(
+          {
+            targets: ['codex'],
+            agents: ['linting'],
+            skills: ['owasp-security-scan']
+          },
+          tmpDir
+        );
+        fs.writeFileSync(
+          path.join(tmpDir, 'AGENTS.md'),
+          buildCodexAgentsMd(['linting'], ['owasp-security-scan'])
+        );
+
+        const result = install({
+          projectRoot: tmpDir,
+          target: 'codex',
+          agents: [],
+          skills: ['owasp-security-scan', 'github-health-check'],
+          patch: true,
+          force: false,
+          saveConfig: false
+        });
+
+        expect(result.errors).toHaveLength(0);
+        const agentsMd = fs.readFileSync(
+          path.join(tmpDir, 'AGENTS.md'),
+          'utf8'
+        );
+        expect(agentsMd).toContain('`.codex/rules/typescript-linting.md`');
+        expect(agentsMd).toContain('`.codex/rules/owasp-security-scan.md`');
+        expect(agentsMd).not.toContain('`.codex/rules/github-health-check.md`');
       });
 
       test('written path matches getDestination for each target', () => {

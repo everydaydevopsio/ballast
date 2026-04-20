@@ -347,6 +347,26 @@ export interface InstallResult {
   errors: Array<{ agent: string; error: string }>;
 }
 
+function resolveSupportFileSelections(
+  projectRoot: string,
+  language: Language,
+  fallbackAgents: string[],
+  fallbackSkills: string[]
+): { agents: string[]; skills: string[] } {
+  const config = loadConfig(projectRoot, language);
+  const rawAgents = config == null ? fallbackAgents : config.agents;
+  const rawSkills =
+    config == null
+      ? fallbackSkills
+      : 'skills' in config
+        ? (config.skills ?? [])
+        : [];
+  return {
+    agents: [...new Set(withImplicitAgents(rawAgents))],
+    skills: [...new Set(rawSkills)]
+  };
+}
+
 /**
  * Deep-merge skill claude-settings.json into .claude/settings.json.
  * Only merges known safe keys (permissions.allow). Creates the file if absent.
@@ -472,6 +492,12 @@ export function install(options: InstallOptions): InstallResult {
     );
   }
   const hookMode = resolveTsHookMode(projectRoot, language);
+  const supportSelections = resolveSupportFileSelections(
+    projectRoot,
+    language,
+    effectiveAgents,
+    skills
+  );
 
   for (const agentId of effectiveAgents) {
     if (!isValidAgent(agentId, language)) {
@@ -588,8 +614,8 @@ export function install(options: InstallOptions): InstallResult {
     } else {
       try {
         const content = buildClaudeMd(
-          Array.from(processedAgentIds),
-          Array.from(processedSkillIds),
+          supportSelections.agents,
+          supportSelections.skills,
           language
         );
         const nextContent =
@@ -616,8 +642,8 @@ export function install(options: InstallOptions): InstallResult {
     } else {
       try {
         const content = buildGeminiMd(
-          Array.from(processedAgentIds),
-          Array.from(processedSkillIds),
+          supportSelections.agents,
+          supportSelections.skills,
           language
         );
         const nextContent =
@@ -637,8 +663,8 @@ export function install(options: InstallOptions): InstallResult {
     if (!fs.existsSync(agentsMdPath)) {
       try {
         const agentsContent = buildCodexAgentsMd(
-          Array.from(processedAgentIds),
-          Array.from(processedSkillIds),
+          supportSelections.agents,
+          supportSelections.skills,
           language
         );
         fs.writeFileSync(agentsMdPath, agentsContent, 'utf8');
@@ -659,8 +685,8 @@ export function install(options: InstallOptions): InstallResult {
     } else {
       try {
         const content = buildCodexAgentsMd(
-          Array.from(processedAgentIds),
-          Array.from(processedSkillIds),
+          supportSelections.agents,
+          supportSelections.skills,
           language
         );
         const nextContent =

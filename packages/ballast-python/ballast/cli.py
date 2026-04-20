@@ -1459,6 +1459,18 @@ def install(
     if persist:
         save_config(root, language, target, agents, skills)
 
+    config_for_support_files = load_config(root, language)
+    support_agents = with_implicit_agents(
+        config_for_support_files.get("agents", agents)
+        if config_for_support_files
+        else agents
+    )
+    support_skills = (
+        config_for_support_files.get("skills", skills)
+        if config_for_support_files
+        else skills
+    )
+
     for agent in agents:
         if not is_valid_agent(agent, language):
             result.errors.append((agent, "Unknown agent"))
@@ -1527,7 +1539,7 @@ def install(
             result.skipped_support_files.append(str(claude_md))
         else:
             try:
-                content = build_claude_md(processed_agents, processed_skills, language)
+                content = build_claude_md(support_agents, support_skills, language)
                 next_content = (
                     patch_codex_agents_md(
                         claude_md.read_text(encoding="utf-8"), content
@@ -1548,7 +1560,7 @@ def install(
             result.skipped_support_files.append(str(gemini_md))
         else:
             try:
-                content = build_gemini_md(processed_agents, processed_skills, language)
+                content = build_gemini_md(support_agents, support_skills, language)
                 next_content = (
                     patch_codex_agents_md(
                         gemini_md.read_text(encoding="utf-8"), content
@@ -1564,7 +1576,7 @@ def install(
         if not agents_md.exists():
             try:
                 agents_md.write_text(
-                    build_codex_agents_md(processed_agents, processed_skills, language),
+                    build_codex_agents_md(support_agents, support_skills, language),
                     encoding="utf-8",
                 )
                 result.installed_support_files.append(str(agents_md))
@@ -1578,7 +1590,7 @@ def install(
         else:
             try:
                 content = build_codex_agents_md(
-                    processed_agents, processed_skills, language
+                    support_agents, support_skills, language
                 )
                 next_content = (
                     patch_codex_agents_md(
