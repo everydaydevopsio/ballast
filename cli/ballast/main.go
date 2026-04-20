@@ -589,6 +589,8 @@ func runUpgrade(selectedLanguage language, args []string) int {
 			fmt.Printf("brew upgrade failed: %v\n", err)
 			return 1
 		}
+		fmt.Println("ballast was upgraded via Homebrew. Please rerun `ballast upgrade` to update .rulesrc.json and finish syncing with the new version.")
+		return 0
 	}
 
 	root := findProjectRoot("")
@@ -968,7 +970,9 @@ func detectBrewInstall() bool {
 	if resolved, err := filepath.EvalSymlinks(execPath); err == nil {
 		execPath = resolved
 	}
-	return strings.HasPrefix(execPath, prefix)
+	prefix = filepath.Clean(prefix)
+	execPath = filepath.Clean(execPath)
+	return execPath == prefix || strings.HasPrefix(execPath, prefix+string(os.PathSeparator))
 }
 
 // brewUpgradeArgs returns the brew subcommand arguments needed to upgrade
