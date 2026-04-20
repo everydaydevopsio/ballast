@@ -12,6 +12,7 @@ node_modules/
 # Test coverage
 coverage/
 cover.out
+coverage.out
 
 # Logs
 *.log
