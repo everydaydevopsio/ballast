@@ -124,6 +124,7 @@ var walkDirFunc = filepath.WalkDir
 var osExecutableFunc = os.Executable
 var execLookPathFunc = exec.LookPath
 var runCommandFunc = runCommand
+var runCommandOutputFunc = runCommandOutput
 var resolveInstalledVersionFunc = resolveInstalledVersion
 var collectDoctorBackendsFunc = collectDoctorBackends
 
@@ -577,6 +578,19 @@ func runUpgrade(selectedLanguage language, args []string) int {
 		return 1
 	}
 
+	if detectBrewInstall() {
+		fmt.Println("Updating Homebrew...")
+		if err := runCommandFunc("brew", []string{"update"}); err != nil {
+			fmt.Printf("brew update failed: %v\n", err)
+			return 1
+		}
+		fmt.Println("Upgrading ballast via Homebrew...")
+		if err := runCommandFunc("brew", brewUpgradeArgs()); err != nil {
+			fmt.Printf("brew upgrade failed: %v\n", err)
+			return 1
+		}
+	}
+
 	root := findProjectRoot("")
 	config, err := loadDoctorConfig(root)
 	if err != nil {
@@ -929,6 +943,41 @@ func runCommand(name string, args []string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	return cmd.Run()
+}
+
+func runCommandOutput(name string, args []string) (string, error) {
+	out, err := exec.Command(name, args...).Output()
+	return strings.TrimSpace(string(out)), err
+}
+
+// detectBrewInstall reports whether the running ballast binary was installed
+// via Homebrew by checking that (a) brew is on PATH and (b) the resolved
+// executable path lives under the Homebrew prefix.
+func detectBrewInstall() bool {
+	if _, err := execLookPathFunc("brew"); err != nil {
+		return false
+	}
+	prefix, err := runCommandOutputFunc("brew", []string{"--prefix"})
+	if err != nil || prefix == "" {
+		return false
+	}
+	execPath, err := osExecutableFunc()
+	if err != nil {
+		return false
+	}
+	if resolved, err := filepath.EvalSymlinks(execPath); err == nil {
+		execPath = resolved
+	}
+	return strings.HasPrefix(execPath, prefix)
+}
+
+// brewUpgradeArgs returns the brew subcommand arguments needed to upgrade
+// the ballast CLI: formula on Linux, cask on macOS.
+func brewUpgradeArgs() []string {
+	if runtime.GOOS == "darwin" {
+		return []string{"upgrade", "--cask", "ballast"}
+	}
+	return []string{"upgrade", "--formula", "everydaydevopsio/ballast/ballast"}
 }
 
 func resolveCommandVersion(binary string) (string, error) {

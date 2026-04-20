@@ -652,6 +652,182 @@ func TestRunUpgradeRequiresExistingConfig(t *testing.T) {
 	}
 }
 
+func TestDetectBrewInstallReturnsFalseWhenBrewNotFound(t *testing.T) {
+	originalLookPath := execLookPathFunc
+	t.Cleanup(func() { execLookPathFunc = originalLookPath })
+
+	execLookPathFunc = func(file string) (string, error) {
+		return "", errors.New("not found")
+	}
+
+	if detectBrewInstall() {
+		t.Fatal("expected detectBrewInstall to return false when brew is not on PATH")
+	}
+}
+
+func TestDetectBrewInstallReturnsFalseWhenExeOutsidePrefix(t *testing.T) {
+	originalLookPath := execLookPathFunc
+	originalOutput := runCommandOutputFunc
+	originalExe := osExecutableFunc
+	t.Cleanup(func() {
+		execLookPathFunc = originalLookPath
+		runCommandOutputFunc = originalOutput
+		osExecutableFunc = originalExe
+	})
+
+	execLookPathFunc = func(file string) (string, error) { return "/usr/local/bin/brew", nil }
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "/opt/homebrew", nil
+	}
+	osExecutableFunc = func() (string, error) { return "/usr/local/bin/ballast", nil }
+
+	if detectBrewInstall() {
+		t.Fatal("expected detectBrewInstall to return false when exe is outside brew prefix")
+	}
+}
+
+func TestDetectBrewInstallReturnsTrueWhenExeUnderPrefix(t *testing.T) {
+	originalLookPath := execLookPathFunc
+	originalOutput := runCommandOutputFunc
+	originalExe := osExecutableFunc
+	t.Cleanup(func() {
+		execLookPathFunc = originalLookPath
+		runCommandOutputFunc = originalOutput
+		osExecutableFunc = originalExe
+	})
+
+	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "/opt/homebrew", nil
+	}
+	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
+
+	if !detectBrewInstall() {
+		t.Fatal("expected detectBrewInstall to return true when exe is under brew prefix")
+	}
+}
+
+func TestRunUpgradeRunsBrewWhenBrewInstalled(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	originalLookPath := execLookPathFunc
+	originalOutput := runCommandOutputFunc
+	originalExe := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+		execLookPathFunc = originalLookPath
+		runCommandOutputFunc = originalOutput
+		osExecutableFunc = originalExe
+	})
+	version = "5.0.6"
+
+	// Simulate a brew installation
+	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "/opt/homebrew", nil
+	}
+	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.5",
+  "target":"claude",
+  "agents":["local-dev"],
+  "languages":["typescript"],
+  "paths":{"typescript":["."]}
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"upgrade"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) < 2 {
+		t.Fatalf("expected at least 2 commands (brew update + brew upgrade), got %v", commands)
+	}
+	if got := strings.Join(commands[0], " "); got != "brew update" {
+		t.Fatalf("expected first command to be 'brew update', got %q", got)
+	}
+	if got := commands[1][0]; got != "brew" {
+		t.Fatalf("expected second command to start with 'brew', got %q", got)
+	}
+	if got := commands[1][1]; got != "upgrade" {
+		t.Fatalf("expected second command to be 'brew upgrade ...', got %v", commands[1])
+	}
+}
+
+func TestRunUpgradeSkipsBrewWhenNotBrewInstalled(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	originalLookPath := execLookPathFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+		execLookPathFunc = originalLookPath
+	})
+	version = "5.0.6"
+
+	// Simulate no brew installation
+	execLookPathFunc = func(file string) (string, error) {
+		return "", errors.New("not found")
+	}
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.5",
+  "target":"claude",
+  "agents":["local-dev"],
+  "languages":["typescript"],
+  "paths":{"typescript":["."]}
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"upgrade"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	for _, cmd := range commands {
+		if cmd[0] == "brew" {
+			t.Fatalf("expected no brew commands when not brew-installed, got %v", cmd)
+		}
+	}
+}
+
 func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
