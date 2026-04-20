@@ -48,6 +48,18 @@ func withImplicitAgents(agents []string) []string {
 	return resolved
 }
 
+func uniqueStrings(s []string) []string {
+	seen := make(map[string]struct{}, len(s))
+	out := make([]string, 0, len(s))
+	for _, v := range s {
+		if _, ok := seen[v]; !ok {
+			seen[v] = struct{}{}
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 //go:embed agents/**
 var embeddedAgentsFS embed.FS
 
@@ -694,6 +706,8 @@ func install(opts installOptions) installResult {
 		supportAgents = withImplicitAgents(config.Agents)
 		supportSkills = slices.Clone(config.Skills)
 	}
+	supportAgents = uniqueStrings(supportAgents)
+	supportSkills = uniqueStrings(supportSkills)
 
 	for _, target := range targets {
 		processed := map[string]struct{}{}

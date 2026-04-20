@@ -354,9 +354,16 @@ function resolveSupportFileSelections(
   fallbackSkills: string[]
 ): { agents: string[]; skills: string[] } {
   const config = loadConfig(projectRoot, language);
+  const rawAgents = config == null ? fallbackAgents : config.agents;
+  const rawSkills =
+    config == null
+      ? fallbackSkills
+      : 'skills' in config
+        ? (config.skills ?? [])
+        : [];
   return {
-    agents: withImplicitAgents(config?.agents ?? fallbackAgents),
-    skills: config?.skills ?? fallbackSkills
+    agents: [...new Set(withImplicitAgents(rawAgents))],
+    skills: [...new Set(rawSkills)]
   };
 }
 
