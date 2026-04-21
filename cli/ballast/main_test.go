@@ -707,26 +707,18 @@ func TestDetectBrewInstallReturnsTrueWhenExeUnderPrefix(t *testing.T) {
 	}
 }
 
-func TestRunUpgradeRunsBrewWhenBrewInstalled(t *testing.T) {
+func TestRunUpdateRunsBrewWhenBrewInstalled(t *testing.T) {
 	originalRun := runCommandFunc
-	originalEnsure := ensureInstalledFunc
-	originalExec := execToolFunc
-	originalVersion := version
 	originalLookPath := execLookPathFunc
 	originalOutput := runCommandOutputFunc
 	originalExe := osExecutableFunc
 	t.Cleanup(func() {
 		runCommandFunc = originalRun
-		ensureInstalledFunc = originalEnsure
-		execToolFunc = originalExec
-		version = originalVersion
 		execLookPathFunc = originalLookPath
 		runCommandOutputFunc = originalOutput
 		osExecutableFunc = originalExe
 	})
-	version = "5.0.6"
 
-	// Simulate a brew installation
 	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
 	runCommandOutputFunc = func(name string, args []string) (string, error) {
 		return "/opt/homebrew", nil
@@ -738,27 +730,11 @@ func TestRunUpgradeRunsBrewWhenBrewInstalled(t *testing.T) {
 		commands = append(commands, append([]string{name}, args...))
 		return nil
 	}
-	ensureInstalledFunc = func(tool toolConfig) error { return nil }
-	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
-		return 0, nil
+
+	exitCode := run([]string{"update"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
-
-	root := t.TempDir()
-	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
-	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
-  "ballastVersion":"5.0.5",
-  "target":"claude",
-  "agents":["local-dev"],
-  "languages":["typescript"],
-  "paths":{"typescript":["."]}
-}`)
-
-	withWorkingDir(t, root, func() {
-		exitCode := run([]string{"upgrade"})
-		if exitCode != 0 {
-			t.Fatalf("expected exit code 0, got %d", exitCode)
-		}
-	})
 
 	if len(commands) < 2 {
 		t.Fatalf("expected at least 2 commands (brew update + brew upgrade), got %v", commands)
@@ -774,7 +750,155 @@ func TestRunUpgradeRunsBrewWhenBrewInstalled(t *testing.T) {
 	}
 }
 
-func TestRunUpgradeSkipsBrewWhenNotBrewInstalled(t *testing.T) {
+func TestRunUpdateFailsWhenNotBrewInstalled(t *testing.T) {
+	originalLookPath := execLookPathFunc
+	t.Cleanup(func() { execLookPathFunc = originalLookPath })
+
+	execLookPathFunc = func(file string) (string, error) {
+		return "", errors.New("not found")
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"update"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "only supported for Homebrew installations") {
+		t.Fatalf("expected non-brew message, got %q", output)
+	}
+}
+
+func TestRunUpdateRejectsUnknownOption(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"update", "--bogus"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "unknown update option: --bogus") {
+		t.Fatalf("expected update option error, got %q", output)
+	}
+	if len(commands) != 0 {
+		t.Fatalf("expected no commands to run for invalid update args, got %v", commands)
+	}
+}
+
+func TestRunUpdateFailsWhenBrewUpdateFails(t *testing.T) {
+	originalRun := runCommandFunc
+	originalLookPath := execLookPathFunc
+	originalOutput := runCommandOutputFunc
+	originalExe := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		execLookPathFunc = originalLookPath
+		runCommandOutputFunc = originalOutput
+		osExecutableFunc = originalExe
+	})
+
+	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "/opt/homebrew", nil
+	}
+	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
+	runCommandFunc = func(name string, args []string) error {
+		if name == "brew" && len(args) > 0 && args[0] == "update" {
+			return errors.New("brew update error")
+		}
+		return nil
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"update"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "brew update failed") {
+		t.Fatalf("expected brew update failure message, got %q", output)
+	}
+}
+
+func TestRunUpdateFailsWhenBrewUpgradeFails(t *testing.T) {
+	originalRun := runCommandFunc
+	originalLookPath := execLookPathFunc
+	originalOutput := runCommandOutputFunc
+	originalExe := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		execLookPathFunc = originalLookPath
+		runCommandOutputFunc = originalOutput
+		osExecutableFunc = originalExe
+	})
+
+	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "/opt/homebrew", nil
+	}
+	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
+	runCommandFunc = func(name string, args []string) error {
+		if name == "brew" && len(args) > 0 && args[0] == "upgrade" {
+			return errors.New("brew upgrade error")
+		}
+		return nil
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"update"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "brew upgrade failed") {
+		t.Fatalf("expected brew upgrade failure message, got %q", output)
+	}
+}
+
+func TestRunUpdateSuccessMessage(t *testing.T) {
+	originalRun := runCommandFunc
+	originalLookPath := execLookPathFunc
+	originalOutput := runCommandOutputFunc
+	originalExe := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		execLookPathFunc = originalLookPath
+		runCommandOutputFunc = originalOutput
+		osExecutableFunc = originalExe
+	})
+
+	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "/opt/homebrew", nil
+	}
+	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
+	runCommandFunc = func(name string, args []string) error { return nil }
+
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"update"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "ballast upgrade") {
+		t.Fatalf("expected post-update hint to run ballast upgrade, got %q", output)
+	}
+}
+
+func TestRunUpgradeDoesNotRunBrew(t *testing.T) {
 	originalRun := runCommandFunc
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
@@ -789,10 +913,8 @@ func TestRunUpgradeSkipsBrewWhenNotBrewInstalled(t *testing.T) {
 	})
 	version = "5.0.6"
 
-	// Simulate no brew installation
-	execLookPathFunc = func(file string) (string, error) {
-		return "", errors.New("not found")
-	}
+	// Even when brew is on PATH, upgrade should not invoke brew
+	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
 
 	var commands [][]string
 	runCommandFunc = func(name string, args []string) error {
@@ -823,117 +945,8 @@ func TestRunUpgradeSkipsBrewWhenNotBrewInstalled(t *testing.T) {
 
 	for _, cmd := range commands {
 		if cmd[0] == "brew" {
-			t.Fatalf("expected no brew commands when not brew-installed, got %v", cmd)
+			t.Fatalf("expected no brew commands from upgrade, got %v", cmd)
 		}
-	}
-}
-
-func TestRunUpgradeFailsWhenBrewUpdateFails(t *testing.T) {
-	originalRun := runCommandFunc
-	originalLookPath := execLookPathFunc
-	originalOutput := runCommandOutputFunc
-	originalExe := osExecutableFunc
-	t.Cleanup(func() {
-		runCommandFunc = originalRun
-		execLookPathFunc = originalLookPath
-		runCommandOutputFunc = originalOutput
-		osExecutableFunc = originalExe
-	})
-
-	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
-	runCommandOutputFunc = func(name string, args []string) (string, error) {
-		return "/opt/homebrew", nil
-	}
-	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
-	runCommandFunc = func(name string, args []string) error {
-		if name == "brew" && len(args) > 0 && args[0] == "update" {
-			return errors.New("brew update error")
-		}
-		return nil
-	}
-
-	output := captureStdout(t, func() {
-		withWorkingDir(t, t.TempDir(), func() {
-			exitCode := run([]string{"upgrade"})
-			if exitCode != 1 {
-				t.Fatalf("expected exit code 1, got %d", exitCode)
-			}
-		})
-	})
-
-	if !strings.Contains(output, "brew update failed") {
-		t.Fatalf("expected brew update failure message, got %q", output)
-	}
-}
-
-func TestRunUpgradeFailsWhenBrewUpgradeFails(t *testing.T) {
-	originalRun := runCommandFunc
-	originalLookPath := execLookPathFunc
-	originalOutput := runCommandOutputFunc
-	originalExe := osExecutableFunc
-	t.Cleanup(func() {
-		runCommandFunc = originalRun
-		execLookPathFunc = originalLookPath
-		runCommandOutputFunc = originalOutput
-		osExecutableFunc = originalExe
-	})
-
-	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
-	runCommandOutputFunc = func(name string, args []string) (string, error) {
-		return "/opt/homebrew", nil
-	}
-	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
-	runCommandFunc = func(name string, args []string) error {
-		if name == "brew" && len(args) > 0 && args[0] == "upgrade" {
-			return errors.New("brew upgrade error")
-		}
-		return nil
-	}
-
-	output := captureStdout(t, func() {
-		withWorkingDir(t, t.TempDir(), func() {
-			exitCode := run([]string{"upgrade"})
-			if exitCode != 1 {
-				t.Fatalf("expected exit code 1, got %d", exitCode)
-			}
-		})
-	})
-
-	if !strings.Contains(output, "brew upgrade failed") {
-		t.Fatalf("expected brew upgrade failure message, got %q", output)
-	}
-}
-
-func TestRunUpgradeSuccessMessageWhenBrewInstalled(t *testing.T) {
-	originalRun := runCommandFunc
-	originalLookPath := execLookPathFunc
-	originalOutput := runCommandOutputFunc
-	originalExe := osExecutableFunc
-	t.Cleanup(func() {
-		runCommandFunc = originalRun
-		execLookPathFunc = originalLookPath
-		runCommandOutputFunc = originalOutput
-		osExecutableFunc = originalExe
-	})
-
-	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
-	runCommandOutputFunc = func(name string, args []string) (string, error) {
-		return "/opt/homebrew", nil
-	}
-	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
-	runCommandFunc = func(name string, args []string) error { return nil }
-
-	output := captureStdout(t, func() {
-		withWorkingDir(t, t.TempDir(), func() {
-			exitCode := run([]string{"upgrade"})
-			if exitCode != 0 {
-				t.Fatalf("expected exit code 0, got %d", exitCode)
-			}
-		})
-	})
-
-	if !strings.Contains(output, "Please rerun") {
-		t.Fatalf("expected rerun message after brew upgrade, got %q", output)
 	}
 }
 

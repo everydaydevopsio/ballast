@@ -189,6 +189,9 @@ func run(args []string) int {
 	if len(forwardedArgs) > 0 && forwardedArgs[0] == "upgrade" {
 		return runUpgrade(selectedLanguage, forwardedArgs[1:])
 	}
+	if len(forwardedArgs) > 0 && forwardedArgs[0] == "update" {
+		return runUpdate(forwardedArgs[1:])
+	}
 
 	if hasVersionFlag(forwardedArgs) {
 		printVersion()
@@ -345,6 +348,7 @@ func printUsage() {
 	fmt.Println("  install-cli Install or upgrade backend CLIs (latest by default, or a specific --version)")
 	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config; add `--patch` with `--fix` to merge backend file updates during refresh)")
 	fmt.Println("  upgrade     Rewrite .rulesrc.json to the running ballast version and sync backend CLIs (`--patch` and `--force` forward to the backend refresh)")
+	fmt.Println("  update      Upgrade the ballast CLI itself via Homebrew (`brew update && brew upgrade ...`)")
 	fmt.Println("  help        Show help for ballast")
 	fmt.Println("  version     Print the ballast wrapper version")
 	fmt.Println()
@@ -364,6 +368,7 @@ func printUsage() {
 	fmt.Println("  ballast install-cli --language python")
 	fmt.Println("  ballast doctor")
 	fmt.Println("  ballast doctor --fix")
+	fmt.Println("  ballast update")
 	fmt.Println("  ballast upgrade")
 	fmt.Println("  ballast upgrade --patch")
 	fmt.Println("  ballast upgrade --force")
@@ -571,26 +576,35 @@ func runDoctor(selectedLanguage language, args []string) int {
 	return 0
 }
 
+func runUpdate(args []string) int {
+	if len(args) > 0 {
+		fmt.Printf("unknown update option: %s\n", args[0])
+		return 1
+	}
+	if !detectBrewInstall() {
+		fmt.Println("ballast update is only supported for Homebrew installations.")
+		fmt.Println("To upgrade a non-Homebrew install, download the latest release from GitHub.")
+		return 1
+	}
+	fmt.Println("Updating Homebrew...")
+	if err := runCommandFunc("brew", []string{"update"}); err != nil {
+		fmt.Printf("brew update failed: %v\n", err)
+		return 1
+	}
+	fmt.Println("Upgrading ballast via Homebrew...")
+	if err := runCommandFunc("brew", brewUpgradeArgs()); err != nil {
+		fmt.Printf("brew upgrade failed: %v\n", err)
+		return 1
+	}
+	fmt.Println("ballast upgraded. Run `ballast upgrade` to update .rulesrc.json and sync backend CLIs.")
+	return 0
+}
+
 func runUpgrade(selectedLanguage language, args []string) int {
 	patch, force, err := parseUpgradeOptions(args)
 	if err != nil {
 		fmt.Println(err)
 		return 1
-	}
-
-	if detectBrewInstall() {
-		fmt.Println("Updating Homebrew...")
-		if err := runCommandFunc("brew", []string{"update"}); err != nil {
-			fmt.Printf("brew update failed: %v\n", err)
-			return 1
-		}
-		fmt.Println("Upgrading ballast via Homebrew...")
-		if err := runCommandFunc("brew", brewUpgradeArgs()); err != nil {
-			fmt.Printf("brew upgrade failed: %v\n", err)
-			return 1
-		}
-		fmt.Println("ballast was upgraded via Homebrew. Please rerun `ballast upgrade` to update .rulesrc.json and finish syncing with the new version.")
-		return 0
 	}
 
 	root := findProjectRoot("")
