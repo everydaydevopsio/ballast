@@ -190,7 +190,7 @@ func run(args []string) int {
 		return runUpgrade(selectedLanguage, forwardedArgs[1:])
 	}
 	if len(forwardedArgs) > 0 && forwardedArgs[0] == "update" {
-		return runUpdate()
+		return runUpdate(forwardedArgs[1:])
 	}
 
 	if hasVersionFlag(forwardedArgs) {
@@ -348,7 +348,7 @@ func printUsage() {
 	fmt.Println("  install-cli Install or upgrade backend CLIs (latest by default, or a specific --version)")
 	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config; add `--patch` with `--fix` to merge backend file updates during refresh)")
 	fmt.Println("  upgrade     Rewrite .rulesrc.json to the running ballast version and sync backend CLIs (`--patch` and `--force` forward to the backend refresh)")
-	fmt.Println("  update      Upgrade the ballast CLI itself via Homebrew (`brew update && brew upgrade ballast`)")
+	fmt.Println("  update      Upgrade the ballast CLI itself via Homebrew (`brew update && brew upgrade ...`)")
 	fmt.Println("  help        Show help for ballast")
 	fmt.Println("  version     Print the ballast wrapper version")
 	fmt.Println()
@@ -576,7 +576,11 @@ func runDoctor(selectedLanguage language, args []string) int {
 	return 0
 }
 
-func runUpdate() int {
+func runUpdate(args []string) int {
+	if len(args) > 0 {
+		fmt.Printf("unknown update option: %s\n", args[0])
+		return 1
+	}
 	if !detectBrewInstall() {
 		fmt.Println("ballast update is only supported for Homebrew installations.")
 		fmt.Println("To upgrade a non-Homebrew install, download the latest release from GitHub.")

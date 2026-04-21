@@ -770,6 +770,31 @@ func TestRunUpdateFailsWhenNotBrewInstalled(t *testing.T) {
 	}
 }
 
+func TestRunUpdateRejectsUnknownOption(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"update", "--bogus"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "unknown update option: --bogus") {
+		t.Fatalf("expected update option error, got %q", output)
+	}
+	if len(commands) != 0 {
+		t.Fatalf("expected no commands to run for invalid update args, got %v", commands)
+	}
+}
+
 func TestRunUpdateFailsWhenBrewUpdateFails(t *testing.T) {
 	originalRun := runCommandFunc
 	originalLookPath := execLookPathFunc
