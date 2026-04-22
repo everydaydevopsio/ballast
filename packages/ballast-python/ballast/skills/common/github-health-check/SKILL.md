@@ -178,10 +178,13 @@ gh api "/repos/${OWNER}/${NAME}/actions/secrets" --jq '.secrets[].name' 2>/dev/n
 ```bash
 # Try the direct repo feature status first. GitHub may not expose this field
 # yet for all plans / repos / API versions, so treat missing data as inconclusive.
-gh api "/repos/${OWNER}/${NAME}" \
-  --jq '.security_and_analysis.code_quality.status // "not_exposed"' 2>/dev/null | \
-  xargs -I{} echo "Code Quality API status: {}" || \
+if code_quality_status="$(gh api "/repos/${OWNER}/${NAME}" \
+  --jq '.security_and_analysis.code_quality.status // "not_exposed"' 2>/dev/null)" \
+  && [ -n "$code_quality_status" ]; then
+  echo "Code Quality API status: $code_quality_status"
+else
   echo "Code Quality API status: unavailable"
+fi
 
 # Look for the dynamic workflow GitHub creates when Code Quality is enabled.
 gh run list --workflow "Code Quality" --limit 10 \
