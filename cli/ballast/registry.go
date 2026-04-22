@@ -92,7 +92,7 @@ var skillRegistry = []skillEntry{
 	},
 	{
 		ID:          "github-health-check",
-		Description: "run a comprehensive GitHub repository health check covering CI status, branch hygiene, and repo configuration",
+		Description: "run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration",
 		Status:      statusActive,
 	},
 }

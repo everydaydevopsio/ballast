@@ -3,16 +3,17 @@ name: github-health-check
 description: >
   Run a comprehensive GitHub repository health check. Use this skill whenever
   the user asks to: check GitHub health, audit the repo, check CI status,
-  review open PRs, merge Dependabot PRs, check code coverage, check security
-  alerts, check Snyk integration, keep GitHub in good shape, or any variation
-  of "how is the repo doing". Also trigger for: "check dependabot PRs",
-  "any PRs to merge", "check branch status", "repo health", "GitHub status
-  check", "what needs attention in GitHub", "tidy up GitHub".
+  review open PRs, merge Dependabot PRs, check code coverage, check GitHub
+  Code Quality, check security alerts, check Snyk integration, keep GitHub in
+  good shape, or any variation of "how is the repo doing". Also trigger for:
+  "check dependabot PRs", "any PRs to merge", "check branch status", "repo
+  health", "GitHub status check", "what needs attention in GitHub", "tidy up
+  GitHub".
 ---
 
 # GitHub Repository Health Check Skill
 
-Runs a comprehensive health audit of the current GitHub repository using the `gh` CLI. Produces a structured report with status indicators and actionable items. Auto-merges safe Dependabot PRs.
+Runs a comprehensive health audit of the current GitHub repository using the `gh` CLI. Produces a structured report with status indicators and actionable items. Auto-merges safe Dependabot PRs and checks whether GitHub Code Quality is enabled.
 
 ---
 
@@ -131,7 +132,7 @@ For each Dependabot PR returned, apply this decision logic:
 
 2. **Check CI status**: all checks must be `SUCCESS` (no failures, no pending)
    ```bash
-   gh pr checks <PR_NUMBER> --json name,state,conclusion
+   gh pr checks <PR_NUMBER> --json name,state,bucket,workflow
    ```
 
 3. **Verify not a draft** and **mergeable** state is not `CONFLICTING`
@@ -172,7 +173,39 @@ gh api "/repos/${OWNER}/${NAME}/actions/secrets" --jq '.secrets[].name' 2>/dev/n
 
 ---
 
-## Check 5 — Security Alerts
+## Check 5 — GitHub Code Quality
+
+```bash
+# Try the direct repo feature status first. GitHub may not expose this field
+# yet for all plans / repos / API versions, so treat missing data as inconclusive.
+if code_quality_status="$(gh api "/repos/${OWNER}/${NAME}" \
+  --jq '.security_and_analysis.code_quality.status // "not_exposed"' 2>/dev/null)" \
+  && [ -n "$code_quality_status" ]; then
+  echo "Code Quality API status: $code_quality_status"
+else
+  echo "Code Quality API status: unavailable"
+fi
+
+# Look for the dynamic workflow GitHub creates when Code Quality is enabled.
+gh run list --workflow "Code Quality" --limit 10 \
+  --json status,conclusion,createdAt,url \
+  --jq '.[] | {status, conclusion, createdAt, url}' 2>/dev/null || true
+
+# Look for repository comments from the Code Quality bot on pull requests.
+gh api "/repos/${OWNER}/${NAME}/issues/comments?per_page=100" \
+  --jq '.[] | select(.user.login == "github-code-quality[bot]") |
+    {createdAt: .created_at, url: .html_url}' 2>/dev/null || true
+```
+
+**Interpret results:**
+- If `security_and_analysis.code_quality.status` is `enabled`: report GitHub Code Quality as enabled
+- If the direct field is not exposed, infer likely enabled when recent `Code Quality` workflow runs or `github-code-quality[bot]` comments exist
+- If neither the direct field nor fallback signals are present: report Code Quality as not detected and recommend verifying `Settings` → `Security` → `Code quality`
+- Note that GitHub Code Quality is currently in public preview and its API surface may be incomplete or absent for some repositories
+
+---
+
+## Check 6 — Security Alerts
 
 ```bash
 # Count open Dependabot security alerts
@@ -203,7 +236,7 @@ gh api "/repos/${OWNER}/${NAME}/secret-scanning/alerts?state=open&per_page=100" 
 
 ---
 
-## Check 6 — Snyk Integration
+## Check 7 — Snyk Integration
 
 ```bash
 # Check for .snyk policy file
@@ -225,7 +258,7 @@ gh api "/repos/${OWNER}/${NAME}/actions/secrets" --jq '.secrets[].name' 2>/dev/n
 
 ---
 
-## Check 7 — Branch Protection Rules
+## Check 8 — Branch Protection Rules
 
 ```bash
 # Check protection rules on the default branch
@@ -260,7 +293,7 @@ except Exception as e: print('Could not parse:', e)
 
 ---
 
-## Check 8 — Stale Branches
+## Check 9 — Stale Branches
 
 ```bash
 # List remote branches not merged to default branch, sorted by last commit date
@@ -289,7 +322,7 @@ echo "Stale branches (30+ days, unmerged): $STALE_COUNT"
 
 ---
 
-## Check 9 — Repository Housekeeping
+## Check 10 — Repository Housekeeping
 
 ```bash
 # Check for essential files
@@ -312,7 +345,7 @@ gh repo view --json description,repositoryTopics \
 
 ---
 
-## Check 10 — Workflow Health Patterns
+## Check 11 — Workflow Health Patterns
 
 ```bash
 # Detect consistently failing workflows (>50% failure rate over recent runs)
@@ -328,7 +361,7 @@ gh run list --branch "$DEFAULT_BRANCH" --limit 50 \
 
 ---
 
-## Check 11 — Release & Tag Health
+## Check 12 — Release & Tag Health
 
 ```bash
 # List recent releases
@@ -342,7 +375,7 @@ DRAFT_COUNT=$(gh release list --json isDraft --jq '[.[] | select(.isDraft)] | le
 
 ---
 
-## Check 12 — Actions Permissions & Secrets Health
+## Check 13 — Actions Permissions & Secrets Health
 
 ```bash
 # Check default workflow permissions
@@ -403,6 +436,7 @@ After running all checks, present findings in this structure:
 
 ---
 ### Security  ✅/⚠️/❌
+- GitHub Code Quality: enabled / NOT DETECTED ⚠️
 - Dependabot alerts: N open (X critical, Y high)
 - Code scanning (CodeQL): enabled/NOT ENABLED
 - Secret scanning: N open alerts
