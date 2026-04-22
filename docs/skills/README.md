@@ -33,6 +33,7 @@ Ballast ships reusable skill guides alongside its agent rules.
 - Type: common skill
 - Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
 - Installed by: `--skill github-health-check` or `--all-skills`
+- Focus: CI status, pull requests, Dependabot, code coverage, GitHub Code Quality, and security checks
 
 ## Installation Targets
 

@@ -1,6 +1,6 @@
 # `github-health-check`
 
-The `github-health-check` skill runs a comprehensive GitHub repository health audit using the `gh` CLI. It produces a structured report with status indicators and actionable items, and auto-merges safe Dependabot PRs.
+The `github-health-check` skill runs a comprehensive GitHub repository health audit using the `gh` CLI. It produces a structured report with status indicators and actionable items, auto-merges safe Dependabot PRs, and checks whether GitHub Code Quality is enabled.
 
 ## When To Use It
 
@@ -10,6 +10,7 @@ Use this skill when you want to:
 - check CI workflow status and failure trends
 - review open pull requests and stale branches
 - merge safe Dependabot dependency updates
+- check whether GitHub Code Quality is turned on
 - check security alerts and code scanning results
 - review branch protection and Snyk integration
 - get a prioritized list of items that need attention
