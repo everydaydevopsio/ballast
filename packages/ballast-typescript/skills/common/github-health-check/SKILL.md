@@ -281,9 +281,22 @@ gh api "/repos/${OWNER}/${NAME}/security-advisories?per_page=100" \
 
 # Private vulnerability reporting is expected only for public repos.
 if [ "$IS_PRIVATE" = "false" ]; then
-  gh api "/repos/${OWNER}/${NAME}/private-vulnerability-reporting" \
-    --jq '{enabled}' 2>/dev/null || \
-    echo "Private vulnerability reporting status unavailable"
+  PVR_RESPONSE=$(gh api --include "/repos/${OWNER}/${NAME}/private-vulnerability-reporting" 2>&1 || true)
+  PVR_STATUS=$(printf '%s\n' "$PVR_RESPONSE" | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | tail -n 1)
+  case "$PVR_STATUS" in
+    200|204)
+      echo '{"enabled": true}'
+      ;;
+    404)
+      echo '{"enabled": false}'
+      ;;
+    403)
+      echo "Private vulnerability reporting status unavailable (permission denied)"
+      ;;
+    *)
+      echo "Private vulnerability reporting status unavailable"
+      ;;
+  esac
 else
   echo "Private vulnerability reporting: not required for private repositories"
 fi
