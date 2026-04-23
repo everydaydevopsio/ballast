@@ -207,6 +207,16 @@ describe('build', () => {
       const content = getSkillContent('github-health-check');
       expect(content).toContain('name: github-health-check');
       expect(content).toContain('# GitHub Repository Health Check Skill');
+      expect(content).toContain(
+        '## Check 6 — GitHub Security Feature Enablement'
+      );
+      expect(content).toContain(
+        '`HIGH`: Private vulnerability reporting must be enabled for public repositories only'
+      );
+      expect(content).toContain('--- Dependabot malware alerts ---');
+      expect(content).toContain(
+        '## Check 15 — Public and Private Repository Best Practices'
+      );
     });
 
     test('builds cursor skill format', () => {
