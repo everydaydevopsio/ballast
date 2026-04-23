@@ -44,7 +44,7 @@ Common skills:
 - `aws-weekly-security-review`
 - `github-health-check`
 
-`github-health-check` covers CI status, pull request hygiene, Dependabot, code coverage, GitHub Code Quality, and security checks.
+`github-health-check` covers CI status, pull request hygiene, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings.
 
 Guide index:
 

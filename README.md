@@ -90,7 +90,7 @@ Skills are reusable task guides that Ballast installs for the target AI tool alo
 - `aws-health-review`: run a weekly read-only AWS operational health baseline and append prioritized TODO follow-up
 - `aws-live-health-review`: generate a current-state AWS operational snapshot for EC2, RDS, ALB, alarms, and logs
 - `aws-weekly-security-review`: run a weekly read-only AWS security baseline review with prioritized findings
-- `github-health-check`: run a comprehensive GitHub repository health check covering CI status, open PRs, Dependabot, code coverage, GitHub Code Quality, and security alerts
+- `github-health-check`: run a comprehensive GitHub repository health check covering CI status, open PRs, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
 
 ### Install a skill
 
