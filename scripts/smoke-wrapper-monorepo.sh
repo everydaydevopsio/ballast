@@ -129,6 +129,11 @@ verify_refresh_preserves_removed_target() {
   ! grep -q '"codex"' "${monorepo}/.rulesrc.json"
 }
 
+verify_warning_output() {
+  local output="$1"
+  grep -Fq "JavaScript package.json-based component or app" <<<"${output}"
+}
+
 run_wrapper_language_smoke() {
   local project="${WORKDIR}/ballast-wrapper-python"
 
@@ -142,6 +147,79 @@ run_wrapper_language_smoke() {
 
   test -f "${project}/.codex/rules/python-linting.md"
   grep -q '"codex"' "${project}/.rulesrc.json"
+}
+
+run_wrapper_javascript_warning_smoke() {
+  local project="${WORKDIR}/ballast-wrapper-javascript-warning"
+
+  mkdir -p "${project}"
+  cat > "${project}/package.json" <<'EOF'
+{
+  "name": "ballast-wrapper-javascript-warning",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "playwright": "^1.45.0"
+  }
+}
+EOF
+  cat > "${project}/playwright.config.mjs" <<'EOF'
+export default {};
+EOF
+
+  local output
+  output="$(
+    cd "${project}" &&
+    ballast install --target codex --agent linting --yes 2>&1
+  )"
+
+  verify_warning_output "${output}"
+  test -f "${project}/.codex/rules/typescript-linting.md"
+}
+
+run_wrapper_mixed_warning_smoke() {
+  local project="${WORKDIR}/ballast-wrapper-mixed-warning"
+
+  mkdir -p "${project}/infra/terraform"
+  cat > "${project}/package.json" <<'EOF'
+{
+  "name": "ballast-wrapper-mixed-warning",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "playwright": "^1.45.0"
+  }
+}
+EOF
+  cat > "${project}/playwright.config.mjs" <<'EOF'
+export default {};
+EOF
+  cat > "${project}/ansible.cfg" <<'EOF'
+[defaults]
+inventory = hosts.ini
+EOF
+  cat > "${project}/infra/terraform/.terraform-version" <<'EOF'
+1.8.5
+EOF
+  cat > "${project}/infra/terraform/versions.tf" <<'EOF'
+terraform {}
+EOF
+
+  local output
+  output="$(
+    cd "${project}" &&
+    ballast install --target codex --all --yes 2>&1
+  )"
+
+  verify_warning_output "${output}"
+  grep -q '"ansible"' "${project}/.rulesrc.json"
+  grep -q '"terraform"' "${project}/.rulesrc.json"
 }
 
 main() {
@@ -180,6 +258,8 @@ main() {
 
   verify_refresh_preserves_removed_target "${monorepo}"
   run_wrapper_language_smoke
+  run_wrapper_javascript_warning_smoke
+  run_wrapper_mixed_warning_smoke
 
   echo "Ballast wrapper monorepo smoke test passed."
 }

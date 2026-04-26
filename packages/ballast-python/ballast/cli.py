@@ -254,6 +254,20 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
                 if isinstance(ballast_version_value, str)
                 else None
             ),
+            "languages": [
+                item for item in data.get("languages", []) if isinstance(item, str)
+            ]
+            if isinstance(data.get("languages"), list)
+            else [],
+            "paths": {
+                key: value
+                for key, value in data.get("paths", {}).items()
+                if isinstance(key, str)
+                and isinstance(value, list)
+                and all(isinstance(item, str) for item in value)
+            }
+            if isinstance(data.get("paths"), dict)
+            else {},
         }
     except Exception:
         return None
@@ -449,6 +463,8 @@ def build_doctor_report(
         targets = config.get("targets")
         agents = config.get("agents")
         skills = config.get("skills")
+        languages = config.get("languages")
+        paths = config.get("paths")
         if isinstance(targets, list) and all(
             isinstance(target, str) for target in targets
         ):
@@ -457,6 +473,27 @@ def build_doctor_report(
             lines.append(f"- agents: {', '.join(agents)}")
         if isinstance(skills, list) and all(isinstance(skill, str) for skill in skills):
             lines.append(f"- skills: {', '.join(skills)}")
+        if isinstance(languages, list) and all(
+            isinstance(language, str) for language in languages
+        ):
+            lines.append(f"- languages: {', '.join(languages)}")
+        if (
+            isinstance(languages, list)
+            and all(isinstance(language, str) for language in languages)
+            and isinstance(paths, dict)
+        ):
+            formatted_paths = _format_config_paths(
+                languages,
+                {
+                    key: value
+                    for key, value in paths.items()
+                    if isinstance(key, str)
+                    and isinstance(value, list)
+                    and all(isinstance(item, str) for item in value)
+                },
+            )
+            if formatted_paths:
+                lines.append(f"- paths: {formatted_paths}")
 
     lines.extend(["", "Recommendations:"])
     if recommendations:
@@ -464,6 +501,21 @@ def build_doctor_report(
     else:
         lines.append("- No action needed.")
     return "\n".join(lines) + "\n"
+
+
+def _format_config_paths(
+    languages: list[str], paths: dict[str, list[str]]
+) -> str | None:
+    ordered_keys = [
+        *[language for language in languages if language in paths],
+        *sorted(key for key in paths if key not in languages),
+    ]
+    entries = [
+        f"{key}={','.join(paths[key])}"
+        for key in ordered_keys
+        if isinstance(paths.get(key), list) and paths[key]
+    ]
+    return "; ".join(entries) if entries else None
 
 
 def run_doctor() -> int:

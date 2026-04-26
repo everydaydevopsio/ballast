@@ -17,6 +17,8 @@ export interface DoctorReport {
   configTargets: string[];
   configAgents: string[];
   configSkills: string[];
+  configLanguages: string[];
+  configPaths: Record<string, string[]>;
   installed: InstalledCliStatus[];
   recommendations: string[];
 }
@@ -94,6 +96,8 @@ export function buildDoctorReport(
   configTargets: string[],
   configAgents: string[],
   configSkills: string[],
+  configLanguages: string[],
+  configPaths: Record<string, string[]>,
   installed: InstalledCliStatus[]
 ): DoctorReport {
   const targetVersion = latestVersion([
@@ -145,9 +149,30 @@ export function buildDoctorReport(
     configTargets,
     configAgents,
     configSkills,
+    configLanguages,
+    configPaths,
     installed,
     recommendations
   };
+}
+
+function formatConfigPaths(
+  languages: string[],
+  paths: Record<string, string[]>
+): string | null {
+  const orderedKeys = [
+    ...languages.filter((language) => Array.isArray(paths[language])),
+    ...Object.keys(paths)
+      .filter((language) => !languages.includes(language))
+      .sort()
+  ];
+  const entries = orderedKeys.flatMap((language) => {
+    const values = paths[language];
+    return Array.isArray(values) && values.length > 0
+      ? [`${language}=${values.join(',')}`]
+      : [];
+  });
+  return entries.length > 0 ? entries.join('; ') : null;
 }
 
 export function formatDoctorReport(report: DoctorReport): string {
@@ -181,6 +206,16 @@ export function formatDoctorReport(report: DoctorReport): string {
     if (report.configSkills.length > 0) {
       lines.push(`- skills: ${report.configSkills.join(', ')}`);
     }
+    if (report.configLanguages.length > 0) {
+      lines.push(`- languages: ${report.configLanguages.join(', ')}`);
+    }
+    const formattedPaths = formatConfigPaths(
+      report.configLanguages,
+      report.configPaths
+    );
+    if (formattedPaths) {
+      lines.push(`- paths: ${formattedPaths}`);
+    }
   }
 
   lines.push('', 'Recommendations:');
@@ -207,6 +242,8 @@ export function runDoctor(): number {
     config?.targets ?? [],
     config?.agents ?? [],
     config?.skills ?? [],
+    config?.languages ?? [],
+    config?.paths ?? {},
     CLI_NAMES.map((name) => detectInstalledCli(name))
   );
   process.stdout.write(formatDoctorReport(report));

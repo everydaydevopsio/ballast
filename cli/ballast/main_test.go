@@ -113,7 +113,16 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 
 	root := t.TempDir()
-	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"ballastVersion":"5.0.2","target":"claude","agents":["local-dev"]}`)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "target":"claude",
+  "agents":["local-dev"],
+  "languages":["typescript","ansible"],
+  "paths":{
+    "typescript":["apps/web"],
+    "ansible":["infra/ansible"]
+  }
+}`)
 
 	output := captureStdout(t, func() {
 		withWorkingDir(t, root, func() {
@@ -134,6 +143,12 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 	if !strings.Contains(output, "ballastVersion: 5.0.2") {
 		t.Fatalf("expected config version in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "languages: typescript, ansible") {
+		t.Fatalf("expected config languages in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "paths: typescript=apps/web; ansible=infra/ansible") {
+		t.Fatalf("expected config paths in doctor output, got %q", output)
 	}
 }
 
@@ -1653,6 +1668,62 @@ func TestDetectLanguageSupportsTerraformRulesConfig(t *testing.T) {
 	}
 }
 
+func TestDetectLanguageWarnsForJavaScriptPackageWithoutTsconfig(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{
+  "name": "novnc-desktop",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0"
+  }
+}`)
+
+	stderr := captureStderr(t, func() {
+		got := detectLanguage(root)
+		if got != langTypeScript {
+			t.Fatalf("expected typescript detection from package.json, got %q", got)
+		}
+	})
+
+	if !strings.Contains(stderr, "JavaScript package.json-based component or app") {
+		t.Fatalf("expected JavaScript conversion warning, got %q", stderr)
+	}
+}
+
+func TestResolveMonorepoPlanWarnsForJavaScriptRootWithoutTypeScriptProfile(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{
+  "name": "novnc-desktop",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0"
+  }
+}`)
+	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", "versions.tf"), "terraform {}\n")
+	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform-version"), "1.8.5\n")
+
+	stderr := captureStderr(t, func() {
+		plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--all"})
+		if err != nil {
+			t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+		}
+		if plan == nil {
+			t.Fatal("expected monorepo plan, got nil")
+		}
+	})
+
+	if !strings.Contains(stderr, "JavaScript package.json-based component or app") {
+		t.Fatalf("expected JavaScript conversion warning, got %q", stderr)
+	}
+}
+
 func TestResolveBackendCommandAddsAnsibleLanguageFlag(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
@@ -3002,6 +3073,45 @@ func captureStdout(t *testing.T, fn func()) string {
 	wg.Wait()
 	if copyErr != nil {
 		t.Fatalf("read stdout: %v", copyErr)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("close reader: %v", err)
+	}
+
+	return buf.String()
+}
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	originalStderr := os.Stderr
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("create pipe: %v", err)
+	}
+
+	os.Stderr = writer
+	t.Cleanup(func() {
+		os.Stderr = originalStderr
+	})
+
+	var buf bytes.Buffer
+	var copyErr error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_, copyErr = io.Copy(&buf, reader)
+	}()
+
+	fn()
+
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close writer: %v", err)
+	}
+	wg.Wait()
+	if copyErr != nil {
+		t.Fatalf("read stderr: %v", copyErr)
 	}
 	if err := reader.Close(); err != nil {
 		t.Fatalf("close reader: %v", err)

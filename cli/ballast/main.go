@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"slices"
+	"sort"
 	"strings"
 )
 
@@ -734,7 +735,39 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	if len(config.Skills) > 0 {
 		fmt.Printf("- skills: %s\n", strings.Join(config.Skills, ", "))
 	}
+	if len(config.Languages) > 0 {
+		fmt.Printf("- languages: %s\n", strings.Join(config.Languages, ", "))
+	}
+	if formattedPaths := formatDoctorConfigPaths(config.Languages, config.Paths); formattedPaths != "" {
+		fmt.Printf("- paths: %s\n", formattedPaths)
+	}
 	fmt.Println()
+}
+
+func formatDoctorConfigPaths(languages []string, paths map[string][]string) string {
+	orderedKeys := make([]string, 0, len(paths))
+	seen := map[string]bool{}
+	for _, language := range languages {
+		if len(paths[language]) == 0 {
+			continue
+		}
+		orderedKeys = append(orderedKeys, language)
+		seen[language] = true
+	}
+	remaining := make([]string, 0, len(paths))
+	for language, values := range paths {
+		if seen[language] || len(values) == 0 {
+			continue
+		}
+		remaining = append(remaining, language)
+	}
+	sort.Strings(remaining)
+	orderedKeys = append(orderedKeys, remaining...)
+	entries := make([]string, 0, len(orderedKeys))
+	for _, language := range orderedKeys {
+		entries = append(entries, fmt.Sprintf("%s=%s", language, strings.Join(paths[language], ",")))
+	}
+	return strings.Join(entries, "; ")
 }
 
 func parseDoctorFix(args []string) (bool, bool, error) {
@@ -1371,6 +1404,74 @@ func cloneEnvMap(env map[string]string) map[string]string {
 	return cloned
 }
 
+type packageJSONMetadata struct {
+	Scripts              map[string]any `json:"scripts"`
+	Dependencies         map[string]any `json:"dependencies"`
+	DevDependencies      map[string]any `json:"devDependencies"`
+	PeerDependencies     map[string]any `json:"peerDependencies"`
+	OptionalDependencies map[string]any `json:"optionalDependencies"`
+	Main                 string         `json:"main"`
+	Module               string         `json:"module"`
+	Browser              any            `json:"browser"`
+	Bin                  any            `json:"bin"`
+	Exports              any            `json:"exports"`
+}
+
+func javascriptComponentWarning(root string) string {
+	if fileExists(filepath.Join(root, "tsconfig.json")) {
+		return ""
+	}
+
+	packageJSONPath := filepath.Join(root, "package.json")
+	if !fileExists(packageJSONPath) {
+		return ""
+	}
+
+	content, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		return ""
+	}
+
+	var metadata packageJSONMetadata
+	if err := json.Unmarshal(content, &metadata); err != nil {
+		return ""
+	}
+
+	if !looksLikeJavaScriptComponent(metadata) {
+		return ""
+	}
+
+	return "detected a JavaScript package.json-based component or app without tsconfig.json; convert it to TypeScript or add tsconfig.json so Ballast can track it as a TypeScript profile."
+}
+
+func looksLikeJavaScriptComponent(metadata packageJSONMetadata) bool {
+	if len(metadata.Scripts) > 0 {
+		return true
+	}
+	if len(metadata.Dependencies) > 0 ||
+		len(metadata.DevDependencies) > 0 ||
+		len(metadata.PeerDependencies) > 0 ||
+		len(metadata.OptionalDependencies) > 0 {
+		return true
+	}
+	if strings.TrimSpace(metadata.Main) != "" || strings.TrimSpace(metadata.Module) != "" {
+		return true
+	}
+	if metadata.Browser != nil || metadata.Bin != nil || metadata.Exports != nil {
+		return true
+	}
+	return false
+}
+
+func profilesIncludeLanguage(profiles []repoProfile, target language) bool {
+	for _, profile := range profiles {
+		if profile.Language == target {
+			return true
+		}
+	}
+	return false
+}
+
 func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if len(args) == 0 || args[0] != "install" {
 		return nil, nil
@@ -1399,6 +1500,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 
 	if len(profiles) < 2 {
 		return nil, nil
+	}
+	if warning := javascriptComponentWarning(root); warning != "" && !profilesIncludeLanguage(profiles, langTypeScript) {
+		fmt.Fprintln(os.Stderr, "warning:", warning)
 	}
 
 	installTargets := findFlagValues(args, "--target", "-t")
@@ -2531,6 +2635,10 @@ func hasRootMarker(dir string) bool {
 }
 
 func detectLanguage(root string) language {
+	if warning := javascriptComponentWarning(root); warning != "" {
+		fmt.Fprintln(os.Stderr, "warning:", warning)
+	}
+
 	scores := map[language]int{
 		langTypeScript: 0,
 		langPython:     0,
