@@ -63,5 +63,5 @@ Created by Ballast. Do not edit this section.
 Read and use these skill files in `.claude/skills/` when they are relevant:
 
 - `.claude/skills/owasp-security-scan.skill` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
-- `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, branch hygiene, and repo configuration
+- `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 
