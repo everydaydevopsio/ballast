@@ -10,6 +10,8 @@ describe('doctor', () => {
       ['cursor'],
       ['linting', 'testing'],
       [],
+      [],
+      {},
       [
         {
           name: 'ballast-typescript',
@@ -46,6 +48,11 @@ describe('doctor', () => {
       ['cursor'],
       ['linting'],
       ['owasp-security-scan'],
+      ['typescript', 'ansible'],
+      {
+        typescript: ['apps/web'],
+        ansible: ['infra/ansible']
+      },
       [
         {
           name: 'ballast-typescript',
@@ -66,6 +73,10 @@ describe('doctor', () => {
     expect(output).toContain('- targets: cursor');
     expect(output).toContain('Recommendations:');
     expect(output).toContain('- skills: owasp-security-scan');
+    expect(output).toContain('- languages: typescript, ansible');
+    expect(output).toContain(
+      '- paths: typescript=apps/web; ansible=infra/ansible'
+    );
     expect(output).toContain('- No action needed.');
   });
 });

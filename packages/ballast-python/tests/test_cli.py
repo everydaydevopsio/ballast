@@ -25,6 +25,11 @@ class PatchInstallTests(unittest.TestCase):
                 "agents": ["linting", "testing"],
                 "skills": ["owasp-security-scan"],
                 "ballastVersion": "5.0.1",
+                "languages": ["typescript", "ansible"],
+                "paths": {
+                    "typescript": ["apps/web"],
+                    "ansible": ["infra/ansible"],
+                },
             },
             [
                 {
@@ -51,6 +56,8 @@ class PatchInstallTests(unittest.TestCase):
         )
         self.assertIn("- targets: cursor", output)
         self.assertIn("- skills: owasp-security-scan", output)
+        self.assertIn("- languages: typescript, ansible", output)
+        self.assertIn("- paths: typescript=apps/web; ansible=infra/ansible", output)
 
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:

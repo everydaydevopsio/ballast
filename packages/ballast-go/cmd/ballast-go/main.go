@@ -555,6 +555,12 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		if len(config.Skills) > 0 {
 			lines = append(lines, fmt.Sprintf("- skills: %s", strings.Join(config.Skills, ", ")))
 		}
+		if len(config.Languages) > 0 {
+			lines = append(lines, fmt.Sprintf("- languages: %s", strings.Join(config.Languages, ", ")))
+		}
+		if formattedPaths := formatDoctorConfigPaths(config.Languages, config.Paths); formattedPaths != "" {
+			lines = append(lines, fmt.Sprintf("- paths: %s", formattedPaths))
+		}
 		if configVersion == "" || compareVersions(configVersion, targetVersion) < 0 {
 			recommendations = append(
 				recommendations,
@@ -573,6 +579,32 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 	}
 
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func formatDoctorConfigPaths(languages []string, paths map[string][]string) string {
+	orderedKeys := make([]string, 0, len(paths))
+	seen := map[string]bool{}
+	for _, language := range languages {
+		if len(paths[language]) == 0 {
+			continue
+		}
+		orderedKeys = append(orderedKeys, language)
+		seen[language] = true
+	}
+	remaining := make([]string, 0, len(paths))
+	for language, values := range paths {
+		if seen[language] || len(values) == 0 {
+			continue
+		}
+		remaining = append(remaining, language)
+	}
+	sort.Strings(remaining)
+	orderedKeys = append(orderedKeys, remaining...)
+	entries := make([]string, 0, len(orderedKeys))
+	for _, language := range orderedKeys {
+		entries = append(entries, fmt.Sprintf("%s=%s", language, strings.Join(paths[language], ",")))
+	}
+	return strings.Join(entries, "; ")
 }
 
 func runDoctor() int {
