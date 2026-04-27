@@ -12,6 +12,7 @@
     "observability",
     "publishing",
     "git-hooks",
+    "tasks",
     "linting",
     "logging",
     "testing"
@@ -20,7 +21,7 @@
     "owasp-security-scan",
     "github-health-check"
   ],
-  "ballastVersion": "5.7.4",
+  "ballastVersion": "5.9.0",
   "languages": [
     "typescript",
     "python",
@@ -48,5 +49,6 @@
       "examples/smoke/typescript-sample",
       "packages/ballast-typescript"
     ]
-  }
+  },
+  "taskSystem": "github"
 }

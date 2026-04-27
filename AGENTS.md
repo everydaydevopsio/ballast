@@ -89,6 +89,7 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/common/publishing-sdks.md` — Rules for common/publishing-sdks
 - `.codex/rules/common/publishing-apps.md` — Rules for common/publishing-apps
 - `.codex/rules/common/git-hooks.md` — Rules for common/git-hooks
+- `.codex/rules/common/tasks.md` — Rules for common/tasks
 - `.codex/rules/typescript/typescript-linting.md` — Rules for typescript/linting
 - `.codex/rules/typescript/typescript-logging.md` — Rules for typescript/logging
 - `.codex/rules/typescript/typescript-testing.md` — Rules for typescript/testing
