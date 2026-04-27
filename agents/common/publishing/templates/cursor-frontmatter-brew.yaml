@@ -1,0 +1,7 @@
+description: 'Homebrew tap publishing specialist - GoReleaser brews block and tap repo setup'
+alwaysApply: false
+globs:
+  - '.goreleaser.yaml'
+  - '.github/workflows/**'
+  - 'Formula/**'
+  - 'README*'

@@ -910,7 +910,7 @@ Keep my custom responsibilities.
         saveConfig: false
       });
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules.length).toBe(3);
+      expect(result.installedRules.length).toBe(8);
       const librariesFile = path.join(
         tmpDir,
         '.cursor',
@@ -929,9 +929,30 @@ Keep my custom responsibilities.
         'rules',
         'publishing-apps.mdc'
       );
+      const cliFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'publishing-cli.mdc'
+      );
+      const webFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'publishing-web.mdc'
+      );
+      const apiFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'publishing-api.mdc'
+      );
       expect(fs.existsSync(librariesFile)).toBe(true);
       expect(fs.existsSync(sdksFile)).toBe(true);
       expect(fs.existsSync(appsFile)).toBe(true);
+      expect(fs.existsSync(cliFile)).toBe(true);
+      expect(fs.existsSync(webFile)).toBe(true);
+      expect(fs.existsSync(apiFile)).toBe(true);
       expect(fs.readFileSync(librariesFile, 'utf8')).toContain(
         'Publishing Libraries Agent'
       );

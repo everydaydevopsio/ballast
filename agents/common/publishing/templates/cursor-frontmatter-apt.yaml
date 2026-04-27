@@ -1,0 +1,7 @@
+description: 'APT/deb package publishing specialist - GoReleaser nfpms and GitHub Releases'
+alwaysApply: false
+globs:
+  - '.goreleaser.yaml'
+  - '.github/workflows/**'
+  - '*.deb'
+  - 'README*'

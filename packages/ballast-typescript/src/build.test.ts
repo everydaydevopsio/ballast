@@ -56,7 +56,12 @@ describe('build', () => {
       expect(listRuleSuffixes('publishing')).toContain('libraries');
       expect(listRuleSuffixes('publishing')).toContain('sdks');
       expect(listRuleSuffixes('publishing')).toContain('apps');
-      expect(listRuleSuffixes('publishing').length).toBe(3);
+      expect(listRuleSuffixes('publishing')).toContain('cli');
+      expect(listRuleSuffixes('publishing')).toContain('brew');
+      expect(listRuleSuffixes('publishing')).toContain('apt');
+      expect(listRuleSuffixes('publishing')).toContain('web');
+      expect(listRuleSuffixes('publishing')).toContain('api');
+      expect(listRuleSuffixes('publishing').length).toBe(8);
     });
 
     test('throws for unknown agent', () => {

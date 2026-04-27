@@ -1,4 +1,5 @@
 import { spawnSync } from 'child_process';
+import fs from 'fs';
 import path from 'path';
 import { findProjectRoot, getRulesrcFilename, loadConfig } from './config';
 import { BALLAST_VERSION } from './version';
@@ -8,6 +9,8 @@ export interface InstalledCliStatus {
   version: string | null;
   path: string | null;
 }
+
+export type AppType = 'cli' | 'web' | 'api' | 'library' | 'sdk' | 'unknown';
 
 export interface DoctorReport {
   currentCli: string;
@@ -20,6 +23,7 @@ export interface DoctorReport {
   configLanguages: string[];
   configPaths: Record<string, string[]>;
   installed: InstalledCliStatus[];
+  detectedAppType: AppType;
   recommendations: string[];
 }
 
@@ -78,6 +82,107 @@ function detectInstalledCli(name: string): InstalledCliStatus {
   };
 }
 
+function fileExists(dir: string, ...names: string[]): boolean {
+  return names.some((name) => fs.existsSync(path.join(dir, name)));
+}
+
+function hasPackageJsonBin(dir: string): boolean {
+  const pkgPath = path.join(dir, 'package.json');
+  if (!fs.existsSync(pkgPath)) return false;
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as {
+      bin?: unknown;
+    };
+    return (
+      pkg.bin !== null &&
+      pkg.bin !== undefined &&
+      typeof pkg.bin !== 'undefined' &&
+      !(
+        typeof pkg.bin === 'object' &&
+        Object.keys(pkg.bin as object).length === 0
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
+function hasFrontendIndicators(dir: string): boolean {
+  return fileExists(
+    dir,
+    'next.config.js',
+    'next.config.ts',
+    'next.config.mjs',
+    'vite.config.js',
+    'vite.config.ts',
+    'vite.config.mjs',
+    'nuxt.config.js',
+    'nuxt.config.ts',
+    'svelte.config.js',
+    'remix.config.js'
+  );
+}
+
+function hasApiIndicators(dir: string): boolean {
+  return (
+    fileExists(dir, 'go.mod', 'pyproject.toml') ||
+    fileExists(dir, 'routes', 'handlers', 'api', 'server') ||
+    fileExists(dir, 'app.ts', 'server.ts', 'main.go', 'app.py', 'main.py')
+  );
+}
+
+/**
+ * Heuristically detect the app type from filesystem markers in the project root.
+ * Returns the most specific match; falls back to 'unknown'.
+ */
+export function detectAppType(projectRoot: string): AppType {
+  const hasDockerfile = fileExists(projectRoot, 'Dockerfile');
+  const hasGoReleaser = fileExists(
+    projectRoot,
+    '.goreleaser.yaml',
+    '.goreleaser.yml'
+  );
+  const hasPackageJson = fileExists(projectRoot, 'package.json');
+  const hasBin = hasPackageJsonBin(projectRoot);
+
+  // CLI indicators: GoReleaser config or package.json with bin entries
+  if (hasGoReleaser || hasBin) {
+    return 'cli';
+  }
+
+  // Container-deployed apps require a Dockerfile
+  if (hasDockerfile) {
+    if (hasFrontendIndicators(projectRoot)) {
+      return 'web';
+    }
+    if (hasApiIndicators(projectRoot)) {
+      return 'api';
+    }
+    // Dockerfile present but no clear frontend or API markers — default to web
+    return 'web';
+  }
+
+  // Library / SDK indicators: package.json, go.mod, or pyproject.toml without Dockerfile or bin
+  if (
+    hasPackageJson ||
+    fileExists(projectRoot, 'go.mod') ||
+    fileExists(projectRoot, 'pyproject.toml')
+  ) {
+    return 'library';
+  }
+
+  return 'unknown';
+}
+
+const APP_TYPE_PUBLISH_RULE: Record<AppType, string | null> = {
+  cli: 'publishing-cli',
+  web: 'publishing-web',
+  api: 'publishing-api',
+  library: 'publishing-libraries',
+  sdk: 'publishing-sdks',
+  unknown: null
+};
+
 function refreshConfigCommand(
   report: Pick<
     DoctorReport,
@@ -98,7 +203,8 @@ export function buildDoctorReport(
   configSkills: string[],
   configLanguages: string[],
   configPaths: Record<string, string[]>,
-  installed: InstalledCliStatus[]
+  installed: InstalledCliStatus[],
+  detectedAppType: AppType = 'unknown'
 ): DoctorReport {
   const targetVersion = latestVersion([
     currentVersion,
@@ -141,6 +247,13 @@ export function buildDoctorReport(
     );
   }
 
+  const suggestedRule = APP_TYPE_PUBLISH_RULE[detectedAppType];
+  if (suggestedRule && configPath && !configAgents.includes('publishing')) {
+    recommendations.push(
+      `Detected app type: ${detectedAppType} — add the publishing agent: ballast install --agents publishing`
+    );
+  }
+
   return {
     currentCli,
     currentVersion,
@@ -152,6 +265,7 @@ export function buildDoctorReport(
     configLanguages,
     configPaths,
     installed,
+    detectedAppType,
     recommendations
   };
 }
@@ -189,6 +303,10 @@ export function formatDoctorReport(report: DoctorReport): string {
       continue;
     }
     lines.push(`- ${item.name}: ${item.version ?? 'unknown'} (${item.path})`);
+  }
+
+  if (report.detectedAppType !== 'unknown') {
+    lines.push('', `Detected app type: ${report.detectedAppType}`);
   }
 
   lines.push('', 'Config:');
@@ -244,7 +362,8 @@ export function runDoctor(): number {
     config?.skills ?? [],
     config?.languages ?? [],
     config?.paths ?? {},
-    CLI_NAMES.map((name) => detectInstalledCli(name))
+    CLI_NAMES.map((name) => detectInstalledCli(name)),
+    detectAppType(projectRoot)
   );
   process.stdout.write(formatDoctorReport(report));
   return 0;
