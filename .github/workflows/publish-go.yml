@@ -45,6 +45,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.24.x'
+          cache-dependency-path: packages/ballast-go/go.mod
 
       - name: Verify build
         run: |
@@ -79,6 +80,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.24.x'
+          cache-dependency-path: packages/ballast-go/go.mod
 
       - name: Verify build
         run: |
