@@ -820,11 +820,19 @@ export async function runInstall(
   const { targets, agents, skills } = resolved;
 
   // Resolve taskSystem: flag overrides config; prompt interactively when tasks agent is selected and not in CI.
-  const taskSystemFromFlag =
-    options.taskSystem &&
-    (TASK_SYSTEMS as readonly string[]).includes(options.taskSystem)
-      ? (options.taskSystem as TaskSystem)
-      : undefined;
+  const normalizedTaskSystem = options.taskSystem?.trim().toLowerCase();
+  if (
+    normalizedTaskSystem &&
+    !(TASK_SYSTEMS as readonly string[]).includes(normalizedTaskSystem)
+  ) {
+    console.error(
+      `Invalid --task-system value: "${normalizedTaskSystem}". Valid values: ${TASK_SYSTEMS.join(', ')}`
+    );
+    return 1;
+  }
+  const taskSystemFromFlag = normalizedTaskSystem
+    ? (normalizedTaskSystem as TaskSystem)
+    : undefined;
   let resolvedTaskSystem: TaskSystem | undefined =
     taskSystemFromFlag ?? priorConfig?.taskSystem ?? undefined;
   if (agents.includes('tasks')) {

@@ -537,6 +537,22 @@ alwaysApply: false
         /Unknown target/
       );
     });
+
+    test('tasks task-system with variables resolves {{taskSystem}} in templates', () => {
+      for (const target of ['cursor', 'claude', 'opencode', 'codex'] as const) {
+        const result = buildContent(
+          'tasks',
+          target,
+          'task-system',
+          'typescript',
+          {
+            variables: { taskSystem: 'jira' }
+          }
+        );
+        expect(result).not.toContain('{{taskSystem}}');
+        expect(result).toContain('jira');
+      }
+    });
   });
 
   describe('getDestination', () => {

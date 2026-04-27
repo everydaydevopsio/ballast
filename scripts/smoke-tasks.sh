@@ -52,6 +52,13 @@ assert_rule_file_contains() {
     fail "Expected '${text}' in ${file}"
 }
 
+assert_rule_file_not_contains() {
+  local file="$1"
+  local text="$2"
+  grep -qF "${text}" "${file}" && \
+    fail "Expected '${text}' to be absent in ${file}" || true
+}
+
 make_project() {
   local dir="$1"
   mkdir -p "${dir}"
@@ -97,7 +104,8 @@ test_tasks_default_github() {
     [ -f "${rule_file}" ] || \
       fail "Expected task-system rule file at ${rule_file}"
     assert_rule_file_contains "${rule_file}" "github"
-    pass "step 2 (${target}): task-system rule file contains 'github'"
+    assert_rule_file_not_contains "${rule_file}" "{{taskSystem}}"
+    pass "step 2 (${target}): task-system rule file contains 'github' and has no unresolved {{taskSystem}}"
   done
 
   echo "  ✓ test_tasks_default_github passed for all targets"
@@ -123,7 +131,8 @@ test_tasks_jira() {
     [ -f "${rule_file}" ] || \
       fail "Expected task-system rule file at ${rule_file}"
     assert_rule_file_contains "${rule_file}" "jira"
-    pass "step 2 (${target}): task-system rule file contains 'jira'"
+    assert_rule_file_not_contains "${rule_file}" "{{taskSystem}}"
+    pass "step 2 (${target}): task-system rule file contains 'jira' and has no unresolved {{taskSystem}}"
   done
 
   echo "  ✓ test_tasks_jira passed for all targets"
@@ -149,7 +158,8 @@ test_tasks_linear() {
     [ -f "${rule_file}" ] || \
       fail "Expected task-system rule file at ${rule_file}"
     assert_rule_file_contains "${rule_file}" "linear"
-    pass "step 2 (${target}): task-system rule file contains 'linear'"
+    assert_rule_file_not_contains "${rule_file}" "{{taskSystem}}"
+    pass "step 2 (${target}): task-system rule file contains 'linear' and has no unresolved {{taskSystem}}"
   done
 
   echo "  ✓ test_tasks_linear passed for all targets"
