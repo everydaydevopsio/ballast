@@ -1,6 +1,6 @@
 {
   "name": "@everydaydevopsio/ballast",
-  "version": "5.8.0",
+  "version": "5.8.1",
   "description": "CLI to install AI agent rules for docs, local-dev, CI/CD, observability, publishing, linting, logging, and testing for Cursor, Claude Code, OpenCode, and Codex",
   "main": "dist/cli.js",
   "bin": {
