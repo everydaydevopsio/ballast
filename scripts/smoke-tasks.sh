@@ -70,10 +70,10 @@ tasks_rule_file() {
   local target="$2"
   local suffix="$3"  # "task-system" or "todo"
   case "${target}" in
-    cursor)  echo "${dir}/.cursor/rules/common-tasks-${suffix}.mdc" ;;
-    claude)  echo "${dir}/.claude/rules/common/tasks-${suffix}.md" ;;
-    opencode) echo "${dir}/.opencode/common-tasks-${suffix}.md" ;;
-    codex)   echo "${dir}/.codex/rules/common-tasks-${suffix}.md" ;;
+    cursor)   echo "${dir}/.cursor/rules/tasks-${suffix}.mdc" ;;
+    claude)   echo "${dir}/.claude/rules/tasks-${suffix}.md" ;;
+    opencode) echo "${dir}/.opencode/tasks-${suffix}.md" ;;
+    codex)    echo "${dir}/.codex/rules/tasks-${suffix}.md" ;;
   esac
 }
 
