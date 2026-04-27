@@ -261,6 +261,11 @@ func run(args []string) int {
 				fmt.Println(err)
 				return 1
 			}
+			// Merge taskSystem written by backend invocations (e.g. on a fresh
+			// install where plan.Config.TaskSystem starts empty).
+			if plan.Config.TaskSystem == "" {
+				plan.Config.TaskSystem = readTaskSystem(root)
+			}
 			if err := saveMonorepoConfig(root, plan.Config); err != nil {
 				fmt.Println(err)
 				return 1
@@ -1688,6 +1693,23 @@ func loadMonorepoConfig(root string) (*monorepoConfig, error) {
 		return nil, nil
 	}
 	return &config, nil
+}
+
+// readTaskSystem reads only the taskSystem field from .rulesrc.json.
+// It does not validate Languages/Paths so it works on configs written by a
+// single-language backend invocation during a fresh monorepo install.
+func readTaskSystem(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		return ""
+	}
+	var raw struct {
+		TaskSystem string `json:"taskSystem"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return ""
+	}
+	return raw.TaskSystem
 }
 
 func saveMonorepoConfig(root string, config monorepoConfig) error {
