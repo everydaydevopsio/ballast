@@ -47,7 +47,7 @@ jobs:
       contents: read
       packages: write        # required for GHCR; remove for Docker Hub
     outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
+      image_tag: sha-${{ github.sha }}
       image_digest: ${{ steps.push.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
@@ -98,6 +98,9 @@ jobs:
           repository: OWNER/helm-charts   # your Helm chart repo
           token: ${{ secrets.HELM_CHART_REPO_TOKEN }}
           path: helm-charts
+
+      - name: Install yq
+        uses: mikefarah/yq@v4
 
       - name: Update image digest in values.yaml
         run: |

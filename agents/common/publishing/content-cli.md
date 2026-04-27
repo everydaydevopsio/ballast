@@ -169,7 +169,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: '~> v2'
+          version: 'v2.14.0'       # pin to an explicit version; check for the latest at github.com/goreleaser/goreleaser/releases
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

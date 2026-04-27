@@ -27,7 +27,7 @@ Add a `brews` section to your `.goreleaser.yaml`:
 brews:
   - name: <your-cli-name>
     ids:
-      - <your-cli-name>       # must match the archive id in your builds section
+      - <your-cli-name>       # must match the archive id in your archives section
     homepage: https://github.com/OWNER/REPO
     description: One-line description of what the CLI does.
     license: MIT
