@@ -22,6 +22,7 @@ describe('agents', () => {
       expect(listAgents()).toContain('observability');
       expect(listAgents()).toContain('publishing');
       expect(listAgents()).toContain('git-hooks');
+      expect(listAgents()).toContain('tasks');
       expect(listAgents()).toContain('testing');
     });
   });
@@ -48,6 +49,7 @@ describe('agents', () => {
       expect(isValidAgent('observability')).toBe(true);
       expect(isValidAgent('publishing')).toBe(true);
       expect(isValidAgent('git-hooks')).toBe(true);
+      expect(isValidAgent('tasks')).toBe(true);
       expect(isValidAgent('testing')).toBe(true);
     });
 

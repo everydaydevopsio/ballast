@@ -34,7 +34,10 @@ import {
   saveConfig,
   isCiMode,
   parseTargets,
-  type Target
+  TASK_SYSTEMS,
+  DEFAULT_TASK_SYSTEM,
+  type Target,
+  type TaskSystem
 } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -227,6 +230,21 @@ async function promptSkills(
   return resolved;
 }
 
+async function promptTaskSystem(): Promise<TaskSystem> {
+  const line = await prompt(
+    `Task system (${TASK_SYSTEMS.join(', ')}) [${DEFAULT_TASK_SYSTEM}]: `
+  );
+  if (!line) return DEFAULT_TASK_SYSTEM;
+  const token = line.trim().toLowerCase();
+  if ((TASK_SYSTEMS as readonly string[]).includes(token)) {
+    return token as TaskSystem;
+  }
+  console.error(
+    `Invalid task system. Choose one of: ${TASK_SYSTEMS.join(', ')}`
+  );
+  return promptTaskSystem();
+}
+
 export interface ResolveTargetAndAgentsOptions {
   projectRoot?: string;
   target?: string;
@@ -333,6 +351,7 @@ export interface InstallOptions {
   patchClaudeMd?: boolean;
   patchGeminiMd?: boolean;
   saveConfig?: boolean;
+  taskSystem?: TaskSystem;
 }
 
 export interface InstallResult {
@@ -455,7 +474,8 @@ export function install(options: InstallOptions): InstallResult {
     patch = false,
     patchClaudeMd = false,
     patchGeminiMd = false,
-    saveConfig: persist
+    saveConfig: persist,
+    taskSystem
   } = options;
   const effectiveAgents = withImplicitAgents(agents);
   const installed: string[] = [];
@@ -479,6 +499,11 @@ export function install(options: InstallOptions): InstallResult {
     });
   }
 
+  // Resolve the task system: use provided value, fall back to existing config, then default.
+  const existingConfig = loadConfig(projectRoot, language);
+  const resolvedTaskSystem =
+    taskSystem ?? existingConfig?.taskSystem ?? DEFAULT_TASK_SYSTEM;
+
   if (persist) {
     saveConfig(
       {
@@ -486,7 +511,10 @@ export function install(options: InstallOptions): InstallResult {
         agents: effectiveAgents,
         skills,
         ballastVersion: BALLAST_VERSION,
-        languages: [language]
+        languages: [language],
+        taskSystem: effectiveAgents.includes('tasks')
+          ? resolvedTaskSystem
+          : (taskSystem ?? existingConfig?.taskSystem)
       },
       projectRoot
     );
@@ -521,12 +549,20 @@ export function install(options: InstallOptions): InstallResult {
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
+        const buildVariables: Record<string, string> =
+          agentId === 'tasks' ? { taskSystem: resolvedTaskSystem } : {};
         const content = buildContent(
           agentId,
           target,
           ruleSuffix || undefined,
           language,
-          { hookMode }
+          {
+            hookMode,
+            variables:
+              Object.keys(buildVariables).length > 0
+                ? buildVariables
+                : undefined
+          }
         );
         if (fileExists && !force && !patch) {
           agentSkipped = true;
@@ -728,6 +764,7 @@ export interface RunInstallOptions {
   force?: boolean;
   patch?: boolean;
   yes?: boolean;
+  taskSystem?: string;
 }
 
 async function promptYesNo(
@@ -781,6 +818,31 @@ export async function runInstall(
   }
 
   const { targets, agents, skills } = resolved;
+
+  // Resolve taskSystem: flag overrides config; prompt interactively when tasks agent is selected and not in CI.
+  const normalizedTaskSystem = options.taskSystem?.trim().toLowerCase();
+  if (
+    normalizedTaskSystem &&
+    !(TASK_SYSTEMS as readonly string[]).includes(normalizedTaskSystem)
+  ) {
+    console.error(
+      `Invalid --task-system value: "${normalizedTaskSystem}". Valid values: ${TASK_SYSTEMS.join(', ')}`
+    );
+    return 1;
+  }
+  const taskSystemFromFlag = normalizedTaskSystem
+    ? (normalizedTaskSystem as TaskSystem)
+    : undefined;
+  let resolvedTaskSystem: TaskSystem | undefined =
+    taskSystemFromFlag ?? priorConfig?.taskSystem ?? undefined;
+  if (agents.includes('tasks')) {
+    if (isCiMode() || options.yes || taskSystemFromFlag) {
+      resolvedTaskSystem = resolvedTaskSystem ?? DEFAULT_TASK_SYSTEM;
+    } else {
+      resolvedTaskSystem = await promptTaskSystem();
+    }
+  }
+
   const explicitAgentSelection =
     Boolean(options.all) || options.agents !== undefined;
   const agentsToPersist =
@@ -793,7 +855,8 @@ export async function runInstall(
       agents: agentsToPersist,
       skills,
       ballastVersion: BALLAST_VERSION,
-      languages: [language]
+      languages: [language],
+      taskSystem: resolvedTaskSystem
     },
     projectRoot
   );
@@ -833,7 +896,8 @@ export async function runInstall(
       patch: options.patch ?? false,
       patchClaudeMd,
       patchGeminiMd,
-      saveConfig: false
+      saveConfig: false,
+      taskSystem: resolvedTaskSystem
     });
 
     if (result.errors.length > 0) {

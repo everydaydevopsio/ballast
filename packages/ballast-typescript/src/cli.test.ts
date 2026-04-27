@@ -45,7 +45,8 @@ describe('parseArgs', () => {
       allSkills: false,
       force: false,
       patch: false,
-      yes: false
+      yes: false,
+      taskSystem: ''
     });
   });
 
@@ -68,7 +69,8 @@ describe('parseArgs', () => {
       allSkills: true,
       force: false,
       patch: false,
-      yes: false
+      yes: false,
+      taskSystem: ''
     });
   });
 
@@ -94,7 +96,36 @@ describe('parseArgs', () => {
       allSkills: false,
       force: false,
       patch: false,
-      yes: false
+      yes: false,
+      taskSystem: ''
+    });
+  });
+
+  test('parses --task-system flag', () => {
+    expect(
+      parseArgs([
+        'node',
+        'ballast-typescript',
+        'install',
+        '--target',
+        'cursor',
+        '--agent',
+        'tasks',
+        '--task-system',
+        'jira',
+        '--yes'
+      ])
+    ).toEqual({
+      targets: ['cursor'],
+      agents: ['tasks'],
+      skills: [],
+      language: 'typescript',
+      all: false,
+      allSkills: false,
+      force: false,
+      patch: false,
+      yes: true,
+      taskSystem: 'jira'
     });
   });
 });

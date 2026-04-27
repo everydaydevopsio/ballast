@@ -21,6 +21,7 @@ type HookMode = 'standalone' | 'monorepo';
 
 interface BuildOptions {
   hookMode?: HookMode;
+  variables?: Record<string, string>;
 }
 
 interface SkillEntry {
@@ -270,12 +271,13 @@ export function getContent(
   if (!fs.existsSync(file)) {
     throw new Error(`Agent "${agentId}" has no ${basename}`);
   }
-  return applyHookGuidance(
-    fs.readFileSync(file, 'utf8'),
-    agentId,
-    language,
-    options
-  );
+  let raw = fs.readFileSync(file, 'utf8');
+  if (options?.variables) {
+    for (const [key, value] of Object.entries(options.variables)) {
+      raw = raw.replaceAll(`{{${key}}}`, value);
+    }
+  }
+  return applyHookGuidance(raw, agentId, language, options);
 }
 
 /**
@@ -869,20 +871,32 @@ export function buildContent(
   language: Language = 'typescript',
   options?: BuildOptions
 ): string {
+  let result: string;
   switch (target) {
     case 'cursor':
-      return buildCursorFormat(agentId, ruleSuffix, language, options);
+      result = buildCursorFormat(agentId, ruleSuffix, language, options);
+      break;
     case 'claude':
-      return buildClaudeFormat(agentId, ruleSuffix, language, options);
+      result = buildClaudeFormat(agentId, ruleSuffix, language, options);
+      break;
     case 'gemini':
-      return buildGeminiFormat(agentId, ruleSuffix, language, options);
+      result = buildGeminiFormat(agentId, ruleSuffix, language, options);
+      break;
     case 'opencode':
-      return buildOpenCodeFormat(agentId, ruleSuffix, language, options);
+      result = buildOpenCodeFormat(agentId, ruleSuffix, language, options);
+      break;
     case 'codex':
-      return buildCodexFormat(agentId, ruleSuffix, language, options);
+      result = buildCodexFormat(agentId, ruleSuffix, language, options);
+      break;
     default:
       throw new Error(`Unknown target: ${target}`);
   }
+  if (options?.variables) {
+    for (const [key, value] of Object.entries(options.variables)) {
+      result = result.replaceAll(`{{${key}}}`, value);
+    }
+  }
+  return result;
 }
 
 /**

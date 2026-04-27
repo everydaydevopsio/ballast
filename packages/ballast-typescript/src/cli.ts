@@ -4,6 +4,7 @@ import { runInstall } from './install';
 import { LANGUAGES, Language, AGENT_IDS, SKILL_IDS } from './agents';
 import { runDoctor } from './doctor';
 import { BALLAST_VERSION } from './version';
+import { TASK_SYSTEMS } from './config';
 
 export interface CliOptions {
   targets: string[];
@@ -15,6 +16,7 @@ export interface CliOptions {
   force: boolean;
   patch: boolean;
   yes: boolean;
+  taskSystem: string;
 }
 
 export type ParseArgsResult =
@@ -42,7 +44,8 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     allSkills: false,
     force: false,
     patch: false,
-    yes: false
+    yes: false,
+    taskSystem: ''
   };
   let i = 0;
   while (i < args.length) {
@@ -108,6 +111,12 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       i++;
       continue;
     }
+    if (arg === '--task-system') {
+      const value = args[++i];
+      if (value) options.taskSystem = value.trim().toLowerCase();
+      i++;
+      continue;
+    }
     if (arg === '--help' || arg === '-h') {
       return { help: true };
     }
@@ -138,6 +147,7 @@ Options:
   --skill, -s <skills>      Skill(s) to install (comma-separated); run 'list' to see available skills
   --all                     Install all agents
   --all-skills              Install all skills
+  --task-system <system>    Task system for the tasks agent: ${TASK_SYSTEMS.join(', ')} (default: github)
   --force, -f               Overwrite existing rule files
   --patch, -p               Merge upstream rule updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -225,7 +235,8 @@ export async function main(): Promise<void> {
     language: cliOptions.language as Language,
     targets: cliOptions.targets,
     agents: cliOptions.agents.length > 0 ? cliOptions.agents : undefined,
-    skills: cliOptions.skills.length > 0 ? cliOptions.skills : undefined
+    skills: cliOptions.skills.length > 0 ? cliOptions.skills : undefined,
+    taskSystem: cliOptions.taskSystem || undefined
   };
 
   const exitCode = await runInstall(normalizedOptions);

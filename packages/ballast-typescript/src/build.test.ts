@@ -88,9 +88,37 @@ describe('build', () => {
 
     test('returns mcp content for local-dev with ruleSuffix mcp', () => {
       const content = getContent('local-dev', 'mcp');
-      expect(content).toContain('GitHub MCP');
-      expect(content).toContain('Jira');
-      expect(content).toContain('Linear');
+      expect(content).toContain('tasks');
+      expect(content).toContain('ballast install');
+    });
+
+    test('returns tasks task-system content with default variable substitution', () => {
+      const content = getContent('tasks', 'task-system', 'typescript', {
+        variables: { taskSystem: 'github' }
+      });
+      expect(content).toContain('github');
+      expect(content).toContain('MCP Server Setup');
+      expect(content).not.toContain('{{taskSystem}}');
+    });
+
+    test('returns tasks task-system content with linear substituted', () => {
+      const content = getContent('tasks', 'task-system', 'typescript', {
+        variables: { taskSystem: 'linear' }
+      });
+      expect(content).toContain('linear');
+      expect(content).not.toContain('{{taskSystem}}');
+    });
+
+    test('returns tasks todo content', () => {
+      const content = getContent('tasks', 'todo');
+      expect(content).toContain('tasks/TODO.md');
+      expect(content).toContain('triage');
+      expect(content).not.toContain('{{taskSystem}}');
+    });
+
+    test('returns tasks task-system content unsubstituted when no variables', () => {
+      const content = getContent('tasks', 'task-system');
+      expect(content).toContain('{{taskSystem}}');
     });
 
     test('returns docs content', () => {
@@ -508,6 +536,22 @@ alwaysApply: false
       expect(() => buildContent('linting', 'unknown' as 'cursor')).toThrow(
         /Unknown target/
       );
+    });
+
+    test('tasks task-system with variables resolves {{taskSystem}} in templates', () => {
+      for (const target of ['cursor', 'claude', 'opencode', 'codex'] as const) {
+        const result = buildContent(
+          'tasks',
+          target,
+          'task-system',
+          'typescript',
+          {
+            variables: { taskSystem: 'jira' }
+          }
+        );
+        expect(result).not.toContain('{{taskSystem}}');
+        expect(result).toContain('jira');
+      }
     });
   });
 
