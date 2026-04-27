@@ -18,6 +18,9 @@ concurrency:
   group: publish-python-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   validate_cross_language:
     uses: ./.github/workflows/cross-language-validate.yml
