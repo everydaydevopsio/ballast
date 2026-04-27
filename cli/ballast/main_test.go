@@ -2912,6 +2912,103 @@ func TestRunMonorepoRemoveTargetDoesNotPersistConfigWhenCleanupFails(t *testing.
 	}
 }
 
+// TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend asserts that a
+// taskSystem value written to .rulesrc.json by a backend invocation (simulating
+// what ballast-typescript does after prompting the user) is not clobbered by
+// the final saveMonorepoConfig call.
+func TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["cursor"],
+  "agents": ["tasks", "linting"],
+  "languages": ["typescript"],
+  "paths": {"typescript": ["apps/frontend"]}
+}`)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	callCount := 0
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		callCount++
+		// Simulate the common backend invocation writing taskSystem to .rulesrc.json
+		// after prompting the user (as ballast-typescript does).
+		if callCount == 1 {
+			mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["cursor"],
+  "agents": ["tasks", "linting"],
+  "taskSystem": "github",
+  "languages": ["typescript"],
+  "paths": {"typescript": ["apps/frontend"]}
+}`)
+		}
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--target", "cursor", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	if !strings.Contains(string(config), `"taskSystem": "github"`) {
+		t.Fatalf("expected taskSystem to be preserved in final .rulesrc.json, got %q", string(config))
+	}
+}
+
+// TestRunMonorepoInstallPreservesTaskSystemFromExistingConfig asserts that a
+// taskSystem already present in .rulesrc.json before the install runs is
+// carried through into the final saved config.
+func TestRunMonorepoInstallPreservesTaskSystemFromExistingConfig(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["cursor"],
+  "agents": ["tasks", "linting"],
+  "taskSystem": "linear",
+  "languages": ["typescript"],
+  "paths": {"typescript": ["apps/frontend"]}
+}`)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--target", "cursor", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	if !strings.Contains(string(config), `"taskSystem": "linear"`) {
+		t.Fatalf("expected taskSystem to be preserved from existing config, got %q", string(config))
+	}
+}
+
 func TestPatchInstalledRulesSectionIgnoresHeadingInsideCodeFence(t *testing.T) {
 	existing := "# CLAUDE.md\n\n```md\n## Installed agent rules\n```\n\n## Installed agent rules\n\n- `.claude/rules/old.md` — Old rule\n"
 	canonical := "# CLAUDE.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.claude/rules/typescript-linting.md` — Rules for typescript/linting\n"

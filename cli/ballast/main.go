@@ -137,6 +137,7 @@ type monorepoConfig struct {
 	BallastVersion string              `json:"ballastVersion,omitempty"`
 	Languages      []string            `json:"languages,omitempty"`
 	Paths          map[string][]string `json:"paths,omitempty"`
+	TaskSystem     string              `json:"taskSystem,omitempty"`
 }
 
 type repoProfile struct {
@@ -259,6 +260,11 @@ func run(args []string) int {
 			if err := updateMonorepoSupportFiles(root, plan, forwardedArgs); err != nil {
 				fmt.Println(err)
 				return 1
+			}
+			// Merge taskSystem written by backend invocations (e.g. on a fresh
+			// install where plan.Config.TaskSystem starts empty).
+			if plan.Config.TaskSystem == "" {
+				plan.Config.TaskSystem = readTaskSystem(root)
 			}
 			if err := saveMonorepoConfig(root, plan.Config); err != nil {
 				fmt.Println(err)
@@ -1585,6 +1591,10 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, err
 	}
 
+	var savedTaskSystem string
+	if config != nil {
+		savedTaskSystem = config.TaskSystem
+	}
 	configToSave := monorepoConfig{
 		Targets:        savedTargets,
 		Agents:         persistAgents,
@@ -1592,6 +1602,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		BallastVersion: normalizeVersion(resolveVersion()),
 		Languages:      make([]string, 0, len(profiles)),
 		Paths:          map[string][]string{},
+		TaskSystem:     savedTaskSystem,
 	}
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
@@ -1682,6 +1693,23 @@ func loadMonorepoConfig(root string) (*monorepoConfig, error) {
 		return nil, nil
 	}
 	return &config, nil
+}
+
+// readTaskSystem reads only the taskSystem field from .rulesrc.json.
+// It does not validate Languages/Paths so it works on configs written by a
+// single-language backend invocation during a fresh monorepo install.
+func readTaskSystem(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		return ""
+	}
+	var raw struct {
+		TaskSystem string `json:"taskSystem"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return ""
+	}
+	return raw.TaskSystem
 }
 
 func saveMonorepoConfig(root string, config monorepoConfig) error {
