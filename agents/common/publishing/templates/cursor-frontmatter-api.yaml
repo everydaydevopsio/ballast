@@ -1,0 +1,7 @@
+description: 'REST API publishing specialist - Docker CD with Kubernetes health probes and Helm chart update'
+alwaysApply: false
+globs:
+  - 'Dockerfile'
+  - '.github/workflows/**'
+  - 'charts/**'
+  - 'README*'
