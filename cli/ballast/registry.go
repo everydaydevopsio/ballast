@@ -59,6 +59,7 @@ var agentRegistry = []agentEntry{
 	{ID: "observability", Kind: kindCommon, Status: statusActive},
 	{ID: "publishing", Kind: kindCommon, Status: statusActive},
 	{ID: "git-hooks", Kind: kindCommon, Status: statusActive},
+	{ID: "tasks", Kind: kindCommon, Status: statusActive},
 
 	// Language agents — installed once per language sub-project.
 	{ID: "linting", Kind: kindLanguage, Status: statusActive},

@@ -21,6 +21,7 @@ type HookMode = 'standalone' | 'monorepo';
 
 interface BuildOptions {
   hookMode?: HookMode;
+  variables?: Record<string, string>;
 }
 
 interface SkillEntry {
@@ -270,12 +271,13 @@ export function getContent(
   if (!fs.existsSync(file)) {
     throw new Error(`Agent "${agentId}" has no ${basename}`);
   }
-  return applyHookGuidance(
-    fs.readFileSync(file, 'utf8'),
-    agentId,
-    language,
-    options
-  );
+  let raw = fs.readFileSync(file, 'utf8');
+  if (options?.variables) {
+    for (const [key, value] of Object.entries(options.variables)) {
+      raw = raw.replaceAll(`{{${key}}}`, value);
+    }
+  }
+  return applyHookGuidance(raw, agentId, language, options);
 }
 
 /**

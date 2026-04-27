@@ -1,0 +1,8 @@
+---
+description: 'Branch-local TODO tracking - manage tasks/TODO.md and triage before PR'
+alwaysApply: false
+globs:
+  - 'tasks/TODO.md'
+  - '**/AGENTS.md'
+  - '**/CLAUDE.md'
+---

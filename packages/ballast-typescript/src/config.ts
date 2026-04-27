@@ -5,8 +5,11 @@ import { LANGUAGES } from './agents';
 const RULESRC_FILENAME = '.rulesrc.json';
 const LEGACY_TYPESCRIPT_RULESRC_FILENAME = '.rulesrc.ts.json';
 const TARGETS = ['cursor', 'claude', 'opencode', 'codex', 'gemini'] as const;
+export const TASK_SYSTEMS = ['github', 'jira', 'linear'] as const;
+export const DEFAULT_TASK_SYSTEM = 'github' as const;
 
 export type Target = (typeof TARGETS)[number];
+export type TaskSystem = (typeof TASK_SYSTEMS)[number];
 
 export interface RulesConfig {
   targets: Target[];
@@ -15,6 +18,7 @@ export interface RulesConfig {
   ballastVersion?: string;
   languages?: string[];
   paths?: Record<string, string[]>;
+  taskSystem?: TaskSystem;
 }
 
 export function getRulesrcFilename(): string {
@@ -153,6 +157,11 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     };
   }
 
+  const taskSystem = config.taskSystem ?? existing?.taskSystem;
+  if (taskSystem) {
+    nextConfig = { ...nextConfig, taskSystem };
+  }
+
   fs.writeFileSync(filePath, JSON.stringify(nextConfig, null, 2), 'utf8');
 }
 
@@ -177,6 +186,7 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     ballastVersion?: unknown;
     languages?: unknown;
     paths?: unknown;
+    taskSystem?: unknown;
   };
   const targets = normalizeTargets(record.targets ?? record.target);
   if (targets.length === 0 || !Array.isArray(record.agents)) {
@@ -212,6 +222,12 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
           : []
       )
     );
+  }
+  if (
+    typeof record.taskSystem === 'string' &&
+    (TASK_SYSTEMS as readonly string[]).includes(record.taskSystem)
+  ) {
+    config.taskSystem = record.taskSystem as TaskSystem;
   }
   return config;
 }

@@ -8,7 +8,9 @@ import {
   isCiMode,
   RULESRC_FILENAME,
   getLegacyRulesrcFilename,
-  parseTargets
+  parseTargets,
+  TASK_SYSTEMS,
+  DEFAULT_TASK_SYSTEM
 } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -233,6 +235,64 @@ describe('config', () => {
       );
       expect(parsed.targets).toEqual(['cursor', 'claude']);
       expect(parsed.target).toBeUndefined();
+    });
+  });
+
+  describe('taskSystem', () => {
+    test('TASK_SYSTEMS contains github, jira, linear', () => {
+      expect(TASK_SYSTEMS).toContain('github');
+      expect(TASK_SYSTEMS).toContain('jira');
+      expect(TASK_SYSTEMS).toContain('linear');
+    });
+
+    test('DEFAULT_TASK_SYSTEM is github', () => {
+      expect(DEFAULT_TASK_SYSTEM).toBe('github');
+    });
+
+    test('saves and loads taskSystem', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['tasks'],
+          ballastVersion: BALLAST_VERSION,
+          taskSystem: 'linear'
+        },
+        tmpDir
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.taskSystem).toBe('linear');
+    });
+
+    test('loads config without taskSystem field', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({ targets: ['claude'], agents: ['local-dev'] })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.taskSystem).toBeUndefined();
+    });
+
+    test('ignores invalid taskSystem value', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['tasks'],
+          taskSystem: 'notion'
+        })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.taskSystem).toBeUndefined();
+    });
+
+    test('preserves existing taskSystem when saving without one', () => {
+      saveConfig(
+        { targets: ['claude'], agents: ['tasks'], taskSystem: 'jira' },
+        tmpDir
+      );
+      saveConfig({ targets: ['cursor'], agents: ['tasks'] }, tmpDir);
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.taskSystem).toBe('jira');
     });
   });
 
