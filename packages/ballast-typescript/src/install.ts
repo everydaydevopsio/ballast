@@ -838,7 +838,7 @@ export async function runInstall(
   if (agents.includes('tasks')) {
     if (isCiMode() || options.yes || taskSystemFromFlag) {
       resolvedTaskSystem = resolvedTaskSystem ?? DEFAULT_TASK_SYSTEM;
-    } else {
+    } else if (resolvedTaskSystem === undefined) {
       resolvedTaskSystem = await promptTaskSystem();
     }
   }

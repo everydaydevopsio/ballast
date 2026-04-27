@@ -137,6 +137,7 @@ type monorepoConfig struct {
 	BallastVersion string              `json:"ballastVersion,omitempty"`
 	Languages      []string            `json:"languages,omitempty"`
 	Paths          map[string][]string `json:"paths,omitempty"`
+	TaskSystem     string              `json:"taskSystem,omitempty"`
 }
 
 type repoProfile struct {
@@ -1585,6 +1586,10 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, err
 	}
 
+	var savedTaskSystem string
+	if config != nil {
+		savedTaskSystem = config.TaskSystem
+	}
 	configToSave := monorepoConfig{
 		Targets:        savedTargets,
 		Agents:         persistAgents,
@@ -1592,6 +1597,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		BallastVersion: normalizeVersion(resolveVersion()),
 		Languages:      make([]string, 0, len(profiles)),
 		Paths:          map[string][]string{},
+		TaskSystem:     savedTaskSystem,
 	}
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
