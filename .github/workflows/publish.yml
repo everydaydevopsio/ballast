@@ -236,7 +236,7 @@ jobs:
       - name: Set up App Store Connect API key
         run: |
           mkdir -p ~/.private_keys
-          printf '%s' "$APPLE_API_KEY_CONTENT" | base64 --decode \
+          printf '%s' "$APPLE_API_KEY_CONTENT" | base64 -D \
             > ~/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
           chmod 600 ~/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
         env:
