@@ -24,6 +24,11 @@ builds:
     ignore:
       - goos: windows
         goarch: arm64
+    hooks:
+      post:
+        - cmd: sh -c '[ "{{ .Os }}" = "darwin" ] && codesign --sign "{{ .Env.APPLE_SIGNING_IDENTITY }}" --options runtime --timestamp "{{ .Path }}" || true'
+          env:
+            - APPLE_SIGNING_IDENTITY={{ .Env.APPLE_SIGNING_IDENTITY }}
 
 archives:
   - id: ballast

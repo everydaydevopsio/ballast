@@ -210,7 +210,7 @@ jobs:
     if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
     needs:
       - bump_and_tag
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       contents: write
 
@@ -226,6 +226,22 @@ jobs:
         with:
           go-version: '1.24.x'
 
+      - name: Import Developer ID certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Set up App Store Connect API key
+        run: |
+          mkdir -p ~/.private_keys
+          printf '%s' "$APPLE_API_KEY_CONTENT" | base64 -D \
+            > ~/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+          chmod 600 ~/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+
       - name: Verify build
         run: |
           cd cli/ballast
@@ -240,3 +256,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+      - name: Notarize darwin release archives
+        run: |
+          VERSION="${{ needs.bump_and_tag.outputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          for ARCH in amd64 arm64; do
+            ARCHIVE="dist/ballast_${VERSION}_darwin_${ARCH}.tar.gz"
+            WORKDIR="/tmp/notarize_${ARCH}"
+            mkdir -p "$WORKDIR"
+
+            tar -xzf "$ARCHIVE" -C "$WORKDIR" ballast
+            ditto -c -k --keepParent "$WORKDIR/ballast" "$WORKDIR/ballast.zip"
+
+            xcrun notarytool submit "$WORKDIR/ballast.zip" \
+              --key ~/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8 \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_KEY_ISSUER_ID" \
+              --wait \
+              --timeout 20m
+
+            echo "Notarized darwin/${ARCH}"
+          done
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_KEY_ISSUER_ID: ${{ secrets.APPLE_API_KEY_ISSUER_ID }}
