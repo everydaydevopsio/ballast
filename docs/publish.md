@@ -130,6 +130,53 @@ brew tap everydaydevopsio/ballast
 brew install --cask ballast
 ```
 
+## macOS Code Signing and Notarization
+
+macOS release artifacts are signed with a Developer ID Application certificate and notarized with Apple before the Homebrew cask is updated. This is required for Gatekeeper to accept the binary on macOS.
+
+### One-time Apple Developer setup
+
+1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/enroll) ($99/year)
+2. In **Keychain Access**, create a CSR: Keychain Access → Certificate Assistant → Request a Certificate From a Certificate Authority → save to disk
+3. At `developer.apple.com` → Certificates, IDs & Profiles → `+` → **Developer ID Application** → upload the CSR → download and double-click the `.cer` to install into the **login** keychain
+4. In Keychain Access → login → My Certificates, right-click the cert → **Export** → save as `.p12` with a strong password
+5. At `appstoreconnect.apple.com` → Users and Access → Integrations → App Store Connect API → `+` → Name: `Ballast Release`, Access: **Developer** → download the `.p8` (only available once)
+
+### Required GitHub secrets
+
+Add these to `everydaydevopsio/ballast` → Settings → Secrets and variables → Actions:
+
+| Secret | How to get it |
+|---|---|
+| `APPLE_CERTIFICATE` | `base64 -i certificate.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | password set when exporting the `.p12` |
+| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: Mark C Allen (TEAMID)` |
+| `APPLE_TEAM_ID` | shown at `developer.apple.com/account` |
+| `APPLE_API_KEY_ID` | Key ID from App Store Connect |
+| `APPLE_API_KEY_ISSUER_ID` | Issuer ID from App Store Connect |
+| `APPLE_API_KEY_CONTENT` | `base64 -i AuthKey_KEYID.p8` |
+
+### How it works in CI
+
+The `publish_cli` job in `publish.yml` and both jobs in `publish-cli.yml` run on `macos-latest` so that signing tools are available. The sequence is:
+
+1. **Import certificate** — `apple-actions/import-codesign-certs` installs the `.p12` into the runner keychain
+2. **GoReleaser build** — a `hooks.post` in `.goreleaser.yaml` calls `codesign` on each darwin binary immediately after compilation, before archiving
+3. **GoReleaser publish** — signed binaries are archived, SHA256 checksums computed, artifacts uploaded to GitHub Releases, and `Formula/ballast.rb` and `Casks/ballast.rb` updated with correct checksums
+4. **Notarization** — each darwin archive is submitted to Apple via `xcrun notarytool submit --wait`; Apple validates the signature and registers a ticket in their CDN so Gatekeeper's online check passes
+
+### Verifying a signed release locally
+
+```bash
+# Check signature
+codesign --verify --verbose $(which ballast)
+
+# Check Gatekeeper acceptance
+spctl --assess --verbose $(which ballast)
+```
+
+Both should succeed after a signed release is installed.
+
 ## Quick Checklist
 
 - Single-language publish workflows call the shared cross-language validation workflow before publishing.
