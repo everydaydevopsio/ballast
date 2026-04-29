@@ -161,13 +161,28 @@ ballast upgrade --force
 
 ```bash
 brew tap everydaydevopsio/ballast
-brew install --cask ballast
+brew install --cask everydaydevopsio/ballast/ballast
 ballast install --target cursor --all
+ballast doctor
+ballast install-cli --language python
+ballast upgrade
+ballast upgrade --patch
+ballast upgrade --force
+```
+
+For existing installs, use one of:
+
+```bash
+brew upgrade --cask everydaydevopsio/ballast/ballast
+# or
+brew reinstall --cask everydaydevopsio/ballast/ballast
 ```
 
 ### Homebrew Troubleshooting
 
-If Homebrew still installs an older Ballast release after the tap has been updated, your local tap checkout is stale. Reset the tap to the latest `origin/HEAD`, then reinstall the fully qualified formula:
+If Homebrew still installs an older Ballast release after the tap has been updated, your local tap checkout is stale. Reset the tap to the latest `origin/HEAD`, then reinstall:
+
+**Linux (formula):**
 
 ```bash
 brew update-reset "$(brew --repository everydaydevopsio/ballast)"
@@ -175,7 +190,17 @@ brew info --formula everydaydevopsio/ballast/ballast
 brew reinstall --formula everydaydevopsio/ballast/ballast
 ```
 
+**macOS (cask):**
+
+```bash
+brew update-reset "$(brew --repository everydaydevopsio/ballast)"
+brew info --cask everydaydevopsio/ballast/ballast
+brew reinstall --cask everydaydevopsio/ballast/ballast
+```
+
 If the tap still does not refresh, remove and re-add it:
+
+**Linux:**
 
 ```bash
 brew untap everydaydevopsio/ballast
@@ -183,10 +208,18 @@ brew tap everydaydevopsio/ballast
 brew reinstall --formula everydaydevopsio/ballast/ballast
 ```
 
+**macOS:**
+
+```bash
+brew untap everydaydevopsio/ballast
+brew tap everydaydevopsio/ballast
+brew install --cask everydaydevopsio/ballast/ballast
+```
+
 Notes:
 
-- Use `everydaydevopsio/ballast/ballast` for the Linux formula. Plain `ballast` can collide with an unrelated Homebrew cask.
-- Verify the installed version with `brew info --formula everydaydevopsio/ballast/ballast` and `ballast --version`.
+- Always use the fully qualified name `everydaydevopsio/ballast/ballast` for both the Linux formula and the macOS cask. Plain `ballast` can resolve to an unrelated third-party package.
+- Verify the installed version with `ballast --version`.
 
 ### TypeScript (npm)
 
