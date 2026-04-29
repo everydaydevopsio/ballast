@@ -28,13 +28,14 @@ updates:
           - 'eslint*'
           - '@eslint/*'
           - '@typescript-eslint/*'
+          - 'typescript-eslint'
       prettier:
         patterns:
           - 'prettier*'
           - 'eslint-*-prettier'
       typescript:
         patterns:
-          - 'typescript*'
+          - 'typescript'
       jest:
         patterns:
           - 'jest*'
