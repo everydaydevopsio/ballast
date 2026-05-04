@@ -596,14 +596,8 @@ export function install(options: InstallOptions): InstallResult {
     }
     try {
       const { dir, file } = getSkillDestination(skillId, target, projectRoot);
-      const fileExists = fs.existsSync(file);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
-      }
-      if (fileExists && !force) {
-        skippedSkills.push(skillId);
-        processedSkillIds.add(skillId);
-        continue;
       }
       switch (target) {
         case 'cursor':

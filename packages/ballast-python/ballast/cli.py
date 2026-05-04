@@ -1566,10 +1566,6 @@ def install(
             continue
         try:
             dst = skill_destination(root, target, skill)
-            if dst.exists() and not force:
-                result.skipped_skills.append(skill)
-                processed_skills.append(skill)
-                continue
             dst.parent.mkdir(parents=True, exist_ok=True)
             if target == "cursor":
                 dst.write_text(

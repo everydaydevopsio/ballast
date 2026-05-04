@@ -819,13 +819,6 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
 				continue
 			}
-			if exists(file) && !opts.force {
-				if !contains(result.skippedSkills, skillID) {
-					result.skippedSkills = append(result.skippedSkills, skillID)
-				}
-				processedSkills[skillID] = struct{}{}
-				continue
-			}
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
 				continue

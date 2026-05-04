@@ -1,5 +1,13 @@
 # Lessons
 
+## 2026-04-29 Managed Skill Files Must Refresh on Upgrade
+- Incident/bug: `ballast upgrade` replayed saved skill selections but left existing skill files stale unless `--force` was passed.
+- Root cause pattern: Generated skill artifacts reused agent-rule overwrite semantics even though skills are Ballast-managed shipped content.
+- Early signal missed: Tests asserted existing skills were skipped instead of asserting refresh behavior for managed artifacts.
+- Preventative rule: When adding generated managed assets, test refresh/upgrade semantics separately from user-editable rule patch semantics.
+- Validation added (test/check/alert): Cross-backend unit tests plus wrapper upgrade smoke coverage for stale skill refresh.
+- Next trigger to detect sooner: During PR review, verify whether an installed artifact is user-owned or managed before reusing skip/force behavior.
+
 ## 2026-03-02 Installer Asset Location Must Be Package-Safe
 - Incident/bug: Installers assumed repo-relative `agents/` paths, breaking packaged installs.
 - Root cause pattern: Runtime path resolution relied on monorepo layout instead of shipped assets.

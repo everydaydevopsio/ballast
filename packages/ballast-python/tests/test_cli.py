@@ -302,6 +302,30 @@ class PatchInstallTests(unittest.TestCase):
             self.assertTrue(skill.exists())
             self.assertTrue(skill.read_bytes().startswith(b"PK\x03\x04"))
 
+    def test_install_refreshes_existing_managed_skill_without_force(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / ".opencode" / "skills" / "owasp-security-scan.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("stale skill content", encoding="utf-8")
+
+            result = cli.install(
+                root,
+                "opencode",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("owasp-security-scan", result.installed_skills)
+            self.assertNotIn("owasp-security-scan", result.skipped_skills)
+            refreshed = skill.read_text(encoding="utf-8")
+            self.assertIn("# OWASP Security Scan Skill", refreshed)
+            self.assertNotEqual(refreshed, "stale skill content")
+
     def test_install_adds_ballast_to_gitignore(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

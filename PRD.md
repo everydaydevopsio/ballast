@@ -1,5 +1,27 @@
 # Product Requirements
 
+## Ballast Upgrade Skill Refresh
+
+### Problem
+
+Ballast-installed skill files are generated managed artifacts, but the current refresh behavior treats existing skill files like user-owned agent rules. As a result, `ballast upgrade` replays saved `.rulesrc.json` skill selections without updating stale skill file content unless the operator also passes `--force`.
+
+### Requirements
+
+1. Normal install refreshes must rewrite selected managed skill files when they already exist.
+2. `ballast upgrade` and `doctor --fix` must refresh saved skill selections through their existing `install --refresh-config` path without requiring `--force`.
+3. Existing agent rule overwrite, patch, and force semantics must remain unchanged.
+4. The behavior must stay consistent across the TypeScript, Python, Go, and wrapper CLIs.
+5. Support files such as `AGENTS.md` and `CLAUDE.md` must continue reflecting the saved skill list after refresh.
+
+### Acceptance Criteria
+
+1. Given an existing installed skill file with stale content, running backend install with the same skill and `force=false` rewrites the file to current packaged skill content.
+2. Given an existing installed agent rule and `force=false`, backend install still skips the rule unless patch mode or force mode is selected.
+3. Given a repository with `.rulesrc.json` that declares a skill, running wrapper `upgrade` without `--force` invokes the refresh path that updates the existing managed skill file.
+4. Automated unit coverage demonstrates the backend skill refresh behavior for TypeScript, Python, and Go.
+5. Smoke coverage demonstrates the wrapper upgrade path refreshes stale managed skill content.
+
 ## Ballast Doctor Config Visibility
 
 ### Problem
