@@ -212,6 +212,8 @@ def resolve_project_root(cwd: Path) -> Path:
             or has_any_cfg
         ):
             return directory
+        if (directory / ".git").exists():
+            break
     return cwd
 
 

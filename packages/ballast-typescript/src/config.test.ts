@@ -75,6 +75,15 @@ describe('config', () => {
       fs.mkdirSync(sub, { recursive: true });
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
     });
+
+    test('does not cross git repository boundary', () => {
+      // parent has a project marker
+      fs.writeFileSync(path.join(tmpDir, 'playbook.yml'), '---\n');
+      // child is its own git repo with no project markers
+      const child = path.join(tmpDir, 'child-project');
+      fs.mkdirSync(path.join(child, '.git'), { recursive: true });
+      expect(findProjectRoot(child)).toBe(path.resolve(child));
+    });
   });
 
   describe('loadConfig', () => {

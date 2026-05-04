@@ -157,6 +157,20 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(resolved, root)
 
+    def test_resolve_project_root_does_not_cross_git_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # parent has a project marker
+            (root / "playbook.yml").write_text("---\n", encoding="utf-8")
+            child = root / "child-project"
+            child.mkdir()
+            # child is its own git repo with no project markers
+            (child / ".git").mkdir()
+
+            resolved = cli.resolve_project_root(child)
+
+            self.assertEqual(resolved, child)
+
     def test_normalize_target_tokens_ignores_non_string_items(self) -> None:
         self.assertEqual(
             cli.normalize_target_tokens(["cursor,claude", 7, None, "codex"]),

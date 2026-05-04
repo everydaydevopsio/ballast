@@ -1868,11 +1868,15 @@ func findProjectRoot(cwd string) (string, error) {
 			hasAnyRulesConfig(dir) {
 			return dir, nil
 		}
+		atGitBoundary := exists(filepath.Join(dir, ".git"))
 		next := filepath.Dir(dir)
 		if next == dir {
 			break
 		}
 		dir = next
+		if atGitBoundary {
+			break
+		}
 	}
 	return start, nil
 }

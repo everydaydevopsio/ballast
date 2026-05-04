@@ -100,7 +100,9 @@ export function findProjectRoot(cwd: string = process.cwd()): string {
     if (hasConfigFile(dir) || hasProjectMarker(dir)) {
       return dir;
     }
+    const atGitBoundary = fs.existsSync(path.join(dir, '.git'));
     dir = path.dirname(dir);
+    if (atGitBoundary) break;
   }
   return cwd;
 }

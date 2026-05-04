@@ -276,6 +276,25 @@ func TestFindProjectRootSupportsTerraformMarkers(t *testing.T) {
 	}
 }
 
+func TestFindProjectRootDoesNotCrossGitBoundary(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "playbook.yml"), []byte("---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	child := filepath.Join(tmpDir, "child-project")
+	if err := os.MkdirAll(filepath.Join(child, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(child)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != child {
+		t.Fatalf("expected %q (cwd), got %q", child, root)
+	}
+}
+
 func TestInstallRecordsGitignoreErrorAndContinues(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(tmpDir, ".gitignore"), 0o755); err != nil {
