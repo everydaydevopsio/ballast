@@ -152,6 +152,32 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 }
 
+func TestFindProjectRootUsesBallastConfigMarkers(t *testing.T) {
+	tests := []struct {
+		name   string
+		marker string
+	}{
+		{name: "canonical rulesrc", marker: ".rulesrc.json"},
+		{name: "legacy python rulesrc", marker: ".rulesrc.python.json"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			nested := filepath.Join(root, "apps", "child")
+			if err := os.MkdirAll(nested, 0o755); err != nil {
+				t.Fatalf("mkdir nested: %v", err)
+			}
+			mustWriteFile(t, filepath.Join(root, tt.marker), "{}")
+
+			resolved := findProjectRoot(nested)
+			if resolved != root {
+				t.Fatalf("expected project root %q, got %q", root, resolved)
+			}
+		})
+	}
+}
+
 func TestRunDoctorFixPrintsMode(t *testing.T) {
 	originalRun := runCommandFunc
 	originalVersion := version
