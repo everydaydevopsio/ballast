@@ -153,6 +153,17 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 }
 
+func makeGitBoundary(t *testing.T, dir string) {
+	t.Helper()
+	gitDir := filepath.Join(dir, ".git")
+	if err := os.MkdirAll(gitDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestBuildDoctorReportRecommendsFixForUnknownVersion(t *testing.T) {
 	output := buildDoctorReport(
 		"ballast-go",
@@ -273,6 +284,44 @@ func TestFindProjectRootSupportsTerraformMarkers(t *testing.T) {
 	}
 	if root != tmpDir {
 		t.Fatalf("expected terraform project root %q, got %q", tmpDir, root)
+	}
+}
+
+func TestFindProjectRootDoesNotCrossGitBoundary(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "playbook.yml"), []byte("---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	child := filepath.Join(tmpDir, "child-project")
+	makeGitBoundary(t, child)
+
+	root, err := findProjectRoot(child)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != child {
+		t.Fatalf("expected %q (cwd), got %q", child, root)
+	}
+}
+
+func TestFindProjectRootReturnsChildRepoRootForNestedCwd(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "playbook.yml"), []byte("---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	child := filepath.Join(tmpDir, "child-project")
+	nested := filepath.Join(child, "subdir")
+	makeGitBoundary(t, child)
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(nested)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != child {
+		t.Fatalf("expected %q (child repo root), got %q", child, root)
 	}
 }
 

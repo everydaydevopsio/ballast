@@ -127,6 +127,15 @@ def normalize_target_tokens(raw: object | None) -> list[str]:
     return targets
 
 
+def has_git_boundary(directory: Path) -> bool:
+    git_path = directory / ".git"
+    if not git_path.exists():
+        return False
+    if git_path.is_file():
+        return True
+    return (git_path / "HEAD").exists() or (git_path / "config").exists()
+
+
 @lru_cache(maxsize=1)
 def ballast_version() -> str:
     try:
@@ -211,6 +220,8 @@ def resolve_project_root(cwd: Path) -> Path:
             or has_terraform
             or has_any_cfg
         ):
+            return directory
+        if has_git_boundary(directory):
             return directory
     return cwd
 

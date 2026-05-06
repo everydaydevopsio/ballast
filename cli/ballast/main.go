@@ -2653,7 +2653,30 @@ func cwdOrDot(cwd string) string {
 }
 
 func hasRootMarker(dir string) bool {
-	markers := []string{".git", "go.mod", "pyproject.toml", "package.json", "pnpm-lock.yaml", "uv.lock", "ansible.cfg", "site.yml", "playbook.yml", "requirements.yml", "requirements.yaml", ".terraform-version", "main.tf", "providers.tf", "versions.tf", "terraform.tf"}
+	markers := []string{
+		".git",
+		".rulesrc.json",
+		".rulesrc.ts.json",
+		".rulesrc.python.json",
+		".rulesrc.go.json",
+		".rulesrc.ansible.json",
+		".rulesrc.terraform.json",
+		"go.mod",
+		"pyproject.toml",
+		"package.json",
+		"pnpm-lock.yaml",
+		"uv.lock",
+		"ansible.cfg",
+		"site.yml",
+		"playbook.yml",
+		"requirements.yml",
+		"requirements.yaml",
+		".terraform-version",
+		"main.tf",
+		"providers.tf",
+		"versions.tf",
+		"terraform.tf",
+	}
 	for _, marker := range markers {
 		if fileExists(filepath.Join(dir, marker)) {
 			return true
