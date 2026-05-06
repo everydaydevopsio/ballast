@@ -14,6 +14,12 @@ import {
 } from './config';
 import { BALLAST_VERSION } from './version';
 
+function makeGitBoundary(dir: string): void {
+  const gitDir = path.join(dir, '.git');
+  fs.mkdirSync(gitDir, { recursive: true });
+  fs.writeFileSync(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main\n');
+}
+
 describe('config', () => {
   let tmpDir: string;
 
@@ -31,6 +37,7 @@ describe('config', () => {
   describe('findProjectRoot', () => {
     test('returns cwd when no config or package.json in cwd', () => {
       const cwd = tmpDir;
+      makeGitBoundary(cwd);
       expect(findProjectRoot(cwd)).toBe(path.resolve(cwd));
     });
 
@@ -81,8 +88,17 @@ describe('config', () => {
       fs.writeFileSync(path.join(tmpDir, 'playbook.yml'), '---\n');
       // child is its own git repo with no project markers
       const child = path.join(tmpDir, 'child-project');
-      fs.mkdirSync(path.join(child, '.git'), { recursive: true });
+      makeGitBoundary(child);
       expect(findProjectRoot(child)).toBe(path.resolve(child));
+    });
+
+    test('returns child repo root for nested cwd inside unmarked git repo', () => {
+      fs.writeFileSync(path.join(tmpDir, 'playbook.yml'), '---\n');
+      const child = path.join(tmpDir, 'child-project');
+      const nested = path.join(child, 'subdir');
+      makeGitBoundary(child);
+      fs.mkdirSync(nested, { recursive: true });
+      expect(findProjectRoot(nested)).toBe(path.resolve(child));
     });
   });
 

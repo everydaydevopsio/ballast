@@ -93,6 +93,17 @@ function hasProjectMarker(dir: string): boolean {
   );
 }
 
+function isGitBoundary(dir: string): boolean {
+  const gitPath = path.join(dir, '.git');
+  if (!fs.existsSync(gitPath)) return false;
+  const stat = fs.statSync(gitPath);
+  if (stat.isFile()) return true;
+  return (
+    fs.existsSync(path.join(gitPath, 'HEAD')) ||
+    fs.existsSync(path.join(gitPath, 'config'))
+  );
+}
+
 export function findProjectRoot(cwd: string = process.cwd()): string {
   let dir = path.resolve(cwd);
   const root = path.parse(dir).root;
@@ -100,9 +111,10 @@ export function findProjectRoot(cwd: string = process.cwd()): string {
     if (hasConfigFile(dir) || hasProjectMarker(dir)) {
       return dir;
     }
-    const atGitBoundary = fs.existsSync(path.join(dir, '.git'));
+    if (isGitBoundary(dir)) {
+      return dir;
+    }
     dir = path.dirname(dir);
-    if (atGitBoundary) break;
   }
   return cwd;
 }

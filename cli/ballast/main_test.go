@@ -679,8 +679,10 @@ func TestRunUpgradeRejectsUnknownOption(t *testing.T) {
 }
 
 func TestRunUpgradeRequiresExistingConfig(t *testing.T) {
+	root := t.TempDir()
+	makeGitBoundary(t, root)
 	output := captureStdout(t, func() {
-		withWorkingDir(t, t.TempDir(), func() {
+		withWorkingDir(t, root, func() {
 			exitCode := run([]string{"upgrade"})
 			if exitCode != 1 {
 				t.Fatalf("expected exit code 1, got %d", exitCode)
@@ -3202,6 +3204,18 @@ func captureStdout(t *testing.T, fn func()) string {
 	}
 
 	return buf.String()
+}
+
+func makeGitBoundary(t *testing.T, dir string) {
+	t.Helper()
+
+	gitDir := filepath.Join(dir, ".git")
+	if err := os.MkdirAll(gitDir, 0o755); err != nil {
+		t.Fatalf("create git dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0o644); err != nil {
+		t.Fatalf("write git HEAD: %v", err)
+	}
 }
 
 func captureStderr(t *testing.T, fn func()) string {

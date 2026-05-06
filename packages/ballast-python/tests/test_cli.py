@@ -15,6 +15,12 @@ from ballast import cli
 
 
 class PatchInstallTests(unittest.TestCase):
+    @staticmethod
+    def make_git_boundary(directory: Path) -> None:
+        git_dir = directory / ".git"
+        git_dir.mkdir(parents=True, exist_ok=True)
+        (git_dir / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+
     def test_build_doctor_report_recommends_upgrades(self) -> None:
         output = cli.build_doctor_report(
             "ballast-python",
@@ -165,9 +171,22 @@ class PatchInstallTests(unittest.TestCase):
             child = root / "child-project"
             child.mkdir()
             # child is its own git repo with no project markers
-            (child / ".git").mkdir()
+            self.make_git_boundary(child)
 
             resolved = cli.resolve_project_root(child)
+
+            self.assertEqual(resolved, child)
+
+    def test_resolve_project_root_returns_child_repo_root_for_nested_cwd(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "playbook.yml").write_text("---\n", encoding="utf-8")
+            child = root / "child-project"
+            nested = child / "subdir"
+            nested.mkdir(parents=True)
+            self.make_git_boundary(child)
+
+            resolved = cli.resolve_project_root(nested)
 
             self.assertEqual(resolved, child)
 
@@ -180,6 +199,7 @@ class PatchInstallTests(unittest.TestCase):
     def test_run_install_writes_shared_rulesrc_for_explicit_flags(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            self.make_git_boundary(root)
             old_cwd = Path.cwd()
             os.chdir(root)
             try:
@@ -201,6 +221,7 @@ class PatchInstallTests(unittest.TestCase):
     def test_run_install_writes_multi_target_shared_rulesrc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            self.make_git_boundary(root)
             old_cwd = Path.cwd()
             os.chdir(root)
             try:

@@ -32,6 +32,14 @@ trap 'rm -rf "${WORKDIR}"' EXIT
 pass() { echo "  PASS: $*"; }
 fail() { echo "  FAIL: $*" >&2; exit 1; }
 
+snapshot_parent_state() {
+  local target="$1"
+  (
+    cd "${PARENT}"
+    find . -path ./empty-sample -prune -o -type f -exec sha256sum {} \; | sort
+  ) > "${target}"
+}
+
 # ─── Set up parent with project markers ─────────────────────────────────────
 PARENT="${WORKDIR}/parent-with-markers"
 mkdir -p "${PARENT}"
@@ -60,9 +68,10 @@ git -C "${CHILD}" -c user.email=test@example.com -c user.name=Test \
 [[ ! -f "${CHILD}/.rulesrc.json" ]] || fail "empty-sample should not have .rulesrc.json"
 [[ -d "${CHILD}/.git" ]] || fail "child should be its own git repo"
 
-# Snapshot parent state before install so we can assert it was not touched
+# Snapshot parent state before install so we can assert it was not touched,
+# including in-place edits to files that already exist in the parent.
 PARENT_BEFORE="${WORKDIR}/parent-before.txt"
-(cd "${PARENT}" && find . -path ./empty-sample -prune -o -type f -print | sort) > "${PARENT_BEFORE}"
+snapshot_parent_state "${PARENT_BEFORE}"
 
 # ─── Run the install from inside the child ──────────────────────────────────
 echo "==> Running ballast install from ${CHILD}"
@@ -94,9 +103,9 @@ pass ".rulesrc.json created in child with python language"
 
 # ─── Assert install did NOT escape into the PARENT ──────────────────────────
 PARENT_AFTER="${WORKDIR}/parent-after.txt"
-(cd "${PARENT}" && find . -path ./empty-sample -prune -o -type f -print | sort) > "${PARENT_AFTER}"
+snapshot_parent_state "${PARENT_AFTER}"
 if ! diff -q "${PARENT_BEFORE}" "${PARENT_AFTER}" >/dev/null; then
-  echo "    Parent files changed:" >&2
+  echo "    Parent file contents changed:" >&2
   diff "${PARENT_BEFORE}" "${PARENT_AFTER}" >&2 || true
   fail "parent directory was modified by install (git boundary not respected)"
 fi
