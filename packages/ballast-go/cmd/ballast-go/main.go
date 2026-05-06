@@ -1861,6 +1861,9 @@ func findProjectRoot(cwd string) (string, error) {
 			hasAnyRulesConfig(dir) {
 			return dir, nil
 		}
+		if isGitBoundary(dir) {
+			return dir, nil
+		}
 		next := filepath.Dir(dir)
 		if next == dir {
 			break
@@ -1868,6 +1871,18 @@ func findProjectRoot(cwd string) (string, error) {
 		dir = next
 	}
 	return start, nil
+}
+
+func isGitBoundary(dir string) bool {
+	gitPath := filepath.Join(dir, ".git")
+	info, err := os.Stat(gitPath)
+	if err != nil {
+		return false
+	}
+	if !info.IsDir() {
+		return true
+	}
+	return exists(filepath.Join(gitPath, "HEAD")) || exists(filepath.Join(gitPath, "config"))
 }
 
 func hasAnyRulesConfig(dir string) bool {

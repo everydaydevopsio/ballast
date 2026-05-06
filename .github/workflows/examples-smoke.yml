@@ -154,6 +154,28 @@ jobs:
       - name: Run config-persistence smoke test
         run: ./scripts/smoke-config-persistence.sh "$GITHUB_WORKSPACE"
 
+  git-boundary-smoke:
+    name: git-boundary-smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v6
+
+      - name: Checkout ballast-examples repo
+        uses: actions/checkout@v6
+        with:
+          repository: everydaydevopsio/ballast-examples
+          path: .ci/ballast-examples
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Run git-boundary smoke test
+        run: ./scripts/smoke-git-boundary.sh "$GITHUB_WORKSPACE/.ci/ballast-examples"
+
   monorepo-patch-smoke:
     name: monorepo-patch-smoke
     runs-on: ubuntu-latest

@@ -152,6 +152,32 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 }
 
+func TestFindProjectRootUsesBallastConfigMarkers(t *testing.T) {
+	tests := []struct {
+		name   string
+		marker string
+	}{
+		{name: "canonical rulesrc", marker: ".rulesrc.json"},
+		{name: "legacy python rulesrc", marker: ".rulesrc.python.json"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			nested := filepath.Join(root, "apps", "child")
+			if err := os.MkdirAll(nested, 0o755); err != nil {
+				t.Fatalf("mkdir nested: %v", err)
+			}
+			mustWriteFile(t, filepath.Join(root, tt.marker), "{}")
+
+			resolved := findProjectRoot(nested)
+			if resolved != root {
+				t.Fatalf("expected project root %q, got %q", root, resolved)
+			}
+		})
+	}
+}
+
 func TestRunDoctorFixPrintsMode(t *testing.T) {
 	originalRun := runCommandFunc
 	originalVersion := version
@@ -653,8 +679,10 @@ func TestRunUpgradeRejectsUnknownOption(t *testing.T) {
 }
 
 func TestRunUpgradeRequiresExistingConfig(t *testing.T) {
+	root := t.TempDir()
+	makeGitBoundary(t, root)
 	output := captureStdout(t, func() {
-		withWorkingDir(t, t.TempDir(), func() {
+		withWorkingDir(t, root, func() {
 			exitCode := run([]string{"upgrade"})
 			if exitCode != 1 {
 				t.Fatalf("expected exit code 1, got %d", exitCode)
@@ -3176,6 +3204,18 @@ func captureStdout(t *testing.T, fn func()) string {
 	}
 
 	return buf.String()
+}
+
+func makeGitBoundary(t *testing.T, dir string) {
+	t.Helper()
+
+	gitDir := filepath.Join(dir, ".git")
+	if err := os.MkdirAll(gitDir, 0o755); err != nil {
+		t.Fatalf("create git dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0o644); err != nil {
+		t.Fatalf("write git HEAD: %v", err)
+	}
 }
 
 func captureStderr(t *testing.T, fn func()) string {
