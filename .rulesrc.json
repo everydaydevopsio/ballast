@@ -21,7 +21,7 @@
     "owasp-security-scan",
     "github-health-check"
   ],
-  "ballastVersion": "5.9.0",
+  "ballastVersion": "5.9.3",
   "languages": [
     "typescript",
     "python",
