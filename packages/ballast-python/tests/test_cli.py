@@ -356,7 +356,6 @@ class PatchInstallTests(unittest.TestCase):
             )
 
             self.assertIn("owasp-security-scan", result.installed_skills)
-            self.assertNotIn("owasp-security-scan", result.skipped_skills)
             refreshed = skill.read_text(encoding="utf-8")
             self.assertIn("# OWASP Security Scan Skill", refreshed)
             self.assertNotEqual(refreshed, "stale skill content")

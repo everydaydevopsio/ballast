@@ -874,9 +874,6 @@ func TestInstallRefreshesExistingManagedSkillWithoutForce(t *testing.T) {
 	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
 		t.Fatalf("expected refreshed skill, got %+v", result.installedSkills)
 	}
-	if len(result.skippedSkills) > 0 {
-		t.Fatalf("expected no skipped skills, got %+v", result.skippedSkills)
-	}
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
 		t.Fatalf("read existing skill: %v", err)

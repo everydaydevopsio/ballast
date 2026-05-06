@@ -66,7 +66,6 @@ class InstallResult:
     installed_skills: list[str] = field(default_factory=list)
     installed_support_files: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
-    skipped_skills: list[str] = field(default_factory=list)
     skipped_support_files: list[str] = field(default_factory=list)
     errors: list[tuple[str, str]] = field(default_factory=list)
 
@@ -1734,11 +1733,6 @@ def print_install_result(
             "Skipped (already present; use --force to overwrite): "
             + ", ".join(result.skipped)
         )
-    if result.skipped_skills:
-        print(
-            "Skipped skills (already present; use --force to overwrite): "
-            + ", ".join(result.skipped_skills)
-        )
     if result.skipped_support_files:
         print(
             "Skipped support files (already present; use --force to overwrite): "
@@ -1826,7 +1820,6 @@ def run_install(args: argparse.Namespace) -> int:
         combined.installed_skills.extend(result.installed_skills)
         combined.installed_support_files.extend(result.installed_support_files)
         combined.skipped.extend(result.skipped)
-        combined.skipped_skills.extend(result.skipped_skills)
         combined.skipped_support_files.extend(result.skipped_support_files)
         combined.errors.extend(result.errors)
 
@@ -1836,7 +1829,6 @@ def run_install(args: argparse.Namespace) -> int:
         not combined.installed
         and not combined.installed_skills
         and not combined.skipped
-        and not combined.skipped_skills
         and not combined.errors
     ):
         print("Nothing to install.")

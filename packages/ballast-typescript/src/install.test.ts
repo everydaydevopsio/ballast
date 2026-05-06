@@ -346,7 +346,6 @@ describe('install', () => {
       });
 
       expect(result.installedSkills).toContain('owasp-security-scan');
-      expect(result.skippedSkills).not.toContain('owasp-security-scan');
       const refreshed = fs.readFileSync(skillFile, 'utf8');
       expect(refreshed).toContain('# OWASP Security Scan Skill');
       expect(refreshed).not.toBe('stale skill content');

@@ -361,7 +361,6 @@ export interface InstallResult {
   installedSkills: string[];
   installedSupportFiles: string[];
   skipped: string[];
-  skippedSkills: string[];
   skippedSupportFiles: string[];
   errors: Array<{ agent: string; error: string }>;
 }
@@ -483,7 +482,6 @@ export function install(options: InstallOptions): InstallResult {
   const installedSkills: string[] = [];
   const installedSupportFiles: string[] = [];
   const skipped: string[] = [];
-  const skippedSkills: string[] = [];
   const skippedSupportFiles: string[] = [];
   const errors: Array<{ agent: string; error: string }> = [];
   const processedAgentIds = new Set<string>();
@@ -740,7 +738,6 @@ export function install(options: InstallOptions): InstallResult {
     installedSkills,
     installedSupportFiles,
     skipped,
-    skippedSkills,
     skippedSupportFiles,
     errors
   };
@@ -944,16 +941,10 @@ export async function runInstall(
         )}`
       );
     }
-    if (result.skippedSkills.length > 0) {
-      console.log(
-        `Skipped skills (already present; use --force to overwrite): ${result.skippedSkills.join(', ')}`
-      );
-    }
     if (
       result.installed.length === 0 &&
       result.installedSkills.length === 0 &&
       result.skipped.length === 0 &&
-      result.skippedSkills.length === 0 &&
       result.errors.length === 0
     ) {
       console.log('Nothing to install.');
