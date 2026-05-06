@@ -222,6 +222,40 @@ EOF
   grep -q '"terraform"' "${project}/.rulesrc.json"
 }
 
+run_wrapper_upgrade_refreshes_skill_smoke() {
+  local project="${WORKDIR}/ballast-wrapper-upgrade-refresh-skill"
+
+  mkdir -p "${project}/.codex/rules"
+  cat > "${project}/go.mod" <<'EOF'
+module example.com/upgrade-refresh-skill
+
+go 1.24
+EOF
+  cat > "${project}/.rulesrc.json" <<'EOF'
+{
+  "targets": ["codex"],
+  "agents": ["linting"],
+  "skills": ["owasp-security-scan"],
+  "languages": ["go"],
+  "paths": {"go": ["."]},
+  "ballastVersion": "0.0.1"
+}
+EOF
+  cat > "${project}/.codex/rules/owasp-security-scan.md" <<'EOF'
+stale skill content
+EOF
+
+  (
+    cd "${project}"
+    ballast --language go upgrade
+  )
+
+  grep -q "# OWASP Security Scan Skill" "${project}/.codex/rules/owasp-security-scan.md"
+  ! grep -q "stale skill content" "${project}/.codex/rules/owasp-security-scan.md"
+  grep -q '"owasp-security-scan"' "${project}/.rulesrc.json"
+  grep -q '`.codex/rules/owasp-security-scan.md`' "${project}/AGENTS.md"
+}
+
 main() {
   local monorepo="${WORKDIR}/ballast-wrapper-monorepo"
   make_fixture "${monorepo}"
@@ -260,6 +294,7 @@ main() {
   run_wrapper_language_smoke
   run_wrapper_javascript_warning_smoke
   run_wrapper_mixed_warning_smoke
+  run_wrapper_upgrade_refreshes_skill_smoke
 
   echo "Ballast wrapper monorepo smoke test passed."
 }

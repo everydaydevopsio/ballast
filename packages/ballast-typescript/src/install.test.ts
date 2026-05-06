@@ -326,6 +326,31 @@ describe('install', () => {
       ).toBe(true);
     });
 
+    test('refreshes existing managed skill files without force', () => {
+      const skillFile = path.join(
+        tmpDir,
+        '.opencode',
+        'skills',
+        'owasp-security-scan.md'
+      );
+      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      fs.writeFileSync(skillFile, 'stale skill content', 'utf8');
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'opencode',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installedSkills).toContain('owasp-security-scan');
+      const refreshed = fs.readFileSync(skillFile, 'utf8');
+      expect(refreshed).toContain('# OWASP Security Scan Skill');
+      expect(refreshed).not.toBe('stale skill content');
+    });
+
     test('writes ansible language rules when requested', () => {
       const result = install({
         projectRoot: tmpDir,

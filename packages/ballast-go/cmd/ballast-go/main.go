@@ -91,7 +91,6 @@ type installResult struct {
 	installedSkills     []string
 	installedSupport    []string
 	skipped             []string
-	skippedSkills       []string
 	skippedSupportFiles []string
 	errors              []agentError
 }
@@ -322,16 +321,13 @@ func runInstall(args []string) int {
 	if len(result.skipped) > 0 {
 		fmt.Printf("Skipped (already present; use --force to overwrite): %s\n", strings.Join(result.skipped, ", "))
 	}
-	if len(result.skippedSkills) > 0 {
-		fmt.Printf("Skipped skills (already present; use --force to overwrite): %s\n", strings.Join(result.skippedSkills, ", "))
-	}
 	if len(result.skippedSupportFiles) > 0 {
 		fmt.Printf(
 			"Skipped support files (already present; use --force to overwrite): %s\n",
 			strings.Join(result.skippedSupportFiles, ", "),
 		)
 	}
-	if len(result.installed) == 0 && len(result.installedSkills) == 0 && len(result.skipped) == 0 && len(result.skippedSkills) == 0 && len(result.errors) == 0 {
+	if len(result.installed) == 0 && len(result.installedSkills) == 0 && len(result.skipped) == 0 && len(result.errors) == 0 {
 		fmt.Println("Nothing to install.")
 	}
 
@@ -817,13 +813,6 @@ func install(opts installOptions) installResult {
 			dir, file, err := skillDestination(opts.projectRoot, target, skillID)
 			if err != nil {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
-				continue
-			}
-			if exists(file) && !opts.force {
-				if !contains(result.skippedSkills, skillID) {
-					result.skippedSkills = append(result.skippedSkills, skillID)
-				}
-				processedSkills[skillID] = struct{}{}
 				continue
 			}
 			if err := os.MkdirAll(dir, 0o755); err != nil {

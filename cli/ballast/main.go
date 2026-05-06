@@ -631,11 +631,24 @@ func runUpgrade(selectedLanguage language, args []string) int {
 		return 1
 	}
 	printDoctorSummary(root, selectedLanguage, true)
-	return runDoctorFix(root, selectedLanguage, patch, force)
+	installVersion := config.BallastVersion
+	if preferredSourceRoot(root) != "" {
+		installVersion = ""
+	}
+	return runDoctorFixWithVersion(root, selectedLanguage, patch, force, installVersion)
 }
 
 func runDoctorFix(root string, selectedLanguage language, patch bool, force bool) int {
-	desiredVersion := normalizeVersion(desiredDoctorInstallVersion(root))
+	return runDoctorFixWithVersion(
+		root,
+		selectedLanguage,
+		patch,
+		force,
+		normalizeVersion(desiredDoctorInstallVersion(root)),
+	)
+}
+
+func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool, force bool, desiredVersion string) int {
 	if exitCode := installCLIs(selectedLanguage, desiredVersion); exitCode != 0 {
 		return exitCode
 	}

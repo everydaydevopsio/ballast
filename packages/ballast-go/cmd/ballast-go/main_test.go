@@ -853,13 +853,13 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 	}
 }
 
-func TestInstallSkipsExistingSkillWithoutForce(t *testing.T) {
+func TestInstallRefreshesExistingManagedSkillWithoutForce(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
 	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
 		t.Fatalf("create skill dir: %v", err)
 	}
-	if err := os.WriteFile(skillPath, []byte("existing skill"), 0o644); err != nil {
+	if err := os.WriteFile(skillPath, []byte("stale skill content"), 0o644); err != nil {
 		t.Fatalf("seed skill file: %v", err)
 	}
 
@@ -871,15 +871,19 @@ func TestInstallSkipsExistingSkillWithoutForce(t *testing.T) {
 		force:       false,
 		saveConfig:  false,
 	})
-	if !slices.Equal(result.skippedSkills, []string{"owasp-security-scan"}) {
-		t.Fatalf("expected skipped skill, got %+v", result.skippedSkills)
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected refreshed skill, got %+v", result.installedSkills)
 	}
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
 		t.Fatalf("read existing skill: %v", err)
 	}
-	if string(content) != "existing skill" {
-		t.Fatalf("expected existing skill to remain untouched, got %q", string(content))
+	text := string(content)
+	if !strings.Contains(text, "# OWASP Security Scan Skill") {
+		t.Fatalf("expected refreshed managed skill content, got %q", text)
+	}
+	if text == "stale skill content" {
+		t.Fatalf("expected stale skill content to be refreshed")
 	}
 }
 

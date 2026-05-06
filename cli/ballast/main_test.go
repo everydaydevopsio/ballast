@@ -416,8 +416,8 @@ func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T)
 	if len(commands) != 3 {
 		t.Fatalf("expected upgrade to install all backends, got %#v", commands)
 	}
-	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(root, ".ballast", "tools", "typescript")+" @everydaydevopsio/ballast@5.0.6" {
-		t.Fatalf("expected upgrade to install latest typescript backend, got %q", got)
+	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(root, ".ballast", "tools", "typescript")+" "+filepath.Join(root, "packages", "ballast-typescript") {
+		t.Fatalf("expected upgrade to install typescript backend from local sources inside source checkout, got %q", got)
 	}
 	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --yes") {
 		t.Fatalf("expected upgrade to refresh config via install --yes, got %q", got)
@@ -467,6 +467,77 @@ func TestRunUpgradePatchForwardsPatchToRefreshInstall(t *testing.T) {
 
 	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --patch --yes") {
 		t.Fatalf("expected upgrade --patch to refresh config via install --patch --yes, got %q", got)
+	}
+}
+
+func TestRunUpgradeUsesLocalSourcesInsideSourceCheckout(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+	version = "5.0.6"
+
+	sourceRoot := t.TempDir()
+	projectRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(sourceRoot, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(sourceRoot, ".ci", "bin", "ballast"), nil
+	}
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	var invocation backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocation = backendInvocation{Binary: binary, Args: append([]string(nil), args...)}
+		return 0, nil
+	}
+
+	mustWriteFile(t, filepath.Join(projectRoot, "go.mod"), "module example.com/project\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(projectRoot, ".rulesrc.json"), `{
+  "ballastVersion":"0.0.1",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["go"],
+  "paths":{"go":["."]}
+}`)
+
+	withWorkingDir(t, projectRoot, func() {
+		exitCode := run([]string{"--language", "go", "upgrade"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected a single local go install command, got %#v", commands)
+	}
+	if got := strings.Join(commands[0], " "); got != "go build -C "+filepath.Join(sourceRoot, "packages", "ballast-go")+" -o "+filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")+" ./cmd/ballast-go" {
+		t.Fatalf("expected upgrade to build ballast-go from local sources, got %q", got)
+	}
+	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --yes") {
+		t.Fatalf("expected upgrade to refresh config after local source install, got %q", got)
+	}
+	config, err := loadDoctorConfig(projectRoot)
+	if err != nil {
+		t.Fatalf("loadDoctorConfig returned error: %v", err)
+	}
+	if config == nil || config.BallastVersion != "5.0.6" {
+		t.Fatalf("expected upgrade to rewrite ballastVersion to running wrapper version, got %#v", config)
 	}
 }
 
@@ -542,20 +613,13 @@ func TestRunDoctorFixForwardsSelectedLanguageToRefreshInstall(t *testing.T) {
 	}
 
 	root := t.TempDir()
-	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
-	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
-	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
-	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/project\n\ngo 1.24\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "ballastVersion":"5.0.5",
   "target":"claude",
   "agents":["linting"],
-  "languages":["typescript","python","go"],
-  "paths":{
-    "typescript":["packages/ballast-typescript"],
-    "python":["packages/ballast-python"],
-    "go":["packages/ballast-go"]
-  }
+  "languages":["go"],
+  "paths":{"go":["."]}
 }`)
 
 	withWorkingDir(t, root, func() {
@@ -605,33 +669,33 @@ func TestRunDoctorFixSkipsRefreshWhenConfigIsMissing(t *testing.T) {
 	}
 }
 
-func TestRunDoctorFixReportsRewriteFailure(t *testing.T) {
+func TestRunUpgradeRefreshesSelectedBackendOnceOutsideSourceCheckout(t *testing.T) {
 	originalRun := runCommandFunc
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
 	originalVersion := version
+	originalExecutable := osExecutableFunc
 	t.Cleanup(func() {
 		runCommandFunc = originalRun
 		ensureInstalledFunc = originalEnsure
 		execToolFunc = originalExec
 		version = originalVersion
+		osExecutableFunc = originalExecutable
 	})
 	version = "5.0.6"
 
 	runCommandFunc = func(name string, args []string) error { return nil }
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(t.TempDir(), "outside-ballast", "ballast"), nil
+	}
+	root := t.TempDir()
 	refreshCount := 0
 	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
 		refreshCount++
-		if refreshCount == 1 {
-			if err := os.Chmod(filepath.Join(dir, ".rulesrc.json"), 0o444); err != nil {
-				t.Fatalf("failed to make .rulesrc.json read-only: %v", err)
-			}
-		}
 		return 0, nil
 	}
 
-	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -648,20 +712,15 @@ func TestRunDoctorFixReportsRewriteFailure(t *testing.T) {
   }
 }`)
 
-	output := captureStdout(t, func() {
-		withWorkingDir(t, root, func() {
-			exitCode := run([]string{"--language", "go", "upgrade"})
-			if exitCode != 1 {
-				t.Fatalf("expected exit code 1, got %d", exitCode)
-			}
-		})
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"--language", "go", "upgrade"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
 	})
 
 	if refreshCount != 1 {
-		t.Fatalf("expected a single refresh install before rewrite failure, got %d", refreshCount)
-	}
-	if !strings.Contains(output, "rulesrc.json") {
-		t.Fatalf("expected rewrite failure to be reported, got %q", output)
+		t.Fatalf("expected a single refresh install for the selected backend, got %d", refreshCount)
 	}
 }
 
