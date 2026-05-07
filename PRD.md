@@ -1,5 +1,34 @@
 # Product Requirements
 
+## Skill Patch Support And Support File Force Confirmation
+
+### Problem
+
+Ballast does not apply the same overwrite decision matrix to installed skill files that it applies to agent rule files, and `--force` can silently replace support files such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. Operators need a safe way to merge upstream skill updates without discarding local edits, and destructive support-file overwrites must require explicit confirmation.
+
+### Requirements
+
+1. Existing installed skill files must follow the same force/patch/skip decision matrix as agent rule files across the TypeScript, Python, Go, and wrapper install paths.
+2. `--patch` must merge canonical skill content into an existing skill file using the existing patch logic for the selected target.
+3. `--force` must overwrite an existing skill file without patching.
+4. `--force` must prompt before replacing an existing support file (`AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`) that would lose user customizations.
+5. In non-interactive mode (`--yes`, CI, or non-TTY stdin), an attempted `--force` overwrite of an existing support file must fail with a clear error telling the operator to rerun interactively.
+6. Creating a missing support file with `--force` must continue without prompting.
+7. Support-file patch behavior and existing agent-rule overwrite semantics must remain unchanged.
+8. README and installation documentation must describe the updated `--patch` and `--force` behavior.
+
+### Acceptance Criteria
+
+1. Given an existing skill file and `force=false, patch=false`, install skips the file and leaves the existing content unchanged.
+2. Given a missing skill file and `force=false, patch=true`, install creates the file with canonical content.
+3. Given an existing skill file and `force=false, patch=true`, install merges canonical content into the existing file and preserves user-managed sections supported by the patcher.
+4. Given an existing skill file and `force=true`, install overwrites the file with canonical content.
+5. Given an existing support file and interactive `--force`, answering no skips the support file and prints a clear notice.
+6. Given an existing support file and interactive `--force`, answering yes overwrites the support file with canonical content.
+7. Given an existing support file and non-interactive `--force`, install exits with an error and does not overwrite the file.
+8. Automated tests cover the skill-file decision matrix and support-file confirmation behavior in the TypeScript, Python, and Go backends.
+9. README and `docs/installation.md` describe when to use `--patch` versus `--force`, including the support-file confirmation behavior.
+
 ## Ballast Upgrade Skill Refresh
 
 ### Problem

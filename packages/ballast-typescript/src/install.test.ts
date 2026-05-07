@@ -28,6 +28,7 @@ describe('install', () => {
     if (tmpDir && fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true });
     }
+    jest.restoreAllMocks();
     process.env = origEnv;
   });
 
@@ -326,7 +327,7 @@ describe('install', () => {
       ).toBe(true);
     });
 
-    test('refreshes existing managed skill files without force', () => {
+    test('skips an existing skill file when force and patch are false', () => {
       const skillFile = path.join(
         tmpDir,
         '.opencode',
@@ -345,10 +346,103 @@ describe('install', () => {
         saveConfig: false
       });
 
+      expect(result.installedSkills).toEqual([]);
+      expect(result.skipped).toEqual([]);
+      expect(fs.readFileSync(skillFile, 'utf8')).toBe('stale skill content');
+    });
+
+    test('creates a missing skill file when patch is true', () => {
+      const skillFile = path.join(
+        tmpDir,
+        '.opencode',
+        'skills',
+        'owasp-security-scan.md'
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'opencode',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        patch: true,
+        force: false,
+        saveConfig: false
+      });
+
       expect(result.installedSkills).toContain('owasp-security-scan');
-      const refreshed = fs.readFileSync(skillFile, 'utf8');
-      expect(refreshed).toContain('# OWASP Security Scan Skill');
-      expect(refreshed).not.toBe('stale skill content');
+      expect(fs.readFileSync(skillFile, 'utf8')).toContain(
+        '## Scan Architecture'
+      );
+    });
+
+    test('patches an existing skill file when patch is true', () => {
+      const skillFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'owasp-security-scan.mdc'
+      );
+      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      fs.writeFileSync(
+        skillFile,
+        `---
+description: Team customized skill
+alwaysApply: true
+---
+
+Team intro.
+
+## Usage
+
+Keep team-specific usage notes.
+`,
+        'utf8'
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        patch: true,
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installedSkills).toContain('owasp-security-scan');
+      const content = fs.readFileSync(skillFile, 'utf8');
+      expect(content).toContain('description: Team customized skill');
+      expect(content).toContain('alwaysApply: true');
+      expect(content).toContain('Keep team-specific usage notes.');
+      expect(content).toContain('## Scan Architecture');
+    });
+
+    test('overwrites an existing skill file when force is true', () => {
+      const skillFile = path.join(
+        tmpDir,
+        '.opencode',
+        'skills',
+        'owasp-security-scan.md'
+      );
+      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      fs.writeFileSync(skillFile, 'stale skill content', 'utf8');
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'opencode',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        force: true,
+        saveConfig: false
+      });
+
+      expect(result.installedSkills).toContain('owasp-security-scan');
+      expect(fs.readFileSync(skillFile, 'utf8')).toContain(
+        '## Scan Architecture'
+      );
+      expect(fs.readFileSync(skillFile, 'utf8')).not.toBe(
+        'stale skill content'
+      );
     });
 
     test('writes ansible language rules when requested', () => {
@@ -1550,6 +1644,100 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         yes: true
       });
       expect(exitCode).toBe(1);
+    });
+
+    test('prompts before force-overwriting an existing support file and skips on no', async () => {
+      const agentsMdPath = path.join(tmpDir, 'AGENTS.md');
+      fs.writeFileSync(
+        agentsMdPath,
+        '# AGENTS.md\n\nTeam customizations.\n',
+        'utf8'
+      );
+      const consoleLog = jest
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+      jest.spyOn(readline, 'createInterface').mockImplementation(
+        () =>
+          ({
+            question: (_prompt: string, cb: (answer: string) => void) =>
+              cb('n'),
+            close: () => {}
+          }) as unknown as readline.Interface
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        skills: ['owasp-security-scan'],
+        force: true
+      });
+
+      expect(exitCode).toBe(0);
+      expect(fs.readFileSync(agentsMdPath, 'utf8')).toContain(
+        'Team customizations.'
+      );
+      expect(consoleLog).toHaveBeenCalledWith(
+        expect.stringContaining('Skipped support file: AGENTS.md')
+      );
+    });
+
+    test('force-overwrites an existing support file when prompt is accepted', async () => {
+      const agentsMdPath = path.join(tmpDir, 'AGENTS.md');
+      fs.writeFileSync(
+        agentsMdPath,
+        '# AGENTS.md\n\nTeam customizations.\n',
+        'utf8'
+      );
+      jest.spyOn(readline, 'createInterface').mockImplementation(
+        () =>
+          ({
+            question: (_prompt: string, cb: (answer: string) => void) =>
+              cb('y'),
+            close: () => {}
+          }) as unknown as readline.Interface
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        skills: ['owasp-security-scan'],
+        force: true
+      });
+
+      expect(exitCode).toBe(0);
+      const content = fs.readFileSync(agentsMdPath, 'utf8');
+      expect(content).toContain('## Installed skills');
+      expect(content).not.toContain('Team customizations.');
+    });
+
+    test('refuses force-overwriting an existing support file in non-interactive mode', async () => {
+      const agentsMdPath = path.join(tmpDir, 'AGENTS.md');
+      fs.writeFileSync(
+        agentsMdPath,
+        '# AGENTS.md\n\nTeam customizations.\n',
+        'utf8'
+      );
+      const consoleError = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        skills: ['owasp-security-scan'],
+        force: true,
+        yes: true
+      });
+
+      expect(exitCode).toBe(1);
+      expect(fs.readFileSync(agentsMdPath, 'utf8')).toContain(
+        'Team customizations.'
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Cannot overwrite existing support file AGENTS.md in non-interactive mode'
+        )
+      );
     });
   });
 });

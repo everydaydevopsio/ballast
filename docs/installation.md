@@ -184,7 +184,11 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ballast-go install --target cursor --all
 ```
 
-Ballast preserves existing rule and skill files unless `--force` is provided. Use `--patch` to merge upstream Ballast updates into an existing rule file while preserving the user's edited sections.
+Ballast preserves existing rule and skill files unless you explicitly choose `--patch` or `--force`.
+
+Use `--patch` to merge upstream Ballast updates into an existing rule or skill file while preserving user-edited sections.
+
+Use `--force` to reset a managed rule or skill file to canonical Ballast content. When `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` already exists, Ballast prompts before overwriting it; in non-interactive mode (`--yes` or CI), Ballast aborts instead of replacing the support file silently.
 
 For single-language TypeScript installs, the `git-hooks` rules should use `pre-commit` instead of Husky and add unit tests to the `pre-push` stage.
 
@@ -196,8 +200,8 @@ For single-language TypeScript installs, the `git-hooks` rules should use `pre-c
 - `--skill, -s`: comma-separated list
 - `--all`: install all available agents
 - `--all-skills`: install all available skills
-- `--force, -f`: overwrite existing files
-- `--patch, -p`: merge upstream rule updates into existing files while preserving user-edited sections (`--force` wins if both are set)
+- `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files
+- `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
 
 ## Wrapper Commands

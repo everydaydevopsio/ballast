@@ -337,7 +337,7 @@ class PatchInstallTests(unittest.TestCase):
             self.assertTrue(skill.exists())
             self.assertTrue(skill.read_bytes().startswith(b"PK\x03\x04"))
 
-    def test_install_refreshes_existing_managed_skill_without_force(self) -> None:
+    def test_install_skips_existing_managed_skill_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             skill = root / ".opencode" / "skills" / "owasp-security-scan.md"
@@ -355,10 +355,8 @@ class PatchInstallTests(unittest.TestCase):
                 False,
             )
 
-            self.assertIn("owasp-security-scan", result.installed_skills)
-            refreshed = skill.read_text(encoding="utf-8")
-            self.assertIn("# OWASP Security Scan Skill", refreshed)
-            self.assertNotEqual(refreshed, "stale skill content")
+            self.assertEqual(result.installed_skills, [])
+            self.assertEqual(skill.read_text(encoding="utf-8"), "stale skill content")
 
     def test_install_adds_ballast_to_gitignore(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -621,6 +619,112 @@ class PatchInstallTests(unittest.TestCase):
             agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("## Installed skills", agents_md)
             self.assertIn("`.codex/rules/owasp-security-scan.md`", agents_md)
+
+    def test_install_skips_existing_skill_when_force_and_patch_are_false(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill_path = root / ".opencode" / "skills" / "owasp-security-scan.md"
+            skill_path.parent.mkdir(parents=True, exist_ok=True)
+            skill_path.write_text("stale skill content", encoding="utf-8")
+
+            result = cli.install(
+                root,
+                "opencode",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertEqual(result.installed_skills, [])
+            self.assertEqual(
+                skill_path.read_text(encoding="utf-8"), "stale skill content"
+            )
+
+    def test_install_patch_creates_missing_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "opencode",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                True,
+                False,
+            )
+
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            skill_path = root / ".opencode" / "skills" / "owasp-security-scan.md"
+            self.assertIn(
+                "## Scan Architecture",
+                skill_path.read_text(encoding="utf-8"),
+            )
+
+    def test_install_patch_merges_existing_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill_path = root / ".cursor" / "rules" / "owasp-security-scan.mdc"
+            skill_path.parent.mkdir(parents=True, exist_ok=True)
+            skill_path.write_text(
+                """---
+description: Team customized skill
+alwaysApply: true
+---
+
+Team intro.
+
+## Usage
+
+Keep team-specific usage notes.
+""",
+                encoding="utf-8",
+            )
+
+            result = cli.install(
+                root,
+                "cursor",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                True,
+                False,
+            )
+
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            content = skill_path.read_text(encoding="utf-8")
+            self.assertIn("description: Team customized skill", content)
+            self.assertIn("alwaysApply: true", content)
+            self.assertIn("Keep team-specific usage notes.", content)
+            self.assertIn("## Scan Architecture", content)
+
+    def test_install_force_overwrites_existing_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill_path = root / ".opencode" / "skills" / "owasp-security-scan.md"
+            skill_path.parent.mkdir(parents=True, exist_ok=True)
+            skill_path.write_text("stale skill content", encoding="utf-8")
+
+            result = cli.install(
+                root,
+                "opencode",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                True,
+                False,
+                False,
+            )
+
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            content = skill_path.read_text(encoding="utf-8")
+            self.assertIn("## Scan Architecture", content)
+            self.assertNotEqual(content, "stale skill content")
 
     def test_install_creates_language_prefixed_rule_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -930,6 +1034,115 @@ Read and follow these rule files in `.gemini/rules/` when they apply:
             "Invalid --target. Use: cursor, claude, opencode, codex, gemini",
             output,
         )
+
+    def test_run_install_force_support_file_declined_skips_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "pyproject.toml").write_text(
+                "[project]\nname='demo'\n", encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                "# AGENTS.md\n\nTeam customizations.\n",
+                encoding="utf-8",
+            )
+            args = cli.parser().parse_args(
+                [
+                    "install",
+                    "--target",
+                    "codex",
+                    "--skill",
+                    "owasp-security-scan",
+                    "--force",
+                ]
+            )
+
+            with (
+                mock.patch.object(cli, "resolve_project_root", return_value=root),
+                mock.patch.object(cli, "prompt_yes_no", return_value=False),
+                io.StringIO() as buf,
+                redirect_stdout(buf),
+            ):
+                exit_code = cli.run_install(args)
+                output = buf.getvalue()
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Skipped support file: AGENTS.md", output)
+            self.assertIn(
+                "Team customizations.",
+                (root / "AGENTS.md").read_text(encoding="utf-8"),
+            )
+
+    def test_run_install_force_support_file_accepted_overwrites_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "pyproject.toml").write_text(
+                "[project]\nname='demo'\n", encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                "# AGENTS.md\n\nTeam customizations.\n",
+                encoding="utf-8",
+            )
+            args = cli.parser().parse_args(
+                [
+                    "install",
+                    "--target",
+                    "codex",
+                    "--skill",
+                    "owasp-security-scan",
+                    "--force",
+                ]
+            )
+
+            with (
+                mock.patch.object(cli, "resolve_project_root", return_value=root),
+                mock.patch.object(cli, "prompt_yes_no", return_value=True),
+            ):
+                exit_code = cli.run_install(args)
+
+            self.assertEqual(exit_code, 0)
+            content = (root / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn("## Installed skills", content)
+            self.assertNotIn("Team customizations.", content)
+
+    def test_run_install_force_support_file_non_interactive_aborts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "pyproject.toml").write_text(
+                "[project]\nname='demo'\n", encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                "# AGENTS.md\n\nTeam customizations.\n",
+                encoding="utf-8",
+            )
+            args = cli.parser().parse_args(
+                [
+                    "install",
+                    "--target",
+                    "codex",
+                    "--skill",
+                    "owasp-security-scan",
+                    "--force",
+                    "--yes",
+                ]
+            )
+
+            with (
+                mock.patch.object(cli, "resolve_project_root", return_value=root),
+                io.StringIO() as buf,
+                redirect_stdout(buf),
+            ):
+                exit_code = cli.run_install(args)
+                output = buf.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "Cannot overwrite existing support file AGENTS.md in non-interactive mode",
+                output,
+            )
+            self.assertIn(
+                "Team customizations.",
+                (root / "AGENTS.md").read_text(encoding="utf-8"),
+            )
 
     def test_patch_flag_updates_claude_md_section(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

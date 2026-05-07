@@ -9,6 +9,7 @@ import {
   buildCursorSkillFormat,
   buildCodexAgentsMd,
   buildSkillMarkdown,
+  getSkillContent,
   getClaudeMdPath,
   getGeminiMdPath,
   getCodexAgentsMdPath,
@@ -350,6 +351,7 @@ export interface InstallOptions {
   patch?: boolean;
   patchClaudeMd?: boolean;
   patchGeminiMd?: boolean;
+  skipSupportFiles?: string[];
   saveConfig?: boolean;
   taskSystem?: TaskSystem;
 }
@@ -363,6 +365,11 @@ export interface InstallResult {
   skipped: string[];
   skippedSupportFiles: string[];
   errors: Array<{ agent: string; error: string }>;
+}
+
+interface SupportFileDecision {
+  error?: string;
+  skipSupportFile?: string;
 }
 
 function resolveSupportFileSelections(
@@ -383,6 +390,55 @@ function resolveSupportFileSelections(
     agents: [...new Set(withImplicitAgents(rawAgents))],
     skills: [...new Set(rawSkills)]
   };
+}
+
+function readStoredZipEntry(
+  archive: Buffer,
+  entryName: string
+): string | undefined {
+  let offset = 0;
+  while (offset + 30 <= archive.length) {
+    const signature = archive.readUInt32LE(offset);
+    if (signature !== 0x04034b50) {
+      break;
+    }
+    const compressionMethod = archive.readUInt16LE(offset + 8);
+    const compressedSize = archive.readUInt32LE(offset + 18);
+    const fileNameLength = archive.readUInt16LE(offset + 26);
+    const extraLength = archive.readUInt16LE(offset + 28);
+    const fileName = archive.toString(
+      'utf8',
+      offset + 30,
+      offset + 30 + fileNameLength
+    );
+    const dataStart = offset + 30 + fileNameLength + extraLength;
+    const dataEnd = dataStart + compressedSize;
+    if (dataEnd > archive.length) {
+      break;
+    }
+    if (fileName === entryName) {
+      if (compressionMethod !== 0) {
+        return undefined;
+      }
+      return archive.toString('utf8', dataStart, dataEnd);
+    }
+    offset = dataEnd;
+  }
+  return undefined;
+}
+
+function getSupportFilePath(
+  target: Target,
+  projectRoot: string
+): string | undefined {
+  if (target === 'claude') return getClaudeMdPath(projectRoot);
+  if (target === 'gemini') return getGeminiMdPath(projectRoot);
+  if (target === 'codex') return getCodexAgentsMdPath(projectRoot);
+  return undefined;
+}
+
+function getSupportFileLabel(filePath: string): string {
+  return path.basename(filePath);
 }
 
 /**
@@ -473,6 +529,7 @@ export function install(options: InstallOptions): InstallResult {
     patch = false,
     patchClaudeMd = false,
     patchGeminiMd = false,
+    skipSupportFiles = [],
     saveConfig: persist,
     taskSystem
   } = options;
@@ -524,6 +581,7 @@ export function install(options: InstallOptions): InstallResult {
     effectiveAgents,
     skills
   );
+  const skippedSupportSet = new Set(skipSupportFiles);
 
   for (const agentId of effectiveAgents) {
     if (!isValidAgent(agentId, language)) {
@@ -594,15 +652,34 @@ export function install(options: InstallOptions): InstallResult {
     }
     try {
       const { dir, file } = getSkillDestination(skillId, target, projectRoot);
+      const fileExists = fs.existsSync(file);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
+      if (fileExists && !force && !patch) {
+        continue;
+      }
       switch (target) {
-        case 'cursor':
-          fs.writeFileSync(file, buildCursorSkillFormat(skillId), 'utf8');
+        case 'cursor': {
+          const content = buildCursorSkillFormat(skillId);
+          const nextContent =
+            fileExists && !force && patch
+              ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
+              : content;
+          fs.writeFileSync(file, nextContent, 'utf8');
           break;
+        }
         case 'claude': {
-          fs.writeFileSync(file, buildClaudeSkill(skillId));
+          const skillContent = getSkillContent(skillId);
+          const nextSkillContent =
+            fileExists && !force && patch
+              ? patchRuleContent(
+                  readStoredZipEntry(fs.readFileSync(file), 'SKILL.md') ?? '',
+                  skillContent,
+                  target
+                )
+              : skillContent;
+          fs.writeFileSync(file, buildClaudeSkill(skillId, nextSkillContent));
           const skillSettings = getSkillClaudeSettings(skillId);
           if (skillSettings) {
             try {
@@ -618,9 +695,15 @@ export function install(options: InstallOptions): InstallResult {
         }
         case 'opencode':
         case 'codex':
-        case 'gemini':
-          fs.writeFileSync(file, buildSkillMarkdown(skillId), 'utf8');
+        case 'gemini': {
+          const content = buildSkillMarkdown(skillId);
+          const nextContent =
+            fileExists && !force && patch
+              ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
+              : content;
+          fs.writeFileSync(file, nextContent, 'utf8');
           break;
+        }
         default:
           throw new Error(`Unknown target: ${target}`);
       }
@@ -637,7 +720,9 @@ export function install(options: InstallOptions): InstallResult {
   if (!disableSupportFiles && target === 'claude') {
     const claudeMdPath = getClaudeMdPath(projectRoot);
     const shouldPatchClaudeMd = patch || patchClaudeMd;
-    if (fs.existsSync(claudeMdPath) && !force && !shouldPatchClaudeMd) {
+    if (skippedSupportSet.has(claudeMdPath)) {
+      skippedSupportFiles.push(claudeMdPath);
+    } else if (fs.existsSync(claudeMdPath) && !force && !shouldPatchClaudeMd) {
       skippedSupportFiles.push(claudeMdPath);
     } else {
       try {
@@ -665,7 +750,9 @@ export function install(options: InstallOptions): InstallResult {
     const geminiMdPath = getGeminiMdPath(projectRoot);
     const agentsMdPath = getCodexAgentsMdPath(projectRoot);
     const shouldPatchGeminiMd = patch || patchGeminiMd;
-    if (fs.existsSync(geminiMdPath) && !force && !shouldPatchGeminiMd) {
+    if (skippedSupportSet.has(geminiMdPath)) {
+      skippedSupportFiles.push(geminiMdPath);
+    } else if (fs.existsSync(geminiMdPath) && !force && !shouldPatchGeminiMd) {
       skippedSupportFiles.push(geminiMdPath);
     } else {
       try {
@@ -688,7 +775,7 @@ export function install(options: InstallOptions): InstallResult {
       }
     }
 
-    if (!fs.existsSync(agentsMdPath)) {
+    if (!fs.existsSync(agentsMdPath) && !skippedSupportSet.has(agentsMdPath)) {
       try {
         const agentsContent = buildCodexAgentsMd(
           supportSelections.agents,
@@ -708,7 +795,9 @@ export function install(options: InstallOptions): InstallResult {
 
   if (!disableSupportFiles && target === 'codex') {
     const agentsMdPath = getCodexAgentsMdPath(projectRoot);
-    if (fs.existsSync(agentsMdPath) && !force && !patch) {
+    if (skippedSupportSet.has(agentsMdPath)) {
+      skippedSupportFiles.push(agentsMdPath);
+    } else if (fs.existsSync(agentsMdPath) && !force && !patch) {
       skippedSupportFiles.push(agentsMdPath);
     } else {
       try {
@@ -766,6 +855,31 @@ async function promptYesNo(
   const line = (await prompt(question + suffix)).toLowerCase();
   if (!line) return defaultAnswer;
   return line === 'y' || line === 'yes';
+}
+
+async function confirmSupportFileOverwrite(
+  target: Target,
+  projectRoot: string,
+  force: boolean,
+  yes: boolean
+): Promise<SupportFileDecision> {
+  if (!force) return {};
+  const supportFilePath = getSupportFilePath(target, projectRoot);
+  if (!supportFilePath || !fs.existsSync(supportFilePath)) {
+    return {};
+  }
+  const label = getSupportFileLabel(supportFilePath);
+  if (isCiMode() || yes) {
+    return {
+      error: `Cannot overwrite existing support file ${label} in non-interactive mode. Re-run interactively without --yes to confirm the destructive overwrite.`
+    };
+  }
+
+  const approved = await promptYesNo(
+    `\n⚠️  ${label} already exists and may contain your customizations.\n    --force will replace it with the canonical template.\n    Your current file will be lost.\n\n    Continue?`
+  );
+
+  return approved ? {} : { skipSupportFile: supportFilePath };
 }
 
 /**
@@ -853,6 +967,22 @@ export async function runInstall(
   );
 
   for (const target of targets) {
+    const supportDecision = await confirmSupportFileOverwrite(
+      target,
+      projectRoot,
+      options.force ?? false,
+      options.yes ?? false
+    );
+    if (supportDecision.error) {
+      console.error(supportDecision.error);
+      return 1;
+    }
+    if (supportDecision.skipSupportFile) {
+      console.log(
+        `Skipped support file: ${getSupportFileLabel(supportDecision.skipSupportFile)} (${supportDecision.skipSupportFile})`
+      );
+    }
+
     const claudeMdPath = getClaudeMdPath(projectRoot);
     let patchClaudeMd = false;
     if (target === 'claude' && fs.existsSync(claudeMdPath) && !options.force) {
@@ -887,6 +1017,9 @@ export async function runInstall(
       patch: options.patch ?? false,
       patchClaudeMd,
       patchGeminiMd,
+      skipSupportFiles: supportDecision.skipSupportFile
+        ? [supportDecision.skipSupportFile]
+        : [],
       saveConfig: false,
       taskSystem: resolvedTaskSystem
     });

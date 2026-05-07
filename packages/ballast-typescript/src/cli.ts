@@ -148,8 +148,8 @@ Options:
   --all                     Install all agents
   --all-skills              Install all skills
   --task-system <system>    Task system for the tasks agent: ${TASK_SYSTEMS.join(', ')} (default: github)
-  --force, -f               Overwrite existing rule files
-  --patch, -p               Merge upstream rule updates into existing files; ignored when --force is set
+  --force, -f               Overwrite existing rule/skill files; prompts before replacing AGENTS.md or CLAUDE.md
+  --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
   --help, -h                Show this help
   --version, -v             Show version
