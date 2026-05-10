@@ -298,7 +298,7 @@ Ballast only installs shipped agents and skills and follows the single overwrite
 
 Use `--patch` when you want to merge upstream Ballast updates into an existing rule or skill file while preserving user-edited sections.
 
-Use `--force` when you want to reset a managed rule or skill file to canonical Ballast content. When `AGENTS.md` or `CLAUDE.md` already exists, `--force` prompts before overwriting it; in non-interactive mode (`--yes` or CI), Ballast aborts instead of replacing the support file silently.
+Use `--force` when you want to reset a managed rule or skill file to canonical Ballast content. When `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` already exists, `--force` prompts before overwriting it; in non-interactive mode (`--yes` or CI), Ballast aborts instead of replacing the support file silently.
 
 ## CLI Flags
 
@@ -308,7 +308,7 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 - `--skill, -s`: comma-separated skill list
 - `--all`: install all agents for the selected language
 - `--all-skills`: install all available skills for the selected language
-- `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files such as `AGENTS.md` and `CLAUDE.md`
+- `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`
 - `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
 

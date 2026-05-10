@@ -958,6 +958,48 @@ Keep team-specific usage notes.
 	}
 }
 
+func TestInstallPatchMergesClaudeSkillArchive(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	existingSkillContent := "# owasp-security-scan\n\nTeam intro preserved by patch.\n\n## Team Custom Section\n\nKeep this team-specific section.\n"
+	initialArchive, err := buildClaudeSkill("owasp-security-scan", "go", existingSkillContent)
+	if err != nil {
+		t.Fatalf("build initial skill archive: %v", err)
+	}
+	if err := os.WriteFile(skillPath, initialArchive, 0o644); err != nil {
+		t.Fatalf("seed skill archive: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		patch:       true,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected patched skill install, got %+v", result.installedSkills)
+	}
+	skillMd, err := readClaudeSkillContent(skillPath)
+	if err != nil {
+		t.Fatalf("read merged skill archive: %v", err)
+	}
+	if !strings.Contains(skillMd, "Team intro preserved by patch.") {
+		t.Fatalf("expected user intro to remain: %s", skillMd)
+	}
+	if !strings.Contains(skillMd, "Team Custom Section") {
+		t.Fatalf("expected custom section to remain: %s", skillMd)
+	}
+	if !strings.Contains(skillMd, "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content to be merged: %s", skillMd)
+	}
+}
+
 func TestInstallForceOverwritesExistingSkill(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
@@ -1042,6 +1084,10 @@ func TestRunInstallWritesSharedRulesrcForMultipleTargets(t *testing.T) {
 }
 
 func TestRunInstallForceSupportFileDeclinedSkipsFile(t *testing.T) {
+	t.Setenv("CI", "")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("TF_BUILD", "")
 	tmpDir := t.TempDir()
 	originalWD, err := os.Getwd()
 	if err != nil {
@@ -1098,6 +1144,10 @@ func TestRunInstallForceSupportFileDeclinedSkipsFile(t *testing.T) {
 }
 
 func TestRunInstallForceSupportFileAcceptedOverwritesFile(t *testing.T) {
+	t.Setenv("CI", "")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("TF_BUILD", "")
 	tmpDir := t.TempDir()
 	originalWD, err := os.Getwd()
 	if err != nil {

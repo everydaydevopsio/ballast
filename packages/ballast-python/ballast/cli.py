@@ -67,6 +67,7 @@ class InstallResult:
     installed_support_files: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     skipped_support_files: list[str] = field(default_factory=list)
+    declined_support_files: list[str] = field(default_factory=list)
     errors: list[tuple[str, str]] = field(default_factory=list)
 
 
@@ -1658,7 +1659,7 @@ def install(
         claude_md = root / "CLAUDE.md"
         should_patch_claude_md = patch or patch_claude_md
         if str(claude_md) in skipped_support_files:
-            result.skipped_support_files.append(str(claude_md))
+            result.declined_support_files.append(str(claude_md))
         elif claude_md.exists() and not force and not should_patch_claude_md:
             result.skipped_support_files.append(str(claude_md))
         else:
@@ -1681,7 +1682,7 @@ def install(
         agents_md = root / "AGENTS.md"
         should_patch_gemini_md = patch or patch_gemini_md
         if str(gemini_md) in skipped_support_files:
-            result.skipped_support_files.append(str(gemini_md))
+            result.declined_support_files.append(str(gemini_md))
         elif gemini_md.exists() and not force and not should_patch_gemini_md:
             result.skipped_support_files.append(str(gemini_md))
         else:
@@ -1712,7 +1713,7 @@ def install(
     if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"
         if str(agents_md) in skipped_support_files:
-            result.skipped_support_files.append(str(agents_md))
+            result.declined_support_files.append(str(agents_md))
         elif agents_md.exists() and not force and not patch:
             result.skipped_support_files.append(str(agents_md))
         else:
@@ -1808,6 +1809,11 @@ def print_install_result(
             "Skipped support files (already present; use --force to overwrite): "
             + ", ".join(result.skipped_support_files)
         )
+    if result.declined_support_files:
+        print(
+            "Skipped support files (overwrite declined): "
+            + ", ".join(result.declined_support_files)
+        )
 
 
 def run_install(args: argparse.Namespace) -> int:
@@ -1850,8 +1856,7 @@ def run_install(args: argparse.Namespace) -> int:
                 f"Existing GEMINI.md found at {root / 'GEMINI.md'}. Patch the Installed agent rules section?"
             )
 
-    per_target_results: list[tuple[str, InstallResult]] = []
-    save_config(root, language, targets, with_implicit_agents(agents), skills)
+    support_decisions: dict[str, str | None] = {}
     for target in targets:
         skipped_support_file, support_error = confirm_support_file_overwrite(
             root, target, bool(args.force), bool(args.yes)
@@ -1859,6 +1864,12 @@ def run_install(args: argparse.Namespace) -> int:
         if support_error:
             print(support_error)
             return 1
+        support_decisions[target] = skipped_support_file
+
+    per_target_results: list[tuple[str, InstallResult]] = []
+    save_config(root, language, targets, with_implicit_agents(agents), skills)
+    for target in targets:
+        skipped_support_file = support_decisions.get(target)
         if skipped_support_file:
             print(
                 f"Skipped support file: {Path(skipped_support_file).name} ({skipped_support_file})"
@@ -1891,6 +1902,7 @@ def run_install(args: argparse.Namespace) -> int:
         combined.installed_support_files.extend(result.installed_support_files)
         combined.skipped.extend(result.skipped)
         combined.skipped_support_files.extend(result.skipped_support_files)
+        combined.declined_support_files.extend(result.declined_support_files)
         combined.errors.extend(result.errors)
 
     if combined.errors:

@@ -12,7 +12,7 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 2. `--patch` must merge canonical skill content into an existing skill file using the existing patch logic for the selected target.
 3. `--force` must overwrite an existing skill file without patching.
 4. `--force` must prompt before replacing an existing support file (`AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`) that would lose user customizations.
-5. In non-interactive mode (`--yes`, CI, or non-TTY stdin), an attempted `--force` overwrite of an existing support file must fail with a clear error telling the operator to rerun interactively.
+5. In non-interactive mode (`--yes` or CI environment variables), an attempted `--force` overwrite of an existing support file must fail with a clear error telling the operator to rerun interactively without `--yes`.
 6. Creating a missing support file with `--force` must continue without prompting.
 7. Support-file patch behavior and existing agent-rule overwrite semantics must remain unchanged.
 8. README and installation documentation must describe the updated `--patch` and `--force` behavior.

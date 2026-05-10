@@ -703,6 +703,40 @@ Keep team-specific usage notes.
             self.assertIn("Keep team-specific usage notes.", content)
             self.assertIn("## Scan Architecture", content)
 
+    def test_install_patch_merges_claude_skill_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill_path = root / ".claude" / "skills" / "owasp-security-scan.skill"
+            skill_path.parent.mkdir(parents=True, exist_ok=True)
+            existing_skill_content = (
+                "# owasp-security-scan\n\n"
+                "Team intro preserved by patch.\n\n"
+                "## Team Custom Section\n\n"
+                "Keep this team-specific section.\n"
+            )
+            skill_path.write_bytes(
+                cli.build_claude_skill(
+                    "owasp-security-scan", "python", existing_skill_content
+                )
+            )
+
+            result = cli.install(
+                root,
+                "claude",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                True,
+                False,
+            )
+
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            skill_md = cli.read_claude_skill_content(skill_path)
+            self.assertIn("Team intro preserved by patch.", skill_md)
+            self.assertIn("Team Custom Section", skill_md)
+            self.assertIn("## Scan Architecture", skill_md)
+
     def test_install_force_overwrites_existing_skill(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1058,6 +1092,7 @@ Read and follow these rule files in `.gemini/rules/` when they apply:
 
             with (
                 mock.patch.object(cli, "resolve_project_root", return_value=root),
+                mock.patch.object(cli, "is_ci_mode", return_value=False),
                 mock.patch.object(cli, "prompt_yes_no", return_value=False),
                 io.StringIO() as buf,
                 redirect_stdout(buf),
@@ -1095,6 +1130,7 @@ Read and follow these rule files in `.gemini/rules/` when they apply:
 
             with (
                 mock.patch.object(cli, "resolve_project_root", return_value=root),
+                mock.patch.object(cli, "is_ci_mode", return_value=False),
                 mock.patch.object(cli, "prompt_yes_no", return_value=True),
             ):
                 exit_code = cli.run_install(args)

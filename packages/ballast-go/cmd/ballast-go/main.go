@@ -87,13 +87,14 @@ type rawRulesConfig struct {
 }
 
 type installResult struct {
-	installed           []string
-	installedRules      []installedRule
-	installedSkills     []string
-	installedSupport    []string
-	skipped             []string
-	skippedSupportFiles []string
-	errors              []agentError
+	installed            []string
+	installedRules       []installedRule
+	installedSkills      []string
+	installedSupport     []string
+	skipped              []string
+	skippedSupportFiles  []string
+	declinedSupportFiles []string
+	errors               []agentError
 }
 
 type installedRule struct {
@@ -354,6 +355,12 @@ func runInstall(args []string) int {
 		fmt.Printf(
 			"Skipped support files (already present; use --force to overwrite): %s\n",
 			strings.Join(result.skippedSupportFiles, ", "),
+		)
+	}
+	if len(result.declinedSupportFiles) > 0 {
+		fmt.Printf(
+			"Skipped support files (overwrite declined): %s\n",
+			strings.Join(result.declinedSupportFiles, ", "),
 		)
 	}
 	if len(result.installed) == 0 && len(result.installedSkills) == 0 && len(result.skipped) == 0 && len(result.errors) == 0 {
@@ -932,8 +939,8 @@ func install(opts installOptions) installResult {
 		if target == "codex" && !disableSupportFiles {
 			agentsPath := codexAgentsMDPath(opts.projectRoot)
 			if _, skipped := opts.skipSupport[agentsPath]; skipped {
-				if !contains(result.skippedSupportFiles, agentsPath) {
-					result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
+				if !contains(result.declinedSupportFiles, agentsPath) {
+					result.declinedSupportFiles = append(result.declinedSupportFiles, agentsPath)
 				}
 			} else if exists(agentsPath) && !opts.force && !opts.patch {
 				if !contains(result.skippedSupportFiles, agentsPath) {
@@ -966,8 +973,8 @@ func install(opts installOptions) installResult {
 			claudePath := claudeMDPath(opts.projectRoot)
 			shouldPatchClaude := opts.patch || opts.patchClaude
 			if _, skipped := opts.skipSupport[claudePath]; skipped {
-				if !contains(result.skippedSupportFiles, claudePath) {
-					result.skippedSupportFiles = append(result.skippedSupportFiles, claudePath)
+				if !contains(result.declinedSupportFiles, claudePath) {
+					result.declinedSupportFiles = append(result.declinedSupportFiles, claudePath)
 				}
 			} else if exists(claudePath) && !opts.force && !shouldPatchClaude {
 				if !contains(result.skippedSupportFiles, claudePath) {

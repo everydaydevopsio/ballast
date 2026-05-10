@@ -364,6 +364,7 @@ export interface InstallResult {
   installedSupportFiles: string[];
   skipped: string[];
   skippedSupportFiles: string[];
+  declinedSupportFiles: string[];
   errors: Array<{ agent: string; error: string }>;
 }
 
@@ -540,6 +541,7 @@ export function install(options: InstallOptions): InstallResult {
   const installedSupportFiles: string[] = [];
   const skipped: string[] = [];
   const skippedSupportFiles: string[] = [];
+  const declinedSupportFiles: string[] = [];
   const errors: Array<{ agent: string; error: string }> = [];
   const processedAgentIds = new Set<string>();
   const processedSkillIds = new Set<string>();
@@ -721,7 +723,7 @@ export function install(options: InstallOptions): InstallResult {
     const claudeMdPath = getClaudeMdPath(projectRoot);
     const shouldPatchClaudeMd = patch || patchClaudeMd;
     if (skippedSupportSet.has(claudeMdPath)) {
-      skippedSupportFiles.push(claudeMdPath);
+      declinedSupportFiles.push(claudeMdPath);
     } else if (fs.existsSync(claudeMdPath) && !force && !shouldPatchClaudeMd) {
       skippedSupportFiles.push(claudeMdPath);
     } else {
@@ -751,7 +753,7 @@ export function install(options: InstallOptions): InstallResult {
     const agentsMdPath = getCodexAgentsMdPath(projectRoot);
     const shouldPatchGeminiMd = patch || patchGeminiMd;
     if (skippedSupportSet.has(geminiMdPath)) {
-      skippedSupportFiles.push(geminiMdPath);
+      declinedSupportFiles.push(geminiMdPath);
     } else if (fs.existsSync(geminiMdPath) && !force && !shouldPatchGeminiMd) {
       skippedSupportFiles.push(geminiMdPath);
     } else {
@@ -796,7 +798,7 @@ export function install(options: InstallOptions): InstallResult {
   if (!disableSupportFiles && target === 'codex') {
     const agentsMdPath = getCodexAgentsMdPath(projectRoot);
     if (skippedSupportSet.has(agentsMdPath)) {
-      skippedSupportFiles.push(agentsMdPath);
+      declinedSupportFiles.push(agentsMdPath);
     } else if (fs.existsSync(agentsMdPath) && !force && !patch) {
       skippedSupportFiles.push(agentsMdPath);
     } else {
@@ -828,6 +830,7 @@ export function install(options: InstallOptions): InstallResult {
     installedSupportFiles,
     skipped,
     skippedSupportFiles,
+    declinedSupportFiles,
     errors
   };
 }
@@ -954,6 +957,22 @@ export async function runInstall(
     explicitAgentSelection || agents.length > 0
       ? agents
       : withImplicitAgents(priorConfig?.agents ?? []);
+
+  const supportDecisions = new Map<Target, SupportFileDecision>();
+  for (const target of targets) {
+    const supportDecision = await confirmSupportFileOverwrite(
+      target,
+      projectRoot,
+      options.force ?? false,
+      options.yes ?? false
+    );
+    if (supportDecision.error) {
+      console.error(supportDecision.error);
+      return 1;
+    }
+    supportDecisions.set(target, supportDecision);
+  }
+
   saveConfig(
     {
       targets,
@@ -967,16 +986,7 @@ export async function runInstall(
   );
 
   for (const target of targets) {
-    const supportDecision = await confirmSupportFileOverwrite(
-      target,
-      projectRoot,
-      options.force ?? false,
-      options.yes ?? false
-    );
-    if (supportDecision.error) {
-      console.error(supportDecision.error);
-      return 1;
-    }
+    const supportDecision = supportDecisions.get(target) ?? {};
     if (supportDecision.skipSupportFile) {
       console.log(
         `Skipped support file: ${getSupportFileLabel(supportDecision.skipSupportFile)} (${supportDecision.skipSupportFile})`
@@ -1072,6 +1082,11 @@ export async function runInstall(
         `Skipped support files (already present; use --force to overwrite): ${result.skippedSupportFiles.join(
           ', '
         )}`
+      );
+    }
+    if (result.declinedSupportFiles.length > 0) {
+      console.log(
+        `Skipped support files (overwrite declined): ${result.declinedSupportFiles.join(', ')}`
       );
     }
     if (

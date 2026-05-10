@@ -4,6 +4,7 @@ import os from 'os';
 import readline from 'readline';
 import { install, resolveTargetAndAgents, runInstall } from './install';
 import {
+  buildClaudeSkill,
   buildCodexAgentsMd,
   getClaudeMdPath,
   getDestination,
@@ -443,6 +444,69 @@ Keep team-specific usage notes.
       expect(fs.readFileSync(skillFile, 'utf8')).not.toBe(
         'stale skill content'
       );
+    });
+
+    test('patches SKILL.md inside an existing claude .skill archive when patch is true', () => {
+      const skillFile = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan.skill'
+      );
+      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      const existingSkillContent = `# owasp-security-scan
+
+Team intro preserved by patch.
+
+## Team Custom Section
+
+Keep this team-specific section.
+`;
+      fs.writeFileSync(
+        skillFile,
+        buildClaudeSkill('owasp-security-scan', existingSkillContent)
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        patch: true,
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installedSkills).toContain('owasp-security-scan');
+
+      // Read SKILL.md from output archive (stored/no-compression ZIP)
+      const archive = fs.readFileSync(skillFile);
+      function readStoredZipEntry(
+        buf: Buffer,
+        entry: string
+      ): string | undefined {
+        let offset = 0;
+        while (offset + 30 <= buf.length) {
+          if (buf.readUInt32LE(offset) !== 0x04034b50) break;
+          const compressedSize = buf.readUInt32LE(offset + 18);
+          const fileNameLength = buf.readUInt16LE(offset + 26);
+          const extraLength = buf.readUInt16LE(offset + 28);
+          const fileName = buf.toString(
+            'utf8',
+            offset + 30,
+            offset + 30 + fileNameLength
+          );
+          const dataStart = offset + 30 + fileNameLength + extraLength;
+          if (fileName === entry)
+            return buf.toString('utf8', dataStart, dataStart + compressedSize);
+          offset = dataStart + compressedSize;
+        }
+        return undefined;
+      }
+      const skillMd = readStoredZipEntry(archive, 'SKILL.md');
+      expect(skillMd).toContain('Team intro preserved by patch.');
+      expect(skillMd).toContain('Team Custom Section');
+      expect(skillMd).toContain('## Scan Architecture');
     });
 
     test('writes ansible language rules when requested', () => {
