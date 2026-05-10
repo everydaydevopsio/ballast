@@ -294,7 +294,11 @@ Recommended order for one repository that uses all five language profiles:
 4. If the repo also contains Ansible, run `ballast-go install --language ansible --target cursor --all`.
 5. If the repo also contains Terraform, run `ballast-go install --language terraform --target cursor --all`.
 
-Ballast only installs shipped agents and skills and follows the single overwrite policy (existing rule files are preserved unless `--force` is passed). Use `--patch` to merge new Ballast content into an existing rule file while preserving the user's version of edited sections.
+Ballast only installs shipped agents and skills and follows the single overwrite policy: existing rule and skill files are preserved unless you explicitly choose `--patch` or `--force`.
+
+Use `--patch` when you want to merge upstream Ballast updates into an existing rule or skill file while preserving user-edited sections.
+
+Use `--force` when you want to reset a managed rule or skill file to canonical Ballast content. When `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` already exists, `--force` prompts before overwriting it; in non-interactive mode (`--yes` or CI), Ballast aborts instead of replacing the support file silently.
 
 ## CLI Flags
 
@@ -304,8 +308,8 @@ Ballast only installs shipped agents and skills and follows the single overwrite
 - `--skill, -s`: comma-separated skill list
 - `--all`: install all agents for the selected language
 - `--all-skills`: install all available skills for the selected language
-- `--force, -f`: overwrite existing rule files
-- `--patch, -p`: merge upstream rule updates into existing rule files while preserving user-edited sections (`--force` wins if both are set)
+- `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`
+- `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
 
 ## Wrapper Commands

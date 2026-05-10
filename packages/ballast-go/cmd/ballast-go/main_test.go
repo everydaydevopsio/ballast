@@ -853,7 +853,7 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 	}
 }
 
-func TestInstallRefreshesExistingManagedSkillWithoutForce(t *testing.T) {
+func TestInstallSkipsExistingSkillWithoutForceOrPatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
 	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
@@ -871,19 +871,208 @@ func TestInstallRefreshesExistingManagedSkillWithoutForce(t *testing.T) {
 		force:       false,
 		saveConfig:  false,
 	})
-	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
-		t.Fatalf("expected refreshed skill, got %+v", result.installedSkills)
+	if len(result.installedSkills) != 0 {
+		t.Fatalf("expected existing skill to be skipped, got %+v", result.installedSkills)
 	}
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
 		t.Fatalf("read existing skill: %v", err)
 	}
+	if string(content) != "stale skill content" {
+		t.Fatalf("expected existing skill content to remain, got %q", string(content))
+	}
+}
+
+func TestInstallPatchCreatesMissingSkill(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"opencode"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		patch:       true,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected patched install to create skill, got %+v", result.installedSkills)
+	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md"))
+	if err != nil {
+		t.Fatalf("read created skill: %v", err)
+	}
+	if !strings.Contains(string(content), "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content, got %q", string(content))
+	}
+}
+
+func TestInstallPatchMergesExistingSkill(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".cursor", "rules", "owasp-security-scan.mdc")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(skillPath, []byte(`---
+description: Team customized skill
+alwaysApply: true
+---
+
+Team intro.
+
+## Usage
+
+Keep team-specific usage notes.
+`), 0o644); err != nil {
+		t.Fatalf("seed skill file: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"cursor"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		patch:       true,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected patched skill install, got %+v", result.installedSkills)
+	}
+	content, err := os.ReadFile(skillPath)
+	if err != nil {
+		t.Fatalf("read merged skill: %v", err)
+	}
 	text := string(content)
-	if !strings.Contains(text, "# OWASP Security Scan Skill") {
-		t.Fatalf("expected refreshed managed skill content, got %q", text)
+	if !strings.Contains(text, "description: Team customized skill") {
+		t.Fatalf("expected custom frontmatter to remain: %s", text)
+	}
+	if !strings.Contains(text, "alwaysApply: true") {
+		t.Fatalf("expected custom alwaysApply to remain: %s", text)
+	}
+	if !strings.Contains(text, "Keep team-specific usage notes.") {
+		t.Fatalf("expected custom section to remain: %s", text)
+	}
+	if !strings.Contains(text, "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content to be merged: %s", text)
+	}
+}
+
+func TestInstallPatchMergesClaudeSkillArchive(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	existingSkillContent := "# owasp-security-scan\n\nTeam intro preserved by patch.\n\n## Team Custom Section\n\nKeep this team-specific section.\n"
+	initialArchive, err := buildClaudeSkill("owasp-security-scan", "go", existingSkillContent)
+	if err != nil {
+		t.Fatalf("build initial skill archive: %v", err)
+	}
+	if err := os.WriteFile(skillPath, initialArchive, 0o644); err != nil {
+		t.Fatalf("seed skill archive: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		patch:       true,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected patched skill install, got %+v", result.installedSkills)
+	}
+	skillMd, err := readClaudeSkillContent(skillPath)
+	if err != nil {
+		t.Fatalf("read merged skill archive: %v", err)
+	}
+	if !strings.Contains(skillMd, "Team intro preserved by patch.") {
+		t.Fatalf("expected user intro to remain: %s", skillMd)
+	}
+	if !strings.Contains(skillMd, "Team Custom Section") {
+		t.Fatalf("expected custom section to remain: %s", skillMd)
+	}
+	if !strings.Contains(skillMd, "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content to be merged: %s", skillMd)
+	}
+}
+
+func TestInstallForceOverwritesExistingClaudeSkillArchive(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	existingSkillContent := "# owasp-security-scan\n\nTeam-only intro that should be removed on force.\n\n## Team Custom Section\n\nThis section should not survive a force overwrite.\n"
+	initialArchive, err := buildClaudeSkill("owasp-security-scan", "go", existingSkillContent)
+	if err != nil {
+		t.Fatalf("build initial skill archive: %v", err)
+	}
+	if err := os.WriteFile(skillPath, initialArchive, 0o644); err != nil {
+		t.Fatalf("seed skill archive: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       true,
+		patch:       false,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected force install, got %+v", result.installedSkills)
+	}
+	skillMd, err := readClaudeSkillContent(skillPath)
+	if err != nil {
+		t.Fatalf("read overwritten skill archive: %v", err)
+	}
+	if strings.Contains(skillMd, "Team-only intro") {
+		t.Fatalf("expected team intro to be removed by force overwrite: %s", skillMd)
+	}
+	if strings.Contains(skillMd, "Team Custom Section") {
+		t.Fatalf("expected custom section to be removed by force overwrite: %s", skillMd)
+	}
+	if !strings.Contains(skillMd, "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content after force overwrite: %s", skillMd)
+	}
+}
+
+func TestInstallForceOverwritesExistingSkill(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(skillPath, []byte("stale skill content"), 0o644); err != nil {
+		t.Fatalf("seed skill file: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"opencode"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       true,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected force install to overwrite skill, got %+v", result.installedSkills)
+	}
+	content, err := os.ReadFile(skillPath)
+	if err != nil {
+		t.Fatalf("read overwritten skill: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content, got %q", text)
 	}
 	if text == "stale skill content" {
-		t.Fatalf("expected stale skill content to be refreshed")
+		t.Fatalf("expected stale skill content to be overwritten")
 	}
 }
 
@@ -933,6 +1122,163 @@ func TestRunInstallWritesSharedRulesrcForMultipleTargets(t *testing.T) {
 	}
 	if !strings.Contains(string(content), `"paths": {`) {
 		t.Fatalf("expected paths in shared config: %s", string(content))
+	}
+}
+
+func TestRunInstallForceSupportFileDeclinedSkipsFile(t *testing.T) {
+	t.Setenv("CI", "")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("TF_BUILD", "")
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agentsPath := filepath.Join(tmpDir, "AGENTS.md")
+	if err := os.WriteFile(agentsPath, []byte("# AGENTS.md\n\nTeam customizations.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = reader
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		_ = reader.Close()
+	})
+	if _, err := writer.WriteString("n\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := runInstall([]string{"install", "--target", "codex", "--skill", "owasp-security-scan", "--force"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	content, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "Team customizations.") {
+		t.Fatalf("expected AGENTS.md to remain unchanged: %s", string(content))
+	}
+	if !strings.Contains(output, "Skipped support file: AGENTS.md") {
+		t.Fatalf("expected skip notice in output, got %q", output)
+	}
+}
+
+func TestRunInstallForceSupportFileAcceptedOverwritesFile(t *testing.T) {
+	t.Setenv("CI", "")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("TF_BUILD", "")
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agentsPath := filepath.Join(tmpDir, "AGENTS.md")
+	if err := os.WriteFile(agentsPath, []byte("# AGENTS.md\n\nTeam customizations.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = reader
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		_ = reader.Close()
+	})
+	if _, err := writer.WriteString("y\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	exitCode := runInstall([]string{"install", "--target", "codex", "--skill", "owasp-security-scan", "--force"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	content, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "## Installed skills") {
+		t.Fatalf("expected canonical AGENTS.md content, got %s", text)
+	}
+	if strings.Contains(text, "Team customizations.") {
+		t.Fatalf("expected AGENTS.md to be overwritten, got %s", text)
+	}
+}
+
+func TestRunInstallForceSupportFileNonInteractiveAborts(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agentsPath := filepath.Join(tmpDir, "AGENTS.md")
+	if err := os.WriteFile(agentsPath, []byte("# AGENTS.md\n\nTeam customizations.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := runInstall([]string{"install", "--target", "codex", "--skill", "owasp-security-scan", "--force", "--yes"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	content, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "Team customizations.") {
+		t.Fatalf("expected AGENTS.md to remain unchanged: %s", string(content))
+	}
+	if !strings.Contains(output, "Cannot overwrite existing support file AGENTS.md in non-interactive mode") {
+		t.Fatalf("expected non-interactive error, got %q", output)
 	}
 }
 

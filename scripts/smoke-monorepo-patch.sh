@@ -111,6 +111,11 @@ Read and follow these rule files in \`${existing_path%/old.md}/\` when they appl
 EOF
 }
 
+remove_support_files() {
+  local monorepo="$1"
+  rm -f "${monorepo}/CLAUDE.md" "${monorepo}/AGENTS.md" "${monorepo}/GEMINI.md"
+}
+
 rule_path() {
   local monorepo="$1"
   local target="$2"
@@ -238,6 +243,8 @@ run_typescript_smoke() {
     verify_rule "${rule_file}" "## When Completed"
     verify_support_file "${monorepo}" "${target}" "${rule_name}"
 
+    remove_support_files "${monorepo}"
+
     (
       cd "${monorepo}"
       node "${REPO_ROOT}/packages/ballast-typescript/dist/cli.js" install --target "${target}" --agent linting --force --yes
@@ -273,6 +280,8 @@ run_python_smoke() {
     verify_rule "${rule_file}" "## Baseline Tooling"
     verify_support_file "${monorepo}" "${target}" "${rule_name}"
 
+    remove_support_files "${monorepo}"
+
     (
       cd "${monorepo}"
       PYTHONPATH="${REPO_ROOT}/packages/ballast-python" python3 -m ballast install --language python --target "${target}" --agent linting --force --yes
@@ -307,6 +316,8 @@ run_go_smoke() {
     rule_file="$(rule_path "${monorepo}" "${target}" "${rule_name}")"
     verify_rule "${rule_file}" "## Commands"
     verify_support_file "${monorepo}" "${target}" "${rule_name}"
+
+    remove_support_files "${monorepo}"
 
     (
       cd "${monorepo}"

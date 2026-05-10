@@ -477,11 +477,14 @@ export function buildSkillMarkdown(skillId: string): string {
   return parseSkillMetadata(skillId).body.trimEnd() + '\n';
 }
 
-export function buildClaudeSkill(skillId: string): Buffer {
+export function buildClaudeSkill(
+  skillId: string,
+  skillContent?: string
+): Buffer {
   const entries: SkillEntry[] = [
     {
       name: 'SKILL.md',
-      data: Buffer.from(getSkillContent(skillId), 'utf8')
+      data: Buffer.from(skillContent ?? getSkillContent(skillId), 'utf8')
     }
   ];
   for (const relativePath of listSkillReferenceFiles(skillId)) {

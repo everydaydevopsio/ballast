@@ -67,6 +67,7 @@ class InstallResult:
     installed_support_files: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     skipped_support_files: list[str] = field(default_factory=list)
+    declined_support_files: list[str] = field(default_factory=list)
     errors: list[tuple[str, str]] = field(default_factory=list)
 
 
@@ -830,10 +831,12 @@ def build_skill_markdown(skill: str, language: str) -> str:
     return body.rstrip() + "\n"
 
 
-def build_claude_skill(skill: str, language: str) -> bytes:
+def build_claude_skill(
+    skill: str, language: str, skill_content: str | None = None
+) -> bytes:
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
-        archive.writestr("SKILL.md", read_skill(skill, language))
+        archive.writestr("SKILL.md", skill_content or read_skill(skill, language))
         references = skill_dir(skill, language) / "references"
         if references.exists():
             for ref in sorted(references.rglob("*")):
@@ -842,6 +845,12 @@ def build_claude_skill(skill: str, language: str) -> bytes:
                         ref, f"references/{ref.relative_to(references).as_posix()}"
                     )
     return output.getvalue()
+
+
+def read_claude_skill_content(archive_path: Path) -> str:
+    with zipfile.ZipFile(archive_path) as archive:
+        with archive.open("SKILL.md") as skill_file:
+            return skill_file.read().decode("utf-8")
 
 
 def destination(root: Path, target: str, basename: str) -> Path:
@@ -1390,6 +1399,41 @@ def prompt_yes_no(question: str, default: bool = False) -> bool:
     return value in {"y", "yes"}
 
 
+def support_file_path(root: Path, target: str) -> Path | None:
+    if target == "claude":
+        return root / "CLAUDE.md"
+    if target == "gemini":
+        return root / "GEMINI.md"
+    if target == "codex":
+        return root / "AGENTS.md"
+    return None
+
+
+def confirm_support_file_overwrite(
+    root: Path, target: str, force: bool, yes: bool
+) -> tuple[str | None, str | None]:
+    if not force:
+        return None, None
+    if os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1":
+        return None, None
+    support_file = support_file_path(root, target)
+    if support_file is None or not support_file.exists():
+        return None, None
+    if is_ci_mode() or yes:
+        return (
+            None,
+            f"Cannot overwrite existing support file {support_file.name} in non-interactive mode. Re-run interactively without --yes to confirm the destructive overwrite.",
+        )
+    approved = prompt_yes_no(
+        "\n"
+        f"⚠️  {support_file.name} already exists and may contain your customizations.\n"
+        "    --force will replace it with the canonical template.\n"
+        "    Your current file will be lost.\n\n"
+        "    Continue?"
+    )
+    return (None, None) if approved else (str(support_file), None)
+
+
 def prompt_targets() -> list[str]:
     value = prompt(f"AI platform(s) ({', '.join(TARGETS)}, comma-separated): ")
     if value.strip().lower() == "all":
@@ -1506,6 +1550,7 @@ def install(
     persist: bool,
     patch_claude_md: bool = False,
     patch_gemini_md: bool = False,
+    skip_support_files: set[str] | None = None,
 ) -> InstallResult:
     result = InstallResult()
     agents = with_implicit_agents(agents)
@@ -1532,6 +1577,7 @@ def install(
         if config_for_support_files
         else skills
     )
+    skipped_support_files = skip_support_files or set()
 
     for agent in agents:
         if not is_valid_agent(agent, language):
@@ -1576,15 +1622,36 @@ def install(
             continue
         try:
             dst = skill_destination(root, target, skill)
+            file_exists = dst.exists()
             dst.parent.mkdir(parents=True, exist_ok=True)
+            if file_exists and not force and not patch:
+                continue
             if target == "cursor":
-                dst.write_text(
-                    build_cursor_skill_format(skill, language), encoding="utf-8"
+                content = build_cursor_skill_format(skill, language)
+                next_content = (
+                    patch_rule_content(dst.read_text(encoding="utf-8"), content, target)
+                    if file_exists and not force and patch
+                    else content
                 )
+                dst.write_text(next_content, encoding="utf-8")
             elif target == "claude":
-                dst.write_bytes(build_claude_skill(skill, language))
+                skill_content = read_skill(skill, language)
+                next_content = (
+                    patch_rule_content(
+                        read_claude_skill_content(dst), skill_content, target
+                    )
+                    if file_exists and not force and patch
+                    else skill_content
+                )
+                dst.write_bytes(build_claude_skill(skill, language, next_content))
             else:
-                dst.write_text(build_skill_markdown(skill, language), encoding="utf-8")
+                content = build_skill_markdown(skill, language)
+                next_content = (
+                    patch_rule_content(dst.read_text(encoding="utf-8"), content, target)
+                    if file_exists and not force and patch
+                    else content
+                )
+                dst.write_text(next_content, encoding="utf-8")
             result.installed_skills.append(skill)
             processed_skills.append(skill)
         except Exception as err:
@@ -1593,7 +1660,9 @@ def install(
     if target == "claude" and not disable_support_files:
         claude_md = root / "CLAUDE.md"
         should_patch_claude_md = patch or patch_claude_md
-        if claude_md.exists() and not force and not should_patch_claude_md:
+        if str(claude_md) in skipped_support_files:
+            result.declined_support_files.append(str(claude_md))
+        elif claude_md.exists() and not force and not should_patch_claude_md:
             result.skipped_support_files.append(str(claude_md))
         else:
             try:
@@ -1614,7 +1683,9 @@ def install(
         gemini_md = root / "GEMINI.md"
         agents_md = root / "AGENTS.md"
         should_patch_gemini_md = patch or patch_gemini_md
-        if gemini_md.exists() and not force and not should_patch_gemini_md:
+        if str(gemini_md) in skipped_support_files:
+            result.declined_support_files.append(str(gemini_md))
+        elif gemini_md.exists() and not force and not should_patch_gemini_md:
             result.skipped_support_files.append(str(gemini_md))
         else:
             try:
@@ -1631,7 +1702,7 @@ def install(
             except Exception as err:
                 result.errors.append(("gemini", str(err)))
 
-        if not agents_md.exists():
+        if not agents_md.exists() and str(agents_md) not in skipped_support_files:
             try:
                 agents_md.write_text(
                     build_codex_agents_md(support_agents, support_skills, language),
@@ -1643,7 +1714,9 @@ def install(
 
     if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"
-        if agents_md.exists() and not force and not patch:
+        if str(agents_md) in skipped_support_files:
+            result.declined_support_files.append(str(agents_md))
+        elif agents_md.exists() and not force and not patch:
             result.skipped_support_files.append(str(agents_md))
         else:
             try:
@@ -1738,6 +1811,11 @@ def print_install_result(
             "Skipped support files (already present; use --force to overwrite): "
             + ", ".join(result.skipped_support_files)
         )
+    if result.declined_support_files:
+        print(
+            "Skipped support files (overwrite declined): "
+            + ", ".join(result.declined_support_files)
+        )
 
 
 def run_install(args: argparse.Namespace) -> int:
@@ -1780,36 +1858,41 @@ def run_install(args: argparse.Namespace) -> int:
                 f"Existing GEMINI.md found at {root / 'GEMINI.md'}. Patch the Installed agent rules section?"
             )
 
-    if len(targets) == 1:
-        per_target_results = [
+    support_decisions: dict[str, str | None] = {}
+    for target in targets:
+        skipped_support_file, support_error = confirm_support_file_overwrite(
+            root, target, bool(args.force), bool(args.yes)
+        )
+        if support_error:
+            print(support_error)
+            return 1
+        support_decisions[target] = skipped_support_file
+
+    per_target_results: list[tuple[str, InstallResult]] = []
+    save_config(root, language, targets, with_implicit_agents(agents), skills)
+    for target in targets:
+        skipped_support_file = support_decisions.get(target)
+        if skipped_support_file:
+            print(
+                f"Skipped support file: {Path(skipped_support_file).name} ({skipped_support_file})"
+            )
+        per_target_results.append(
             (
-                targets[0],
+                target,
                 install(
                     root,
-                    targets[0],
+                    target,
                     agents,
                     skills,
                     language,
                     bool(args.force),
                     bool(args.patch),
-                    True,
+                    False,
                     patch_claude_md,
                     patch_gemini_md,
+                    {skipped_support_file} if skipped_support_file else None,
                 ),
             )
-        ]
-    else:
-        per_target_results = install_for_targets(
-            root,
-            targets,
-            agents,
-            skills,
-            language,
-            bool(args.force),
-            bool(args.patch),
-            True,
-            patch_claude_md,
-            patch_gemini_md,
         )
 
     combined = InstallResult()
@@ -1821,6 +1904,7 @@ def run_install(args: argparse.Namespace) -> int:
         combined.installed_support_files.extend(result.installed_support_files)
         combined.skipped.extend(result.skipped)
         combined.skipped_support_files.extend(result.skipped_support_files)
+        combined.declined_support_files.extend(result.declined_support_files)
         combined.errors.extend(result.errors)
 
     if combined.errors:
@@ -1862,8 +1946,18 @@ def parser() -> argparse.ArgumentParser:
     install_cmd.add_argument("--skill", "-s")
     install_cmd.add_argument("--all", action="store_true")
     install_cmd.add_argument("--all-skills", action="store_true")
-    install_cmd.add_argument("--force", "-f", action="store_true")
-    install_cmd.add_argument("--patch", "-p", action="store_true")
+    install_cmd.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Overwrite existing rule and skill files; prompt before replacing support files",
+    )
+    install_cmd.add_argument(
+        "--patch",
+        "-p",
+        action="store_true",
+        help="Merge upstream rule and skill updates into existing files",
+    )
     install_cmd.add_argument("--yes", "-y", action="store_true")
     sub.add_parser(
         "doctor", help="Check local Ballast CLI versions and .rulesrc.json metadata"

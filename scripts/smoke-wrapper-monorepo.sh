@@ -247,7 +247,7 @@ EOF
 
   (
     cd "${project}"
-    ballast --language go upgrade
+    ballast --language go upgrade --force
   )
 
   grep -q "# OWASP Security Scan Skill" "${project}/.codex/rules/owasp-security-scan.md"

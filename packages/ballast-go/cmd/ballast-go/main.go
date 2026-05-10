@@ -9,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -86,13 +87,14 @@ type rawRulesConfig struct {
 }
 
 type installResult struct {
-	installed           []string
-	installedRules      []installedRule
-	installedSkills     []string
-	installedSupport    []string
-	skipped             []string
-	skippedSupportFiles []string
-	errors              []agentError
+	installed            []string
+	installedRules       []installedRule
+	installedSkills      []string
+	installedSupport     []string
+	skipped              []string
+	skippedSupportFiles  []string
+	declinedSupportFiles []string
+	errors               []agentError
 }
 
 type installedRule struct {
@@ -126,6 +128,7 @@ type installOptions struct {
 	force       bool
 	patch       bool
 	patchClaude bool
+	skipSupport map[string]struct{}
 	saveConfig  bool
 }
 
@@ -193,9 +196,9 @@ func runInstall(args []string) int {
 	fs.StringVar(skill, "s", "", "comma-separated list")
 	all := fs.Bool("all", false, "install all agents")
 	allSkills := fs.Bool("all-skills", false, "install all skills")
-	force := fs.Bool("force", false, "overwrite files")
-	patch := fs.Bool("patch", false, "merge upstream updates into existing files")
-	fs.BoolVar(patch, "p", false, "merge upstream updates into existing files")
+	force := fs.Bool("force", false, "overwrite existing rule and skill files; prompts before replacing support files")
+	patch := fs.Bool("patch", false, "merge upstream rule and skill updates into existing files")
+	fs.BoolVar(patch, "p", false, "merge upstream rule and skill updates into existing files")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	if err := fs.Parse(trimCommand(args)); err != nil {
@@ -267,6 +270,35 @@ func runInstall(args []string) int {
 			break
 		}
 	}
+	skippedSupport := map[string]struct{}{}
+	for _, target := range resolved.Targets {
+		supportPath := supportFilePath(root, target)
+		if supportPath == "" || !*force || !exists(supportPath) {
+			continue
+		}
+		if os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1" {
+			continue
+		}
+		if *yes || isCIMode() {
+			fmt.Printf("Cannot overwrite existing support file %s in non-interactive mode. Re-run interactively without --yes to confirm the destructive overwrite.\n", filepath.Base(supportPath))
+			return 1
+		}
+		approved, promptErr := promptYesNo(
+			fmt.Sprintf(
+				"\n⚠️  %s already exists and may contain your customizations.\n    --force will replace it with the canonical template.\n    Your current file will be lost.\n\n    Continue?",
+				filepath.Base(supportPath),
+			),
+			false,
+		)
+		if promptErr != nil {
+			fmt.Println(promptErr)
+			return 1
+		}
+		if !approved {
+			skippedSupport[supportPath] = struct{}{}
+			fmt.Printf("Skipped support file: %s (%s)\n", filepath.Base(supportPath), supportPath)
+		}
+	}
 	result := install(installOptions{
 		projectRoot: root,
 		targets:     resolved.Targets,
@@ -276,6 +308,7 @@ func runInstall(args []string) int {
 		force:       *force,
 		patch:       *patch,
 		patchClaude: patchClaude,
+		skipSupport: skippedSupport,
 		saveConfig:  true,
 	})
 
@@ -327,11 +360,28 @@ func runInstall(args []string) int {
 			strings.Join(result.skippedSupportFiles, ", "),
 		)
 	}
+	if len(result.declinedSupportFiles) > 0 {
+		fmt.Printf(
+			"Skipped support files (overwrite declined): %s\n",
+			strings.Join(result.declinedSupportFiles, ", "),
+		)
+	}
 	if len(result.installed) == 0 && len(result.installedSkills) == 0 && len(result.skipped) == 0 && len(result.errors) == 0 {
 		fmt.Println("Nothing to install.")
 	}
 
 	return 0
+}
+
+func supportFilePath(projectRoot, target string) string {
+	switch target {
+	case "codex":
+		return codexAgentsMDPath(projectRoot)
+	case "claude":
+		return claudeMDPath(projectRoot)
+	default:
+		return ""
+	}
 }
 
 func printHelp() {
@@ -351,8 +401,8 @@ Options:
   --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
-  --force                   Overwrite existing rule files
-  --patch, -p               Merge upstream rule updates into existing files; ignored when --force is set
+  --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md or CLAUDE.md
+  --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
   --help, -h                Show this help
   --version, -v             Show version
@@ -819,6 +869,9 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
 				continue
 			}
+			if exists(file) && !opts.force && !opts.patch {
+				continue
+			}
 			switch target {
 			case "cursor":
 				content, buildErr := buildCursorSkillFormat(skillID, opts.language)
@@ -826,9 +879,32 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				err = os.WriteFile(file, []byte(content), 0o644)
+				nextContent := content
+				if exists(file) && !opts.force && opts.patch {
+					existing, readErr := os.ReadFile(file)
+					if readErr != nil {
+						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
+						continue
+					}
+					nextContent = patchRuleContent(string(existing), content, target)
+				}
+				err = os.WriteFile(file, []byte(nextContent), 0o644)
 			case "claude":
-				content, buildErr := buildClaudeSkill(skillID, opts.language)
+				skillContent, readErr := readSkillContent(skillID, opts.language)
+				if readErr != nil {
+					result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
+					continue
+				}
+				nextContent := skillContent
+				if exists(file) && !opts.force && opts.patch {
+					existing, readErr := readClaudeSkillContent(file)
+					if readErr != nil {
+						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
+						continue
+					}
+					nextContent = patchRuleContent(existing, skillContent, target)
+				}
+				content, buildErr := buildClaudeSkill(skillID, opts.language, nextContent)
 				if buildErr != nil {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
@@ -840,7 +916,16 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				err = os.WriteFile(file, []byte(content), 0o644)
+				nextContent := content
+				if exists(file) && !opts.force && opts.patch {
+					existing, readErr := os.ReadFile(file)
+					if readErr != nil {
+						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
+						continue
+					}
+					nextContent = patchRuleContent(string(existing), content, target)
+				}
+				err = os.WriteFile(file, []byte(nextContent), 0o644)
 			default:
 				err = fmt.Errorf("unknown target: %s", target)
 			}
@@ -856,7 +941,11 @@ func install(opts installOptions) installResult {
 
 		if target == "codex" && !disableSupportFiles {
 			agentsPath := codexAgentsMDPath(opts.projectRoot)
-			if exists(agentsPath) && !opts.force && !opts.patch {
+			if _, skipped := opts.skipSupport[agentsPath]; skipped {
+				if !contains(result.declinedSupportFiles, agentsPath) {
+					result.declinedSupportFiles = append(result.declinedSupportFiles, agentsPath)
+				}
+			} else if exists(agentsPath) && !opts.force && !opts.patch {
 				if !contains(result.skippedSupportFiles, agentsPath) {
 					result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
 				}
@@ -886,7 +975,11 @@ func install(opts installOptions) installResult {
 		if target == "claude" && !disableSupportFiles {
 			claudePath := claudeMDPath(opts.projectRoot)
 			shouldPatchClaude := opts.patch || opts.patchClaude
-			if exists(claudePath) && !opts.force && !shouldPatchClaude {
+			if _, skipped := opts.skipSupport[claudePath]; skipped {
+				if !contains(result.declinedSupportFiles, claudePath) {
+					result.declinedSupportFiles = append(result.declinedSupportFiles, claudePath)
+				}
+			} else if exists(claudePath) && !opts.force && !shouldPatchClaude {
 				if !contains(result.skippedSupportFiles, claudePath) {
 					result.skippedSupportFiles = append(result.skippedSupportFiles, claudePath)
 				}
@@ -1181,10 +1274,16 @@ func buildSkillMarkdown(skillID, language string) (string, error) {
 	return strings.TrimRight(body, "\n") + "\n", nil
 }
 
-func buildClaudeSkill(skillID, language string) ([]byte, error) {
-	content, err := readSkillContent(skillID, language)
-	if err != nil {
-		return nil, err
+func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte, error) {
+	content := ""
+	if len(skillContent) > 0 {
+		content = skillContent[0]
+	} else {
+		var err error
+		content, err = readSkillContent(skillID, language)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var buffer bytes.Buffer
 	archive := zip.NewWriter(&buffer)
@@ -1247,6 +1346,33 @@ func buildClaudeSkill(skillID, language string) ([]byte, error) {
 		return nil, err
 	}
 	return buffer.Bytes(), nil
+}
+
+func readClaudeSkillContent(archivePath string) (string, error) {
+	content, err := os.ReadFile(archivePath)
+	if err != nil {
+		return "", err
+	}
+	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
+	if err != nil {
+		return "", err
+	}
+	for _, file := range reader.File {
+		if file.Name != "SKILL.md" {
+			continue
+		}
+		rc, err := file.Open()
+		if err != nil {
+			return "", err
+		}
+		defer rc.Close()
+		data, err := io.ReadAll(rc)
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+	return "", fmt.Errorf("skill archive missing SKILL.md")
 }
 
 func normalizeLineEndings(content string) string {
