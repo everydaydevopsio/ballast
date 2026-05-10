@@ -737,6 +737,40 @@ Keep team-specific usage notes.
             self.assertIn("Team Custom Section", skill_md)
             self.assertIn("## Scan Architecture", skill_md)
 
+    def test_install_force_overwrites_existing_claude_skill_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill_path = root / ".claude" / "skills" / "owasp-security-scan.skill"
+            skill_path.parent.mkdir(parents=True, exist_ok=True)
+            existing_skill_content = (
+                "# owasp-security-scan\n\n"
+                "Team intro that should be discarded on force.\n\n"
+                "## Team Custom Section\n\n"
+                "This section should be gone after force.\n"
+            )
+            skill_path.write_bytes(
+                cli.build_claude_skill(
+                    "owasp-security-scan", "python", existing_skill_content
+                )
+            )
+
+            result = cli.install(
+                root,
+                "claude",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                True,
+                False,
+                False,
+            )
+
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            skill_md = cli.read_claude_skill_content(skill_path)
+            self.assertNotIn("Team intro that should be discarded on force.", skill_md)
+            self.assertNotIn("Team Custom Section", skill_md)
+            self.assertIn("## Scan Architecture", skill_md)
+
     def test_install_force_overwrites_existing_skill(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

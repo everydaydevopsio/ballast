@@ -509,6 +509,70 @@ Keep this team-specific section.
       expect(skillMd).toContain('## Scan Architecture');
     });
 
+    test('force-overwrites an existing claude .skill archive without patching', () => {
+      const skillFile = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan.skill'
+      );
+      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      const existingSkillContent = `# owasp-security-scan
+
+Team intro that should be discarded on force.
+
+## Team Custom Section
+
+This section should be gone after force.
+`;
+      fs.writeFileSync(
+        skillFile,
+        buildClaudeSkill('owasp-security-scan', existingSkillContent)
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        patch: false,
+        force: true,
+        saveConfig: false
+      });
+
+      expect(result.installedSkills).toContain('owasp-security-scan');
+
+      const archive = fs.readFileSync(skillFile);
+      function readStoredZipEntryLocal(
+        buf: Buffer,
+        entry: string
+      ): string | undefined {
+        let offset = 0;
+        while (offset + 30 <= buf.length) {
+          if (buf.readUInt32LE(offset) !== 0x04034b50) break;
+          const compressedSize = buf.readUInt32LE(offset + 18);
+          const fileNameLength = buf.readUInt16LE(offset + 26);
+          const extraLength = buf.readUInt16LE(offset + 28);
+          const fileName = buf.toString(
+            'utf8',
+            offset + 30,
+            offset + 30 + fileNameLength
+          );
+          const dataStart = offset + 30 + fileNameLength + extraLength;
+          if (fileName === entry)
+            return buf.toString('utf8', dataStart, dataStart + compressedSize);
+          offset = dataStart + compressedSize;
+        }
+        return undefined;
+      }
+      const skillMd = readStoredZipEntryLocal(archive, 'SKILL.md');
+      expect(skillMd).not.toContain(
+        'Team intro that should be discarded on force.'
+      );
+      expect(skillMd).not.toContain('Team Custom Section');
+      expect(skillMd).toContain('## Scan Architecture');
+    });
+
     test('writes ansible language rules when requested', () => {
       const result = install({
         projectRoot: tmpDir,

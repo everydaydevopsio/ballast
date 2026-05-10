@@ -276,6 +276,9 @@ func runInstall(args []string) int {
 		if supportPath == "" || !*force || !exists(supportPath) {
 			continue
 		}
+		if os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1" {
+			continue
+		}
 		if *yes || isCIMode() {
 			fmt.Printf("Cannot overwrite existing support file %s in non-interactive mode. Re-run interactively without --yes to confirm the destructive overwrite.\n", filepath.Base(supportPath))
 			return 1

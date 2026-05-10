@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
+import zlib from 'zlib';
 import {
   buildContent,
   buildClaudeSkill,
@@ -418,10 +419,14 @@ function readStoredZipEntry(
       break;
     }
     if (fileName === entryName) {
-      if (compressionMethod !== 0) {
-        return undefined;
+      const data = archive.subarray(dataStart, dataEnd);
+      if (compressionMethod === 0) {
+        return data.toString('utf8');
       }
-      return archive.toString('utf8', dataStart, dataEnd);
+      if (compressionMethod === 8) {
+        return zlib.inflateRawSync(data).toString('utf8');
+      }
+      return undefined;
     }
     offset = dataEnd;
   }
@@ -867,6 +872,7 @@ async function confirmSupportFileOverwrite(
   yes: boolean
 ): Promise<SupportFileDecision> {
   if (!force) return {};
+  if (process.env.BALLAST_DISABLE_SUPPORT_FILES === '1') return {};
   const supportFilePath = getSupportFilePath(target, projectRoot);
   if (!supportFilePath || !fs.existsSync(supportFilePath)) {
     return {};

@@ -1414,6 +1414,8 @@ def confirm_support_file_overwrite(
 ) -> tuple[str | None, str | None]:
     if not force:
         return None, None
+    if os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1":
+        return None, None
     support_file = support_file_path(root, target)
     if support_file is None or not support_file.exists():
         return None, None

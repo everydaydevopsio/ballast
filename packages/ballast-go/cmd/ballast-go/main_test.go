@@ -1000,6 +1000,48 @@ func TestInstallPatchMergesClaudeSkillArchive(t *testing.T) {
 	}
 }
 
+func TestInstallForceOverwritesExistingClaudeSkillArchive(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	existingSkillContent := "# owasp-security-scan\n\nTeam-only intro that should be removed on force.\n\n## Team Custom Section\n\nThis section should not survive a force overwrite.\n"
+	initialArchive, err := buildClaudeSkill("owasp-security-scan", "go", existingSkillContent)
+	if err != nil {
+		t.Fatalf("build initial skill archive: %v", err)
+	}
+	if err := os.WriteFile(skillPath, initialArchive, 0o644); err != nil {
+		t.Fatalf("seed skill archive: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       true,
+		patch:       false,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected force install, got %+v", result.installedSkills)
+	}
+	skillMd, err := readClaudeSkillContent(skillPath)
+	if err != nil {
+		t.Fatalf("read overwritten skill archive: %v", err)
+	}
+	if strings.Contains(skillMd, "Team-only intro") {
+		t.Fatalf("expected team intro to be removed by force overwrite: %s", skillMd)
+	}
+	if strings.Contains(skillMd, "Team Custom Section") {
+		t.Fatalf("expected custom section to be removed by force overwrite: %s", skillMd)
+	}
+	if !strings.Contains(skillMd, "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content after force overwrite: %s", skillMd)
+	}
+}
+
 func TestInstallForceOverwritesExistingSkill(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
