@@ -1718,7 +1718,6 @@ def install(
 
     if target == "gemini" and not disable_support_files:
         gemini_md = root / "GEMINI.md"
-        agents_md = root / "AGENTS.md"
         should_patch_gemini_md = patch or patch_gemini_md
         if str(gemini_md) in skipped_support_files:
             result.declined_support_files.append(str(gemini_md))
@@ -1738,16 +1737,6 @@ def install(
                 result.installed_support_files.append(str(gemini_md))
             except Exception as err:
                 result.errors.append(("gemini", str(err)))
-
-        if not agents_md.exists() and str(agents_md) not in skipped_support_files:
-            try:
-                agents_md.write_text(
-                    build_codex_agents_md(support_agents, support_skills, language),
-                    encoding="utf-8",
-                )
-                result.installed_support_files.append(str(agents_md))
-            except Exception as err:
-                result.errors.append(("codex", str(err)))
 
     if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"

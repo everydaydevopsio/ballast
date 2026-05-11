@@ -755,7 +755,6 @@ export function install(options: InstallOptions): InstallResult {
 
   if (!disableSupportFiles && target === 'gemini') {
     const geminiMdPath = getGeminiMdPath(projectRoot);
-    const agentsMdPath = getCodexAgentsMdPath(projectRoot);
     const shouldPatchGeminiMd = patch || patchGeminiMd;
     if (skippedSupportSet.has(geminiMdPath)) {
       declinedSupportFiles.push(geminiMdPath);
@@ -777,23 +776,6 @@ export function install(options: InstallOptions): InstallResult {
       } catch (err) {
         errors.push({
           agent: 'gemini',
-          error: err instanceof Error ? err.message : String(err)
-        });
-      }
-    }
-
-    if (!fs.existsSync(agentsMdPath) && !skippedSupportSet.has(agentsMdPath)) {
-      try {
-        const agentsContent = buildCodexAgentsMd(
-          supportSelections.agents,
-          supportSelections.skills,
-          language
-        );
-        fs.writeFileSync(agentsMdPath, agentsContent, 'utf8');
-        installedSupportFiles.push(agentsMdPath);
-      } catch (err) {
-        errors.push({
-          agent: 'codex',
           error: err instanceof Error ? err.message : String(err)
         });
       }
