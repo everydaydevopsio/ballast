@@ -37,6 +37,7 @@ COMMON_SKILLS = [
     "aws-live-health-review",
     "aws-weekly-security-review",
     "github-health-check",
+    "gws-rules",
 ]
 SKILLS_BY_LANGUAGE = {
     "typescript": COMMON_SKILLS,
@@ -760,6 +761,26 @@ def read_template(agent: str, language: str, filename: str, suffix: str = "") ->
     )
 
 
+def render_gemini_mandates() -> str:
+    return "\n".join(
+        [
+            "## Gemini Mandates",
+            "",
+            "### Narrative Flow",
+            r"Always use the `update_topic` tool at the beginning of a task and when transitioning between major strategic phases. Provide a concise `title` and a detailed `summary` (5-10 sentences) that recaps completed work and outlines the immediate strategic intent.",
+            "",
+            "### Context Efficiency",
+            r"- **Surgical Reads:** Use `start_line` and `end_line` in `read_file` to minimize context usage.",
+            "- **Parallelism:** Execute independent searches and reads in parallel whenever possible.",
+            r"- **Topic Search:** Use `grep_search` to identify points of interest before reading entire files.",
+            "",
+            "### Strategic Orchestration",
+            r"Delegate complex, repetitive, or high-volume tasks to specialized sub-agents (`codebase_investigator`, `generalist`) to keep the main session history lean and efficient.",
+            "",
+        ]
+    )
+
+
 def build_content(
     agent: str, target: str, language: str, suffix: str = "", root: Path | None = None
 ) -> str:
@@ -782,7 +803,7 @@ def build_content(
                 header = read_template(agent, language, "claude-header.md", suffix)
             except FileNotFoundError:
                 header = read_template(agent, language, "codex-header.md", suffix)
-        return header + body
+        return header + "\n---\n\n" + render_gemini_mandates() + body
     if target == "opencode":
         return (
             read_template(agent, language, "opencode-frontmatter.yaml", suffix)
@@ -1103,7 +1124,23 @@ def build_gemini_md(agents: list[str], skills: list[str], language: str) -> str:
         "",
         "This file provides guidance to Gemini CLI for working in this repository.",
         "",
-        "@./AGENTS.md",
+        "## Repository Facts",
+        "",
+        "Update this section with core facts about the repository that the agent should always keep in context.",
+        "",
+        "- **Tech Stack**: [e.g. TypeScript, React, Node.js]",
+        "- **Main Entrypoints**: [e.g. src/index.ts]",
+        "- **Key Conventions**: [e.g. Uses functional components]",
+        "",
+        "## Memory Tiering",
+        "",
+        "Follow these routing rules for persisting long-lived facts and preferences:",
+        "",
+        "- **Team-shared (Repository)**: Use this `GEMINI.md` file for architecture, workflows, and repo-wide rules.",
+        "- **Private (Local Setup)**: Use the private project memory (`MEMORY.md` in the ballast memory folder) for local machine notes or private workflows.",
+        "- **Global (Personal)**: Use the global personal memory (`~/.gemini/GEMINI.md`) for cross-project personal coding preferences.",
+        "",
+        "---",
         "",
         "## Installed agent rules",
         "",

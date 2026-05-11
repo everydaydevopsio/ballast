@@ -579,39 +579,64 @@ function getCodexHeader(
   }
 }
 
+function renderGeminiMandates(): string {
+  return [
+    '## Gemini Mandates',
+    '',
+    '### Narrative Flow',
+    'Always use the `update_topic` tool at the beginning of a task and when transitioning between major strategic phases. Provide a concise `title` and a detailed `summary` (5-10 sentences) that recaps completed work and outlines the immediate strategic intent.',
+    '',
+    '### Context Efficiency',
+    '- **Surgical Reads:** Use `start_line` and `end_line` in `read_file` to minimize context usage.',
+    '- **Parallelism:** Execute independent searches and reads in parallel whenever possible.',
+    '- **Topic Search:** Use `grep_search` to identify points of interest before reading entire files.',
+    '',
+    '### Strategic Orchestration',
+    'Delegate complex, repetitive, or high-volume tasks to specialized sub-agents (`codebase_investigator`, `generalist`) to keep the main session history lean and efficient.',
+    ''
+  ].join('\n');
+}
+
+function findGeminiHeader(
+  agentId: string,
+  ruleSuffix?: string,
+  language: Language = 'typescript'
+): string {
+  try {
+    return getTemplate(agentId, 'gemini-header.md', ruleSuffix, language);
+  } catch (geminiError) {
+    try {
+      return getTemplate(agentId, 'claude-header.md', ruleSuffix, language);
+    } catch (claudeError) {
+      try {
+        return getTemplate(agentId, 'codex-header.md', ruleSuffix, language);
+      } catch (codexError) {
+        const geminiMsg =
+          geminiError instanceof Error
+            ? geminiError.message
+            : String(geminiError);
+        const claudeMsg =
+          claudeError instanceof Error
+            ? claudeError.message
+            : String(claudeError);
+        const codexMsg =
+          codexError instanceof Error ? codexError.message : String(codexError);
+        throw new Error(
+          `Agent "${agentId}" missing Gemini header: tried gemini-header.md (${geminiMsg}), fallback claude-header.md (${claudeMsg}), and fallback codex-header.md (${codexMsg})`,
+          { cause: codexError }
+        );
+      }
+    }
+  }
+}
+
 function getGeminiHeader(
   agentId: string,
   ruleSuffix?: string,
   language: Language = 'typescript'
 ): string {
-  let geminiError: unknown;
-  try {
-    return getTemplate(agentId, 'gemini-header.md', ruleSuffix, language);
-  } catch (err) {
-    geminiError = err;
-  }
-  try {
-    return getTemplate(agentId, 'claude-header.md', ruleSuffix, language);
-  } catch (claudeError) {
-    try {
-      return getTemplate(agentId, 'codex-header.md', ruleSuffix, language);
-    } catch (codexError) {
-      const geminiMsg =
-        geminiError instanceof Error
-          ? geminiError.message
-          : String(geminiError);
-      const claudeMsg =
-        claudeError instanceof Error
-          ? claudeError.message
-          : String(claudeError);
-      const codexMsg =
-        codexError instanceof Error ? codexError.message : String(codexError);
-      throw new Error(
-        `Agent "${agentId}" missing Gemini header: tried gemini-header.md (${geminiMsg}), fallback claude-header.md (${claudeMsg}), and fallback codex-header.md (${codexMsg})`,
-        { cause: codexError }
-      );
-    }
-  }
+  const header = findGeminiHeader(agentId, ruleSuffix, language);
+  return header + '\n---\n\n' + renderGeminiMandates();
 }
 
 /**
@@ -824,7 +849,33 @@ export function buildGeminiMd(
     'This file provides guidance to Gemini CLI for working in this repository.'
   );
   lines.push('');
-  lines.push('@./AGENTS.md');
+  lines.push('## Repository Facts');
+  lines.push('');
+  lines.push(
+    'Update this section with core facts about the repository that the agent should always keep in context.'
+  );
+  lines.push('');
+  lines.push('- **Tech Stack**: [e.g. TypeScript, React, Node.js]');
+  lines.push('- **Main Entrypoints**: [e.g. src/index.ts]');
+  lines.push('- **Key Conventions**: [e.g. Uses functional components]');
+  lines.push('');
+  lines.push('## Memory Tiering');
+  lines.push('');
+  lines.push(
+    'Follow these routing rules for persisting long-lived facts and preferences:'
+  );
+  lines.push('');
+  lines.push(
+    '- **Team-shared (Repository)**: Use this `GEMINI.md` file for architecture, workflows, and repo-wide rules.'
+  );
+  lines.push(
+    '- **Private (Local Setup)**: Use the private project memory (`MEMORY.md` in the ballast memory folder) for local machine notes or private workflows.'
+  );
+  lines.push(
+    '- **Global (Personal)**: Use the global personal memory (`~/.gemini/GEMINI.md`) for cross-project personal coding preferences.'
+  );
+  lines.push('');
+  lines.push('---');
   lines.push('');
   lines.push('## Installed agent rules');
   lines.push('');

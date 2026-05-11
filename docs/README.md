@@ -43,8 +43,11 @@ Common skills:
 - `aws-live-health-review`
 - `aws-weekly-security-review`
 - `github-health-check`
+- `gws-rules`
 
 `github-health-check` covers CI status, pull request hygiene, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings.
+
+`gws-rules` provides guidelines for safe and efficient usage of the Google Workspace CLI (gws) extension.
 
 Guide index:
 
@@ -54,6 +57,7 @@ Guide index:
 - [skills/aws-weekly-security-review.md](skills/aws-weekly-security-review.md)
 - [skills/github-health-check.md](skills/github-health-check.md)
 - [skills/owasp-security-scan.md](skills/owasp-security-scan.md)
+- [skills/gws-rules.md](skills/gws-rules.md)
 
 ## Installation and Monorepos
 

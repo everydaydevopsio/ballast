@@ -11,7 +11,7 @@ Ballast is a monorepo that ships AI rule installers for multiple language profil
 
 ## Overview
 
-Ballast installs repo-local AI guidance into the locations expected by Cursor, Claude Code, OpenCode, and Codex.
+Ballast installs repo-local AI guidance into the locations expected by Cursor, Claude Code, OpenCode, Codex, and Gemini.
 
 The source-of-truth rule and skill content lives in this repository:
 
@@ -103,6 +103,7 @@ Rule installation paths:
 | Claude | `.claude/rules/` | `.md` |
 | OpenCode | `.opencode/` | `.md` |
 | Codex | `.codex/rules/` | `.md` |
+| Gemini | `.gemini/rules/` | `.md` |
 
 Skill installation paths:
 
@@ -112,11 +113,13 @@ Skill installation paths:
 | Claude | `.claude/skills/` | `.skill` zip bundle |
 | OpenCode | `.opencode/skills/` | `.md` |
 | Codex | `.codex/rules/` | `.md` |
+| Gemini | `.gemini/rules/` | `.md` |
 
 Support files:
 
 - Claude installs or patches a root `CLAUDE.md`
 - Codex installs or patches a root `AGENTS.md`
+- Gemini installs or patches a root `GEMINI.md`
 
 If `BALLAST_RULE_SUBDIR` is set, installed rule files are scoped into subdirectories such as `.codex/rules/<subdir>/...`, and the emitted filenames are prefixed to avoid collisions.
 
