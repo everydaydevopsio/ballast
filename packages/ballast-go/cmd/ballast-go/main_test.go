@@ -94,6 +94,7 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"aws-live-health-review",
 		"aws-weekly-security-review",
 		"github-health-check",
+		"ballast-audit",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)

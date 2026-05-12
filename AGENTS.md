@@ -114,4 +114,5 @@ Read and use these skill files in `.codex/rules/` when they are relevant:
 
 - `.codex/rules/owasp-security-scan.md` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
 - `.codex/rules/github-health-check.md` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
+- `.codex/rules/ballast-audit.md` — audit AI rule and skill files for context density, duplication, and bloat
 
