@@ -96,11 +96,6 @@ var skillRegistry = []skillEntry{
 		Description: "run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration",
 		Status:      statusActive,
 	},
-	{
-		ID:          "gws-rules",
-		Description: "rules for safe and efficient usage of the Google Workspace CLI (gws) extension",
-		Status:      statusActive,
-	},
 }
 
 // — Agent registry helpers —————————————————————————————————————————————————

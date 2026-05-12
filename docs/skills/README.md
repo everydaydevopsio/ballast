@@ -35,12 +35,6 @@ Ballast ships reusable skill guides alongside its agent rules.
 - Installed by: `--skill github-health-check` or `--all-skills`
 - Focus: CI status, pull requests, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
 
-`gws-rules`
-
-- Type: common skill
-- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
-- Installed by: `--skill gws-rules` or `--all-skills`
-
 ## Installation Targets
 
 Skills install to the target tool's expected location:
@@ -60,4 +54,3 @@ Codex also records installed skills in the root `AGENTS.md`. Claude records them
 - [aws-live-health-review.md](aws-live-health-review.md)
 - [aws-weekly-security-review.md](aws-weekly-security-review.md)
 - [github-health-check.md](github-health-check.md)
-- [gws-rules.md](gws-rules.md)

@@ -84,9 +84,6 @@ func TestRunInstallHelpFlag(t *testing.T) {
 	if !strings.Contains(output, "github-health-check") {
 		t.Fatalf("expected github-health-check in help output, got %q", output)
 	}
-	if !strings.Contains(output, "gws-rules") {
-		t.Fatalf("expected gws-rules in help output, got %q", output)
-	}
 }
 
 func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
@@ -97,7 +94,6 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"aws-live-health-review",
 		"aws-weekly-security-review",
 		"github-health-check",
-		"gws-rules",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)

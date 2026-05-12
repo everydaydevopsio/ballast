@@ -77,7 +77,6 @@ Common skills (all languages):
 - `aws-live-health-review`
 - `aws-weekly-security-review`
 - `github-health-check`
-- `gws-rules`
 
 Skill sources in this repo:
 
@@ -92,7 +91,6 @@ Skills are reusable task guides that Ballast installs for the target AI tool alo
 - `aws-live-health-review`: generate a current-state AWS operational snapshot for EC2, RDS, ALB, alarms, and logs
 - `aws-weekly-security-review`: run a weekly read-only AWS security baseline review with prioritized findings
 - `github-health-check`: run a comprehensive GitHub repository health check covering CI status, open PRs, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
-- `gws-rules`: rules for safe and efficient usage of the Google Workspace CLI (gws) extension
 
 ### Install a skill
 

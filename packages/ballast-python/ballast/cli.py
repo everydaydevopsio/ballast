@@ -37,7 +37,6 @@ COMMON_SKILLS = [
     "aws-live-health-review",
     "aws-weekly-security-review",
     "github-health-check",
-    "gws-rules",
 ]
 SKILLS_BY_LANGUAGE = {
     "typescript": COMMON_SKILLS,
