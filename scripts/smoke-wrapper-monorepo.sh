@@ -2,8 +2,14 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+EXAMPLES_ROOT="${1:-${REPO_ROOT}/../ballast-examples}"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "${WORKDIR}"' EXIT
+
+if [[ ! -d "${EXAMPLES_ROOT}/typescript-sample" || ! -d "${EXAMPLES_ROOT}/python-sample" || ! -d "${EXAMPLES_ROOT}/go-sample" ]]; then
+  echo "ballast-examples repo not found at ${EXAMPLES_ROOT}" >&2
+  exit 1
+fi
 
 make_fixture() {
   local monorepo="$1"
@@ -12,9 +18,9 @@ make_fixture() {
   mkdir -p "${monorepo}/services/api"
   mkdir -p "${monorepo}/tools/worker"
 
-  cp -R "${REPO_ROOT}/examples/smoke/typescript-sample/." "${monorepo}/apps/frontend/"
-  cp -R "${REPO_ROOT}/examples/smoke/python-sample/." "${monorepo}/services/api/"
-  cp -R "${REPO_ROOT}/examples/smoke/go-sample/." "${monorepo}/tools/worker/"
+  cp -R "${EXAMPLES_ROOT}/typescript-sample/." "${monorepo}/apps/frontend/"
+  cp -R "${EXAMPLES_ROOT}/python-sample/." "${monorepo}/services/api/"
+  cp -R "${EXAMPLES_ROOT}/go-sample/." "${monorepo}/tools/worker/"
 
   cat > "${monorepo}/package.json" <<'EOF'
 {
@@ -138,7 +144,7 @@ run_wrapper_language_smoke() {
   local project="${WORKDIR}/ballast-wrapper-python"
 
   mkdir -p "${project}"
-  cp -R "${REPO_ROOT}/examples/smoke/python-sample/." "${project}/"
+  cp -R "${EXAMPLES_ROOT}/python-sample/." "${project}/"
 
   (
     cd "${project}"

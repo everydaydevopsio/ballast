@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="${1:-$(pwd)}"
+REPO_ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+EXAMPLES_ROOT="${2:-${REPO_ROOT}/../ballast-examples}"
+WORKDIR="$(mktemp -d)"
+trap 'rm -rf "${WORKDIR}"' EXIT
+
+if [[ ! -d "${EXAMPLES_ROOT}/typescript-sample" || ! -d "${EXAMPLES_ROOT}/python-sample" || ! -d "${EXAMPLES_ROOT}/go-sample" ]]; then
+  echo "ballast-examples repo not found at ${EXAMPLES_ROOT}" >&2
+  exit 1
+fi
 
 assert_file() {
   local path="$1"
@@ -21,9 +29,9 @@ run_target() {
   local language="$2"
   local target="$3"
   local mode="${4:-skill}"
-  local dir="$ROOT/examples/smoke/$sample"
-
-  rm -rf "$dir/.cursor" "$dir/.claude" "$dir/.opencode" "$dir/.codex" "$dir/AGENTS.md" "$dir/CLAUDE.md" "$dir/.rulesrc.json"
+  local dir="${WORKDIR}/${sample}-${target}-${mode}"
+  mkdir -p "${dir}"
+  cp -R "${EXAMPLES_ROOT}/${sample}/." "${dir}/"
 
   (
     cd "$dir"
