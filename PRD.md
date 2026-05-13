@@ -1,5 +1,27 @@
 # Product Requirements
 
+## Generated Rule Context Hygiene
+
+### Problem
+
+Ballast-generated rule files for persistent agent context have accumulated large generic playbooks and repeated examples. This creates avoidable context bloat for installed targets such as Codex, especially in the `local-dev`, `linting`, `logging`, and `testing` rule families. The source templates need explicit size and density constraints so future generated rules stay concise without editing checked-in installed rule snapshots by hand.
+
+### Requirements
+
+1. Canonical rule templates under repo-root `agents/` must prefer concise persistent guidance over long example-heavy walkthroughs.
+2. Deep reference material should live in documentation or skills, while persistent rules keep only the minimum instructions needed to route the agent correctly.
+3. Source template updates must flow through the existing package-content sync path so TypeScript, Python, and Go package payloads can be refreshed from the same canonical sources.
+4. The change must not require manual edits to installed repository rule snapshots such as `.codex/rules/*`.
+5. Automated tests must enforce size budgets for the worst persistent Codex rule offenders.
+
+### Acceptance Criteria
+
+1. The generated Codex `local-dev-env` rule built from source templates is smaller than 6 KB while still mentioning `.nvmrc`, `docker-compose.local.yaml`, `Makefile`, and `make up-local`.
+2. The generated Codex TypeScript `logging` rule built from source templates is smaller than 6 KB while still mentioning `pino-browser` and `/api/logs`.
+3. The generated Codex TypeScript `testing` rule built from source templates is smaller than 6 KB.
+4. The generated Codex TypeScript `linting` rule built from source templates is smaller than 5 KB.
+5. The content sync workflow can refresh package template mirrors from the repo-root `agents/` and `skills/` sources without editing installed target rule directories directly.
+
 ## Skill Patch Support And Support File Force Confirmation
 
 ### Problem
