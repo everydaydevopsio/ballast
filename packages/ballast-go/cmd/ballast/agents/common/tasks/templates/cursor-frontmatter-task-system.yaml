@@ -1,0 +1,8 @@
+---
+description: 'Task system integration - use {{taskSystem}} for work items and configure the MCP server'
+alwaysApply: false
+globs:
+  - '**/AGENTS.md'
+  - '**/CLAUDE.md'
+  - 'tasks/TODO.md'
+---

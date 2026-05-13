@@ -1,0 +1,4 @@
+interface:
+  display_name: "AWS Health Review"
+  short_description: "Run a weekly read-only AWS health baseline and generate a report with findings and TODO follow-up."
+  default_prompt: "Use $aws-health-review to generate a weekly AWS health report. If needed, set PROFILE first or pass --profile explicitly so the checks run under the intended AWS profile."
