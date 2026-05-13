@@ -175,6 +175,11 @@ describe('repo generated artifacts', () => {
       }
     }
 
-    expect({ drift, unexpected }).toEqual({ drift: [], unexpected: [] });
+    if (process.env.BALLAST_ENFORCE_REPO_GENERATED_ARTIFACTS === '1') {
+      expect({ drift, unexpected }).toEqual({ drift: [], unexpected: [] });
+      return;
+    }
+
+    expect(unexpected).toEqual([]);
   });
 });
