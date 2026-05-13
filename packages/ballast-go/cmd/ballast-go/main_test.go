@@ -649,6 +649,22 @@ func TestBuildCursorSkillFormatIncludesOnDemandFrontmatter(t *testing.T) {
 	}
 }
 
+func TestBuildCursorSkillFormatIncludesBallastAuditFrontmatter(t *testing.T) {
+	content, err := buildCursorSkillFormat("ballast-audit", "go")
+	if err != nil {
+		t.Fatalf("buildCursorSkillFormat(ballast-audit): %v", err)
+	}
+	if !strings.Contains(content, "alwaysApply: false") {
+		t.Fatalf("expected alwaysApply false frontmatter: %s", content)
+	}
+	if !strings.Contains(content, "description: \"audit AI rule and skill files for context density, duplication, and bloat\"") {
+		t.Fatalf("expected ballast-audit description in frontmatter: %s", content)
+	}
+	if !strings.Contains(content, "# Ballast Audit Skill") {
+		t.Fatalf("expected ballast-audit body: %s", content)
+	}
+}
+
 func TestBuildClaudeSkillIncludesSkillAndReferences(t *testing.T) {
 	content, err := buildClaudeSkill("owasp-security-scan", "go")
 	if err != nil {

@@ -11,7 +11,9 @@ assert_file() {
 assert_claude_skill_zip() {
   local path="$1"
   unzip -l "$path" | grep -q "SKILL.md"
-  unzip -l "$path" | grep -q "references/owasp-mapping.md"
+  if [[ "$path" == *"owasp-security-scan.skill" ]]; then
+    unzip -l "$path" | grep -q "references/owasp-mapping.md"
+  fi
 }
 
 run_target() {
@@ -49,6 +51,11 @@ run_target() {
     codex)
       assert_file "$dir/.codex/rules/owasp-security-scan.md"
       grep -q "# OWASP Security Scan Skill" "$dir/.codex/rules/owasp-security-scan.md"
+      if [[ "$mode" == "all-skills" ]]; then
+        assert_file "$dir/.codex/rules/github-health-check.md"
+        assert_file "$dir/.codex/rules/ballast-audit.md"
+        grep -q "# Ballast Audit Skill" "$dir/.codex/rules/ballast-audit.md"
+      fi
       grep -q "## Installed skills" "$dir/AGENTS.md"
       ;;
   esac

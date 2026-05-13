@@ -40,6 +40,7 @@ Before adding or changing the test runner, check for existing test tooling and f
 
 4. **Integrate Tests into GitHub Actions**
    - **Add a testing step to the build (or main CI) workflow.** Prefer adding a test step to an existing build/CI workflow (e.g. `build.yml`, `ci.yml`, or the workflow that runs build) so that every build runs tests. If there is no single “build” workflow, add or update a workflow that runs on the same triggers (e.g. push/PR to main) and include:
+     - A `concurrency` block at the workflow level to cancel redundant runs: use `cancel-in-progress: true`.
      - Checkout, setup Node (and pnpm/yarn if used), install with frozen lockfile.
      - Run the build step if the workflow is a “build” workflow.
      - **Run the test step** (e.g. `pnpm run test` or `npm run test`).
@@ -102,14 +103,24 @@ export default defineConfig({
 
 **GitHub Actions — add test step to build workflow:**
 
-- In the job that runs the build (or the main CI job), add a step after install and before or after the build step:
+- Add a `concurrency` block at the top of the workflow and add the test steps to the job:
 
 ```yaml
-- name: Run tests
-  run: pnpm run test # or npm run test / yarn test
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-- name: Run tests with coverage
-  run: pnpm run test:coverage # or npm run test:coverage / yarn test:coverage
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # ... checkout, setup Node, install ...
+
+      - name: Run tests
+        run: pnpm run test # or npm run test / yarn test
+
+      - name: Run tests with coverage
+        run: pnpm run test:coverage # or npm run test:coverage / yarn test:coverage
 ```
 
 - Use the same Node version, cache, and lockfile flags as the rest of the workflow (e.g. `--frozen-lockfile` for pnpm).
@@ -121,9 +132,48 @@ export default defineConfig({
 - Always add a **testing step to the build (or main CI) GitHub Action** so tests run on every relevant push/PR.
 - Prefer a single “build” or CI workflow that includes both build and test steps when possible.
 
+## Smoke and End-to-End Testing
+
+When the project ships a runnable app or service, add a smoke-test path in addition to unit and coverage checks.
+
+### Your Responsibilities
+
+1. **Run smoke tests against the repo Dockerfile**
+   - Use the repository's actual app `Dockerfile`, not a separate fake smoke-test Dockerfile for the application under test.
+   - If the app has dependent services, use `docker-compose.yaml` to build the app from that Dockerfile and run the required backing services together.
+   - If the repo already has `docker-compose.local.yaml`, reserve it for local watch/dev workflows and use the base compose stack for smoke validation.
+
+2. **Make smoke tests produce explicit pass/fail output**
+   - Add a smoke test command or script that exits non-zero on failure.
+   - Ensure the output clearly indicates success or failure, for example `SMOKE TEST PASSED` and `SMOKE TEST FAILED`.
+   - Prefer a repeatable command such as `pnpm run test:smoke` or `npm run test:smoke`.
+
+3. **Add a GitHub Action for smoke tests**
+   - Add a dedicated workflow such as `.github/workflows/smoke.yml` or a clearly named smoke-test job in the main CI workflow.
+   - The workflow should build the app image from the repo Dockerfile, start the stack with Docker Compose, run the smoke test command, and fail the workflow if the smoke test fails.
+   - Publish logs or artifacts when helpful so failures are diagnosable.
+
+4. **Add an end-to-end path when the app has a user-facing flow**
+   - For web apps, add E2E coverage for at least one critical path such as app boot, login, health page, or a core workflow.
+   - Prefer Playwright for browser-based E2E unless the repo already uses a different framework.
+   - Keep E2E scope narrow and stable; the smoke test should prove deployability, while E2E should prove one real workflow.
+
+5. **Add a status badge**
+   - Add a README badge for the smoke-test workflow so the repo shows smoke-test status alongside CI/release badges.
+   - If the project already has badges, keep the smoke badge on the same line near the other workflow badges.
+
+### Implementation Order
+
+1. Detect whether the repo builds a runnable app/service or only a library.
+2. Reuse the existing `Dockerfile` and `docker-compose.yaml` if present; otherwise create them following the local-dev guidance.
+3. Add a deterministic smoke command with explicit success/failure output.
+4. Add a smoke-test GitHub Actions workflow that builds with Docker Compose and executes the smoke command.
+5. Add a README smoke badge and document how to run the smoke test locally.
+6. Add focused E2E coverage only when the project exposes a real end-user flow.
+
 ## When Completed
 
 1. Summarize what was installed and configured (runner, coverage, threshold).
-2. Show the added or updated `test` and `test:coverage` scripts.
-3. Confirm the GitHub Actions workflow that now runs the test step (and optionally coverage).
-4. Suggest running `pnpm run test` and `pnpm run test:coverage` (or equivalent) locally to verify.
+2. Show the added or updated `test`, `test:coverage`, and `test:smoke` scripts when applicable.
+3. Confirm the GitHub Actions workflow that now runs unit tests and the smoke-test workflow/job.
+4. Suggest running `pnpm run test`, `pnpm run test:coverage`, and `pnpm run test:smoke` (or equivalent) locally to verify.

@@ -17,14 +17,17 @@ You are a Git hook specialist. Your role is to establish local Git hook orchestr
 
 ## Hook Strategy
 
-Use Husky for this monorepo.
+## Git Hooks
 
-- Install and initialize Husky.
-- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.
-- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.
-- Keep the hook file executable with `chmod +x .husky/pre-commit`.
-- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.
-- Keep the hook in sync with the repo's linting workflow whenever the command changes.
+Use `pre-commit` for Terraform repositories.
+
+- Create or update `.pre-commit-config.yaml` at the repo root.
+- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.
+- Install hooks with `pre-commit install`.
+- Install the pre-push hook with `pre-commit install --hook-type pre-push`.
+- Run `terraform fmt -check -recursive`, `terraform validate`, `tflint`, and `tfsec` from the hook configuration.
+- Keep `.terraform/`, state files, and plan files out of Git.
+- Keep the configuration current with `pre-commit autoupdate`.
 
 ## Important Notes
 

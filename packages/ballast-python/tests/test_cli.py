@@ -500,6 +500,16 @@ class PatchInstallTests(unittest.TestCase):
         )
         self.assertNotIn("description: >", content)
 
+    def test_build_cursor_skill_format_supports_ballast_audit(self) -> None:
+        content = cli.build_cursor_skill_format("ballast-audit", "python")
+
+        self.assertIn("alwaysApply: false", content)
+        self.assertIn(
+            'description: "audit AI rule and skill files for context density, duplication, and bloat"',
+            content,
+        )
+        self.assertIn("# Ballast Audit Skill", content)
+
     def test_build_support_file_includes_skills(self) -> None:
         content = cli.build_codex_agents_md(
             ["linting"], ["owasp-security-scan"], "python"

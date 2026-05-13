@@ -295,6 +295,12 @@ describe('build', () => {
         'Run a read-only AWS live health review'
       );
     });
+
+    test('gets ballast audit skill description', () => {
+      expect(getSkillDescription('ballast-audit')).toContain(
+        'audit AI rule and skill files for context density, duplication, and bloat'
+      );
+    });
   });
 
   describe('getTemplate', () => {

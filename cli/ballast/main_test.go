@@ -2487,6 +2487,67 @@ func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
 	}
 }
 
+func TestRunMonorepoInstallSupportsEnvProvidedSourceRoot(t *testing.T) {
+	sourceRoot := t.TempDir()
+	projectRoot := t.TempDir()
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "ballast", "__main__.py"), "print('py')")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "ballast-go"), "#!/bin/sh\n")
+	mustWriteFile(t, filepath.Join(projectRoot, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(projectRoot, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(projectRoot, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalExecutable := osExecutableFunc
+	originalEnv := os.Getenv("BALLAST_REPO_ROOT")
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		osExecutableFunc = originalExecutable
+		_ = os.Setenv("BALLAST_REPO_ROOT", originalEnv)
+	})
+
+	if err := os.Setenv("BALLAST_REPO_ROOT", sourceRoot); err != nil {
+		t.Fatalf("set BALLAST_REPO_ROOT: %v", err)
+	}
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(t.TempDir(), "bin", "ballast"), nil
+	}
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+
+	var invocations []backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocations = append(invocations, backendInvocation{
+			Binary: binary,
+			Args:   append([]string(nil), args...),
+			Dir:    dir,
+			Env:    env,
+		})
+		return 0, nil
+	}
+
+	withWorkingDir(t, filepath.Join(projectRoot, "apps", "frontend"), func() {
+		exitCode := run([]string{"install", "--target", "claude", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(invocations) == 0 {
+		t.Fatal("expected backend invocations")
+	}
+	if invocations[0].Env["BALLAST_REPO_ROOT"] != sourceRoot {
+		t.Fatalf("expected BALLAST_REPO_ROOT from environment to flow to local backends, got %#v", invocations[0])
+	}
+	if invocations[0].Binary != "node" {
+		t.Fatalf("expected TypeScript backend to use local source via env override, got %#v", invocations[0])
+	}
+}
+
 func TestRunMonorepoInstallPrefersSiblingBackendsNextToWrapper(t *testing.T) {
 	sourceRoot := t.TempDir()
 	projectRoot := t.TempDir()

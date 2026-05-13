@@ -84,7 +84,6 @@ Document this install path in `README.md` under an `## Installation` section.
 Add a `.deb` installation section to `README.md`:
 
 ```markdown
-
 ## Installation
 
 ### Debian / Ubuntu (via .deb package)
