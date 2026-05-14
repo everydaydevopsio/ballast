@@ -95,8 +95,14 @@ jobs:
           go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
           echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
 
+      - name: Checkout ballast-examples repo
+        uses: actions/checkout@v6
+        with:
+          repository: everydaydevopsio/ballast-examples
+          path: .ci/ballast-examples
+
       - name: Run skills smoke test
-        run: ./scripts/smoke-skills.sh "$GITHUB_WORKSPACE"
+        run: ./scripts/smoke-skills.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/.ci/ballast-examples"
 
   tasks-smoke:
     name: tasks-smoke
@@ -151,8 +157,14 @@ jobs:
       - name: Build ballast-typescript
         run: pnpm run build
 
+      - name: Checkout ballast-examples repo
+        uses: actions/checkout@v6
+        with:
+          repository: everydaydevopsio/ballast-examples
+          path: .ci/ballast-examples
+
       - name: Run config-persistence smoke test
-        run: ./scripts/smoke-config-persistence.sh "$GITHUB_WORKSPACE"
+        run: ./scripts/smoke-config-persistence.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/.ci/ballast-examples"
 
   git-boundary-smoke:
     name: git-boundary-smoke
@@ -253,4 +265,4 @@ jobs:
         run: ./scripts/smoke-monorepo-patch.sh "$GITHUB_WORKSPACE/.ci/ballast-examples"
 
       - name: Run wrapper monorepo smoke test
-        run: ./scripts/smoke-wrapper-monorepo.sh
+        run: ./scripts/smoke-wrapper-monorepo.sh "$GITHUB_WORKSPACE/.ci/ballast-examples"

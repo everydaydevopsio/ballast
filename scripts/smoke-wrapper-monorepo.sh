@@ -2,9 +2,29 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXAMPLES_ROOT="${1:-${REPO_ROOT}/../ballast-examples}"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "${WORKDIR}"' EXIT
+
+resolve_examples_root() {
+  local requested="${1:-}"
+  local candidates=()
+  if [[ -n "${requested}" ]]; then
+    candidates+=("${requested}")
+  fi
+  candidates+=("${REPO_ROOT}/.ci/ballast-examples" "${REPO_ROOT}/../ballast-examples")
+
+  local candidate=""
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "${candidate}/typescript-sample" && -d "${candidate}/python-sample" && -d "${candidate}/go-sample" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "${requested:-${REPO_ROOT}/.ci/ballast-examples}"
+}
+
+EXAMPLES_ROOT="$(resolve_examples_root "${1:-}")"
 
 if [[ ! -d "${EXAMPLES_ROOT}/typescript-sample" || ! -d "${EXAMPLES_ROOT}/python-sample" || ! -d "${EXAMPLES_ROOT}/go-sample" ]]; then
   echo "ballast-examples repo not found at ${EXAMPLES_ROOT}" >&2
