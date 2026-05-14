@@ -25,41 +25,48 @@ Update this section when those facts change. If live runtime state is required, 
 
 ## Installed agent rules
 
-Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.9.3. Do not edit this section.
+Created by Ballast. Do not edit this section.
 
 Read and follow these rule files in `.claude/rules/` when they apply:
 
-- `.claude/rules/local-dev-badges.md` — Add standard badges (CI, Release, License, GitHub Release, npm) to the top of README.md
-- `.claude/rules/local-dev-env.md` — Local development environment specialist - reproducible dev setup, DX, and documentation
-- `.claude/rules/local-dev-license.md` — License setup - ensure LICENSE file, package.json license field, and README reference (default MIT; overridable in AGENTS.md/CLAUDE.md)
-- `.claude/rules/local-dev-mcp.md` — Optional: use GitHub MCP and issues MCP (Jira/Linear/GitHub) for local-dev context
-- `.claude/rules/docs.md` — Documentation specialist - GitHub Markdown docs by default, or maintain existing Docusaurus sites with publish-docs automation
-- `.claude/rules/cicd.md` — CI/CD specialist - pipeline design, quality gates, and deployment
-- `.claude/rules/observability.md` — Observability specialist - logging, tracing, metrics, and SLOs
-- `.claude/rules/publishing-api.md` — REST API publishing specialist - Docker CD with Kubernetes health probes and Helm chart update
-- `.claude/rules/publishing-apps.md` — App publishing specialist - npmjs for Node apps, PyPI for Python apps, GitHub Releases for Go apps
-- `.claude/rules/publishing-apt.md` — APT/deb package publishing specialist - GoReleaser nfpms and GitHub Releases
-- `.claude/rules/publishing-brew.md` — Homebrew tap publishing specialist - GoReleaser brews block and tap repo setup
-- `.claude/rules/publishing-cli.md` — CLI publishing specialist - GoReleaser for Go, npmjs for Node, PyPI for Python
-- `.claude/rules/publishing-libraries.md` — Library publishing specialist - npmjs for TypeScript, PyPI for Python, GitHub tags/releases for Go
-- `.claude/rules/publishing-sdks.md` — SDK publishing specialist - npmjs for TypeScript SDKs, PyPI for Python SDKs, GitHub tags/releases for Go SDKs
-- `.claude/rules/publishing-web.md` — Web app publishing specialist - Docker to GHCR/Docker Hub with Helm chart CD on push to main
-- `.claude/rules/git-hooks.md` — Git hook specialist - configure pre-commit, pre-push, and Husky workflows that match the repository layout
-- `.claude/rules/tasks-task-system.md` — Task system integration - use {{taskSystem}} for work items and configure the MCP server
-- `.claude/rules/tasks-todo.md` — Branch-local TODO tracking - manage tasks/TODO.md and triage before PR
-- `.claude/rules/typescript-linting.md` — TypeScript linting specialist - implements comprehensive linting and code formatting for TypeScript/JavaScript projects
-- `.claude/rules/typescript-logging.md` — Centralized logging specialist - configures Pino with Fluentd for Node/Next.js, and pino-browser to /api/logs
-- `.claude/rules/typescript-testing.md` — Testing specialist - sets up Jest (default) or Vitest for Vite projects, 50% coverage, and test step in build GitHub Action
+- `.claude/rules/common/local-dev-badges.md` — Rules for common/local-dev-badges
+- `.claude/rules/common/local-dev-env.md` — Rules for common/local-dev-env
+- `.claude/rules/common/local-dev-license.md` — Rules for common/local-dev-license
+- `.claude/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
+- `.claude/rules/common/docs.md` — Rules for common/docs
+- `.claude/rules/common/cicd.md` — Rules for common/cicd
+- `.claude/rules/common/observability.md` — Rules for common/observability
+- `.claude/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
+- `.claude/rules/common/publishing-sdks.md` — Rules for common/publishing-sdks
+- `.claude/rules/common/publishing-apps.md` — Rules for common/publishing-apps
+- `.claude/rules/common/git-hooks.md` — Rules for common/git-hooks
+- `.claude/rules/common/tasks.md` — Rules for common/tasks
+- `.claude/rules/typescript/typescript-linting.md` — Rules for typescript/linting
+- `.claude/rules/typescript/typescript-logging.md` — Rules for typescript/logging
+- `.claude/rules/typescript/typescript-testing.md` — Rules for typescript/testing
+- `.claude/rules/python/python-linting.md` — Rules for python/linting
+- `.claude/rules/python/python-logging.md` — Rules for python/logging
+- `.claude/rules/python/python-testing.md` — Rules for python/testing
+- `.claude/rules/go/go-linting.md` — Rules for go/linting
+- `.claude/rules/go/go-logging.md` — Rules for go/logging
+- `.claude/rules/go/go-testing.md` — Rules for go/testing
+- `.claude/rules/ansible/ansible-linting.md` — Rules for ansible/linting
+- `.claude/rules/ansible/ansible-logging.md` — Rules for ansible/logging
+- `.claude/rules/ansible/ansible-testing.md` — Rules for ansible/testing
+- `.claude/rules/terraform/terraform-linting.md` — Rules for terraform/linting
+- `.claude/rules/terraform/terraform-logging.md` — Rules for terraform/logging
+- `.claude/rules/terraform/terraform-testing.md` — Rules for terraform/testing
 
 ## Installed skills
 
-Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.9.3. Do not edit this section.
+Created by Ballast. Do not edit this section.
 
 Read and use these skill files in `.claude/skills/` when they are relevant:
 
-- `.claude/skills/owasp-security-scan.skill` — Run OWASP-aligned security scans across Go, TypeScript, and Python codebases. Use this skill whenever the user asks to: scan for security vulnerabilities, run OWASP checks, audit dependencies, find CVEs, check for injection flaws, run SAST or SCA analysis, review code security, or harden their app against the OWASP Top 10. Also trigger for phrases like "security audit", "check my code for vulns", "are my dependencies safe", or any mention of gosec, bandit, semgrep, or npm audit in a security context. Covers Go, TypeScript/JavaScript, and Python with language-specific tools plus cross-language Semgrep rulesets.
-- `.claude/skills/github-health-check.skill` — Run a comprehensive GitHub repository health check. Use this skill whenever the user asks to: check GitHub health, audit the repo, check CI status, review open PRs, merge Dependabot PRs, check code coverage, check GitHub Code Quality, check GitHub security feature enablement, check security advisories, check Dependabot alerts, check code scanning alerts, check secret scanning alerts, check Snyk integration, keep GitHub in good shape, or any variation of "how is the repo doing". Also trigger for: "check dependabot PRs", "any PRs to merge", "check branch status", "repo health", "GitHub status check", "what needs attention in GitHub", "tidy up GitHub".
-- `.claude/skills/aws-health-review.skill` — Run a weekly, read-only AWS health review covering configuration issues, performance problems, errors, and warnings. Generates a Markdown report and appends new P0/P1 tasks to TODO.md. Use when asked for AWS health checks, weekly infrastructure review, or configuration/performance triage.
-- `.claude/skills/aws-live-health-review.skill` — Run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and CloudWatch logs, then generate a Markdown status report with current health, risks, and evidence. Use when asked for the system's health right now or a current AWS operations snapshot.
-- `.claude/skills/aws-weekly-security-review.skill` — Run a weekly, read-only AWS security baseline review and generate a Markdown report with prioritized findings. Use when asked for recurring AWS security posture checks, quick risk triage, or a starting point for ongoing cloud hardening.
+- `.claude/skills/owasp-security-scan.skill` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
+- `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
+- `.claude/skills/aws-health-review.skill` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
+- `.claude/skills/aws-live-health-review.skill` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
+- `.claude/skills/aws-weekly-security-review.skill` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `.claude/skills/ballast-audit.skill` — audit AI rule and skill files for context density, duplication, and bloat
+
