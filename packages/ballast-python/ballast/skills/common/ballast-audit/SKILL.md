@@ -12,7 +12,7 @@ This skill performs a "Context Hygiene" audit of the repository's AI rule files 
 
 - **Find Duplicates**: Detect identical rule files across different language/target directories.
 - **Calculate BAS**: Apply the Ballast Audit Score to evaluate rule efficiency.
-- **Identify Bloat**: Flag files over 5KB that contain generic documentation.
+- **Identify Bloat**: Flag files over 5KB for trimming, and escalate files over 10KB to skill-or-split candidates.
 - **Recommend Merges**: Suggest consolidation for fragmented rules.
 
 ---
@@ -46,6 +46,7 @@ Identify files that are too large to be persistent rules:
 
 ```bash
 find .codex/rules .gemini/rules -name "*.md" -size +5k
+find .codex/rules .gemini/rules -name "*.md" -size +10k
 ```
 
 **Action**:

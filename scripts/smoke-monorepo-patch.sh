@@ -24,7 +24,7 @@ resolve_examples_root() {
 
 EXAMPLES_ROOT="$(resolve_examples_root "${1:-}")"
 
-if [[ ! -d "${EXAMPLES_ROOT}/typescript-sample" ]]; then
+if [[ ! -d "${EXAMPLES_ROOT}/typescript-sample" || ! -d "${EXAMPLES_ROOT}/python-sample" || ! -d "${EXAMPLES_ROOT}/go-sample" ]]; then
   echo "ballast-examples repo not found at ${EXAMPLES_ROOT}" >&2
   exit 1
 fi

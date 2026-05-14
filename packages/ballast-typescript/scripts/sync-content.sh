@@ -23,12 +23,13 @@ copy_tree() {
   local dest="$2"
 
   mkdir -p "${dest}"
+  find "${dest}" -mindepth 1 -delete
 
   (
     cd "${src}"
     find . -type d -exec mkdir -p "${dest}/{}" \;
     while IFS= read -r -d '' rel; do
-      clean_rel="${rel#./}"
+      local clean_rel="${rel#./}"
       mkdir -p "${dest}/$(dirname "${clean_rel}")"
       cat "${clean_rel}" > "${dest}/${clean_rel}"
     done < <(find . -type f -print0)

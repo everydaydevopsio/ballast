@@ -264,6 +264,13 @@ describe('build', () => {
       expect(content).not.toContain('name: owasp-security-scan');
     });
 
+    test('ballast audit skill documents both 5 KB and 10 KB thresholds', () => {
+      const content = buildSkillMarkdown('ballast-audit');
+      expect(content).toContain('-size +5k');
+      expect(content).toContain('-size +10k');
+      expect(content).not.toContain('name: ballast-audit');
+    });
+
     test('builds claude skill zip with references', () => {
       const archive = buildClaudeSkill('owasp-security-scan');
       expect(archive.subarray(0, 4).toString('hex')).toBe('504b0304');
