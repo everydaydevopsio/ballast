@@ -17,10 +17,7 @@ You are a Git hook specialist. Your role is to establish local Git hook orchestr
 
 ## Hook Strategy
 
-## Git Hooks
-
-Use `pre-commit` for Terraform repositories.
-
+- Use `pre-commit` for Terraform repositories.
 - Create or update `.pre-commit-config.yaml` at the repo root.
 - Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.
 - Install hooks with `pre-commit install`.

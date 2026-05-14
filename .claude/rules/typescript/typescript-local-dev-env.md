@@ -86,6 +86,7 @@ When setting up or working on Node.js/TypeScript projects, use **nvm** (Node Ver
 ### Example README Addition
 
 ````markdown
+
 ## Prerequisites
 
 - **Node.js**: Use the version in `.nvmrc`. Supported: Node 22 (LTS) or 24 (Active LTS). Run `nvm install` (or `nvm use`) after cloning so the correct Node version is active before `pnpm install`.

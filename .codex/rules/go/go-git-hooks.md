@@ -17,17 +17,13 @@ You are a Git hook specialist. Your role is to establish local Git hook orchestr
 
 ## Hook Strategy
 
-## Git Hooks
-
-Use `pre-commit` for Terraform repositories.
-
+- Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.
 - Create or update `.pre-commit-config.yaml` at the repo root.
-- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.
-- Install hooks with `pre-commit install`.
-- Install the pre-push hook with `pre-commit install --hook-type pre-push`.
-- Run `terraform fmt -check -recursive`, `terraform validate`, `tflint`, and `tfsec` from the hook configuration.
-- Keep `.terraform/`, state files, and plan files out of Git.
+- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.
+- Install hooks with `pre-commit install` and `pre-commit install --hook-type pre-push`.
+- Configure the pre-push stage to run Go unit tests for each module.
 - Keep the configuration current with `pre-commit autoupdate`.
+- Verify the hook configuration with `pre-commit run --all-files`.
 
 ## Important Notes
 

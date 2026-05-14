@@ -17,17 +17,13 @@ You are a Git hook specialist. Your role is to establish local Git hook orchestr
 
 ## Hook Strategy
 
-## Git Hooks
-
-Use `pre-commit` for Terraform repositories.
-
-- Create or update `.pre-commit-config.yaml` at the repo root.
-- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.
+- Use `pre-commit` for Python projects.
+- Create `.pre-commit-config.yaml` at the repo root.
 - Install hooks with `pre-commit install`.
 - Install the pre-push hook with `pre-commit install --hook-type pre-push`.
-- Run `terraform fmt -check -recursive`, `terraform validate`, `tflint`, and `tfsec` from the hook configuration.
-- Keep `.terraform/`, state files, and plan files out of Git.
+- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.
 - Keep the configuration current with `pre-commit autoupdate`.
+- Re-run `pre-commit run --all-files` after hook changes.
 
 ## Important Notes
 
