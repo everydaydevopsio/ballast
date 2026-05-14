@@ -8,7 +8,7 @@
 [![npm version](https://img.shields.io/npm/v/%40everydaydevopsio%2Fballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
 [![npm downloads](https://img.shields.io/npm/dm/%40everydaydevopsio%2Fballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
 
-Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, and Codex.
+Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, Codex, and Gemini.
 
 This repository supports five first-class language profiles:
 
@@ -304,7 +304,7 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 
 ## CLI Flags
 
-- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`; adds to saved targets in `.rulesrc.json`
+- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`, `gemini`; adds to saved targets in `.rulesrc.json`
 - `--remove-target`: remove one or more saved targets and clean up Ballast-managed files for them
 - `--agent, -a`: comma-separated agent list
 - `--skill, -s`: comma-separated skill list
@@ -336,8 +336,10 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 - Claude: `.claude/rules/<agent>.md` and `.claude/skills/<skill>.skill`
 - OpenCode: `.opencode/<agent>.md` and `.opencode/skills/<skill>.md`
 - Codex: `.codex/rules/<agent>.md` and root `AGENTS.md`
+- Gemini: `.gemini/rules/<agent>.md` and root `GEMINI.md`
 - Cursor skills: `.cursor/rules/<skill>.mdc`
 - Codex skills: `.codex/rules/<skill>.md`, with root `AGENTS.md` listing installed skills
+- Gemini skills: `.gemini/rules/<skill>.md`, with root `GEMINI.md` listing installed skills
 
 ## Development
 

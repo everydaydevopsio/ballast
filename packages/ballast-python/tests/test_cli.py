@@ -519,11 +519,12 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("## Installed skills", content)
         self.assertIn("`.codex/rules/owasp-security-scan.md`", content)
 
-    def test_build_gemini_md_includes_agents_import_and_rules(self) -> None:
+    def test_build_gemini_md_includes_repository_facts_and_rules(self) -> None:
         content = cli.build_gemini_md(["linting"], ["owasp-security-scan"], "python")
 
         self.assertIn("# GEMINI.md", content)
-        self.assertIn("@./AGENTS.md", content)
+        self.assertIn("## Repository Facts", content)
+        self.assertIn("## Memory Tiering", content)
         self.assertIn("## Installed agent rules", content)
         self.assertIn("`.gemini/rules/python-linting.md`", content)
         self.assertIn("## Installed skills", content)
@@ -1014,7 +1015,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
             self.assertIn("`.claude/rules/python-linting.md`", claude_md)
             self.assertNotIn("`.claude/rules/old.md`", claude_md)
 
-    def test_install_creates_gemini_and_agents_support_files(self) -> None:
+    def test_install_creates_gemini_support_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
@@ -1024,12 +1025,11 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 
             self.assertIn("linting", result.installed)
             gemini_md = (root / "GEMINI.md").read_text(encoding="utf-8")
-            self.assertIn("@./AGENTS.md", gemini_md)
+            self.assertIn("## Repository Facts", gemini_md)
+            self.assertIn("## Memory Tiering", gemini_md)
             self.assertIn("`.gemini/rules/python-linting.md`", gemini_md)
 
-            agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
-            self.assertIn("## Repository Facts", agents_md)
-            self.assertIn("`.codex/rules/python-linting.md`", agents_md)
+            self.assertFalse((root / "AGENTS.md").exists())
 
     def test_install_skips_existing_gemini_md_without_patch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1051,7 +1051,7 @@ Keep this section.
             self.assertIn(str(root / "GEMINI.md"), result.skipped_support_files)
             gemini_md = (root / "GEMINI.md").read_text(encoding="utf-8")
             self.assertIn("## Team Notes", gemini_md)
-            self.assertTrue((root / "AGENTS.md").exists())
+            self.assertFalse((root / "AGENTS.md").exists())
 
     def test_patch_updates_gemini_md_section_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

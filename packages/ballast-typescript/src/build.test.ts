@@ -481,10 +481,11 @@ alwaysApply: false
   });
 
   describe('buildGeminiMd', () => {
-    test('lists gemini rule files with shared AGENTS include and skills', () => {
+    test('lists gemini rule files with repository facts, memory tiering, and skills', () => {
       const content = buildGeminiMd(['linting'], ['owasp-security-scan']);
       expect(content).toContain('# GEMINI.md');
-      expect(content).toContain('@./AGENTS.md');
+      expect(content).toContain('## Repository Facts');
+      expect(content).toContain('## Memory Tiering');
       expect(content).toMatch(
         /Created by \[Ballast]\(https:\/\/github\.com\/everydaydevopsio\/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\./
       );

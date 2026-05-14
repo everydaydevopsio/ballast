@@ -761,6 +761,27 @@ def read_template(agent: str, language: str, filename: str, suffix: str = "") ->
     )
 
 
+def render_gemini_mandates() -> str:
+    return "\n".join(
+        [
+            "## Gemini Mandates",
+            "",
+            "### Narrative Flow",
+            r"Always use the `update_topic` tool at the beginning of a task and when transitioning between major strategic phases. Provide a concise `title` and a detailed `summary` (5-10 sentences) that recaps completed work and outlines the immediate strategic intent.",
+            "",
+            "### Context Efficiency",
+            r"- **Surgical Reads:** Use `start_line` and `end_line` in `read_file` to minimize context usage.",
+            "- **Parallelism:** Execute independent searches and reads in parallel whenever possible.",
+            r"- **Topic Search:** Use `grep_search` to identify points of interest before reading entire files.",
+            "",
+            "### Strategic Orchestration",
+            r"Delegate complex, repetitive, or high-volume tasks to specialized sub-agents (`codebase_investigator`, `generalist`) to keep the main session history lean and efficient.",
+            "",
+            "",
+        ]
+    )
+
+
 def build_content(
     agent: str, target: str, language: str, suffix: str = "", root: Path | None = None
 ) -> str:
@@ -783,7 +804,7 @@ def build_content(
                 header = read_template(agent, language, "claude-header.md", suffix)
             except FileNotFoundError:
                 header = read_template(agent, language, "codex-header.md", suffix)
-        return header + body
+        return header + "\n---\n\n" + render_gemini_mandates() + body
     if target == "opencode":
         return (
             read_template(agent, language, "opencode-frontmatter.yaml", suffix)
@@ -1104,15 +1125,29 @@ def build_gemini_md(agents: list[str], skills: list[str], language: str) -> str:
         "",
         "This file provides guidance to Gemini CLI for working in this repository.",
         "",
-        "@./AGENTS.md",
-        "",
-        "## Installed agent rules",
-        "",
-        ballast_notice(),
-        "",
-        "Read and follow these rule files in `.gemini/rules/` when they apply:",
-        "",
     ]
+    lines.extend(repository_facts_section())
+    lines.extend(
+        [
+            "",
+            "## Memory Tiering",
+            "",
+            "Follow these routing rules for persisting long-lived facts and preferences:",
+            "",
+            "- **Team-shared (Repository)**: Use this `GEMINI.md` file for architecture, workflows, and repo-wide rules.",
+            "- **Private (Local Setup)**: Use the private project memory (`MEMORY.md` in the ballast memory folder) for local machine notes or private workflows.",
+            "- **Global (Personal)**: Use the global personal memory (`~/.gemini/GEMINI.md`) for cross-project personal coding preferences.",
+            "",
+            "---",
+            "",
+            "## Installed agent rules",
+            "",
+            ballast_notice(),
+            "",
+            "Read and follow these rule files in `.gemini/rules/` when they apply:",
+            "",
+        ]
+    )
     for agent in agents:
         for suffix in list_rule_suffixes(agent, language):
             basename = rule_basename(agent, language, suffix)
@@ -1682,7 +1717,6 @@ def install(
 
     if target == "gemini" and not disable_support_files:
         gemini_md = root / "GEMINI.md"
-        agents_md = root / "AGENTS.md"
         should_patch_gemini_md = patch or patch_gemini_md
         if str(gemini_md) in skipped_support_files:
             result.declined_support_files.append(str(gemini_md))
@@ -1702,16 +1736,6 @@ def install(
                 result.installed_support_files.append(str(gemini_md))
             except Exception as err:
                 result.errors.append(("gemini", str(err)))
-
-        if not agents_md.exists() and str(agents_md) not in skipped_support_files:
-            try:
-                agents_md.write_text(
-                    build_codex_agents_md(support_agents, support_skills, language),
-                    encoding="utf-8",
-                )
-                result.installed_support_files.append(str(agents_md))
-            except Exception as err:
-                result.errors.append(("codex", str(err)))
 
     if target == "codex" and not disable_support_files:
         agents_md = root / "AGENTS.md"

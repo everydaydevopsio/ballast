@@ -707,6 +707,7 @@ func TestSkillDestinationReturnsExpectedPaths(t *testing.T) {
 		{target: "claude", dir: filepath.Join(tmpDir, ".claude", "skills"), file: filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")},
 		{target: "opencode", dir: filepath.Join(tmpDir, ".opencode", "skills"), file: filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")},
 		{target: "codex", dir: filepath.Join(tmpDir, ".codex", "rules"), file: filepath.Join(tmpDir, ".codex", "rules", "owasp-security-scan.md")},
+		{target: "gemini", dir: filepath.Join(tmpDir, ".gemini", "rules"), file: filepath.Join(tmpDir, ".gemini", "rules", "owasp-security-scan.md")},
 	}
 
 	for _, tc := range cases {
@@ -717,6 +718,251 @@ func TestSkillDestinationReturnsExpectedPaths(t *testing.T) {
 		if dir != tc.dir || file != tc.file {
 			t.Fatalf("unexpected destination for %s: got (%s, %s), want (%s, %s)", tc.target, dir, file, tc.dir, tc.file)
 		}
+	}
+}
+
+func TestDestinationReturnsGeminiRulePath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	dir, file, err := destination(tmpDir, "gemini", "go-linting")
+	if err != nil {
+		t.Fatalf("destination(gemini): %v", err)
+	}
+	if dir != geminiRuleDir(tmpDir) {
+		t.Fatalf("unexpected gemini dir: got %q want %q", dir, geminiRuleDir(tmpDir))
+	}
+	if file != filepath.Join(tmpDir, ".gemini", "rules", "go-linting.md") {
+		t.Fatalf("unexpected gemini file path: %q", file)
+	}
+	if geminiMDPath(tmpDir) != filepath.Join(tmpDir, "GEMINI.md") {
+		t.Fatalf("unexpected gemini support file path: %q", geminiMDPath(tmpDir))
+	}
+}
+
+func TestBuildGeminiMDIncludesRepositoryFactsAndSkills(t *testing.T) {
+	content, err := buildGeminiMD([]string{"linting"}, []string{"owasp-security-scan"}, "go")
+	if err != nil {
+		t.Fatalf("buildGeminiMD: %v", err)
+	}
+
+	if !strings.Contains(content, "# GEMINI.md") {
+		t.Fatalf("expected GEMINI.md heading, got %q", content)
+	}
+	if !strings.Contains(content, "## Repository Facts") {
+		t.Fatalf("expected repository facts section, got %q", content)
+	}
+	if !strings.Contains(content, "## Memory Tiering") {
+		t.Fatalf("expected memory tiering section, got %q", content)
+	}
+	if !strings.Contains(content, "`.gemini/rules/go-linting.md`") {
+		t.Fatalf("expected gemini linting rule, got %q", content)
+	}
+	if !strings.Contains(content, "`.gemini/rules/owasp-security-scan.md`") {
+		t.Fatalf("expected gemini skill entry, got %q", content)
+	}
+}
+
+func TestBuildContentGeminiIncludesMandates(t *testing.T) {
+	content, err := buildContent("linting", "gemini", "go", "", "standalone")
+	if err != nil {
+		t.Fatalf("buildContent(gemini): %v", err)
+	}
+
+	if !strings.Contains(content, "## Gemini Mandates") {
+		t.Fatalf("expected Gemini mandates in content, got %q", content)
+	}
+	if !strings.Contains(content, "### Narrative Flow") {
+		t.Fatalf("expected narrative flow section, got %q", content)
+	}
+	if !strings.Contains(content, "Go linting specialist") {
+		t.Fatalf("expected go linting body, got %q", content)
+	}
+}
+
+func TestInstallCreatesGeminiSupportFileOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"gemini"},
+		agents:      []string{"linting"},
+		language:    "go",
+		force:       false,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	geminiPath := filepath.Join(tmpDir, "GEMINI.md")
+	content, err := os.ReadFile(geminiPath)
+	if err != nil {
+		t.Fatalf("read GEMINI.md: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "## Repository Facts") {
+		t.Fatalf("expected repository facts section, got %q", text)
+	}
+	if !strings.Contains(text, "## Memory Tiering") {
+		t.Fatalf("expected memory tiering section, got %q", text)
+	}
+	if !strings.Contains(text, "`.gemini/rules/go-linting.md`") {
+		t.Fatalf("expected gemini linting rule entry, got %q", text)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatalf("expected AGENTS.md to remain absent, stat err=%v", err)
+	}
+}
+
+func TestInstallPatchUpdatesGeminiMDSectionOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	rulePath := filepath.Join(tmpDir, ".gemini", "rules", "go-linting.md")
+	if err := os.MkdirAll(filepath.Dir(rulePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rulePath, []byte("# placeholder\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	geminiMD := filepath.Join(tmpDir, "GEMINI.md")
+	if err := os.WriteFile(geminiMD, []byte("# GEMINI.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nRead and follow these rule files in `.gemini/rules/` when they apply:\n\n- `.gemini/rules/old.md` - Old rule\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"gemini"},
+		agents:      []string{"linting"},
+		language:    "go",
+		force:       false,
+		patchGemini: true,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	content, err := os.ReadFile(geminiMD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "## Team Notes") {
+		t.Fatalf("expected team notes to remain, got %q", text)
+	}
+	if !strings.Contains(text, "`.gemini/rules/go-linting.md`") {
+		t.Fatalf("expected gemini linting rule entry, got %q", text)
+	}
+	if strings.Contains(text, "`.gemini/rules/old.md`") {
+		t.Fatalf("expected old installed-rules entry to be replaced, got %q", text)
+	}
+}
+
+func TestRunInstallWritesGeminiSupportFilesAndConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	exitCode := runInstall([]string{"install", "--target", "gemini", "--agent", "linting", "--yes"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+
+	if _, err := os.Stat(filepath.Join(tmpDir, ".gemini", "rules", "go-linting.md")); err != nil {
+		t.Fatalf("expected gemini rule file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "GEMINI.md")); err != nil {
+		t.Fatalf("expected GEMINI.md to be created: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatalf("expected AGENTS.md to stay absent, stat err=%v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, `"targets": [`+"\n"+`    "gemini"`) {
+		t.Fatalf("expected gemini target in config, got %q", text)
+	}
+}
+
+func TestRunInstallPromptsToPatchExistingGeminiMD(t *testing.T) {
+	t.Setenv("CI", "")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("TF_BUILD", "")
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	geminiPath := filepath.Join(tmpDir, "GEMINI.md")
+	if err := os.WriteFile(geminiPath, []byte("# GEMINI.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\n- `.gemini/rules/old.md` - Old rule\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = reader
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		_ = reader.Close()
+	})
+	if _, err := writer.WriteString("y\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := runInstall([]string{"install", "--target", "gemini", "--agent", "linting"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	content, err := os.ReadFile(geminiPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "## Team Notes") {
+		t.Fatalf("expected team notes to remain after patch, got %q", text)
+	}
+	if !strings.Contains(text, "`.gemini/rules/go-linting.md`") {
+		t.Fatalf("expected linting rule to be installed, got %q", text)
+	}
+	if strings.Contains(text, "`.gemini/rules/old.md`") {
+		t.Fatalf("expected old rule entry to be replaced, got %q", text)
+	}
+	if !strings.Contains(output, "GEMINI.md -> ") {
+		t.Fatalf("expected GEMINI.md support file output, got %q", output)
 	}
 }
 

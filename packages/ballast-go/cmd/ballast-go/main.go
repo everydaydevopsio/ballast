@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-var targets = []string{"cursor", "claude", "opencode", "codex"}
+var targets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
 var languages = []string{"typescript", "python", "go", "ansible", "terraform"}
 
 var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks"}
@@ -129,6 +129,7 @@ type installOptions struct {
 	force       bool
 	patch       bool
 	patchClaude bool
+	patchGemini bool
 	skipSupport map[string]struct{}
 	saveConfig  bool
 }
@@ -187,8 +188,8 @@ func run(args []string) int {
 func runInstall(args []string) int {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	var targetFlags targetListFlag
-	fs.Var(&targetFlags, "target", "cursor|claude|opencode|codex")
-	fs.Var(&targetFlags, "t", "cursor|claude|opencode|codex")
+	fs.Var(&targetFlags, "target", "cursor|claude|opencode|codex|gemini")
+	fs.Var(&targetFlags, "t", "cursor|claude|opencode|codex|gemini")
 	language := fs.String("language", "go", "typescript|python|go|ansible|terraform")
 	fs.StringVar(language, "l", "go", "typescript|python|go|ansible|terraform")
 	agent := fs.String("agent", "", "comma-separated list")
@@ -247,28 +248,43 @@ func runInstall(args []string) int {
 	}
 
 	patchClaude := false
+	patchGemini := false
 	for _, target := range resolved.Targets {
-		if target != "claude" || !exists(claudeMDPath(root)) || *force {
-			continue
-		}
-		if *patch {
-			patchClaude = true
-			break
-		}
-		if !*yes && !isCIMode() {
-			approved, promptErr := promptYesNo(
-				fmt.Sprintf(
-					"Existing CLAUDE.md found at %s. Patch the Installed agent rules section?",
-					claudeMDPath(root),
-				),
-				false,
-			)
-			if promptErr != nil {
-				fmt.Println(promptErr)
-				return 1
+		if target == "claude" && exists(claudeMDPath(root)) && !*force {
+			if *patch {
+				patchClaude = true
+			} else if !*yes && !isCIMode() {
+				approved, promptErr := promptYesNo(
+					fmt.Sprintf(
+						"Existing CLAUDE.md found at %s. Patch the Installed agent rules section?",
+						claudeMDPath(root),
+					),
+					false,
+				)
+				if promptErr != nil {
+					fmt.Println(promptErr)
+					return 1
+				}
+				patchClaude = approved
 			}
-			patchClaude = approved
-			break
+		}
+		if target == "gemini" && exists(geminiMDPath(root)) && !*force {
+			if *patch {
+				patchGemini = true
+			} else if !*yes && !isCIMode() {
+				approved, promptErr := promptYesNo(
+					fmt.Sprintf(
+						"Existing GEMINI.md found at %s. Patch the Installed agent rules section?",
+						geminiMDPath(root),
+					),
+					false,
+				)
+				if promptErr != nil {
+					fmt.Println(promptErr)
+					return 1
+				}
+				patchGemini = approved
+			}
 		}
 	}
 	skippedSupport := map[string]struct{}{}
@@ -309,6 +325,7 @@ func runInstall(args []string) int {
 		force:       *force,
 		patch:       *patch,
 		patchClaude: patchClaude,
+		patchGemini: patchGemini,
 		skipSupport: skippedSupport,
 		saveConfig:  true,
 	})
@@ -345,11 +362,7 @@ func runInstall(args []string) int {
 	}
 	if len(result.installedSupport) > 0 {
 		for _, file := range result.installedSupport {
-			label := "AGENTS.md"
-			if strings.HasSuffix(file, "CLAUDE.md") {
-				label = "CLAUDE.md"
-			}
-			fmt.Printf("  %s -> %s\n", label, file)
+			fmt.Printf("  %s -> %s\n", filepath.Base(file), file)
 		}
 	}
 	if len(result.skipped) > 0 {
@@ -402,7 +415,7 @@ Options:
   --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, ballast-audit (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
-  --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md or CLAUDE.md
+  --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
   --help, -h                Show this help
@@ -413,7 +426,7 @@ Examples:
   ballast-go install --target cursor --agent linting
   ballast-go install --target claude --skill owasp-security-scan
   ballast-go install --target codex --skill aws-health-review
-  ballast-go install --target cursor,claude --agent linting
+  ballast-go install --target cursor,claude,gemini --agent linting
   ballast-go install --language python --target cursor --all
   ballast-go install --target claude --all --force
   ballast-go install --target cursor --agent linting --patch
@@ -911,7 +924,7 @@ func install(opts installOptions) installResult {
 					continue
 				}
 				err = os.WriteFile(file, content, 0o644)
-			case "opencode", "codex":
+			case "opencode", "codex", "gemini":
 				content, buildErr := buildSkillMarkdown(skillID, opts.language)
 				if buildErr != nil {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
@@ -1006,6 +1019,40 @@ func install(opts installOptions) installResult {
 				}
 			}
 		}
+
+		if target == "gemini" && !disableSupportFiles {
+			geminiPath := geminiMDPath(opts.projectRoot)
+			shouldPatchGemini := opts.patch || opts.patchGemini
+			if _, skipped := opts.skipSupport[geminiPath]; skipped {
+				if !contains(result.declinedSupportFiles, geminiPath) {
+					result.declinedSupportFiles = append(result.declinedSupportFiles, geminiPath)
+				}
+			} else if exists(geminiPath) && !opts.force && !shouldPatchGemini {
+				if !contains(result.skippedSupportFiles, geminiPath) {
+					result.skippedSupportFiles = append(result.skippedSupportFiles, geminiPath)
+				}
+			} else {
+				content, err := buildGeminiMD(supportAgents, supportSkills, opts.language)
+				if err != nil {
+					result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
+				} else {
+					nextContent := content
+					if exists(geminiPath) && !opts.force && shouldPatchGemini {
+						existing, readErr := os.ReadFile(geminiPath)
+						if readErr != nil {
+							result.errors = append(result.errors, agentError{agent: "gemini", err: readErr.Error()})
+						} else {
+							nextContent = patchCodexAgentsMD(string(existing), content)
+						}
+					}
+					if err := os.WriteFile(geminiPath, []byte(nextContent), 0o644); err != nil {
+						result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
+					} else if !contains(result.installedSupport, geminiPath) {
+						result.installedSupport = append(result.installedSupport, geminiPath)
+					}
+				}
+			}
+		}
 	}
 
 	return result
@@ -1058,6 +1105,76 @@ func buildCodexAgentsMD(agents []string, skills []string, language string) (stri
 	}
 	lines = append(lines, "")
 	return strings.Join(lines, "\n"), nil
+}
+
+func renderGeminiMandates() string {
+	return strings.Join([]string{
+		"## Gemini Mandates",
+		"",
+		"### Narrative Flow",
+		"Always use the `update_topic` tool at the beginning of a task and when transitioning between major strategic phases. Provide a concise `title` and a detailed `summary` (5-10 sentences) that recaps completed work and outlines the immediate strategic intent.",
+		"",
+		"### Context Efficiency",
+		"- **Surgical Reads:** Use `start_line` and `end_line` in `read_file` to minimize context usage.",
+		"- **Parallelism:** Execute independent searches and reads in parallel whenever possible.",
+		"- **Topic Search:** Use `grep_search` to identify points of interest before reading entire files.",
+		"",
+		"### Strategic Orchestration",
+		"Delegate complex, repetitive, or high-volume tasks to specialized sub-agents (`codebase_investigator`, `generalist`) to keep the main session history lean and efficient.",
+		"",
+		"",
+	}, "\n")
+}
+
+func buildGeminiMD(agents []string, skills []string, language string) (string, error) {
+	var sb strings.Builder
+	sb.WriteString("# GEMINI.md\n\n")
+	sb.WriteString("This file provides guidance to Gemini CLI for working in this repository.\n\n")
+
+	for _, line := range repositoryFactsSection() {
+		sb.WriteString(line + "\n")
+	}
+	sb.WriteString("\n")
+
+	sb.WriteString("## Memory Tiering\n\n")
+	sb.WriteString("Follow these routing rules for persisting long-lived facts and preferences:\n\n")
+	sb.WriteString("- **Team-shared (Repository)**: Use this `GEMINI.md` file for architecture, workflows, and repo-wide rules.\n")
+	sb.WriteString("- **Private (Local Setup)**: Use the private project memory (`MEMORY.md` in the ballast memory folder) for local machine notes or private workflows.\n")
+	sb.WriteString("- **Global (Personal)**: Use the global personal memory (`~/.gemini/GEMINI.md`) for cross-project personal coding preferences.\n\n")
+
+	sb.WriteString("---\n\n")
+	sb.WriteString("## Installed agent rules\n\n")
+	sb.WriteString(ballastNotice() + "\n\n")
+	sb.WriteString("Read and follow these rule files in `.gemini/rules/` when they apply:\n\n")
+
+	for _, agent := range agents {
+		suffixes, err := listRuleSuffixes(agent, language)
+		if err != nil {
+			return "", err
+		}
+		for _, suffix := range suffixes {
+			basename := ruleBaseName(agent, language, suffix)
+			description, _ := codexRuleDescription(agent, language, suffix)
+			if description == "" {
+				description = "Rules for " + basename
+			}
+			sb.WriteString(fmt.Sprintf("- `.gemini/rules/%s.md` — %s\n", basename, description))
+		}
+	}
+
+	if len(skills) > 0 {
+		sb.WriteString("\n## Installed skills\n\n")
+		sb.WriteString(ballastNotice() + "\n\n")
+		sb.WriteString("Read and use these skill files in `.gemini/rules/` when they are relevant:\n\n")
+
+		for _, skill := range skills {
+			desc := skillDescription(skill, language)
+			sb.WriteString(fmt.Sprintf("- `.gemini/rules/%s.md` — %s\n", skill, desc))
+		}
+	}
+
+	sb.WriteString("\n")
+	return sb.String(), nil
 }
 
 func buildClaudeMD(agents []string, skills []string, language string) (string, error) {
@@ -1712,6 +1829,18 @@ func buildContent(agentID, target, language, suffix, hookMode string) (string, e
 			return "", err
 		}
 		return header + content, nil
+	case "gemini":
+		header, err := readTemplate(agentID, language, "gemini-header.md", suffix)
+		if err != nil {
+			header, err = readTemplate(agentID, language, "claude-header.md", suffix)
+			if err != nil {
+				header, err = readTemplate(agentID, language, "codex-header.md", suffix)
+				if err != nil {
+					return "", err
+				}
+			}
+		}
+		return header + "\n---\n\n" + renderGeminiMandates() + content, nil
 	case "opencode":
 		front, err := readTemplate(agentID, language, "opencode-frontmatter.yaml", suffix)
 		if err != nil {
@@ -2523,6 +2652,12 @@ func destination(projectRoot, target, basename string) (string, string, error) {
 			dir = filepath.Join(dir, ruleSubdir)
 		}
 		return dir, filepath.Join(dir, scopedBasename+".md"), nil
+	case "gemini":
+		dir := filepath.Join(projectRoot, ".gemini", "rules")
+		if ruleSubdir != "" {
+			dir = filepath.Join(dir, ruleSubdir)
+		}
+		return dir, filepath.Join(dir, scopedBasename+".md"), nil
 	default:
 		dir := filepath.Join(projectRoot, ".codex", "rules")
 		if ruleSubdir != "" {
@@ -2546,6 +2681,9 @@ func skillDestination(projectRoot, target, skillID string) (string, string, erro
 		return dir, filepath.Join(dir, skillID+".md"), nil
 	case "codex":
 		dir := filepath.Join(root, ".codex", "rules")
+		return dir, filepath.Join(dir, skillID+".md"), nil
+	case "gemini":
+		dir := filepath.Join(root, ".gemini", "rules")
 		return dir, filepath.Join(dir, skillID+".md"), nil
 	default:
 		return "", "", fmt.Errorf("unknown target: %s", target)
@@ -2580,6 +2718,14 @@ func codexAgentsMDPath(projectRoot string) string {
 
 func claudeMDPath(projectRoot string) string {
 	return filepath.Join(projectRoot, "CLAUDE.md")
+}
+
+func geminiMDPath(projectRoot string) string {
+	return filepath.Join(projectRoot, "GEMINI.md")
+}
+
+func geminiRuleDir(projectRoot string) string {
+	return filepath.Join(projectRoot, ".gemini", "rules")
 }
 
 func contains(items []string, value string) bool {
