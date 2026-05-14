@@ -1389,6 +1389,11 @@ func siblingBackendBinary(lang language) (string, bool) {
 }
 
 func findBallastSourceRoot() string {
+	if root := strings.TrimSpace(os.Getenv("BALLAST_REPO_ROOT")); root != "" {
+		if abs, err := filepath.Abs(root); err == nil && isBallastSourceRoot(abs) {
+			return abs
+		}
+	}
 	executable, err := osExecutableFunc()
 	if err != nil {
 		return ""

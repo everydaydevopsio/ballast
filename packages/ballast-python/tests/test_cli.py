@@ -478,6 +478,7 @@ class PatchInstallTests(unittest.TestCase):
                 "aws-live-health-review",
                 "aws-weekly-security-review",
                 "github-health-check",
+                "ballast-audit",
             ],
         )
         self.assertEqual(
@@ -498,6 +499,16 @@ class PatchInstallTests(unittest.TestCase):
             content,
         )
         self.assertNotIn("description: >", content)
+
+    def test_build_cursor_skill_format_supports_ballast_audit(self) -> None:
+        content = cli.build_cursor_skill_format("ballast-audit", "python")
+
+        self.assertIn("alwaysApply: false", content)
+        self.assertIn(
+            'description: "audit AI rule and skill files for context density, duplication, and bloat"',
+            content,
+        )
+        self.assertIn("# Ballast Audit Skill", content)
 
     def test_build_support_file_includes_skills(self) -> None:
         content = cli.build_codex_agents_md(

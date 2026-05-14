@@ -94,6 +94,7 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"aws-live-health-review",
 		"aws-weekly-security-review",
 		"github-health-check",
+		"ballast-audit",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
@@ -645,6 +646,22 @@ func TestBuildCursorSkillFormatIncludesOnDemandFrontmatter(t *testing.T) {
 	}
 	if strings.Contains(content, "\n---\n---\n") {
 		t.Fatalf("expected normalized markdown body without duplicate frontmatter: %s", content)
+	}
+}
+
+func TestBuildCursorSkillFormatIncludesBallastAuditFrontmatter(t *testing.T) {
+	content, err := buildCursorSkillFormat("ballast-audit", "go")
+	if err != nil {
+		t.Fatalf("buildCursorSkillFormat(ballast-audit): %v", err)
+	}
+	if !strings.Contains(content, "alwaysApply: false") {
+		t.Fatalf("expected alwaysApply false frontmatter: %s", content)
+	}
+	if !strings.Contains(content, "description: \"audit AI rule and skill files for context density, duplication, and bloat\"") {
+		t.Fatalf("expected ballast-audit description in frontmatter: %s", content)
+	}
+	if !strings.Contains(content, "# Ballast Audit Skill") {
+		t.Fatalf("expected ballast-audit body: %s", content)
 	}
 }
 
