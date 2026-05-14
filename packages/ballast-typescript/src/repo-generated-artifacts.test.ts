@@ -23,7 +23,11 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const RULESRC_PATH = path.join(REPO_ROOT, '.rulesrc.json');
 const ALLOWED_NON_GENERATED = new Set([
   '.claude/settings.json',
-  '.claude/settings.local.json'
+  '.claude/settings.local.json',
+  '.claude/rules/linting.md',
+  '.claude/rules/local-dev.md',
+  '.claude/rules/logging.md',
+  '.claude/rules/testing.md'
 ]);
 
 function collectFiles(dir: string): string[] {
