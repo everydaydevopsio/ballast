@@ -304,7 +304,7 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 
 ## CLI Flags
 
-- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`; adds to saved targets in `.rulesrc.json`
+- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`, `gemini`; adds to saved targets in `.rulesrc.json`
 - `--remove-target`: remove one or more saved targets and clean up Ballast-managed files for them
 - `--agent, -a`: comma-separated agent list
 - `--skill, -s`: comma-separated skill list

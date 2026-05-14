@@ -593,6 +593,7 @@ function renderGeminiMandates(): string {
     '',
     '### Strategic Orchestration',
     'Delegate complex, repetitive, or high-volume tasks to specialized sub-agents (`codebase_investigator`, `generalist`) to keep the main session history lean and efficient.',
+    '',
     ''
   ].join('\n');
 }
@@ -849,15 +850,7 @@ export function buildGeminiMd(
     'This file provides guidance to Gemini CLI for working in this repository.'
   );
   lines.push('');
-  lines.push('## Repository Facts');
-  lines.push('');
-  lines.push(
-    'Update this section with core facts about the repository that the agent should always keep in context.'
-  );
-  lines.push('');
-  lines.push('- **Tech Stack**: [e.g. TypeScript, React, Node.js]');
-  lines.push('- **Main Entrypoints**: [e.g. src/index.ts]');
-  lines.push('- **Key Conventions**: [e.g. Uses functional components]');
+  lines.push(...getRepositoryFactsSection());
   lines.push('');
   lines.push('## Memory Tiering');
   lines.push('');

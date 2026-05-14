@@ -924,7 +924,7 @@ func install(opts installOptions) installResult {
 					continue
 				}
 				err = os.WriteFile(file, content, 0o644)
-			case "opencode", "codex":
+			case "opencode", "codex", "gemini":
 				content, buildErr := buildSkillMarkdown(skillID, opts.language)
 				if buildErr != nil {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
@@ -1121,6 +1121,8 @@ func renderGeminiMandates() string {
 		"",
 		"### Strategic Orchestration",
 		"Delegate complex, repetitive, or high-volume tasks to specialized sub-agents (`codebase_investigator`, `generalist`) to keep the main session history lean and efficient.",
+		"",
+		"",
 	}, "\n")
 }
 
@@ -1129,11 +1131,10 @@ func buildGeminiMD(agents []string, skills []string, language string) (string, e
 	sb.WriteString("# GEMINI.md\n\n")
 	sb.WriteString("This file provides guidance to Gemini CLI for working in this repository.\n\n")
 
-	sb.WriteString("## Repository Facts\n\n")
-	sb.WriteString("Update this section with core facts about the repository that the agent should always keep in context.\n\n")
-	sb.WriteString("- **Tech Stack**: [e.g. TypeScript, React, Node.js]\n")
-	sb.WriteString("- **Main Entrypoints**: [e.g. src/index.ts]\n")
-	sb.WriteString("- **Key Conventions**: [e.g. Uses functional components]\n\n")
+	for _, line := range repositoryFactsSection() {
+		sb.WriteString(line + "\n")
+	}
+	sb.WriteString("\n")
 
 	sb.WriteString("## Memory Tiering\n\n")
 	sb.WriteString("Follow these routing rules for persisting long-lived facts and preferences:\n\n")
@@ -1149,7 +1150,7 @@ func buildGeminiMD(agents []string, skills []string, language string) (string, e
 	for _, agent := range agents {
 		suffixes, err := listRuleSuffixes(agent, language)
 		if err != nil {
-			continue
+			return "", err
 		}
 		for _, suffix := range suffixes {
 			basename := ruleBaseName(agent, language, suffix)

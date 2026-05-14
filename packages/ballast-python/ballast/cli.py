@@ -777,6 +777,7 @@ def render_gemini_mandates() -> str:
             "### Strategic Orchestration",
             r"Delegate complex, repetitive, or high-volume tasks to specialized sub-agents (`codebase_investigator`, `generalist`) to keep the main session history lean and efficient.",
             "",
+            "",
         ]
     )
 
@@ -1124,31 +1125,29 @@ def build_gemini_md(agents: list[str], skills: list[str], language: str) -> str:
         "",
         "This file provides guidance to Gemini CLI for working in this repository.",
         "",
-        "## Repository Facts",
-        "",
-        "Update this section with core facts about the repository that the agent should always keep in context.",
-        "",
-        "- **Tech Stack**: [e.g. TypeScript, React, Node.js]",
-        "- **Main Entrypoints**: [e.g. src/index.ts]",
-        "- **Key Conventions**: [e.g. Uses functional components]",
-        "",
-        "## Memory Tiering",
-        "",
-        "Follow these routing rules for persisting long-lived facts and preferences:",
-        "",
-        "- **Team-shared (Repository)**: Use this `GEMINI.md` file for architecture, workflows, and repo-wide rules.",
-        "- **Private (Local Setup)**: Use the private project memory (`MEMORY.md` in the ballast memory folder) for local machine notes or private workflows.",
-        "- **Global (Personal)**: Use the global personal memory (`~/.gemini/GEMINI.md`) for cross-project personal coding preferences.",
-        "",
-        "---",
-        "",
-        "## Installed agent rules",
-        "",
-        ballast_notice(),
-        "",
-        "Read and follow these rule files in `.gemini/rules/` when they apply:",
-        "",
     ]
+    lines.extend(repository_facts_section())
+    lines.extend(
+        [
+            "",
+            "## Memory Tiering",
+            "",
+            "Follow these routing rules for persisting long-lived facts and preferences:",
+            "",
+            "- **Team-shared (Repository)**: Use this `GEMINI.md` file for architecture, workflows, and repo-wide rules.",
+            "- **Private (Local Setup)**: Use the private project memory (`MEMORY.md` in the ballast memory folder) for local machine notes or private workflows.",
+            "- **Global (Personal)**: Use the global personal memory (`~/.gemini/GEMINI.md`) for cross-project personal coding preferences.",
+            "",
+            "---",
+            "",
+            "## Installed agent rules",
+            "",
+            ballast_notice(),
+            "",
+            "Read and follow these rule files in `.gemini/rules/` when they apply:",
+            "",
+        ]
+    )
     for agent in agents:
         for suffix in list_rule_suffixes(agent, language):
             basename = rule_basename(agent, language, suffix)
