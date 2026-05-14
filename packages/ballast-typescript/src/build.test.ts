@@ -264,6 +264,13 @@ describe('build', () => {
       expect(content).not.toContain('name: owasp-security-scan');
     });
 
+    test('ballast audit skill documents both 5 KB and 10 KB thresholds', () => {
+      const content = buildSkillMarkdown('ballast-audit');
+      expect(content).toContain('-size +5k');
+      expect(content).toContain('-size +10k');
+      expect(content).not.toContain('name: ballast-audit');
+    });
+
     test('builds claude skill zip with references', () => {
       const archive = buildClaudeSkill('owasp-security-scan');
       expect(archive.subarray(0, 4).toString('hex')).toBe('504b0304');
@@ -293,6 +300,12 @@ describe('build', () => {
     test('gets aws live health skill description', () => {
       expect(getSkillDescription('aws-live-health-review')).toContain(
         'Run a read-only AWS live health review'
+      );
+    });
+
+    test('gets ballast audit skill description', () => {
+      expect(getSkillDescription('ballast-audit')).toContain(
+        'audit AI rule and skill files for context density, duplication, and bloat'
       );
     });
   });

@@ -1,0 +1,10 @@
+---
+description: 'Terraform testing specialist for validate, lint, plan safety, tfenv, and security checks'
+alwaysApply: false
+globs:
+  - '*.tf'
+  - '*.tfvars'
+  - '*.tfvars.json'
+  - '.terraform-version'
+  - '.tflint.hcl'
+---

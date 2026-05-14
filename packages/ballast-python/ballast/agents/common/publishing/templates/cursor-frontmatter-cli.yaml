@@ -1,0 +1,10 @@
+description: 'CLI publishing specialist - GoReleaser for Go, npmjs for Node, PyPI for Python'
+alwaysApply: false
+globs:
+  - '.github/workflows/**'
+  - '.goreleaser.yaml'
+  - 'package.json'
+  - 'pyproject.toml'
+  - 'go.mod'
+  - 'README*'
+  - 'CHANGELOG*'

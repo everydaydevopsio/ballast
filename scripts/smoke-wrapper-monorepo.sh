@@ -5,6 +5,32 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "${WORKDIR}"' EXIT
 
+resolve_examples_root() {
+  local requested="${1:-}"
+  local candidates=()
+  if [[ -n "${requested}" ]]; then
+    candidates+=("${requested}")
+  fi
+  candidates+=("${REPO_ROOT}/.ci/ballast-examples" "${REPO_ROOT}/../ballast-examples")
+
+  local candidate=""
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "${candidate}/typescript-sample" && -d "${candidate}/python-sample" && -d "${candidate}/go-sample" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "${requested:-${REPO_ROOT}/.ci/ballast-examples}"
+}
+
+EXAMPLES_ROOT="$(resolve_examples_root "${1:-}")"
+
+if [[ ! -d "${EXAMPLES_ROOT}/typescript-sample" || ! -d "${EXAMPLES_ROOT}/python-sample" || ! -d "${EXAMPLES_ROOT}/go-sample" ]]; then
+  echo "ballast-examples repo not found at ${EXAMPLES_ROOT}" >&2
+  exit 1
+fi
+
 make_fixture() {
   local monorepo="$1"
 
@@ -12,9 +38,9 @@ make_fixture() {
   mkdir -p "${monorepo}/services/api"
   mkdir -p "${monorepo}/tools/worker"
 
-  cp -R "${REPO_ROOT}/examples/smoke/typescript-sample/." "${monorepo}/apps/frontend/"
-  cp -R "${REPO_ROOT}/examples/smoke/python-sample/." "${monorepo}/services/api/"
-  cp -R "${REPO_ROOT}/examples/smoke/go-sample/." "${monorepo}/tools/worker/"
+  cp -R "${EXAMPLES_ROOT}/typescript-sample/." "${monorepo}/apps/frontend/"
+  cp -R "${EXAMPLES_ROOT}/python-sample/." "${monorepo}/services/api/"
+  cp -R "${EXAMPLES_ROOT}/go-sample/." "${monorepo}/tools/worker/"
 
   cat > "${monorepo}/package.json" <<'EOF'
 {
@@ -138,7 +164,7 @@ run_wrapper_language_smoke() {
   local project="${WORKDIR}/ballast-wrapper-python"
 
   mkdir -p "${project}"
-  cp -R "${REPO_ROOT}/examples/smoke/python-sample/." "${project}/"
+  cp -R "${EXAMPLES_ROOT}/python-sample/." "${project}/"
 
   (
     cd "${project}"

@@ -43,8 +43,11 @@ Common skills:
 - `aws-live-health-review`
 - `aws-weekly-security-review`
 - `github-health-check`
+- `ballast-audit`
 
 `github-health-check` covers CI status, pull request hygiene, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings.
+
+`ballast-audit` audits AI rule and skill files for context density, duplication, and bloat.
 
 Guide index:
 
@@ -54,6 +57,7 @@ Guide index:
 - [skills/aws-weekly-security-review.md](skills/aws-weekly-security-review.md)
 - [skills/github-health-check.md](skills/github-health-check.md)
 - [skills/owasp-security-scan.md](skills/owasp-security-scan.md)
+- [skills/ballast-audit.md](skills/ballast-audit.md)
 
 ## Installation and Monorepos
 

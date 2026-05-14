@@ -18,7 +18,27 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXAMPLES_ROOT="${1:-${REPO_ROOT}/../ballast-examples}"
+
+resolve_examples_root() {
+  local requested="${1:-}"
+  local candidates=()
+  if [[ -n "${requested}" ]]; then
+    candidates+=("${requested}")
+  fi
+  candidates+=("${REPO_ROOT}/.ci/ballast-examples" "${REPO_ROOT}/../ballast-examples")
+
+  local candidate=""
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "${candidate}/empty-sample" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "${requested:-${REPO_ROOT}/.ci/ballast-examples}"
+}
+
+EXAMPLES_ROOT="$(resolve_examples_root "${1:-}")"
 EMPTY_SAMPLE="${EXAMPLES_ROOT}/empty-sample"
 
 if [[ ! -d "${EMPTY_SAMPLE}" ]]; then

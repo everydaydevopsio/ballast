@@ -1,0 +1,8 @@
+description: 'Web app publishing specialist - Docker to GHCR/Docker Hub with Helm chart CD on push to main'
+alwaysApply: false
+globs:
+  - 'Dockerfile'
+  - 'docker-compose*.yaml'
+  - '.github/workflows/**'
+  - 'charts/**'
+  - 'README*'
