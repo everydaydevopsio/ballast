@@ -96,6 +96,11 @@ var skillRegistry = []skillEntry{
 		Description: "run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration",
 		Status:      statusActive,
 	},
+	{
+		ID:          "ballast-audit",
+		Description: "audit AI rule and skill files for context density, duplication, and bloat",
+		Status:      statusActive,
+	},
 }
 
 // — Agent registry helpers —————————————————————————————————————————————————

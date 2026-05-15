@@ -1443,7 +1443,7 @@ Read and follow these rule files in \`.gemini/rules/\` when they apply:
         expect(geminiMd).not.toContain('`.gemini/rules/old.md`');
       });
 
-      test('gemini creates GEMINI.md and AGENTS.md when missing', () => {
+      test('gemini creates GEMINI.md when missing', () => {
         install({
           projectRoot: tmpDir,
           target: 'gemini',
@@ -1453,15 +1453,11 @@ Read and follow these rule files in \`.gemini/rules/\` when they apply:
         });
 
         const geminiMd = fs.readFileSync(getGeminiMdPath(tmpDir), 'utf8');
-        expect(geminiMd).toContain('@./AGENTS.md');
+        expect(geminiMd).toContain('## Repository Facts');
+        expect(geminiMd).toContain('## Memory Tiering');
         expect(geminiMd).toContain('`.gemini/rules/typescript-linting.md`');
 
-        const agentsMd = fs.readFileSync(
-          path.join(tmpDir, 'AGENTS.md'),
-          'utf8'
-        );
-        expect(agentsMd).toContain('## Repository Facts');
-        expect(agentsMd).toContain('`.codex/rules/typescript-linting.md`');
+        expect(fs.existsSync(path.join(tmpDir, 'AGENTS.md'))).toBe(false);
       });
 
       test('gemini skips existing GEMINI.md unless patch is approved', () => {
@@ -1489,7 +1485,6 @@ Keep this section.
         expect(
           fs.readFileSync(path.join(tmpDir, 'GEMINI.md'), 'utf8')
         ).toContain('## Team Notes');
-        expect(fs.existsSync(path.join(tmpDir, 'AGENTS.md'))).toBe(true);
       });
 
       test('codex: writes to .codex/rules/<agent>.md and AGENTS.md', () => {

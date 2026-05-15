@@ -10,12 +10,38 @@
 #   - Reinstalling a subset of agents/skills never drops the rest.
 #
 # Usage:
-#   ./scripts/smoke-config-persistence.sh [<repo-root>]
+#   ./scripts/smoke-config-persistence.sh [<repo-root>] [<examples-root>]
 #
 set -euo pipefail
 
 REPO_ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CLI="node ${REPO_ROOT}/packages/ballast-typescript/dist/cli.js"
+
+resolve_examples_root() {
+  local requested="${1:-}"
+  local candidates=()
+  if [[ -n "${requested}" ]]; then
+    candidates+=("${requested}")
+  fi
+  candidates+=("${REPO_ROOT}/.ci/ballast-examples" "${REPO_ROOT}/../ballast-examples")
+
+  local candidate=""
+  for candidate in "${candidates[@]}"; do
+    if [[ -d "${candidate}/typescript-sample" && -d "${candidate}/python-sample" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "${requested:-${REPO_ROOT}/.ci/ballast-examples}"
+}
+
+EXAMPLES_ROOT="$(resolve_examples_root "${2:-}")"
+
+if [[ ! -d "${EXAMPLES_ROOT}/typescript-sample" || ! -d "${EXAMPLES_ROOT}/python-sample" ]]; then
+  echo "ballast-examples repo not found at ${EXAMPLES_ROOT}" >&2
+  exit 1
+fi
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "${WORKDIR}"' EXIT
@@ -115,21 +141,31 @@ make_project() {
   echo '{}' > "${dir}/package.json"
 }
 
-# Creates a minimal 2-language monorepo fixture with TypeScript and Python profiles.
-# Required for exercising the Go CLI's monorepo configToSave logic.
+# Creates a minimal 2-language monorepo fixture from ballast-examples.
+# Required for exercising the wrapper CLI's monorepo configToSave logic without
+# relying on the Ballast repo's own working tree or .ballast state.
 make_monorepo_2lang() {
   local dir="$1"
   mkdir -p "${dir}"
 
-  # TypeScript profile
   mkdir -p "${dir}/apps/frontend"
-  echo '{}' > "${dir}/apps/frontend/package.json"
-  echo '{}' > "${dir}/apps/frontend/tsconfig.json"
+  cp -R "${EXAMPLES_ROOT}/typescript-sample/." "${dir}/apps/frontend/"
 
-  # Python profile
   mkdir -p "${dir}/services/api"
-  echo '{}' > "${dir}/services/api/pyproject.toml"
-  echo '{}' > "${dir}/services/api/setup.py"
+  cp -R "${EXAMPLES_ROOT}/python-sample/." "${dir}/services/api/"
+
+  cat > "${dir}/package.json" <<'EOF'
+{
+  "name": "ballast-examples-config-persistence",
+  "private": true,
+  "packageManager": "pnpm@10.27.0"
+}
+EOF
+
+  cat > "${dir}/pnpm-workspace.yaml" <<'EOF'
+packages:
+  - apps/*
+EOF
 }
 
 ballast() {
@@ -247,7 +283,7 @@ test_add_all_skills() {
     ballast "${dir}" install --target "${target}" --all-skills --yes
     assert_targets "${dir}" "${target}"
     assert_agents "${dir}" "linting" "git-hooks"
-    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check ballast-audit; do
       assert_skills "${dir}" "${skill}"
     done
     assert_doctor_agents "${dir}" "linting"
@@ -395,11 +431,11 @@ test_full_sequential() {
     for agent in linting git-hooks testing logging; do
       assert_agents "${dir}" "${agent}"
     done
-    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check ballast-audit; do
       assert_skills "${dir}" "${skill}"
     done
     assert_doctor_agents "${dir}" "linting" "testing"
-    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review" "github-health-check" "ballast-audit"
     pass "step 2 (${target}): --all-skills added; all agents retained"
 
     ballast "${dir}" install --target "${target}" --agent linting --yes
@@ -417,11 +453,11 @@ test_full_sequential() {
     for agent in linting git-hooks testing logging; do
       assert_agents "${dir}" "${agent}"
     done
-    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review; do
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check ballast-audit; do
       assert_skills "${dir}" "${skill}"
     done
     assert_doctor_agents "${dir}" "linting" "testing"
-    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review"
+    assert_doctor_skills "${dir}" "owasp-security-scan" "aws-health-review" "github-health-check" "ballast-audit"
     pass "step 4 (${target}): reinstall owasp only; all agents and other skills retained"
   done
 
@@ -434,17 +470,25 @@ test_full_sequential() {
 # These tests verify that the Go CLI does not clear agents when adding a skill
 # and does not clear skills when adding an agent.
 
-BALLAST_CLI="${REPO_ROOT}/.ballast/bin/ballast"
+BALLAST_CLI="${WORKDIR}/bin/ballast"
+
+ensure_ballast_cli() {
+  if [ -x "${BALLAST_CLI}" ]; then
+    return
+  fi
+  mkdir -p "$(dirname "${BALLAST_CLI}")"
+  go build -C "${REPO_ROOT}/cli/ballast" -o "${BALLAST_CLI}" .
+}
 
 ballast_cli() {
   local dir="$1"; shift
-  (cd "${dir}" && "${BALLAST_CLI}" "$@")
+  (cd "${dir}" && BALLAST_REPO_ROOT="${REPO_ROOT}" "${BALLAST_CLI}" "$@")
 }
 
 assert_ballast_doctor_agents() {
   local dir="$1"; shift
   local output
-  output="$(cd "${dir}" && "${BALLAST_CLI}" doctor 2>&1)"
+  output="$(cd "${dir}" && BALLAST_REPO_ROOT="${REPO_ROOT}" "${BALLAST_CLI}" doctor 2>&1)"
   for agent in "$@"; do
     grep -Fq "${agent}" <<<"${output}" || \
       fail "ballast doctor did not report agent '${agent}'. Output:\n${output}"
@@ -454,7 +498,7 @@ assert_ballast_doctor_agents() {
 assert_ballast_doctor_skills() {
   local dir="$1"; shift
   local output
-  output="$(cd "${dir}" && "${BALLAST_CLI}" doctor 2>&1)"
+  output="$(cd "${dir}" && BALLAST_REPO_ROOT="${REPO_ROOT}" "${BALLAST_CLI}" doctor 2>&1)"
   for skill in "$@"; do
     grep -Fq "${skill}" <<<"${output}" || \
       fail "ballast doctor did not report skill '${skill}'. Output:\n${output}"
@@ -462,10 +506,7 @@ assert_ballast_doctor_skills() {
 }
 
 test_ballast_cli_skill_retains_agents() {
-  if [ ! -x "${BALLAST_CLI}" ]; then
-    echo "  SKIP: ballast binary not found at ${BALLAST_CLI}"
-    return
-  fi
+  ensure_ballast_cli
 
   local target
   for target in "${TARGETS[@]}"; do
@@ -494,10 +535,7 @@ test_ballast_cli_skill_retains_agents() {
 }
 
 test_ballast_cli_agent_retains_skills() {
-  if [ ! -x "${BALLAST_CLI}" ]; then
-    echo "  SKIP: ballast binary not found at ${BALLAST_CLI}"
-    return
-  fi
+  ensure_ballast_cli
 
   local target
   for target in "${TARGETS[@]}"; do

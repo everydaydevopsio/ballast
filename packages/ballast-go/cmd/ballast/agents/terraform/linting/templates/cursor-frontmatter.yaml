@@ -1,0 +1,10 @@
+---
+description: 'Terraform linting specialist for fmt, validate, tflint, tfenv, and security checks'
+alwaysApply: false
+globs:
+  - '*.tf'
+  - '*.tfvars'
+  - '*.tfvars.json'
+  - '.terraform-version'
+  - '.tflint.hcl'
+---

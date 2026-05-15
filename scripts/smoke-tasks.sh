@@ -18,7 +18,7 @@ CLI="node ${REPO_ROOT}/packages/ballast-typescript/dist/cli.js"
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "${WORKDIR}"' EXIT
-TARGETS=(cursor claude opencode codex)
+TARGETS=(cursor claude opencode codex gemini)
 
 # ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -81,6 +81,7 @@ tasks_rule_file() {
     claude)   echo "${dir}/.claude/rules/tasks-${suffix}.md" ;;
     opencode) echo "${dir}/.opencode/tasks-${suffix}.md" ;;
     codex)    echo "${dir}/.codex/rules/tasks-${suffix}.md" ;;
+    gemini)   echo "${dir}/.gemini/rules/tasks-${suffix}.md" ;;
   esac
 }
 

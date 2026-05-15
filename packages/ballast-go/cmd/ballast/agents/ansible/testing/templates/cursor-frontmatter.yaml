@@ -1,0 +1,10 @@
+---
+description: 'Ansible testing specialist for syntax checks, check mode, and role validation'
+alwaysApply: false
+globs:
+  - '*.yml'
+  - '*.yaml'
+  - 'ansible.cfg'
+  - 'hosts.ini*'
+  - 'requirements.yml'
+---

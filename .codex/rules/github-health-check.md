@@ -649,6 +649,7 @@ grep -RhoE 'uses: +[^ ]+' .github/workflows 2>/dev/null | \
 After running all checks, present findings in this structure:
 
 ```text
+
 ## GitHub Repository Health Report
 **Repo**: owner/name
 **Date**: <today>

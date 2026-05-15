@@ -1,0 +1,9 @@
+---
+description: 'Ansible logging specialist for safe, readable playbook execution output'
+alwaysApply: false
+globs:
+  - '*.yml'
+  - '*.yaml'
+  - 'ansible.cfg'
+  - 'hosts.ini*'
+---
