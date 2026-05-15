@@ -433,6 +433,23 @@ function readStoredZipEntry(
   return undefined;
 }
 
+function patchClaudeSkillContent(
+  archive: Buffer,
+  canonicalSkillContent: string,
+  target: Target
+): string {
+  try {
+    return patchRuleContent(
+      readStoredZipEntry(archive, 'SKILL.md') ?? '',
+      canonicalSkillContent,
+      target
+    );
+  } catch {
+    // Fall back to a clean overwrite when an existing archive is unreadable.
+    return canonicalSkillContent;
+  }
+}
+
 function getSupportFilePath(
   target: Target,
   projectRoot: string
@@ -680,8 +697,8 @@ export function install(options: InstallOptions): InstallResult {
           const skillContent = getSkillContent(skillId);
           const nextSkillContent =
             fileExists && !force && patch
-              ? patchRuleContent(
-                  readStoredZipEntry(fs.readFileSync(file), 'SKILL.md') ?? '',
+              ? patchClaudeSkillContent(
+                  fs.readFileSync(file),
                   skillContent,
                   target
                 )

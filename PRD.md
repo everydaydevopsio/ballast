@@ -44,6 +44,7 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 6. Creating a missing support file with `--force` must continue without prompting.
 7. Support-file patch behavior and existing agent-rule overwrite semantics must remain unchanged.
 8. README and installation documentation must describe the updated `--patch` and `--force` behavior.
+9. If an existing Claude `.skill` archive is unreadable during `--patch`, install must recover by overwriting it with canonical packaged skill content instead of failing the run.
 
 ### Acceptance Criteria
 
@@ -56,6 +57,7 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 7. Given an existing support file and non-interactive `--force`, install exits with an error and does not overwrite the file.
 8. Automated tests cover the skill-file decision matrix and support-file confirmation behavior in the TypeScript, Python, and Go backends.
 9. README and `docs/installation.md` describe when to use `--patch` versus `--force`, including the support-file confirmation behavior.
+10. Given an existing unreadable Claude `.skill` archive and `force=false, patch=true`, install replaces it with canonical content and completes without an install error.
 
 ## Ballast Upgrade Skill Refresh
 

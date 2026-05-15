@@ -509,6 +509,58 @@ Keep this team-specific section.
       expect(skillMd).toContain('## Scan Architecture');
     });
 
+    test('patch falls back to overwrite when an existing claude .skill archive is unreadable', () => {
+      const skillFile = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan.skill'
+      );
+      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      fs.writeFileSync(skillFile, Buffer.from('not-a-zip-archive', 'utf8'));
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        patch: true,
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.errors).toEqual([]);
+      expect(result.installedSkills).toContain('owasp-security-scan');
+
+      const archive = fs.readFileSync(skillFile);
+      function readStoredZipEntryLocal(
+        buf: Buffer,
+        entry: string
+      ): string | undefined {
+        let offset = 0;
+        while (offset + 30 <= buf.length) {
+          if (buf.readUInt32LE(offset) !== 0x04034b50) break;
+          const compressedSize = buf.readUInt32LE(offset + 18);
+          const fileNameLength = buf.readUInt16LE(offset + 26);
+          const extraLength = buf.readUInt16LE(offset + 28);
+          const fileName = buf.toString(
+            'utf8',
+            offset + 30,
+            offset + 30 + fileNameLength
+          );
+          const dataStart = offset + 30 + fileNameLength + extraLength;
+          if (fileName === entry)
+            return buf.toString('utf8', dataStart, dataStart + compressedSize);
+          offset = dataStart + compressedSize;
+        }
+        return undefined;
+      }
+
+      const skillMd = readStoredZipEntryLocal(archive, 'SKILL.md');
+      expect(skillMd).toContain('## Scan Architecture');
+      expect(skillMd).not.toContain('not-a-zip-archive');
+    });
+
     test('force-overwrites an existing claude .skill archive without patching', () => {
       const skillFile = path.join(
         tmpDir,

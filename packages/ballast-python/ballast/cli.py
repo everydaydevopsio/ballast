@@ -22,6 +22,7 @@ COMMON_AGENTS = [
     "observability",
     "publishing",
     "git-hooks",
+    "tasks",
 ]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
@@ -875,6 +876,17 @@ def read_claude_skill_content(archive_path: Path) -> str:
             return skill_file.read().decode("utf-8")
 
 
+def patch_claude_skill_content(
+    archive_path: Path, canonical_skill_content: str, target: str
+) -> str:
+    try:
+        existing_skill_content = read_claude_skill_content(archive_path)
+    except Exception:
+        # Fall back to a clean overwrite when an existing archive is unreadable.
+        return canonical_skill_content
+    return patch_rule_content(existing_skill_content, canonical_skill_content, target)
+
+
 def destination(root: Path, target: str, basename: str) -> Path:
     rule_subdir = os.environ.get("BALLAST_RULE_SUBDIR", "").strip()
     if rule_subdir and not re.fullmatch(r"[A-Za-z0-9_-]+", rule_subdir):
@@ -1673,9 +1685,7 @@ def install(
             elif target == "claude":
                 skill_content = read_skill(skill, language)
                 next_content = (
-                    patch_rule_content(
-                        read_claude_skill_content(dst), skill_content, target
-                    )
+                    patch_claude_skill_content(dst, skill_content, target)
                     if file_exists and not force and patch
                     else skill_content
                 )
