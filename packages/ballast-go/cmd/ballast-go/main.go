@@ -75,6 +75,7 @@ type rulesConfig struct {
 	BallastVersion string              `json:"ballastVersion,omitempty"`
 	Languages      []string            `json:"languages,omitempty"`
 	Paths          map[string][]string `json:"paths,omitempty"`
+	TaskSystem     string              `json:"taskSystem,omitempty"`
 }
 
 type rawRulesConfig struct {
@@ -85,6 +86,7 @@ type rawRulesConfig struct {
 	BallastVersion string              `json:"ballastVersion,omitempty"`
 	Languages      []string            `json:"languages,omitempty"`
 	Paths          map[string][]string `json:"paths,omitempty"`
+	TaskSystem     string              `json:"taskSystem,omitempty"`
 }
 
 type installResult struct {
@@ -621,6 +623,9 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		if formattedPaths := formatDoctorConfigPaths(config.Languages, config.Paths); formattedPaths != "" {
 			lines = append(lines, fmt.Sprintf("- paths: %s", formattedPaths))
 		}
+		if strings.TrimSpace(config.TaskSystem) != "" {
+			lines = append(lines, fmt.Sprintf("- taskSystem: %s", config.TaskSystem))
+		}
 		if configVersion == "" || compareVersions(configVersion, targetVersion) < 0 {
 			recommendations = append(
 				recommendations,
@@ -883,9 +888,6 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
 				continue
 			}
-			if exists(file) && !opts.force && !opts.patch {
-				continue
-			}
 			switch target {
 			case "cursor":
 				content, buildErr := buildCursorSkillFormat(skillID, opts.language)
@@ -913,10 +915,10 @@ func install(opts installOptions) installResult {
 				if exists(file) && !opts.force && opts.patch {
 					existing, readErr := readClaudeSkillContent(file)
 					if readErr != nil {
-						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-						continue
+						nextContent = skillContent
+					} else {
+						nextContent = patchRuleContent(existing, skillContent, target)
 					}
-					nextContent = patchRuleContent(existing, skillContent, target)
 				}
 				content, buildErr := buildClaudeSkill(skillID, opts.language, nextContent)
 				if buildErr != nil {

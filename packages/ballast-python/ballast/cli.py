@@ -478,6 +478,7 @@ def build_doctor_report(
         skills = config.get("skills")
         languages = config.get("languages")
         paths = config.get("paths")
+        task_system = config.get("taskSystem")
         if isinstance(targets, list) and all(
             isinstance(target, str) for target in targets
         ):
@@ -507,6 +508,8 @@ def build_doctor_report(
             )
             if formatted_paths:
                 lines.append(f"- paths: {formatted_paths}")
+        if isinstance(task_system, str) and task_system.strip():
+            lines.append(f"- taskSystem: {task_system}")
 
     lines.extend(["", "Recommendations:"])
     if recommendations:

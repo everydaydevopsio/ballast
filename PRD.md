@@ -81,6 +81,27 @@ Ballast-installed skill files are generated managed artifacts, but the current r
 4. Automated unit coverage demonstrates the backend skill refresh behavior for TypeScript, Python, and Go.
 5. Smoke coverage demonstrates the wrapper upgrade path refreshes stale managed skill content.
 
+## Existing Install Refresh Reconciliation
+
+### Problem
+
+Ballast refreshes saved installs from `.rulesrc.json`, but removing managed agents or skills from saved config can leave stale managed files on disk for targets that remain installed. Operators need refresh behavior that reconciles the managed surface to the current saved config instead of only adding newly selected content.
+
+### Requirements
+
+1. Wrapper `install --refresh-config`, `upgrade`, and `doctor --fix` must remove stale managed agent-rule files for agents no longer present in saved `.rulesrc.json` while preserving remaining configured agents.
+2. Wrapper `install --refresh-config`, `upgrade`, and `doctor --fix` must remove stale managed skill files for skills no longer present in saved `.rulesrc.json` while preserving remaining configured skills.
+3. Reconciliation must apply only to Ballast-managed files for targets that remain installed; it must not remove unrelated user files.
+4. Support-file managed sections such as `AGENTS.md` and `CLAUDE.md` must be refreshed so removed agents and skills are no longer referenced.
+5. Target removal behavior must remain unchanged and continue deleting the full Ballast-managed surface for removed targets.
+
+### Acceptance Criteria
+
+1. Given an existing install with configured agents `linting, docs`, editing `.rulesrc.json` to keep only `linting` and running wrapper `install --refresh-config` deletes the managed `docs` rule files while leaving `linting` files intact.
+2. Given an existing install with configured skills `owasp-security-scan, github-health-check`, editing `.rulesrc.json` to keep only `owasp-security-scan` and running wrapper `install --refresh-config` deletes the managed `github-health-check` files while leaving `owasp-security-scan` intact.
+3. After either reconciliation flow, support files no longer list removed agent or skill references.
+4. Refresh does not delete unmanaged user-authored files outside the Ballast-managed paths for the retained targets.
+
 ## Ballast Doctor Config Visibility
 
 ### Problem
@@ -91,15 +112,17 @@ Operators use `ballast doctor` to inspect the effective Ballast state for a repo
 
 1. `ballast doctor` must display configured `languages` when `.rulesrc.json` contains them.
 2. `ballast doctor` must display configured `paths` when `.rulesrc.json` contains them.
-3. The change must apply consistently across the TypeScript, Python, Go, and wrapper CLIs.
-4. Existing `doctor` output for targets, agents, skills, installed CLIs, and recommendations must remain intact.
+3. `ballast doctor` must display configured `taskSystem` when `.rulesrc.json` contains it.
+4. The change must apply consistently across the TypeScript, Python, Go, and wrapper CLIs.
+5. Existing `doctor` output for targets, agents, skills, installed CLIs, and recommendations must remain intact.
 
 ### Acceptance Criteria
 
 1. Given a `.rulesrc.json` with `languages`, `ballast doctor` prints a `- languages: ...` line in the `Config:` section.
 2. Given a `.rulesrc.json` with `paths`, `ballast doctor` prints a `- paths: ...` line in the `Config:` section.
-3. Given a `.rulesrc.json` without `languages` or `paths`, `ballast doctor` does not print empty placeholder lines for those fields.
-4. Automated tests cover the new output in each CLI implementation that renders `doctor` output.
+3. Given a `.rulesrc.json` with `taskSystem`, `ballast doctor` prints a `- taskSystem: ...` line in the `Config:` section.
+4. Given a `.rulesrc.json` without `languages`, `paths`, or `taskSystem`, `ballast doctor` does not print empty placeholder lines for those fields.
+5. Automated tests cover the new output in each CLI implementation that renders `doctor` output.
 
 ## JavaScript Detection Warning
 

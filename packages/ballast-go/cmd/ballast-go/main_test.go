@@ -129,6 +129,7 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 				"typescript": {"apps/web"},
 				"ansible":    {"infra/ansible"},
 			},
+			TaskSystem: "jira",
 		},
 		[]installedCLIStatus{
 			{Name: "ballast-typescript", Version: "5.0.2", Path: "/tmp/ballast-typescript"},
@@ -151,6 +152,9 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 	if !strings.Contains(output, "- paths: typescript=apps/web; ansible=infra/ansible") {
 		t.Fatalf("expected paths in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "- taskSystem: jira") {
+		t.Fatalf("expected task system in doctor output, got %q", output)
 	}
 }
 
@@ -1116,7 +1120,7 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 	}
 }
 
-func TestInstallSkipsExistingSkillWithoutForceOrPatch(t *testing.T) {
+func TestInstallRefreshOverwritesExistingOpencodeSkillWithoutForceOrPatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
 	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
@@ -1134,15 +1138,19 @@ func TestInstallSkipsExistingSkillWithoutForceOrPatch(t *testing.T) {
 		force:       false,
 		saveConfig:  false,
 	})
-	if len(result.installedSkills) != 0 {
-		t.Fatalf("expected existing skill to be skipped, got %+v", result.installedSkills)
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected existing skill to be refreshed, got %+v", result.installedSkills)
 	}
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
 		t.Fatalf("read existing skill: %v", err)
 	}
-	if string(content) != "stale skill content" {
-		t.Fatalf("expected existing skill content to remain, got %q", string(content))
+	text := string(content)
+	if strings.Contains(text, "stale skill content") {
+		t.Fatalf("expected stale skill content to be replaced, got %q", text)
+	}
+	if !strings.Contains(text, "# OWASP Security Scan Skill") {
+		t.Fatalf("expected canonical skill content after refresh, got %q", text)
 	}
 }
 
@@ -1260,6 +1268,75 @@ func TestInstallPatchMergesClaudeSkillArchive(t *testing.T) {
 	}
 	if !strings.Contains(skillMd, "## Scan Architecture") {
 		t.Fatalf("expected canonical skill content to be merged: %s", skillMd)
+	}
+}
+
+func TestInstallPatchOverwritesUnreadableClaudeSkillArchive(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(skillPath, []byte("not-a-zip-archive"), 0o644); err != nil {
+		t.Fatalf("seed unreadable skill archive: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		patch:       true,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected patched skill install, got %+v", result.installedSkills)
+	}
+	skillMd, err := readClaudeSkillContent(skillPath)
+	if err != nil {
+		t.Fatalf("read overwritten skill archive: %v", err)
+	}
+	if strings.Contains(skillMd, "not-a-zip-archive") {
+		t.Fatalf("expected unreadable archive to be replaced with canonical content: %s", skillMd)
+	}
+	if !strings.Contains(skillMd, "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content after overwrite fallback: %s", skillMd)
+	}
+}
+
+func TestInstallRefreshOverwritesExistingCodexSkill(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".codex", "rules", "owasp-security-scan.md")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(skillPath, []byte("stale skill content\n"), 0o644); err != nil {
+		t.Fatalf("seed stale skill: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		patch:       false,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected refreshed skill install, got %+v", result.installedSkills)
+	}
+	content, err := os.ReadFile(skillPath)
+	if err != nil {
+		t.Fatalf("read refreshed skill: %v", err)
+	}
+	text := string(content)
+	if strings.Contains(text, "stale skill content") {
+		t.Fatalf("expected stale skill content to be replaced: %s", text)
+	}
+	if !strings.Contains(text, "# OWASP Security Scan Skill") {
+		t.Fatalf("expected canonical skill content after refresh: %s", text)
 	}
 }
 

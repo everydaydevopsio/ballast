@@ -257,6 +257,10 @@ func run(args []string) int {
 				fmt.Println(err)
 				return 1
 			}
+			if err := cleanupStaleManagedSelections(root, plan); err != nil {
+				fmt.Println(err)
+				return 1
+			}
 			if err := updateMonorepoSupportFiles(root, plan, forwardedArgs); err != nil {
 				fmt.Println(err)
 				return 1
@@ -759,6 +763,9 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	if formattedPaths := formatDoctorConfigPaths(config.Languages, config.Paths); formattedPaths != "" {
 		fmt.Printf("- paths: %s\n", formattedPaths)
+	}
+	if strings.TrimSpace(config.TaskSystem) != "" {
+		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
 	}
 	fmt.Println()
 }
@@ -1613,6 +1620,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if config != nil {
 		savedTaskSystem = config.TaskSystem
 	}
+	if taskSystem := strings.TrimSpace(strings.ToLower(findFlagValue(args, "--task-system", ""))); taskSystem != "" {
+		savedTaskSystem = taskSystem
+	}
 	configToSave := monorepoConfig{
 		Targets:        savedTargets,
 		Agents:         persistAgents,
@@ -1644,6 +1654,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 
 	plan := make([]backendInvocation, 0, len(profiles)+1)
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
+	if findFlagValue(args, "--task-system", "") != "" && slices.Contains(configToSave.Agents, "tasks") && !hasFlag(commonArgs, "--force", "") {
+		commonArgs = append(commonArgs, "--force")
+	}
 	if len(commonSelection) > 0 || len(selectedSkills) > 0 {
 		commonLanguage := profiles[0].Language
 		if hasLanguage(profiles, langTypeScript) {
@@ -1683,8 +1696,8 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		Invocations: plan,
 		Config:      configToSave,
 		Targets:     requestedTargets,
-		Common:      commonSelection,
-		Language:    languageSelection,
+		Common:      filterAgents(configToSave.Agents, commonAgentIDs()),
+		Language:    filterAgents(configToSave.Agents, languageAgentIDs()),
 		Removed:     removeTargets,
 		Previous:    config,
 	}, nil
@@ -2081,6 +2094,24 @@ func subtractStrings(values []string, remove []string) []string {
 	return uniqueStrings(filtered)
 }
 
+func stringDifference(values []string, remove []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	removeSet := map[string]struct{}{}
+	for _, value := range remove {
+		removeSet[value] = struct{}{}
+	}
+	filtered := make([]string, 0, len(values))
+	for _, value := range uniqueStrings(values) {
+		if _, ok := removeSet[value]; ok {
+			continue
+		}
+		filtered = append(filtered, value)
+	}
+	return filtered
+}
+
 func hasLanguage(profiles []repoProfile, target language) bool {
 	for _, profile := range profiles {
 		if profile.Language == target {
@@ -2132,6 +2163,7 @@ func envPairs(env map[string]string) []string {
 }
 
 func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) error {
+	_ = args
 	for _, target := range plan.Targets {
 		if target != "claude" && target != "codex" && target != "gemini" {
 			continue
@@ -2144,22 +2176,8 @@ func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) 
 			}
 			continue
 		}
-		if hasPatchFlag(args) {
-			if err := os.WriteFile(path, []byte(patchManagedSupportSections(readFile(path), content)), 0o644); err != nil {
-				return err
-			}
-			continue
-		}
-		if isInteractiveInstall(args) {
-			approved, err := promptSupportFilePatch(path)
-			if err != nil {
-				return err
-			}
-			if approved {
-				if err := os.WriteFile(path, []byte(patchManagedSupportSections(readFile(path), content)), 0o644); err != nil {
-					return err
-				}
-			}
+		if err := os.WriteFile(path, []byte(patchManagedSupportSections(readFile(path), content)), 0o644); err != nil {
+			return err
 		}
 		if target == "gemini" {
 			agentsPath := supportFilePath(root, "codex")
@@ -2191,6 +2209,52 @@ func cleanupRemovedMonorepoTargets(root string, plan *monorepoPlan) error {
 		}
 	}
 	return nil
+}
+
+func cleanupStaleManagedSelections(root string, plan *monorepoPlan) error {
+	if plan == nil {
+		return nil
+	}
+	for _, target := range plan.Targets {
+		if err := removeStaleManagedFiles(root, target, &plan.Config); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeStaleManagedFiles(root string, target string, next *monorepoConfig) error {
+	if next == nil {
+		return nil
+	}
+	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePaths(root, target, next)) {
+		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
+	}
+	for _, file := range stringDifference(allManagedSkillPaths(root, target), managedSkillPaths(root, target, next.Skills)) {
+		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
+	}
+	return nil
+}
+
+func allManagedRulePaths(root string, target string) []string {
+	languages := make([]string, 0, len(supportedLanguages))
+	for _, lang := range supportedLanguages {
+		languages = append(languages, string(lang))
+	}
+	return managedRulePaths(root, target, &monorepoConfig{
+		Agents:    supportedAgentIDs(),
+		Languages: languages,
+	})
+}
+
+func allManagedSkillPaths(root string, target string) []string {
+	return managedSkillPaths(root, target, supportedSkillIDs())
 }
 
 func removeManagedTargetFiles(root string, target string, config *monorepoConfig) error {

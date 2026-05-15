@@ -121,7 +121,8 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
   "paths":{
     "typescript":["apps/web"],
     "ansible":["infra/ansible"]
-  }
+  },
+  "taskSystem":"jira"
 }`)
 
 	output := captureStdout(t, func() {
@@ -149,6 +150,9 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 	if !strings.Contains(output, "paths: typescript=apps/web; ansible=infra/ansible") {
 		t.Fatalf("expected config paths in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "taskSystem: jira") {
+		t.Fatalf("expected config task system in doctor output, got %q", output)
 	}
 }
 

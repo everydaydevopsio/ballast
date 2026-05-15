@@ -36,6 +36,7 @@ class PatchInstallTests(unittest.TestCase):
                     "typescript": ["apps/web"],
                     "ansible": ["infra/ansible"],
                 },
+                "taskSystem": "jira",
             },
             [
                 {
@@ -64,6 +65,7 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("- skills: owasp-security-scan", output)
         self.assertIn("- languages: typescript, ansible", output)
         self.assertIn("- paths: typescript=apps/web; ansible=infra/ansible", output)
+        self.assertIn("- taskSystem: jira", output)
 
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:
