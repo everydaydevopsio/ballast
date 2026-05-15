@@ -141,7 +141,7 @@ Commands:
   doctor     Check local Ballast CLI versions and .rulesrc.json metadata
 
 Options:
-  --target, -t <platforms>  AI platform(s): cursor, claude, opencode, codex (comma-separated or repeated)
+  --target, -t <platforms>  AI platform(s): cursor, claude, opencode, codex, gemini (comma-separated or repeated)
   --language, -l <lang>     Language profile: ${LANGUAGES.join(', ')} (default: typescript)
   --agent, -a <agents>      Agent(s) to install (comma-separated); run 'list' to see available agents
   --skill, -s <skills>      Skill(s) to install (comma-separated); run 'list' to see available skills
@@ -158,7 +158,7 @@ Examples:
   ballast-typescript list
   ballast-typescript install
   ballast-typescript install --target cursor --agent linting
-  ballast-typescript install --target cursor,claude --all
+  ballast-typescript install --target cursor,claude,gemini --all
   ballast-typescript install --language python --target cursor --all
   ballast-typescript install --target claude --all --force
   ballast-typescript install --target claude --skill owasp-security-scan

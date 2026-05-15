@@ -8,7 +8,7 @@
 [![npm version](https://img.shields.io/npm/v/%40everydaydevopsio%2Fballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
 [![npm downloads](https://img.shields.io/npm/dm/%40everydaydevopsio%2Fballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
 
-Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, and Codex.
+Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, Codex, and Gemini.
 
 This repository supports five first-class language profiles:
 
@@ -77,6 +77,7 @@ Common skills (all languages):
 - `aws-live-health-review`
 - `aws-weekly-security-review`
 - `github-health-check`
+- `ballast-audit`
 
 Skill sources in this repo:
 
@@ -91,6 +92,7 @@ Skills are reusable task guides that Ballast installs for the target AI tool alo
 - `aws-live-health-review`: generate a current-state AWS operational snapshot for EC2, RDS, ALB, alarms, and logs
 - `aws-weekly-security-review`: run a weekly read-only AWS security baseline review with prioritized findings
 - `github-health-check`: run a comprehensive GitHub repository health check covering CI status, open PRs, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
+- `ballast-audit`: audit AI rule and skill files for context density, duplication, and bloat
 
 ### Install a skill
 
@@ -302,7 +304,7 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 
 ## CLI Flags
 
-- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`; adds to saved targets in `.rulesrc.json`
+- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`, `gemini`; adds to saved targets in `.rulesrc.json`
 - `--remove-target`: remove one or more saved targets and clean up Ballast-managed files for them
 - `--agent, -a`: comma-separated agent list
 - `--skill, -s`: comma-separated skill list
@@ -334,8 +336,10 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 - Claude: `.claude/rules/<agent>.md` and `.claude/skills/<skill>.skill`
 - OpenCode: `.opencode/<agent>.md` and `.opencode/skills/<skill>.md`
 - Codex: `.codex/rules/<agent>.md` and root `AGENTS.md`
+- Gemini: `.gemini/rules/<agent>.md` and root `GEMINI.md`
 - Cursor skills: `.cursor/rules/<skill>.mdc`
 - Codex skills: `.codex/rules/<skill>.md`, with root `AGENTS.md` listing installed skills
+- Gemini skills: `.gemini/rules/<skill>.md`, with root `GEMINI.md` listing installed skills
 
 ## Development
 

@@ -1,6 +1,6 @@
 {
   "name": "@everydaydevopsio/ballast",
-  "version": "5.9.3",
+  "version": "5.10.1",
   "description": "CLI to install AI agent rules for docs, local-dev, CI/CD, observability, publishing, linting, logging, and testing for Cursor, Claude Code, OpenCode, and Codex",
   "main": "dist/cli.js",
   "bin": {
@@ -43,8 +43,8 @@
     "@eslint/js": "^10.0.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.18.10",
-    "@typescript-eslint/eslint-plugin": "^8.59.2",
-    "@typescript-eslint/parser": "^8.59.2",
+    "@typescript-eslint/eslint-plugin": "^8.59.3",
+    "@typescript-eslint/parser": "^8.59.3",
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
@@ -56,7 +56,7 @@
     "ts-jest": "^29.4.9",
     "tsc-files": "^1.1.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.59.2"
+    "typescript-eslint": "^8.59.3"
   },
   "lint-staged": {
     "**/*.js": [
@@ -73,6 +73,6 @@
     ]
   },
   "dependencies": {
-    "yaml": "^2.8.4"
+    "yaml": "^2.9.0"
   }
 }

@@ -264,6 +264,13 @@ describe('build', () => {
       expect(content).not.toContain('name: owasp-security-scan');
     });
 
+    test('ballast audit skill documents both 5 KB and 10 KB thresholds', () => {
+      const content = buildSkillMarkdown('ballast-audit');
+      expect(content).toContain('-size +5k');
+      expect(content).toContain('-size +10k');
+      expect(content).not.toContain('name: ballast-audit');
+    });
+
     test('builds claude skill zip with references', () => {
       const archive = buildClaudeSkill('owasp-security-scan');
       expect(archive.subarray(0, 4).toString('hex')).toBe('504b0304');
@@ -293,6 +300,12 @@ describe('build', () => {
     test('gets aws live health skill description', () => {
       expect(getSkillDescription('aws-live-health-review')).toContain(
         'Run a read-only AWS live health review'
+      );
+    });
+
+    test('gets ballast audit skill description', () => {
+      expect(getSkillDescription('ballast-audit')).toContain(
+        'audit AI rule and skill files for context density, duplication, and bloat'
       );
     });
   });
@@ -468,10 +481,11 @@ alwaysApply: false
   });
 
   describe('buildGeminiMd', () => {
-    test('lists gemini rule files with shared AGENTS include and skills', () => {
+    test('lists gemini rule files with repository facts, memory tiering, and skills', () => {
       const content = buildGeminiMd(['linting'], ['owasp-security-scan']);
       expect(content).toContain('# GEMINI.md');
-      expect(content).toContain('@./AGENTS.md');
+      expect(content).toContain('## Repository Facts');
+      expect(content).toContain('## Memory Tiering');
       expect(content).toMatch(
         /Created by \[Ballast]\(https:\/\/github\.com\/everydaydevopsio\/ballast\) v[0-9A-Za-z._-]+\. Do not edit this section\./
       );
