@@ -1182,6 +1182,37 @@ func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 	}
 }
 
+func TestRunInstallRefreshConfigCleansUpSingleLanguageStaleSelections(t *testing.T) {
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"opencode","agents":["linting"],"skills":[]}`)
+	staleSkill := filepath.Join(root, ".opencode", "skills", "owasp-security-scan.md")
+	mustWriteFile(t, staleSkill, "# Skill\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n")
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--refresh-config"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(staleSkill); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected stale single-language managed skill to be removed, stat err=%v", err)
+	}
+}
+
 func TestRunInstallCLICommand(t *testing.T) {
 	originalRun := runCommandFunc
 	t.Cleanup(func() {
@@ -3336,6 +3367,28 @@ func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
 	}
 	if plan.Invocations[0].Env["BALLAST_REFRESH_TASK_RULES"] != "1" {
 		t.Fatalf("expected task-system updates to refresh existing task rules, got %#v", plan.Invocations[0].Env)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsMissingTaskSystemValue(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	_, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "tasks", "--task-system", "--yes"})
+	if err == nil || !strings.Contains(err.Error(), "missing value for --task-system") {
+		t.Fatalf("expected missing-value error, got %v", err)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidTaskSystemValue(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	_, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "tasks", "--task-system=notion", "--yes"})
+	if err == nil || !strings.Contains(err.Error(), "invalid --task-system") {
+		t.Fatalf("expected invalid task-system error, got %v", err)
 	}
 }
 

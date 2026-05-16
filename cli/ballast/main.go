@@ -132,6 +132,8 @@ var runCommandOutputFunc = runCommandOutput
 var resolveInstalledVersionFunc = resolveInstalledVersion
 var collectDoctorBackendsFunc = collectDoctorBackends
 
+var supportedTaskSystems = []string{"github", "jira", "linear"}
+
 type monorepoConfig struct {
 	Target         string              `json:"target,omitempty"`
 	Targets        []string            `json:"targets,omitempty"`
@@ -322,6 +324,12 @@ func run(args []string) int {
 	if err != nil {
 		fmt.Println(err)
 		return 1
+	}
+	if exitCode == 0 && refreshConfigRequested {
+		if err := cleanupSingleLanguageManagedSelections(root, selectedLanguage); err != nil {
+			fmt.Println(err)
+			return 1
+		}
 	}
 	return exitCode
 }
@@ -1524,6 +1532,11 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, nil
 	}
 
+	requestedTaskSystem, err := parseTaskSystemFlag(args)
+	if err != nil {
+		return nil, err
+	}
+
 	config, err := loadMonorepoConfig(root)
 	if err != nil {
 		return nil, err
@@ -1636,8 +1649,8 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if config != nil {
 		savedTaskSystem = config.TaskSystem
 	}
-	if taskSystem := strings.TrimSpace(strings.ToLower(findFlagValue(args, "--task-system", ""))); taskSystem != "" {
-		savedTaskSystem = taskSystem
+	if requestedTaskSystem != "" {
+		savedTaskSystem = requestedTaskSystem
 	}
 	configToSave := monorepoConfig{
 		Targets:        savedTargets,
@@ -1667,8 +1680,6 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	commonSelection := filterAgents(selectedAgents, commonAgentIDs())
 	languageSelection := filterAgents(selectedAgents, languageAgentIDs())
 	baseArgs := withTargetSelection(stripMonorepoFlags(args), requestedTargets)
-	requestedTaskSystem := strings.TrimSpace(strings.ToLower(findFlagValue(args, "--task-system", "")))
-
 	plan := make([]backendInvocation, 0, len(profiles)+1)
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
 	if requestedTaskSystem != "" && slices.Contains(configToSave.Agents, "tasks") {
@@ -1745,6 +1756,28 @@ func loadMonorepoConfig(root string) (*monorepoConfig, error) {
 		return nil, nil
 	}
 	return &config, nil
+}
+
+func cleanupSingleLanguageManagedSelections(root string, selectedLanguage language) error {
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		return nil
+	}
+	if len(config.Targets) == 0 {
+		return nil
+	}
+	if len(config.Languages) == 0 && selectedLanguage != "" {
+		config.Languages = []string{string(selectedLanguage)}
+	}
+	for _, target := range config.Targets {
+		if err := removeStaleManagedFiles(root, target, nil, config); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // readTaskSystem reads only the taskSystem field from .rulesrc.json.
@@ -1956,6 +1989,41 @@ func splitAgentValues(raw string) []string {
 		agents = append(agents, trimmed)
 	}
 	return agents
+}
+
+func parseTaskSystemFlag(args []string) (string, error) {
+	raw := ""
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "--task-system=") {
+			raw = strings.TrimSpace(strings.TrimPrefix(arg, "--task-system="))
+			continue
+		}
+		if arg != "--task-system" {
+			continue
+		}
+		if i+1 >= len(args) {
+			return "", errors.New("missing value for --task-system")
+		}
+		candidate := strings.TrimSpace(args[i+1])
+		if candidate == "" || strings.HasPrefix(candidate, "-") {
+			return "", errors.New("missing value for --task-system")
+		}
+		raw = candidate
+		i++
+	}
+	if raw == "" {
+		return "", nil
+	}
+	normalized := strings.ToLower(raw)
+	if slices.Contains(supportedTaskSystems, normalized) {
+		return normalized, nil
+	}
+	return "", fmt.Errorf(
+		"invalid --task-system: %s (valid: %s)",
+		raw,
+		strings.Join(supportedTaskSystems, ", "),
+	)
 }
 
 func findFlagValue(args []string, longFlag string, shortFlag string) string {

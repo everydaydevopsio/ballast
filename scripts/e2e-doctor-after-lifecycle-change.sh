@@ -11,14 +11,16 @@ setup_ballast_e2e
 
 PROJECT="${WORKDIR}/doctor-after-lifecycle-change"
 create_monorepo_fixture "${PROJECT}"
+add_typescript_profile "${PROJECT}"
 
 cat > "${PROJECT}/.rulesrc.json" <<'EOF'
 {
   "targets": ["claude", "codex"],
   "agents": ["linting", "docs", "tasks"],
   "skills": ["owasp-security-scan", "github-health-check"],
-  "languages": ["python", "go"],
+  "languages": ["typescript", "python", "go"],
   "paths": {
+    "typescript": ["apps/web"],
     "python": ["services/api"],
     "go": ["tools/worker"]
   },
@@ -39,8 +41,9 @@ cat > "${PROJECT}/.rulesrc.json" <<'EOF'
   "targets": ["claude"],
   "agents": ["linting", "tasks"],
   "skills": ["owasp-security-scan"],
-  "languages": ["python", "go"],
+  "languages": ["typescript", "python", "go"],
   "paths": {
+    "typescript": ["apps/web"],
     "python": ["services/api"],
     "go": ["tools/worker"]
   },
@@ -62,8 +65,8 @@ DOCTOR_OUTPUT="$(
 assert_doctor_contains "${DOCTOR_OUTPUT}" "- targets: claude"
 assert_doctor_contains "${DOCTOR_OUTPUT}" "- skills: owasp-security-scan"
 assert_doctor_contains "${DOCTOR_OUTPUT}" "- agents: linting, tasks"
-assert_doctor_contains "${DOCTOR_OUTPUT}" "- languages: python, go"
-assert_doctor_contains "${DOCTOR_OUTPUT}" "- paths: python=services/api; go=tools/worker"
+assert_doctor_contains "${DOCTOR_OUTPUT}" "- languages: typescript, python, go"
+assert_doctor_contains "${DOCTOR_OUTPUT}" "- paths: typescript=apps/web; python=services/api; go=tools/worker"
 assert_doctor_contains "${DOCTOR_OUTPUT}" "- taskSystem: linear"
 assert_doctor_not_contains "${DOCTOR_OUTPUT}" "codex"
 assert_doctor_not_contains "${DOCTOR_OUTPUT}" "github-health-check"
