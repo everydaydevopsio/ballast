@@ -22,7 +22,6 @@ COMMON_AGENTS = [
     "observability",
     "publishing",
     "git-hooks",
-    "tasks",
 ]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
@@ -1608,6 +1607,7 @@ def install(
     processed_agents: list[str] = []
     processed_skills: list[str] = []
     disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
+    refresh_managed_skills = os.environ.get("BALLAST_REFRESH_SKILLS") == "1"
 
     try:
         ensure_gitignore_entry(root, ".ballast/")
@@ -1675,7 +1675,7 @@ def install(
             dst = skill_destination(root, target, skill)
             file_exists = dst.exists()
             dst.parent.mkdir(parents=True, exist_ok=True)
-            if file_exists and not force and not patch:
+            if file_exists and not force and not patch and not refresh_managed_skills:
                 continue
             if target == "cursor":
                 content = build_cursor_skill_format(skill, language)

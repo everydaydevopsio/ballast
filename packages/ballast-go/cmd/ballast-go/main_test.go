@@ -1120,7 +1120,7 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 	}
 }
 
-func TestInstallRefreshOverwritesExistingOpencodeSkillWithoutForceOrPatch(t *testing.T) {
+func TestInstallSkipsExistingOpencodeSkillWithoutForceOrPatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
 	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
@@ -1138,19 +1138,16 @@ func TestInstallRefreshOverwritesExistingOpencodeSkillWithoutForceOrPatch(t *tes
 		force:       false,
 		saveConfig:  false,
 	})
-	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
-		t.Fatalf("expected existing skill to be refreshed, got %+v", result.installedSkills)
+	if len(result.installedSkills) != 0 {
+		t.Fatalf("expected existing skill to be skipped, got %+v", result.installedSkills)
 	}
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
 		t.Fatalf("read existing skill: %v", err)
 	}
 	text := string(content)
-	if strings.Contains(text, "stale skill content") {
-		t.Fatalf("expected stale skill content to be replaced, got %q", text)
-	}
-	if !strings.Contains(text, "# OWASP Security Scan Skill") {
-		t.Fatalf("expected canonical skill content after refresh, got %q", text)
+	if text != "stale skill content" {
+		t.Fatalf("expected stale skill content to remain unchanged, got %q", text)
 	}
 }
 
@@ -1314,6 +1311,8 @@ func TestInstallRefreshOverwritesExistingCodexSkill(t *testing.T) {
 	if err := os.WriteFile(skillPath, []byte("stale skill content\n"), 0o644); err != nil {
 		t.Fatalf("seed stale skill: %v", err)
 	}
+
+	t.Setenv("BALLAST_REFRESH_SKILLS", "1")
 
 	result := install(installOptions{
 		projectRoot: tmpDir,

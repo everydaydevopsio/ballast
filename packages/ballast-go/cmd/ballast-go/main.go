@@ -774,6 +774,7 @@ func install(opts installOptions) installResult {
 	result := installResult{}
 	opts.agents = withImplicitAgents(opts.agents)
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
+	refreshManagedSkills := os.Getenv("BALLAST_REFRESH_SKILLS") == "1"
 	hookMode := resolveTsHookMode(opts.projectRoot, opts.language)
 	targets := normalizeTargets(opts.targets)
 	if len(targets) == 0 {
@@ -886,6 +887,9 @@ func install(opts installOptions) installResult {
 			}
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
+				continue
+			}
+			if exists(file) && !opts.force && !opts.patch && !refreshManagedSkills {
 				continue
 			}
 			switch target {

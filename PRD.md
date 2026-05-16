@@ -67,19 +67,21 @@ Ballast-installed skill files are generated managed artifacts, but the current r
 
 ### Requirements
 
-1. Normal install refreshes must rewrite selected managed skill files when they already exist.
-2. `ballast upgrade` and `doctor --fix` must refresh saved skill selections through their existing `install --refresh-config` path without requiring `--force`.
-3. Existing agent rule overwrite, patch, and force semantics must remain unchanged.
-4. The behavior must stay consistent across the TypeScript, Python, Go, and wrapper CLIs.
-5. Support files such as `AGENTS.md` and `CLAUDE.md` must continue reflecting the saved skill list after refresh.
+1. Config-refresh flows (`install --refresh-config`, `upgrade`, and `doctor --fix`) must rewrite selected managed skill files when they already exist.
+2. Ordinary backend install behavior outside those refresh flows must keep the existing skill decision matrix: skip on existing files unless `--patch` or `--force` is selected.
+3. `ballast upgrade` and `doctor --fix` must refresh saved skill selections through their existing `install --refresh-config` path without requiring `--force`.
+4. Existing agent rule overwrite, patch, and force semantics must remain unchanged.
+5. The behavior must stay consistent across the TypeScript, Python, Go, and wrapper CLIs.
+6. Support files such as `AGENTS.md` and `CLAUDE.md` must continue reflecting the saved skill list after refresh.
 
 ### Acceptance Criteria
 
-1. Given an existing installed skill file with stale content, running backend install with the same skill and `force=false` rewrites the file to current packaged skill content.
-2. Given an existing installed agent rule and `force=false`, backend install still skips the rule unless patch mode or force mode is selected.
-3. Given a repository with `.rulesrc.json` that declares a skill, running wrapper `upgrade` without `--force` invokes the refresh path that updates the existing managed skill file.
-4. Automated unit coverage demonstrates the backend skill refresh behavior for TypeScript, Python, and Go.
-5. Smoke coverage demonstrates the wrapper upgrade path refreshes stale managed skill content.
+1. Given an existing installed skill file with stale content, running backend install with the same skill and `force=false, patch=false` leaves the file unchanged outside config-refresh flows.
+2. Given an existing installed skill file with stale content and refresh mode enabled through the wrapper config-refresh path, backend install rewrites the file to current packaged skill content without `--force`.
+3. Given an existing installed agent rule and `force=false`, backend install still skips the rule unless patch mode or force mode is selected.
+4. Given a repository with `.rulesrc.json` that declares a skill, running wrapper `upgrade` without `--force` invokes the refresh path that updates the existing managed skill file.
+5. Automated unit coverage demonstrates the backend skill refresh behavior for TypeScript, Python, and Go.
+6. Smoke coverage demonstrates the wrapper upgrade path refreshes stale managed skill content.
 
 ## Existing Install Refresh Reconciliation
 

@@ -360,6 +360,31 @@ class PatchInstallTests(unittest.TestCase):
             self.assertEqual(result.installed_skills, [])
             self.assertEqual(skill.read_text(encoding="utf-8"), "stale skill content")
 
+    def test_install_refresh_overwrites_existing_managed_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / ".opencode" / "skills" / "owasp-security-scan.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("stale skill content", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {"BALLAST_REFRESH_SKILLS": "1"}):
+                result = cli.install(
+                    root,
+                    "opencode",
+                    [],
+                    ["owasp-security-scan"],
+                    "python",
+                    False,
+                    False,
+                    False,
+                )
+
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            self.assertIn(
+                "## Scan Architecture",
+                skill.read_text(encoding="utf-8"),
+            )
+
     def test_install_adds_ballast_to_gitignore(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
