@@ -645,6 +645,9 @@ func TestBuildCursorSkillFormatIncludesOnDemandFrontmatter(t *testing.T) {
 	if strings.Contains(content, "description: >") {
 		t.Fatalf("expected folded YAML description to be resolved: %s", content)
 	}
+	if !strings.Contains(content, "Created by [Ballast]") {
+		t.Fatalf("expected managed skill marker: %s", content)
+	}
 	if strings.Contains(content, "description: Run OWASP-aligned security scans across Go, TypeScript, and Python codebases.") {
 		t.Fatalf("expected description to remain quoted: %s", content)
 	}
@@ -1173,6 +1176,9 @@ func TestInstallPatchCreatesMissingSkill(t *testing.T) {
 	if !strings.Contains(string(content), "## Scan Architecture") {
 		t.Fatalf("expected canonical skill content, got %q", string(content))
 	}
+	if !strings.Contains(string(content), "Created by [Ballast]") {
+		t.Fatalf("expected managed skill marker, got %q", string(content))
+	}
 }
 
 func TestInstallPatchMergesExistingSkill(t *testing.T) {
@@ -1690,7 +1696,7 @@ func TestNormalizeTargetsDetailedReturnsInvalidTokens(t *testing.T) {
 
 func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"],"taskSystem":"jira"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1700,6 +1706,9 @@ func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	}
 	if !slices.Equal(cfg.Targets, []string{"cursor"}) {
 		t.Fatalf("expected legacy target to normalize into targets, got %#v", cfg.Targets)
+	}
+	if cfg.TaskSystem != "jira" {
+		t.Fatalf("expected taskSystem to be loaded from config, got %#v", cfg)
 	}
 }
 

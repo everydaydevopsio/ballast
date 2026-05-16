@@ -846,6 +846,7 @@ def build_cursor_skill_format(skill: str, language: str) -> str:
     description = skill_description(skill, language).replace('"', '\\"')
     return (
         f'---\ndescription: "{description}"\nalwaysApply: false\n---\n\n'
+        + f"<!-- {ballast_notice()} -->\n\n"
         + body.rstrip()
         + "\n"
     )
@@ -853,7 +854,7 @@ def build_cursor_skill_format(skill: str, language: str) -> str:
 
 def build_skill_markdown(skill: str, language: str) -> str:
     _, body = split_skill_document(read_skill(skill, language))
-    return body.rstrip() + "\n"
+    return f"<!-- {ballast_notice()} -->\n\n" + body.rstrip() + "\n"
 
 
 def build_claude_skill(

@@ -408,7 +408,7 @@ function readStoredZipEntry(
     archive.length - minEocdSize - maxCommentLength
   );
 
-  for (
+  eocdLoop: for (
     let eocdOffset = archive.length - minEocdSize;
     eocdOffset >= searchStart;
     eocdOffset--
@@ -425,7 +425,7 @@ function readStoredZipEntry(
       centralDirectoryEnd > archive.length ||
       centralDirectoryOffset > centralDirectoryEnd
     ) {
-      return undefined;
+      continue;
     }
 
     let entryOffset = centralDirectoryOffset;
@@ -443,17 +443,17 @@ function readStoredZipEntry(
       const fileNameStart = entryOffset + 46;
       const fileNameEnd = fileNameStart + fileNameLength;
       if (fileNameEnd > centralDirectoryEnd) {
-        return undefined;
+        continue eocdLoop;
       }
       const fileName = archive.toString('utf8', fileNameStart, fileNameEnd);
       if (fileName === entryName) {
         if (localHeaderOffset + 30 > archive.length) {
-          return undefined;
+          continue eocdLoop;
         }
         if (
           archive.readUInt32LE(localHeaderOffset) !== localFileHeaderSignature
         ) {
-          return undefined;
+          continue eocdLoop;
         }
         const localFileNameLength = archive.readUInt16LE(
           localHeaderOffset + 26
@@ -463,7 +463,7 @@ function readStoredZipEntry(
           localHeaderOffset + 30 + localFileNameLength + localExtraLength;
         const dataEnd = dataStart + compressedSize;
         if (dataEnd > archive.length) {
-          return undefined;
+          continue eocdLoop;
         }
         const data = archive.subarray(dataStart, dataEnd);
         if (compressionMethod === 0) {
@@ -619,7 +619,8 @@ export function install(options: InstallOptions): InstallResult {
   const processedSkillIds = new Set<string>();
   const disableSupportFiles = process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
   const refreshManagedSkills = process.env.BALLAST_REFRESH_SKILLS === '1';
-  const refreshTaskRules = process.env.BALLAST_REFRESH_TASK_RULES === '1';
+  const refreshTaskRulesFromEnv =
+    process.env.BALLAST_REFRESH_TASK_RULES === '1';
 
   try {
     ensureGitignoreEntry(projectRoot, '.ballast/');
@@ -634,6 +635,11 @@ export function install(options: InstallOptions): InstallResult {
   const existingConfig = loadConfig(projectRoot, language);
   const resolvedTaskSystem =
     taskSystem ?? existingConfig?.taskSystem ?? DEFAULT_TASK_SYSTEM;
+  const refreshTaskRules =
+    refreshTaskRulesFromEnv ||
+    (effectiveAgents.includes('tasks') &&
+      taskSystem !== undefined &&
+      taskSystem !== (existingConfig?.taskSystem ?? DEFAULT_TASK_SYSTEM));
 
   if (persist) {
     saveConfig(

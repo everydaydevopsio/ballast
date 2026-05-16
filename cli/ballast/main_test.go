@@ -1177,6 +1177,9 @@ func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 	if invocation.Env["BALLAST_REFRESH_SKILLS"] != "1" {
 		t.Fatalf("expected refresh-config to enable managed skill refresh, got %#v", invocation.Env)
 	}
+	if invocation.Env["BALLAST_REFRESH_TASK_RULES"] != "1" {
+		t.Fatalf("expected refresh-config to enable task rule refresh, got %#v", invocation.Env)
+	}
 }
 
 func TestRunInstallCLICommand(t *testing.T) {
@@ -2986,11 +2989,17 @@ func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
 		Languages:  []string{"typescript"},
 		TaskSystem: "",
 	}
+	previous := &monorepoConfig{
+		Targets:   []string{"codex", "claude"},
+		Agents:    []string{"local-dev", "docs"},
+		Skills:    []string{"owasp-security-scan", "github-health-check"},
+		Languages: []string{"typescript"},
+	}
 
-	if err := removeStaleManagedFiles(root, "codex", next); err != nil {
+	if err := removeStaleManagedFiles(root, "codex", previous, next); err != nil {
 		t.Fatalf("removeStaleManagedFiles(codex): %v", err)
 	}
-	if err := removeStaleManagedFiles(root, "claude", next); err != nil {
+	if err := removeStaleManagedFiles(root, "claude", previous, next); err != nil {
 		t.Fatalf("removeStaleManagedFiles(claude): %v", err)
 	}
 
@@ -2999,6 +3008,32 @@ func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
 	}
 	if _, err := os.Stat(skillPath); err != nil {
 		t.Fatalf("expected unmanaged skill archive to remain, got %v", err)
+	}
+}
+
+func TestRemoveStaleManagedFilesDeletesConfigBackedOpencodeSkill(t *testing.T) {
+	root := t.TempDir()
+	skillPath := filepath.Join(root, ".opencode", "skills", "github-health-check.md")
+	mustWriteFile(t, skillPath, "legacy managed skill without explicit marker\n")
+
+	previous := &monorepoConfig{
+		Targets:   []string{"opencode"},
+		Agents:    []string{"local-dev"},
+		Skills:    []string{"owasp-security-scan", "github-health-check"},
+		Languages: []string{"typescript"},
+	}
+	next := &monorepoConfig{
+		Targets:   []string{"opencode"},
+		Agents:    []string{"local-dev"},
+		Skills:    []string{"owasp-security-scan"},
+		Languages: []string{"typescript"},
+	}
+
+	if err := removeStaleManagedFiles(root, "opencode", previous, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles(opencode): %v", err)
+	}
+	if _, err := os.Stat(skillPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected config-backed stale opencode skill to be removed, got %v", err)
 	}
 }
 
@@ -3224,6 +3259,56 @@ func TestRunMonorepoInstallPreservesTaskSystemFromExistingConfig(t *testing.T) {
 	}
 	if !strings.Contains(string(config), `"taskSystem": "linear"`) {
 		t.Fatalf("expected taskSystem to be preserved from existing config, got %q", string(config))
+	}
+}
+
+func TestRunMonorepoRefreshConfigEnablesTaskAndSkillRefresh(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["tasks", "linting"],
+  "skills": ["owasp-security-scan"],
+  "languages": ["typescript", "python"],
+  "paths": {"typescript": ["apps/frontend"], "python": ["services/api"]},
+  "taskSystem": "linear"
+}`)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	var invocations []backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocations = append(invocations, backendInvocation{
+			Binary: binary,
+			Args:   append([]string(nil), args...),
+			Dir:    dir,
+			Env:    cloneEnvMap(env),
+		})
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--refresh-config"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(invocations) == 0 {
+		t.Fatal("expected backend invocations")
+	}
+	if invocations[0].Env["BALLAST_REFRESH_SKILLS"] != "1" {
+		t.Fatalf("expected refresh-config to enable skill refresh in common invocation, got %#v", invocations[0].Env)
+	}
+	if invocations[0].Env["BALLAST_REFRESH_TASK_RULES"] != "1" {
+		t.Fatalf("expected refresh-config to enable task refresh in common invocation, got %#v", invocations[0].Env)
 	}
 }
 

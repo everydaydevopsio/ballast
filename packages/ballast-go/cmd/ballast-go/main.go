@@ -1386,7 +1386,7 @@ func buildCursorSkillFormat(skillID, language string) (string, error) {
 		return "", err
 	}
 	_, body := splitSkillDocument(content)
-	return fmt.Sprintf("---\ndescription: %q\nalwaysApply: false\n---\n\n%s\n", skillDescription(skillID, language), strings.TrimRight(body, "\n")), nil
+	return fmt.Sprintf("---\ndescription: %q\nalwaysApply: false\n---\n\n<!-- %s -->\n\n%s\n", skillDescription(skillID, language), ballastNotice(), strings.TrimRight(body, "\n")), nil
 }
 
 func buildSkillMarkdown(skillID, language string) (string, error) {
@@ -1395,7 +1395,7 @@ func buildSkillMarkdown(skillID, language string) (string, error) {
 		return "", err
 	}
 	_, body := splitSkillDocument(content)
-	return strings.TrimRight(body, "\n") + "\n", nil
+	return "<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
 }
 
 func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte, error) {
@@ -2182,6 +2182,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		BallastVersion: raw.BallastVersion,
 		Languages:      raw.Languages,
 		Paths:          raw.Paths,
+		TaskSystem:     raw.TaskSystem,
 	}
 }
 
@@ -2195,6 +2196,9 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 	if existing != nil {
 		if cfg.BallastVersion == "" {
 			cfg.BallastVersion = existing.BallastVersion
+		}
+		if strings.TrimSpace(cfg.TaskSystem) == "" {
+			cfg.TaskSystem = existing.TaskSystem
 		}
 		cfg.Targets = mergeStringLists(existing.Targets, cfg.Targets)
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)

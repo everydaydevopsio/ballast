@@ -384,6 +384,10 @@ class PatchInstallTests(unittest.TestCase):
                 "## Scan Architecture",
                 skill.read_text(encoding="utf-8"),
             )
+            self.assertIn(
+                "Created by [Ballast]",
+                skill.read_text(encoding="utf-8"),
+            )
 
     def test_install_adds_ballast_to_gitignore(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -525,6 +529,7 @@ class PatchInstallTests(unittest.TestCase):
             'description: "Run OWASP-aligned security scans across Go, TypeScript, and Python codebases.',
             content,
         )
+        self.assertIn("Created by [Ballast]", content)
         self.assertNotIn("description: >", content)
 
     def test_build_cursor_skill_format_supports_ballast_audit(self) -> None:

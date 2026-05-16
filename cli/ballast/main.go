@@ -243,6 +243,7 @@ func run(args []string) int {
 				if refreshConfigRequested {
 					invocation.Env = cloneEnvMap(invocation.Env)
 					invocation.Env["BALLAST_REFRESH_SKILLS"] = "1"
+					invocation.Env["BALLAST_REFRESH_TASK_RULES"] = "1"
 				}
 				resolved := resolveBackendCommand(invocation.Language, tool, invocation.Args, invocation.Env)
 				if !resolved.UseLocal {
@@ -303,7 +304,10 @@ func run(args []string) int {
 
 	singleEnv := map[string]string(nil)
 	if refreshConfigRequested {
-		singleEnv = map[string]string{"BALLAST_REFRESH_SKILLS": "1"}
+		singleEnv = map[string]string{
+			"BALLAST_REFRESH_SKILLS":     "1",
+			"BALLAST_REFRESH_TASK_RULES": "1",
+		}
 	}
 	resolved := resolveBackendCommand(selectedLanguage, tool, forwardedArgs, singleEnv)
 	if !resolved.UseLocal {
@@ -2251,14 +2255,15 @@ func cleanupStaleManagedSelections(root string, plan *monorepoPlan) error {
 		return nil
 	}
 	for _, target := range plan.Targets {
-		if err := removeStaleManagedFiles(root, target, &plan.Config); err != nil {
+		if err := removeStaleManagedFiles(root, target, plan.Previous, &plan.Config); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func removeStaleManagedFiles(root string, target string, next *monorepoConfig) error {
+func removeStaleManagedFiles(root string, target string, previous *monorepoConfig, next *monorepoConfig) error {
+	_ = previous
 	if next == nil {
 		return nil
 	}
@@ -2273,7 +2278,7 @@ func removeStaleManagedFiles(root string, target string, next *monorepoConfig) e
 		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
 	for _, file := range stringDifference(allManagedSkillPaths(root, target), managedSkillPaths(root, target, next.Skills)) {
-		if !ballastOwnsManagedFile(file) && !trackedPaths[file] {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !allowConfigBackedStaleSkillRemoval(target, file) {
 			continue
 		}
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -2282,6 +2287,10 @@ func removeStaleManagedFiles(root string, target string, next *monorepoConfig) e
 		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
 	return nil
+}
+
+func allowConfigBackedStaleSkillRemoval(target string, path string) bool {
+	return target == "cursor" || target == "opencode"
 }
 
 func allManagedRulePaths(root string, target string) []string {

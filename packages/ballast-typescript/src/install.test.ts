@@ -84,6 +84,102 @@ describe('install', () => {
     ]);
   }
 
+  function buildClaudeSkillWithDataDescriptorComment(
+    skillMd: string,
+    comment: Buffer
+  ): Buffer {
+    const archive = buildClaudeSkillWithDataDescriptor(skillMd);
+    const eocdOffset = archive.length - 22;
+    const eocd = Buffer.from(archive.subarray(eocdOffset));
+    eocd.writeUInt16LE(comment.length, 20);
+    return Buffer.concat([archive.subarray(0, eocdOffset), eocd, comment]);
+  }
+
+  function readSkillMdFromArchive(archive: Buffer): string | undefined {
+    const eocdSignature = 0x06054b50;
+    const centralDirectorySignature = 0x02014b50;
+    const localFileHeaderSignature = 0x04034b50;
+    const minEocdSize = 22;
+    const maxCommentLength = 0xffff;
+    const searchStart = Math.max(
+      0,
+      archive.length - minEocdSize - maxCommentLength
+    );
+
+    eocdLoop: for (
+      let eocdOffset = archive.length - minEocdSize;
+      eocdOffset >= searchStart;
+      eocdOffset--
+    ) {
+      if (archive.readUInt32LE(eocdOffset) !== eocdSignature) {
+        continue;
+      }
+
+      const centralDirectorySize = archive.readUInt32LE(eocdOffset + 12);
+      const centralDirectoryOffset = archive.readUInt32LE(eocdOffset + 16);
+      const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
+      if (
+        centralDirectoryOffset < 0 ||
+        centralDirectoryEnd > archive.length ||
+        centralDirectoryOffset > centralDirectoryEnd
+      ) {
+        continue;
+      }
+
+      let entryOffset = centralDirectoryOffset;
+      while (entryOffset + 46 <= centralDirectoryEnd) {
+        if (archive.readUInt32LE(entryOffset) !== centralDirectorySignature) {
+          break;
+        }
+
+        const compressionMethod = archive.readUInt16LE(entryOffset + 10);
+        const compressedSize = archive.readUInt32LE(entryOffset + 20);
+        const fileNameLength = archive.readUInt16LE(entryOffset + 28);
+        const extraLength = archive.readUInt16LE(entryOffset + 30);
+        const commentLength = archive.readUInt16LE(entryOffset + 32);
+        const localHeaderOffset = archive.readUInt32LE(entryOffset + 42);
+        const fileNameStart = entryOffset + 46;
+        const fileNameEnd = fileNameStart + fileNameLength;
+        if (fileNameEnd > centralDirectoryEnd) {
+          continue eocdLoop;
+        }
+        const fileName = archive.toString('utf8', fileNameStart, fileNameEnd);
+        if (fileName === 'SKILL.md') {
+          if (localHeaderOffset + 30 > archive.length) {
+            continue eocdLoop;
+          }
+          if (
+            archive.readUInt32LE(localHeaderOffset) !== localFileHeaderSignature
+          ) {
+            continue eocdLoop;
+          }
+          const localFileNameLength = archive.readUInt16LE(
+            localHeaderOffset + 26
+          );
+          const localExtraLength = archive.readUInt16LE(localHeaderOffset + 28);
+          const dataStart =
+            localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+          const dataEnd = dataStart + compressedSize;
+          if (dataEnd > archive.length) {
+            continue eocdLoop;
+          }
+          const data = archive.subarray(dataStart, dataEnd);
+          if (compressionMethod === 0) {
+            return data.toString('utf8');
+          }
+          if (compressionMethod === 8) {
+            return zlib.inflateRawSync(data).toString('utf8');
+          }
+          return undefined;
+        }
+
+        entryOffset = fileNameEnd + extraLength + commentLength;
+      }
+    }
+
+    return undefined;
+  }
+
   describe('resolveTargetAndAgents', () => {
     test('with target and agents from options returns them', async () => {
       const result = await resolveTargetAndAgents({
@@ -377,6 +473,12 @@ describe('install', () => {
           path.join(tmpDir, '.cursor', 'rules', 'owasp-security-scan.mdc')
         )
       ).toBe(true);
+      expect(
+        fs.readFileSync(
+          path.join(tmpDir, '.cursor', 'rules', 'owasp-security-scan.mdc'),
+          'utf8'
+        )
+      ).toContain('Created by [Ballast]');
     });
 
     test('skips an existing skill file when force and patch are false', () => {
@@ -424,6 +526,9 @@ describe('install', () => {
       expect(result.installedSkills).toContain('owasp-security-scan');
       expect(fs.readFileSync(skillFile, 'utf8')).toContain(
         '## Scan Architecture'
+      );
+      expect(fs.readFileSync(skillFile, 'utf8')).toContain(
+        'Created by [Ballast]'
       );
     });
 
@@ -523,8 +628,7 @@ Keep team-specific usage notes.
       );
     });
 
-    test('task-system refresh mode rewrites existing task rules without force or patch', () => {
-      process.env.BALLAST_REFRESH_TASK_RULES = '1';
+    test('changing taskSystem rewrites existing task rules without force or patch', () => {
       const taskRule = path.join(
         tmpDir,
         '.codex',
@@ -536,6 +640,15 @@ Keep team-specific usage notes.
         taskRule,
         'Use jira as the system of record for work items.\n',
         'utf8'
+      );
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['tasks'],
+          skills: [],
+          taskSystem: 'jira'
+        },
+        tmpDir
       );
 
       const result = install({
@@ -587,31 +700,8 @@ Keep this team-specific section.
 
       expect(result.installedSkills).toContain('owasp-security-scan');
 
-      // Read SKILL.md from output archive (stored/no-compression ZIP)
       const archive = fs.readFileSync(skillFile);
-      function readStoredZipEntry(
-        buf: Buffer,
-        entry: string
-      ): string | undefined {
-        let offset = 0;
-        while (offset + 30 <= buf.length) {
-          if (buf.readUInt32LE(offset) !== 0x04034b50) break;
-          const compressedSize = buf.readUInt32LE(offset + 18);
-          const fileNameLength = buf.readUInt16LE(offset + 26);
-          const extraLength = buf.readUInt16LE(offset + 28);
-          const fileName = buf.toString(
-            'utf8',
-            offset + 30,
-            offset + 30 + fileNameLength
-          );
-          const dataStart = offset + 30 + fileNameLength + extraLength;
-          if (fileName === entry)
-            return buf.toString('utf8', dataStart, dataStart + compressedSize);
-          offset = dataStart + compressedSize;
-        }
-        return undefined;
-      }
-      const skillMd = readStoredZipEntry(archive, 'SKILL.md');
+      const skillMd = readSkillMdFromArchive(archive);
       expect(skillMd).toContain('Team intro preserved by patch.');
       expect(skillMd).toContain('Team Custom Section');
       expect(skillMd).toContain('## Scan Architecture');
@@ -641,30 +731,7 @@ Keep this team-specific section.
       expect(result.installedSkills).toContain('owasp-security-scan');
 
       const archive = fs.readFileSync(skillFile);
-      function readStoredZipEntryLocal(
-        buf: Buffer,
-        entry: string
-      ): string | undefined {
-        let offset = 0;
-        while (offset + 30 <= buf.length) {
-          if (buf.readUInt32LE(offset) !== 0x04034b50) break;
-          const compressedSize = buf.readUInt32LE(offset + 18);
-          const fileNameLength = buf.readUInt16LE(offset + 26);
-          const extraLength = buf.readUInt16LE(offset + 28);
-          const fileName = buf.toString(
-            'utf8',
-            offset + 30,
-            offset + 30 + fileNameLength
-          );
-          const dataStart = offset + 30 + fileNameLength + extraLength;
-          if (fileName === entry)
-            return buf.toString('utf8', dataStart, dataStart + compressedSize);
-          offset = dataStart + compressedSize;
-        }
-        return undefined;
-      }
-
-      const skillMd = readStoredZipEntryLocal(archive, 'SKILL.md');
+      const skillMd = readSkillMdFromArchive(archive);
       expect(skillMd).toContain('## Scan Architecture');
       expect(skillMd).not.toContain('not-a-zip-archive');
     });
@@ -709,30 +776,7 @@ Keep this team-specific section.
       expect(result.installedSkills).toContain('owasp-security-scan');
 
       const archive = fs.readFileSync(skillFile);
-      function readStoredZipEntryLocal(
-        buf: Buffer,
-        entry: string
-      ): string | undefined {
-        let offset = 0;
-        while (offset + 30 <= buf.length) {
-          if (buf.readUInt32LE(offset) !== 0x04034b50) break;
-          const compressedSize = buf.readUInt32LE(offset + 18);
-          const fileNameLength = buf.readUInt16LE(offset + 26);
-          const extraLength = buf.readUInt16LE(offset + 28);
-          const fileName = buf.toString(
-            'utf8',
-            offset + 30,
-            offset + 30 + fileNameLength
-          );
-          const dataStart = offset + 30 + fileNameLength + extraLength;
-          if (fileName === entry)
-            return buf.toString('utf8', dataStart, dataStart + compressedSize);
-          offset = dataStart + compressedSize;
-        }
-        return undefined;
-      }
-
-      const skillMd = readStoredZipEntryLocal(archive, 'SKILL.md');
+      const skillMd = readSkillMdFromArchive(archive);
       expect(skillMd).toContain('## Scan Architecture');
     });
 
@@ -770,30 +814,48 @@ Keep this team-specific section.
       expect(result.installedSkills).toContain('owasp-security-scan');
 
       const archive = fs.readFileSync(skillFile);
-      function readStoredZipEntryLocal(
-        buf: Buffer,
-        entry: string
-      ): string | undefined {
-        let offset = 0;
-        while (offset + 30 <= buf.length) {
-          if (buf.readUInt32LE(offset) !== 0x04034b50) break;
-          const compressedSize = buf.readUInt32LE(offset + 18);
-          const fileNameLength = buf.readUInt16LE(offset + 26);
-          const extraLength = buf.readUInt16LE(offset + 28);
-          const fileName = buf.toString(
-            'utf8',
-            offset + 30,
-            offset + 30 + fileNameLength
-          );
-          const dataStart = offset + 30 + fileNameLength + extraLength;
-          if (fileName === entry)
-            return buf.toString('utf8', dataStart, dataStart + compressedSize);
-          offset = dataStart + compressedSize;
-        }
-        return undefined;
-      }
+      const skillMd = readSkillMdFromArchive(archive);
+      expect(skillMd).toContain('Team intro preserved by patch.');
+      expect(skillMd).toContain('Team Custom Section');
+      expect(skillMd).toContain('## Scan Architecture');
+    });
 
-      const skillMd = readStoredZipEntryLocal(archive, 'SKILL.md');
+    test('patch preserves team content when the zip comment contains an EOCD signature', () => {
+      const skillFile = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan.skill'
+      );
+      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      fs.writeFileSync(
+        skillFile,
+        buildClaudeSkillWithDataDescriptorComment(
+          `# owasp-security-scan
+
+Team intro preserved by patch.
+
+## Team Custom Section
+
+Keep this team-specific section.
+`,
+          Buffer.from('comment-\x50\x4b\x05\x06-tail', 'binary')
+        )
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        patch: true,
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.errors).toEqual([]);
+      expect(result.installedSkills).toContain('owasp-security-scan');
+      const skillMd = readSkillMdFromArchive(fs.readFileSync(skillFile));
       expect(skillMd).toContain('Team intro preserved by patch.');
       expect(skillMd).toContain('Team Custom Section');
       expect(skillMd).toContain('## Scan Architecture');
@@ -832,30 +894,7 @@ This section should be gone after force.
 
       expect(result.installedSkills).toContain('owasp-security-scan');
 
-      const archive = fs.readFileSync(skillFile);
-      function readStoredZipEntryLocal(
-        buf: Buffer,
-        entry: string
-      ): string | undefined {
-        let offset = 0;
-        while (offset + 30 <= buf.length) {
-          if (buf.readUInt32LE(offset) !== 0x04034b50) break;
-          const compressedSize = buf.readUInt32LE(offset + 18);
-          const fileNameLength = buf.readUInt16LE(offset + 26);
-          const extraLength = buf.readUInt16LE(offset + 28);
-          const fileName = buf.toString(
-            'utf8',
-            offset + 30,
-            offset + 30 + fileNameLength
-          );
-          const dataStart = offset + 30 + fileNameLength + extraLength;
-          if (fileName === entry)
-            return buf.toString('utf8', dataStart, dataStart + compressedSize);
-          offset = dataStart + compressedSize;
-        }
-        return undefined;
-      }
-      const skillMd = readStoredZipEntryLocal(archive, 'SKILL.md');
+      const skillMd = readSkillMdFromArchive(fs.readFileSync(skillFile));
       expect(skillMd).not.toContain(
         'Team intro that should be discarded on force.'
       );
