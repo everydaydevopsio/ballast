@@ -121,7 +121,8 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
   "paths":{
     "typescript":["apps/web"],
     "ansible":["infra/ansible"]
-  }
+  },
+  "taskSystem":"jira"
 }`)
 
 	output := captureStdout(t, func() {
@@ -149,6 +150,9 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 	if !strings.Contains(output, "paths: typescript=apps/web; ansible=infra/ansible") {
 		t.Fatalf("expected config paths in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "taskSystem: jira") {
+		t.Fatalf("expected config task system in doctor output, got %q", output)
 	}
 }
 
@@ -1152,7 +1156,7 @@ func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
 	var invocation backendInvocation
 	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
-		invocation = backendInvocation{Binary: binary, Args: append([]string(nil), args...)}
+		invocation = backendInvocation{Binary: binary, Args: append([]string(nil), args...), Env: cloneEnvMap(env)}
 		return 0, nil
 	}
 
@@ -1169,6 +1173,43 @@ func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 
 	if got := strings.Join(invocation.Args, " "); got != "install --yes" {
 		t.Fatalf("expected refresh-config to forward install --yes, got %q", got)
+	}
+	if invocation.Env["BALLAST_REFRESH_SKILLS"] != "1" {
+		t.Fatalf("expected refresh-config to enable managed skill refresh, got %#v", invocation.Env)
+	}
+	if invocation.Env["BALLAST_REFRESH_TASK_RULES"] != "1" {
+		t.Fatalf("expected refresh-config to enable task rule refresh, got %#v", invocation.Env)
+	}
+}
+
+func TestRunInstallRefreshConfigCleansUpSingleLanguageStaleSelections(t *testing.T) {
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"opencode","agents":["linting"],"skills":[]}`)
+	staleSkill := filepath.Join(root, ".opencode", "skills", "owasp-security-scan.md")
+	mustWriteFile(t, staleSkill, "# Skill\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n")
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--refresh-config"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(staleSkill); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected stale single-language managed skill to be removed, stat err=%v", err)
 	}
 }
 
@@ -2932,6 +2973,101 @@ func TestUpdateMonorepoSupportFilesCreatesClaudeMdAtRoot(t *testing.T) {
 	}
 }
 
+func TestUpdateMonorepoSupportFilesPreservesUnmanagedSectionsWithoutPatch(t *testing.T) {
+	root := t.TempDir()
+	plan := &monorepoPlan{
+		Targets:  []string{"claude"},
+		Common:   []string{"local-dev"},
+		Language: []string{"linting"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+			Skills:    []string{"owasp-security-scan"},
+		},
+	}
+	mustWriteFile(t, filepath.Join(root, "CLAUDE.md"), "# CLAUDE.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nCustom unmanaged rules section.\n\n## Installed skills\n\nCustom unmanaged skills section.\n")
+
+	if err := updateMonorepoSupportFiles(root, plan, []string{"install", "--target", "claude", "--all", "--yes"}); err != nil {
+		t.Fatalf("updateMonorepoSupportFiles returned error: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read CLAUDE.md: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "Custom unmanaged rules section.") {
+		t.Fatalf("expected unmanaged rules section to remain, got %q", text)
+	}
+	if !strings.Contains(text, "Custom unmanaged skills section.") {
+		t.Fatalf("expected unmanaged skills section to remain, got %q", text)
+	}
+	if strings.Contains(text, "`.claude/rules/common/local-dev-env.md`") {
+		t.Fatalf("expected unmanaged support file sections to avoid silent replacement, got %q", text)
+	}
+}
+
+func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
+	root := t.TempDir()
+	rulePath := filepath.Join(root, ".codex", "rules", "common", "docs.md")
+	skillPath := filepath.Join(root, ".claude", "skills", "github-health-check.skill")
+	mustWriteFile(t, rulePath, "user-authored file at canonical path\n")
+	mustWriteFile(t, skillPath, "not-a-ballast-skill\n")
+
+	next := &monorepoConfig{
+		Targets:    []string{"codex", "claude"},
+		Agents:     []string{"local-dev"},
+		Skills:     []string{"owasp-security-scan"},
+		Languages:  []string{"typescript"},
+		TaskSystem: "",
+	}
+	previous := &monorepoConfig{
+		Targets:   []string{"codex", "claude"},
+		Agents:    []string{"local-dev", "docs"},
+		Skills:    []string{"owasp-security-scan", "github-health-check"},
+		Languages: []string{"typescript"},
+	}
+
+	if err := removeStaleManagedFiles(root, "codex", previous, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles(codex): %v", err)
+	}
+	if err := removeStaleManagedFiles(root, "claude", previous, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles(claude): %v", err)
+	}
+
+	if _, err := os.Stat(rulePath); err != nil {
+		t.Fatalf("expected unmanaged rule file to remain, got %v", err)
+	}
+	if _, err := os.Stat(skillPath); err != nil {
+		t.Fatalf("expected unmanaged skill archive to remain, got %v", err)
+	}
+}
+
+func TestRemoveStaleManagedFilesDeletesConfigBackedOpencodeSkill(t *testing.T) {
+	root := t.TempDir()
+	skillPath := filepath.Join(root, ".opencode", "skills", "github-health-check.md")
+	mustWriteFile(t, skillPath, "legacy managed skill without explicit marker\n")
+
+	previous := &monorepoConfig{
+		Targets:   []string{"opencode"},
+		Agents:    []string{"local-dev"},
+		Skills:    []string{"owasp-security-scan", "github-health-check"},
+		Languages: []string{"typescript"},
+	}
+	next := &monorepoConfig{
+		Targets:   []string{"opencode"},
+		Agents:    []string{"local-dev"},
+		Skills:    []string{"owasp-security-scan"},
+		Languages: []string{"typescript"},
+	}
+
+	if err := removeStaleManagedFiles(root, "opencode", previous, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles(opencode): %v", err)
+	}
+	if _, err := os.Stat(skillPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected config-backed stale opencode skill to be removed, got %v", err)
+	}
+}
+
 func TestRunMonorepoRemoveTargetCleansManagedRulesAndSupportFiles(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
@@ -3154,6 +3290,105 @@ func TestRunMonorepoInstallPreservesTaskSystemFromExistingConfig(t *testing.T) {
 	}
 	if !strings.Contains(string(config), `"taskSystem": "linear"`) {
 		t.Fatalf("expected taskSystem to be preserved from existing config, got %q", string(config))
+	}
+}
+
+func TestRunMonorepoRefreshConfigEnablesTaskAndSkillRefresh(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["tasks", "linting"],
+  "skills": ["owasp-security-scan"],
+  "languages": ["typescript", "python"],
+  "paths": {"typescript": ["apps/frontend"], "python": ["services/api"]},
+  "taskSystem": "linear"
+}`)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	var invocations []backendInvocation
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		invocations = append(invocations, backendInvocation{
+			Binary: binary,
+			Args:   append([]string(nil), args...),
+			Dir:    dir,
+			Env:    cloneEnvMap(env),
+		})
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--refresh-config"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(invocations) == 0 {
+		t.Fatal("expected backend invocations")
+	}
+	if invocations[0].Env["BALLAST_REFRESH_SKILLS"] != "1" {
+		t.Fatalf("expected refresh-config to enable skill refresh in common invocation, got %#v", invocations[0].Env)
+	}
+	if invocations[0].Env["BALLAST_REFRESH_TASK_RULES"] != "1" {
+		t.Fatalf("expected refresh-config to enable task refresh in common invocation, got %#v", invocations[0].Env)
+	}
+}
+
+func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "tasks", "--task-system=linear", "--yes"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil || len(plan.Invocations) != 1 {
+		t.Fatalf("expected one common invocation, got %#v", plan)
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if strings.Contains(got, "--task-system=linear") {
+		t.Fatalf("expected normalized task-system flag, got %q", got)
+	}
+	if !strings.Contains(got, "--task-system linear") {
+		t.Fatalf("expected spaced task-system flag for backend, got %q", got)
+	}
+	if strings.Contains(got, "--force") {
+		t.Fatalf("expected task-system forwarding to avoid synthetic force, got %q", got)
+	}
+	if plan.Invocations[0].Env["BALLAST_REFRESH_TASK_RULES"] != "1" {
+		t.Fatalf("expected task-system updates to refresh existing task rules, got %#v", plan.Invocations[0].Env)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsMissingTaskSystemValue(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	_, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "tasks", "--task-system", "--yes"})
+	if err == nil || !strings.Contains(err.Error(), "missing value for --task-system") {
+		t.Fatalf("expected missing-value error, got %v", err)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidTaskSystemValue(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	_, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "tasks", "--task-system=notion", "--yes"})
+	if err == nil || !strings.Contains(err.Error(), "invalid --task-system") {
+		t.Fatalf("expected invalid task-system error, got %v", err)
 	}
 }
 

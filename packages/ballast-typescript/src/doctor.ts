@@ -22,6 +22,7 @@ export interface DoctorReport {
   configSkills: string[];
   configLanguages: string[];
   configPaths: Record<string, string[]>;
+  configTaskSystem: string | null;
   installed: InstalledCliStatus[];
   detectedAppType: AppType;
   recommendations: string[];
@@ -203,6 +204,7 @@ export function buildDoctorReport(
   configSkills: string[],
   configLanguages: string[],
   configPaths: Record<string, string[]>,
+  configTaskSystem: string | null,
   installed: InstalledCliStatus[],
   detectedAppType: AppType = 'unknown'
 ): DoctorReport {
@@ -264,6 +266,7 @@ export function buildDoctorReport(
     configSkills,
     configLanguages,
     configPaths,
+    configTaskSystem,
     installed,
     detectedAppType,
     recommendations
@@ -334,6 +337,9 @@ export function formatDoctorReport(report: DoctorReport): string {
     if (formattedPaths) {
       lines.push(`- paths: ${formattedPaths}`);
     }
+    if (report.configTaskSystem) {
+      lines.push(`- taskSystem: ${report.configTaskSystem}`);
+    }
   }
 
   lines.push('', 'Recommendations:');
@@ -362,6 +368,7 @@ export function runDoctor(): number {
     config?.skills ?? [],
     config?.languages ?? [],
     config?.paths ?? {},
+    config?.taskSystem ?? null,
     CLI_NAMES.map((name) => detectInstalledCli(name)),
     detectAppType(projectRoot)
   );

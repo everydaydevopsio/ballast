@@ -15,6 +15,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      null,
       [
         {
           name: 'ballast-typescript',
@@ -56,6 +57,7 @@ describe('doctor', () => {
         typescript: ['apps/web'],
         ansible: ['infra/ansible']
       },
+      'jira',
       [
         {
           name: 'ballast-typescript',
@@ -80,6 +82,7 @@ describe('doctor', () => {
     expect(output).toContain(
       '- paths: typescript=apps/web; ansible=infra/ansible'
     );
+    expect(output).toContain('- taskSystem: jira');
     expect(output).toContain('- No action needed.');
   });
 
@@ -94,6 +97,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      null,
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'cli'
     );
@@ -112,6 +116,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      null,
       [],
       'unknown'
     );
@@ -130,6 +135,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      null,
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'web'
     );
@@ -151,6 +157,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      null,
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'api'
     );

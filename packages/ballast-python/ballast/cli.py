@@ -477,6 +477,7 @@ def build_doctor_report(
         skills = config.get("skills")
         languages = config.get("languages")
         paths = config.get("paths")
+        task_system = config.get("taskSystem")
         if isinstance(targets, list) and all(
             isinstance(target, str) for target in targets
         ):
@@ -506,6 +507,8 @@ def build_doctor_report(
             )
             if formatted_paths:
                 lines.append(f"- paths: {formatted_paths}")
+        if isinstance(task_system, str) and task_system.strip():
+            lines.append(f"- taskSystem: {task_system}")
 
     lines.extend(["", "Recommendations:"])
     if recommendations:
@@ -843,6 +846,7 @@ def build_cursor_skill_format(skill: str, language: str) -> str:
     description = skill_description(skill, language).replace('"', '\\"')
     return (
         f'---\ndescription: "{description}"\nalwaysApply: false\n---\n\n'
+        + f"<!-- {ballast_notice()} -->\n\n"
         + body.rstrip()
         + "\n"
     )
@@ -850,7 +854,7 @@ def build_cursor_skill_format(skill: str, language: str) -> str:
 
 def build_skill_markdown(skill: str, language: str) -> str:
     _, body = split_skill_document(read_skill(skill, language))
-    return body.rstrip() + "\n"
+    return f"<!-- {ballast_notice()} -->\n\n" + body.rstrip() + "\n"
 
 
 def build_claude_skill(
@@ -873,6 +877,17 @@ def read_claude_skill_content(archive_path: Path) -> str:
     with zipfile.ZipFile(archive_path) as archive:
         with archive.open("SKILL.md") as skill_file:
             return skill_file.read().decode("utf-8")
+
+
+def patch_claude_skill_content(
+    archive_path: Path, canonical_skill_content: str, target: str
+) -> str:
+    try:
+        existing_skill_content = read_claude_skill_content(archive_path)
+    except Exception:
+        # Fall back to a clean overwrite when an existing archive is unreadable.
+        return canonical_skill_content
+    return patch_rule_content(existing_skill_content, canonical_skill_content, target)
 
 
 def destination(root: Path, target: str, basename: str) -> Path:
@@ -1593,6 +1608,7 @@ def install(
     processed_agents: list[str] = []
     processed_skills: list[str] = []
     disable_support_files = os.environ.get("BALLAST_DISABLE_SUPPORT_FILES") == "1"
+    refresh_managed_skills = os.environ.get("BALLAST_REFRESH_SKILLS") == "1"
 
     try:
         ensure_gitignore_entry(root, ".ballast/")
@@ -1660,7 +1676,7 @@ def install(
             dst = skill_destination(root, target, skill)
             file_exists = dst.exists()
             dst.parent.mkdir(parents=True, exist_ok=True)
-            if file_exists and not force and not patch:
+            if file_exists and not force and not patch and not refresh_managed_skills:
                 continue
             if target == "cursor":
                 content = build_cursor_skill_format(skill, language)
@@ -1673,9 +1689,7 @@ def install(
             elif target == "claude":
                 skill_content = read_skill(skill, language)
                 next_content = (
-                    patch_rule_content(
-                        read_claude_skill_content(dst), skill_content, target
-                    )
+                    patch_claude_skill_content(dst, skill_content, target)
                     if file_exists and not force and patch
                     else skill_content
                 )

@@ -75,6 +75,7 @@ type rulesConfig struct {
 	BallastVersion string              `json:"ballastVersion,omitempty"`
 	Languages      []string            `json:"languages,omitempty"`
 	Paths          map[string][]string `json:"paths,omitempty"`
+	TaskSystem     string              `json:"taskSystem,omitempty"`
 }
 
 type rawRulesConfig struct {
@@ -85,6 +86,7 @@ type rawRulesConfig struct {
 	BallastVersion string              `json:"ballastVersion,omitempty"`
 	Languages      []string            `json:"languages,omitempty"`
 	Paths          map[string][]string `json:"paths,omitempty"`
+	TaskSystem     string              `json:"taskSystem,omitempty"`
 }
 
 type installResult struct {
@@ -621,6 +623,9 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		if formattedPaths := formatDoctorConfigPaths(config.Languages, config.Paths); formattedPaths != "" {
 			lines = append(lines, fmt.Sprintf("- paths: %s", formattedPaths))
 		}
+		if strings.TrimSpace(config.TaskSystem) != "" {
+			lines = append(lines, fmt.Sprintf("- taskSystem: %s", config.TaskSystem))
+		}
 		if configVersion == "" || compareVersions(configVersion, targetVersion) < 0 {
 			recommendations = append(
 				recommendations,
@@ -769,6 +774,7 @@ func install(opts installOptions) installResult {
 	result := installResult{}
 	opts.agents = withImplicitAgents(opts.agents)
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
+	refreshManagedSkills := os.Getenv("BALLAST_REFRESH_SKILLS") == "1"
 	hookMode := resolveTsHookMode(opts.projectRoot, opts.language)
 	targets := normalizeTargets(opts.targets)
 	if len(targets) == 0 {
@@ -883,7 +889,7 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
 				continue
 			}
-			if exists(file) && !opts.force && !opts.patch {
+			if exists(file) && !opts.force && !opts.patch && !refreshManagedSkills {
 				continue
 			}
 			switch target {
@@ -913,10 +919,10 @@ func install(opts installOptions) installResult {
 				if exists(file) && !opts.force && opts.patch {
 					existing, readErr := readClaudeSkillContent(file)
 					if readErr != nil {
-						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-						continue
+						nextContent = skillContent
+					} else {
+						nextContent = patchRuleContent(existing, skillContent, target)
 					}
-					nextContent = patchRuleContent(existing, skillContent, target)
 				}
 				content, buildErr := buildClaudeSkill(skillID, opts.language, nextContent)
 				if buildErr != nil {
@@ -1380,7 +1386,7 @@ func buildCursorSkillFormat(skillID, language string) (string, error) {
 		return "", err
 	}
 	_, body := splitSkillDocument(content)
-	return fmt.Sprintf("---\ndescription: %q\nalwaysApply: false\n---\n\n%s\n", skillDescription(skillID, language), strings.TrimRight(body, "\n")), nil
+	return fmt.Sprintf("---\ndescription: %q\nalwaysApply: false\n---\n\n<!-- %s -->\n\n%s\n", skillDescription(skillID, language), ballastNotice(), strings.TrimRight(body, "\n")), nil
 }
 
 func buildSkillMarkdown(skillID, language string) (string, error) {
@@ -1389,7 +1395,7 @@ func buildSkillMarkdown(skillID, language string) (string, error) {
 		return "", err
 	}
 	_, body := splitSkillDocument(content)
-	return strings.TrimRight(body, "\n") + "\n", nil
+	return "<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
 }
 
 func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte, error) {
@@ -2176,6 +2182,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		BallastVersion: raw.BallastVersion,
 		Languages:      raw.Languages,
 		Paths:          raw.Paths,
+		TaskSystem:     raw.TaskSystem,
 	}
 }
 
@@ -2189,6 +2196,9 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 	if existing != nil {
 		if cfg.BallastVersion == "" {
 			cfg.BallastVersion = existing.BallastVersion
+		}
+		if strings.TrimSpace(cfg.TaskSystem) == "" {
+			cfg.TaskSystem = existing.TaskSystem
 		}
 		cfg.Targets = mergeStringLists(existing.Targets, cfg.Targets)
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)

@@ -36,6 +36,7 @@ class PatchInstallTests(unittest.TestCase):
                     "typescript": ["apps/web"],
                     "ansible": ["infra/ansible"],
                 },
+                "taskSystem": "jira",
             },
             [
                 {
@@ -64,6 +65,7 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("- skills: owasp-security-scan", output)
         self.assertIn("- languages: typescript, ansible", output)
         self.assertIn("- paths: typescript=apps/web; ansible=infra/ansible", output)
+        self.assertIn("- taskSystem: jira", output)
 
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:
@@ -358,6 +360,35 @@ class PatchInstallTests(unittest.TestCase):
             self.assertEqual(result.installed_skills, [])
             self.assertEqual(skill.read_text(encoding="utf-8"), "stale skill content")
 
+    def test_install_refresh_overwrites_existing_managed_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / ".opencode" / "skills" / "owasp-security-scan.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("stale skill content", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {"BALLAST_REFRESH_SKILLS": "1"}):
+                result = cli.install(
+                    root,
+                    "opencode",
+                    [],
+                    ["owasp-security-scan"],
+                    "python",
+                    False,
+                    False,
+                    False,
+                )
+
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            self.assertIn(
+                "## Scan Architecture",
+                skill.read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                "Created by [Ballast]",
+                skill.read_text(encoding="utf-8"),
+            )
+
     def test_install_adds_ballast_to_gitignore(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -498,6 +529,7 @@ class PatchInstallTests(unittest.TestCase):
             'description: "Run OWASP-aligned security scans across Go, TypeScript, and Python codebases.',
             content,
         )
+        self.assertIn("Created by [Ballast]", content)
         self.assertNotIn("description: >", content)
 
     def test_build_cursor_skill_format_supports_ballast_audit(self) -> None:
@@ -748,6 +780,30 @@ Keep team-specific usage notes.
             self.assertIn("Team intro preserved by patch.", skill_md)
             self.assertIn("Team Custom Section", skill_md)
             self.assertIn("## Scan Architecture", skill_md)
+
+    def test_install_patch_overwrites_unreadable_claude_skill_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill_path = root / ".claude" / "skills" / "owasp-security-scan.skill"
+            skill_path.parent.mkdir(parents=True, exist_ok=True)
+            skill_path.write_bytes(b"not-a-zip-archive")
+
+            result = cli.install(
+                root,
+                "claude",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                True,
+                False,
+            )
+
+            self.assertEqual(result.errors, [])
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            skill_md = cli.read_claude_skill_content(skill_path)
+            self.assertIn("## Scan Architecture", skill_md)
+            self.assertNotIn("not-a-zip-archive", skill_md)
 
     def test_install_force_overwrites_existing_claude_skill_archive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

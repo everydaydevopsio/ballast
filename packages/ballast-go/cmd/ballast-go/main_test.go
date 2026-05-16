@@ -129,6 +129,7 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 				"typescript": {"apps/web"},
 				"ansible":    {"infra/ansible"},
 			},
+			TaskSystem: "jira",
 		},
 		[]installedCLIStatus{
 			{Name: "ballast-typescript", Version: "5.0.2", Path: "/tmp/ballast-typescript"},
@@ -151,6 +152,9 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 	if !strings.Contains(output, "- paths: typescript=apps/web; ansible=infra/ansible") {
 		t.Fatalf("expected paths in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "- taskSystem: jira") {
+		t.Fatalf("expected task system in doctor output, got %q", output)
 	}
 }
 
@@ -641,6 +645,9 @@ func TestBuildCursorSkillFormatIncludesOnDemandFrontmatter(t *testing.T) {
 	if strings.Contains(content, "description: >") {
 		t.Fatalf("expected folded YAML description to be resolved: %s", content)
 	}
+	if !strings.Contains(content, "Created by [Ballast]") {
+		t.Fatalf("expected managed skill marker: %s", content)
+	}
 	if strings.Contains(content, "description: Run OWASP-aligned security scans across Go, TypeScript, and Python codebases.") {
 		t.Fatalf("expected description to remain quoted: %s", content)
 	}
@@ -1116,7 +1123,7 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 	}
 }
 
-func TestInstallSkipsExistingSkillWithoutForceOrPatch(t *testing.T) {
+func TestInstallSkipsExistingOpencodeSkillWithoutForceOrPatch(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillPath := filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")
 	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
@@ -1141,8 +1148,9 @@ func TestInstallSkipsExistingSkillWithoutForceOrPatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read existing skill: %v", err)
 	}
-	if string(content) != "stale skill content" {
-		t.Fatalf("expected existing skill content to remain, got %q", string(content))
+	text := string(content)
+	if text != "stale skill content" {
+		t.Fatalf("expected stale skill content to remain unchanged, got %q", text)
 	}
 }
 
@@ -1167,6 +1175,9 @@ func TestInstallPatchCreatesMissingSkill(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "## Scan Architecture") {
 		t.Fatalf("expected canonical skill content, got %q", string(content))
+	}
+	if !strings.Contains(string(content), "Created by [Ballast]") {
+		t.Fatalf("expected managed skill marker, got %q", string(content))
 	}
 }
 
@@ -1260,6 +1271,77 @@ func TestInstallPatchMergesClaudeSkillArchive(t *testing.T) {
 	}
 	if !strings.Contains(skillMd, "## Scan Architecture") {
 		t.Fatalf("expected canonical skill content to be merged: %s", skillMd)
+	}
+}
+
+func TestInstallPatchOverwritesUnreadableClaudeSkillArchive(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(skillPath, []byte("not-a-zip-archive"), 0o644); err != nil {
+		t.Fatalf("seed unreadable skill archive: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		patch:       true,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected patched skill install, got %+v", result.installedSkills)
+	}
+	skillMd, err := readClaudeSkillContent(skillPath)
+	if err != nil {
+		t.Fatalf("read overwritten skill archive: %v", err)
+	}
+	if strings.Contains(skillMd, "not-a-zip-archive") {
+		t.Fatalf("expected unreadable archive to be replaced with canonical content: %s", skillMd)
+	}
+	if !strings.Contains(skillMd, "## Scan Architecture") {
+		t.Fatalf("expected canonical skill content after overwrite fallback: %s", skillMd)
+	}
+}
+
+func TestInstallRefreshOverwritesExistingCodexSkill(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, ".codex", "rules", "owasp-security-scan.md")
+	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(skillPath, []byte("stale skill content\n"), 0o644); err != nil {
+		t.Fatalf("seed stale skill: %v", err)
+	}
+
+	t.Setenv("BALLAST_REFRESH_SKILLS", "1")
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		patch:       false,
+		saveConfig:  false,
+	})
+	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
+		t.Fatalf("expected refreshed skill install, got %+v", result.installedSkills)
+	}
+	content, err := os.ReadFile(skillPath)
+	if err != nil {
+		t.Fatalf("read refreshed skill: %v", err)
+	}
+	text := string(content)
+	if strings.Contains(text, "stale skill content") {
+		t.Fatalf("expected stale skill content to be replaced: %s", text)
+	}
+	if !strings.Contains(text, "# OWASP Security Scan Skill") {
+		t.Fatalf("expected canonical skill content after refresh: %s", text)
 	}
 }
 
@@ -1614,7 +1696,7 @@ func TestNormalizeTargetsDetailedReturnsInvalidTokens(t *testing.T) {
 
 func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"]}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"],"taskSystem":"jira"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1624,6 +1706,9 @@ func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	}
 	if !slices.Equal(cfg.Targets, []string{"cursor"}) {
 		t.Fatalf("expected legacy target to normalize into targets, got %#v", cfg.Targets)
+	}
+	if cfg.TaskSystem != "jira" {
+		t.Fatalf("expected taskSystem to be loaded from config, got %#v", cfg)
 	}
 }
 
