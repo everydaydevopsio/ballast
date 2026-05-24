@@ -289,6 +289,7 @@ jobs:
             needs_typescript: true
           - name: repository-facts-populated-e2e
             script: ./scripts/e2e-repository-facts-populated.sh
+            needs_typescript: true
 
     steps:
       - name: Checkout ballast repo
