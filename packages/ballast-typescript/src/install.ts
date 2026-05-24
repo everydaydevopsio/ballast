@@ -398,39 +398,106 @@ function readStoredZipEntry(
   archive: Buffer,
   entryName: string
 ): string | undefined {
-  let offset = 0;
-  while (offset + 30 <= archive.length) {
-    const signature = archive.readUInt32LE(offset);
-    if (signature !== 0x04034b50) {
-      break;
+  const eocdSignature = 0x06054b50;
+  const centralDirectorySignature = 0x02014b50;
+  const localFileHeaderSignature = 0x04034b50;
+  const minEocdSize = 22;
+  const maxCommentLength = 0xffff;
+  const searchStart = Math.max(
+    0,
+    archive.length - minEocdSize - maxCommentLength
+  );
+
+  eocdLoop: for (
+    let eocdOffset = archive.length - minEocdSize;
+    eocdOffset >= searchStart;
+    eocdOffset--
+  ) {
+    if (archive.readUInt32LE(eocdOffset) !== eocdSignature) {
+      continue;
     }
-    const compressionMethod = archive.readUInt16LE(offset + 8);
-    const compressedSize = archive.readUInt32LE(offset + 18);
-    const fileNameLength = archive.readUInt16LE(offset + 26);
-    const extraLength = archive.readUInt16LE(offset + 28);
-    const fileName = archive.toString(
-      'utf8',
-      offset + 30,
-      offset + 30 + fileNameLength
-    );
-    const dataStart = offset + 30 + fileNameLength + extraLength;
-    const dataEnd = dataStart + compressedSize;
-    if (dataEnd > archive.length) {
-      break;
+
+    const centralDirectorySize = archive.readUInt32LE(eocdOffset + 12);
+    const centralDirectoryOffset = archive.readUInt32LE(eocdOffset + 16);
+    const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
+    if (
+      centralDirectoryOffset < 0 ||
+      centralDirectoryEnd > archive.length ||
+      centralDirectoryOffset > centralDirectoryEnd
+    ) {
+      continue;
     }
-    if (fileName === entryName) {
-      const data = archive.subarray(dataStart, dataEnd);
-      if (compressionMethod === 0) {
-        return data.toString('utf8');
+
+    let entryOffset = centralDirectoryOffset;
+    while (entryOffset + 46 <= centralDirectoryEnd) {
+      if (archive.readUInt32LE(entryOffset) !== centralDirectorySignature) {
+        break;
       }
-      if (compressionMethod === 8) {
-        return zlib.inflateRawSync(data).toString('utf8');
+
+      const compressionMethod = archive.readUInt16LE(entryOffset + 10);
+      const compressedSize = archive.readUInt32LE(entryOffset + 20);
+      const fileNameLength = archive.readUInt16LE(entryOffset + 28);
+      const extraLength = archive.readUInt16LE(entryOffset + 30);
+      const commentLength = archive.readUInt16LE(entryOffset + 32);
+      const localHeaderOffset = archive.readUInt32LE(entryOffset + 42);
+      const fileNameStart = entryOffset + 46;
+      const fileNameEnd = fileNameStart + fileNameLength;
+      if (fileNameEnd > centralDirectoryEnd) {
+        continue eocdLoop;
       }
-      return undefined;
+      const fileName = archive.toString('utf8', fileNameStart, fileNameEnd);
+      if (fileName === entryName) {
+        if (localHeaderOffset + 30 > archive.length) {
+          continue eocdLoop;
+        }
+        if (
+          archive.readUInt32LE(localHeaderOffset) !== localFileHeaderSignature
+        ) {
+          continue eocdLoop;
+        }
+        const localFileNameLength = archive.readUInt16LE(
+          localHeaderOffset + 26
+        );
+        const localExtraLength = archive.readUInt16LE(localHeaderOffset + 28);
+        const dataStart =
+          localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+        const dataEnd = dataStart + compressedSize;
+        if (dataEnd > archive.length) {
+          continue eocdLoop;
+        }
+        const data = archive.subarray(dataStart, dataEnd);
+        if (compressionMethod === 0) {
+          return data.toString('utf8');
+        }
+        if (compressionMethod === 8) {
+          return zlib.inflateRawSync(data).toString('utf8');
+        }
+        return undefined;
+      }
+
+      entryOffset = fileNameEnd + extraLength + commentLength;
     }
-    offset = dataEnd;
   }
+
   return undefined;
+}
+
+function patchClaudeSkillContent(
+  archivePath: string,
+  canonicalSkillContent: string,
+  target: Target
+): string {
+  try {
+    const archive = fs.readFileSync(archivePath);
+    return patchRuleContent(
+      readStoredZipEntry(archive, 'SKILL.md') ?? '',
+      canonicalSkillContent,
+      target
+    );
+  } catch {
+    // Fall back to a clean overwrite when an existing archive is unreadable.
+    return canonicalSkillContent;
+  }
 }
 
 function getSupportFilePath(
@@ -551,6 +618,9 @@ export function install(options: InstallOptions): InstallResult {
   const processedAgentIds = new Set<string>();
   const processedSkillIds = new Set<string>();
   const disableSupportFiles = process.env.BALLAST_DISABLE_SUPPORT_FILES === '1';
+  const refreshManagedSkills = process.env.BALLAST_REFRESH_SKILLS === '1';
+  const refreshTaskRulesFromEnv =
+    process.env.BALLAST_REFRESH_TASK_RULES === '1';
 
   try {
     ensureGitignoreEntry(projectRoot, '.ballast/');
@@ -565,6 +635,11 @@ export function install(options: InstallOptions): InstallResult {
   const existingConfig = loadConfig(projectRoot, language);
   const resolvedTaskSystem =
     taskSystem ?? existingConfig?.taskSystem ?? DEFAULT_TASK_SYSTEM;
+  const refreshTaskRules =
+    refreshTaskRulesFromEnv ||
+    (effectiveAgents.includes('tasks') &&
+      taskSystem !== undefined &&
+      taskSystem !== (existingConfig?.taskSystem ?? DEFAULT_TASK_SYSTEM));
 
   if (persist) {
     saveConfig(
@@ -627,7 +702,12 @@ export function install(options: InstallOptions): InstallResult {
                 : undefined
           }
         );
-        if (fileExists && !force && !patch) {
+        if (
+          fileExists &&
+          !force &&
+          !patch &&
+          !(refreshTaskRules && agentId === 'tasks')
+        ) {
           agentSkipped = true;
           agentProcessed = true;
           continue;
@@ -663,7 +743,7 @@ export function install(options: InstallOptions): InstallResult {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      if (fileExists && !force && !patch) {
+      if (fileExists && !force && !patch && !refreshManagedSkills) {
         continue;
       }
       switch (target) {
@@ -680,11 +760,7 @@ export function install(options: InstallOptions): InstallResult {
           const skillContent = getSkillContent(skillId);
           const nextSkillContent =
             fileExists && !force && patch
-              ? patchRuleContent(
-                  readStoredZipEntry(fs.readFileSync(file), 'SKILL.md') ?? '',
-                  skillContent,
-                  target
-                )
+              ? patchClaudeSkillContent(file, skillContent, target)
               : skillContent;
           fs.writeFileSync(file, buildClaudeSkill(skillId, nextSkillContent));
           const skillSettings = getSkillClaudeSettings(skillId);

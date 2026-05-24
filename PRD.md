@@ -44,6 +44,7 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 6. Creating a missing support file with `--force` must continue without prompting.
 7. Support-file patch behavior and existing agent-rule overwrite semantics must remain unchanged.
 8. README and installation documentation must describe the updated `--patch` and `--force` behavior.
+9. If an existing Claude `.skill` archive is unreadable during `--patch`, install must recover by overwriting it with canonical packaged skill content instead of failing the run.
 
 ### Acceptance Criteria
 
@@ -56,6 +57,7 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 7. Given an existing support file and non-interactive `--force`, install exits with an error and does not overwrite the file.
 8. Automated tests cover the skill-file decision matrix and support-file confirmation behavior in the TypeScript, Python, and Go backends.
 9. README and `docs/installation.md` describe when to use `--patch` versus `--force`, including the support-file confirmation behavior.
+10. Given an existing unreadable Claude `.skill` archive and `force=false, patch=true`, install replaces it with canonical content and completes without an install error.
 
 ## Ballast Upgrade Skill Refresh
 
@@ -65,19 +67,42 @@ Ballast-installed skill files are generated managed artifacts, but the current r
 
 ### Requirements
 
-1. Normal install refreshes must rewrite selected managed skill files when they already exist.
-2. `ballast upgrade` and `doctor --fix` must refresh saved skill selections through their existing `install --refresh-config` path without requiring `--force`.
-3. Existing agent rule overwrite, patch, and force semantics must remain unchanged.
-4. The behavior must stay consistent across the TypeScript, Python, Go, and wrapper CLIs.
-5. Support files such as `AGENTS.md` and `CLAUDE.md` must continue reflecting the saved skill list after refresh.
+1. Config-refresh flows (`install --refresh-config`, `upgrade`, and `doctor --fix`) must rewrite selected managed skill files when they already exist.
+2. Ordinary backend install behavior outside those refresh flows must keep the existing skill decision matrix: skip on existing files unless `--patch` or `--force` is selected.
+3. `ballast upgrade` and `doctor --fix` must refresh saved skill selections through their existing `install --refresh-config` path without requiring `--force`.
+4. Existing agent rule overwrite, patch, and force semantics must remain unchanged.
+5. The behavior must stay consistent across the TypeScript, Python, Go, and wrapper CLIs.
+6. Support files such as `AGENTS.md` and `CLAUDE.md` must continue reflecting the saved skill list after refresh.
 
 ### Acceptance Criteria
 
-1. Given an existing installed skill file with stale content, running backend install with the same skill and `force=false` rewrites the file to current packaged skill content.
-2. Given an existing installed agent rule and `force=false`, backend install still skips the rule unless patch mode or force mode is selected.
-3. Given a repository with `.rulesrc.json` that declares a skill, running wrapper `upgrade` without `--force` invokes the refresh path that updates the existing managed skill file.
-4. Automated unit coverage demonstrates the backend skill refresh behavior for TypeScript, Python, and Go.
-5. Smoke coverage demonstrates the wrapper upgrade path refreshes stale managed skill content.
+1. Given an existing installed skill file with stale content, running backend install with the same skill and `force=false, patch=false` leaves the file unchanged outside config-refresh flows.
+2. Given an existing installed skill file with stale content and refresh mode enabled through the wrapper config-refresh path, backend install rewrites the file to current packaged skill content without `--force`.
+3. Given an existing installed agent rule and `force=false`, backend install still skips the rule unless patch mode or force mode is selected.
+4. Given a repository with `.rulesrc.json` that declares a skill, running wrapper `upgrade` without `--force` invokes the refresh path that updates the existing managed skill file.
+5. Automated unit coverage demonstrates the backend skill refresh behavior for TypeScript, Python, and Go.
+6. Smoke coverage demonstrates the wrapper upgrade path refreshes stale managed skill content.
+
+## Existing Install Refresh Reconciliation
+
+### Problem
+
+Ballast refreshes saved installs from `.rulesrc.json`, but removing managed agents or skills from saved config can leave stale managed files on disk for targets that remain installed. Operators need refresh behavior that reconciles the managed surface to the current saved config instead of only adding newly selected content.
+
+### Requirements
+
+1. Wrapper `install --refresh-config`, `upgrade`, and `doctor --fix` must remove stale managed agent-rule files for agents no longer present in saved `.rulesrc.json` while preserving remaining configured agents.
+2. Wrapper `install --refresh-config`, `upgrade`, and `doctor --fix` must remove stale managed skill files for skills no longer present in saved `.rulesrc.json` while preserving remaining configured skills.
+3. Reconciliation must apply only to Ballast-managed files for targets that remain installed; it must not remove unrelated user files.
+4. Support-file managed sections such as `AGENTS.md` and `CLAUDE.md` must be refreshed so removed agents and skills are no longer referenced.
+5. Target removal behavior must remain unchanged and continue deleting the full Ballast-managed surface for removed targets.
+
+### Acceptance Criteria
+
+1. Given an existing install with configured agents `linting, docs`, editing `.rulesrc.json` to keep only `linting` and running wrapper `install --refresh-config` deletes the managed `docs` rule files while leaving `linting` files intact.
+2. Given an existing install with configured skills `owasp-security-scan, github-health-check`, editing `.rulesrc.json` to keep only `owasp-security-scan` and running wrapper `install --refresh-config` deletes the managed `github-health-check` files while leaving `owasp-security-scan` intact.
+3. After either reconciliation flow, support files no longer list removed agent or skill references.
+4. Refresh does not delete unmanaged user-authored files outside the Ballast-managed paths for the retained targets.
 
 ## Ballast Doctor Config Visibility
 
@@ -89,15 +114,17 @@ Operators use `ballast doctor` to inspect the effective Ballast state for a repo
 
 1. `ballast doctor` must display configured `languages` when `.rulesrc.json` contains them.
 2. `ballast doctor` must display configured `paths` when `.rulesrc.json` contains them.
-3. The change must apply consistently across the TypeScript, Python, Go, and wrapper CLIs.
-4. Existing `doctor` output for targets, agents, skills, installed CLIs, and recommendations must remain intact.
+3. `ballast doctor` must display configured `taskSystem` when `.rulesrc.json` contains it.
+4. The change must apply consistently across the TypeScript, Python, Go, and wrapper CLIs.
+5. Existing `doctor` output for targets, agents, skills, installed CLIs, and recommendations must remain intact.
 
 ### Acceptance Criteria
 
 1. Given a `.rulesrc.json` with `languages`, `ballast doctor` prints a `- languages: ...` line in the `Config:` section.
 2. Given a `.rulesrc.json` with `paths`, `ballast doctor` prints a `- paths: ...` line in the `Config:` section.
-3. Given a `.rulesrc.json` without `languages` or `paths`, `ballast doctor` does not print empty placeholder lines for those fields.
-4. Automated tests cover the new output in each CLI implementation that renders `doctor` output.
+3. Given a `.rulesrc.json` with `taskSystem`, `ballast doctor` prints a `- taskSystem: ...` line in the `Config:` section.
+4. Given a `.rulesrc.json` without `languages`, `paths`, or `taskSystem`, `ballast doctor` does not print empty placeholder lines for those fields.
+5. Automated tests cover the new output in each CLI implementation that renders `doctor` output.
 
 ## JavaScript Detection Warning
 

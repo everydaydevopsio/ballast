@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -266,3 +266,129 @@ jobs:
 
       - name: Run wrapper monorepo smoke test
         run: ./scripts/smoke-wrapper-monorepo.sh "$GITHUB_WORKSPACE/.ci/ballast-examples"
+
+  e2e:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: upgrade-refresh-skills-e2e
+            script: ./scripts/e2e-upgrade-refresh-skills.sh
+          - name: upgrade-patch-unreadable-claude-skill-e2e
+            script: ./scripts/e2e-upgrade-patch-unreadable-claude-skill.sh
+          - name: remove-target-existing-install-e2e
+            script: ./scripts/e2e-remove-target-existing-install.sh
+          - name: refresh-after-target-removal-e2e
+            script: ./scripts/e2e-refresh-after-target-removal.sh
+          - name: add-skill-existing-install-e2e
+            script: ./scripts/e2e-add-skill-existing-install.sh
+          - name: change-task-system-e2e
+            script: ./scripts/e2e-change-task-system.sh
+            needs_typescript: true
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: packages/ballast-go/go.mod
+
+      - name: Setup pnpm
+        if: matrix.needs_typescript
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        if: matrix.needs_typescript
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        if: matrix.needs_typescript
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ballast wrapper and Go backend
+        run: make build-go build-cli
+
+      - name: Build ballast-typescript
+        if: matrix.needs_typescript
+        run: pnpm run build
+
+      - name: Run e2e script
+        run: SKIP_BUILD=1 "${{ matrix.script }}" "$GITHUB_WORKSPACE"
+
+  e2e-dispatch:
+    if: github.event_name == 'workflow_dispatch'
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: add-target-existing-install-e2e
+            script: ./scripts/e2e-add-target-existing-install.sh
+          - name: add-agent-existing-install-e2e
+            script: ./scripts/e2e-add-agent-existing-install.sh
+          - name: add-task-system-e2e
+            script: ./scripts/e2e-add-task-system.sh
+            needs_typescript: true
+          - name: doctor-after-lifecycle-change-e2e
+            script: ./scripts/e2e-doctor-after-lifecycle-change.sh
+            needs_typescript: true
+          - name: remove-skill-existing-install-e2e
+            script: ./scripts/e2e-remove-skill-existing-install.sh
+          - name: remove-agent-existing-install-e2e
+            script: ./scripts/e2e-remove-agent-existing-install.sh
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: packages/ballast-go/go.mod
+
+      - name: Setup pnpm
+        if: matrix.needs_typescript
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        if: matrix.needs_typescript
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        if: matrix.needs_typescript
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ballast wrapper and Go backend
+        run: make build-go build-cli
+
+      - name: Build ballast-typescript
+        if: matrix.needs_typescript
+        run: pnpm run build
+
+      - name: Run e2e script
+        run: SKIP_BUILD=1 "${{ matrix.script }}" "$GITHUB_WORKSPACE"

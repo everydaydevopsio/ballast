@@ -1,9 +1,12 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -129,6 +132,8 @@ var runCommandOutputFunc = runCommandOutput
 var resolveInstalledVersionFunc = resolveInstalledVersion
 var collectDoctorBackendsFunc = collectDoctorBackends
 
+var supportedTaskSystems = []string{"github", "jira", "linear"}
+
 type monorepoConfig struct {
 	Target         string              `json:"target,omitempty"`
 	Targets        []string            `json:"targets,omitempty"`
@@ -216,6 +221,7 @@ func run(args []string) int {
 	}
 
 	root := findProjectRoot("")
+	refreshConfigRequested := len(forwardedArgs) > 0 && forwardedArgs[0] == "install" && hasFlag(forwardedArgs, "--refresh-config", "")
 	normalizedArgs, err := normalizeInstallArgs(forwardedArgs, root)
 	if err != nil {
 		fmt.Println(err)
@@ -236,6 +242,11 @@ func run(args []string) int {
 					fmt.Printf("Unsupported language: %s\n", invocation.Language)
 					return 1
 				}
+				if refreshConfigRequested {
+					invocation.Env = cloneEnvMap(invocation.Env)
+					invocation.Env["BALLAST_REFRESH_SKILLS"] = "1"
+					invocation.Env["BALLAST_REFRESH_TASK_RULES"] = "1"
+				}
 				resolved := resolveBackendCommand(invocation.Language, tool, invocation.Args, invocation.Env)
 				if !resolved.UseLocal {
 					if err := ensureInstalledFunc(tool); err != nil {
@@ -254,6 +265,10 @@ func run(args []string) int {
 				}
 			}
 			if err := cleanupRemovedMonorepoTargets(root, plan); err != nil {
+				fmt.Println(err)
+				return 1
+			}
+			if err := cleanupStaleManagedSelections(root, plan); err != nil {
 				fmt.Println(err)
 				return 1
 			}
@@ -289,19 +304,32 @@ func run(args []string) int {
 		return 1
 	}
 
-	resolved := resolveBackendCommand(selectedLanguage, tool, forwardedArgs, nil)
+	singleEnv := map[string]string(nil)
+	if refreshConfigRequested {
+		singleEnv = map[string]string{
+			"BALLAST_REFRESH_SKILLS":     "1",
+			"BALLAST_REFRESH_TASK_RULES": "1",
+		}
+	}
+	resolved := resolveBackendCommand(selectedLanguage, tool, forwardedArgs, singleEnv)
 	if !resolved.UseLocal {
 		if err := ensureInstalledFunc(tool); err != nil {
 			fmt.Println(err)
 			return 1
 		}
-		resolved = resolveBackendCommand(selectedLanguage, tool, forwardedArgs, nil)
+		resolved = resolveBackendCommand(selectedLanguage, tool, forwardedArgs, singleEnv)
 	}
 
 	exitCode, err := execToolFunc(resolved.Binary, resolved.Args, "", resolved.Env)
 	if err != nil {
 		fmt.Println(err)
 		return 1
+	}
+	if exitCode == 0 && refreshConfigRequested {
+		if err := cleanupSingleLanguageManagedSelections(root, selectedLanguage); err != nil {
+			fmt.Println(err)
+			return 1
+		}
 	}
 	return exitCode
 }
@@ -759,6 +787,9 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	if formattedPaths := formatDoctorConfigPaths(config.Languages, config.Paths); formattedPaths != "" {
 		fmt.Printf("- paths: %s\n", formattedPaths)
+	}
+	if strings.TrimSpace(config.TaskSystem) != "" {
+		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
 	}
 	fmt.Println()
 }
@@ -1501,6 +1532,11 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, nil
 	}
 
+	requestedTaskSystem, err := parseTaskSystemFlag(args)
+	if err != nil {
+		return nil, err
+	}
+
 	config, err := loadMonorepoConfig(root)
 	if err != nil {
 		return nil, err
@@ -1613,6 +1649,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if config != nil {
 		savedTaskSystem = config.TaskSystem
 	}
+	if requestedTaskSystem != "" {
+		savedTaskSystem = requestedTaskSystem
+	}
 	configToSave := monorepoConfig{
 		Targets:        savedTargets,
 		Agents:         persistAgents,
@@ -1641,20 +1680,26 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	commonSelection := filterAgents(selectedAgents, commonAgentIDs())
 	languageSelection := filterAgents(selectedAgents, languageAgentIDs())
 	baseArgs := withTargetSelection(stripMonorepoFlags(args), requestedTargets)
-
 	plan := make([]backendInvocation, 0, len(profiles)+1)
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
+	if requestedTaskSystem != "" && slices.Contains(configToSave.Agents, "tasks") {
+		commonArgs = append(commonArgs, "--task-system", requestedTaskSystem)
+	}
 	if len(commonSelection) > 0 || len(selectedSkills) > 0 {
 		commonLanguage := profiles[0].Language
 		if hasLanguage(profiles, langTypeScript) {
 			commonLanguage = langTypeScript
 		}
 		tool := toolsByLanguage[commonLanguage]
+		env := monorepoInvocationEnv("common")
+		if requestedTaskSystem != "" && slices.Contains(commonSelection, "tasks") {
+			env["BALLAST_REFRESH_TASK_RULES"] = "1"
+		}
 		plan = append(plan, backendInvocation{
 			Language: commonLanguage,
 			Binary:   tool.binary,
 			Dir:      root,
-			Env:      monorepoInvocationEnv("common"),
+			Env:      env,
 			Args:     commonArgs,
 		})
 	}
@@ -1683,8 +1728,8 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		Invocations: plan,
 		Config:      configToSave,
 		Targets:     requestedTargets,
-		Common:      commonSelection,
-		Language:    languageSelection,
+		Common:      filterAgents(configToSave.Agents, commonAgentIDs()),
+		Language:    filterAgents(configToSave.Agents, languageAgentIDs()),
 		Removed:     removeTargets,
 		Previous:    config,
 	}, nil
@@ -1711,6 +1756,28 @@ func loadMonorepoConfig(root string) (*monorepoConfig, error) {
 		return nil, nil
 	}
 	return &config, nil
+}
+
+func cleanupSingleLanguageManagedSelections(root string, selectedLanguage language) error {
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		return nil
+	}
+	if len(config.Targets) == 0 {
+		return nil
+	}
+	if len(config.Languages) == 0 && selectedLanguage != "" {
+		config.Languages = []string{string(selectedLanguage)}
+	}
+	for _, target := range config.Targets {
+		if err := removeStaleManagedFiles(root, target, nil, config); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // readTaskSystem reads only the taskSystem field from .rulesrc.json.
@@ -1924,6 +1991,41 @@ func splitAgentValues(raw string) []string {
 	return agents
 }
 
+func parseTaskSystemFlag(args []string) (string, error) {
+	raw := ""
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "--task-system=") {
+			raw = strings.TrimSpace(strings.TrimPrefix(arg, "--task-system="))
+			continue
+		}
+		if arg != "--task-system" {
+			continue
+		}
+		if i+1 >= len(args) {
+			return "", errors.New("missing value for --task-system")
+		}
+		candidate := strings.TrimSpace(args[i+1])
+		if candidate == "" || strings.HasPrefix(candidate, "-") {
+			return "", errors.New("missing value for --task-system")
+		}
+		raw = candidate
+		i++
+	}
+	if raw == "" {
+		return "", nil
+	}
+	normalized := strings.ToLower(raw)
+	if slices.Contains(supportedTaskSystems, normalized) {
+		return normalized, nil
+	}
+	return "", fmt.Errorf(
+		"invalid --task-system: %s (valid: %s)",
+		raw,
+		strings.Join(supportedTaskSystems, ", "),
+	)
+}
+
 func findFlagValue(args []string, longFlag string, shortFlag string) string {
 	values := findFlagValues(args, longFlag, shortFlag)
 	if len(values) == 0 {
@@ -1962,10 +2064,17 @@ func stripMonorepoFlags(args []string) []string {
 			i++
 			continue
 		}
+		if arg == "--task-system" {
+			i++
+			continue
+		}
 		if strings.HasPrefix(arg, "--language=") {
 			continue
 		}
 		if strings.HasPrefix(arg, "--remove-target=") {
+			continue
+		}
+		if strings.HasPrefix(arg, "--task-system=") {
 			continue
 		}
 		filtered = append(filtered, arg)
@@ -2081,6 +2190,24 @@ func subtractStrings(values []string, remove []string) []string {
 	return uniqueStrings(filtered)
 }
 
+func stringDifference(values []string, remove []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	removeSet := map[string]struct{}{}
+	for _, value := range remove {
+		removeSet[value] = struct{}{}
+	}
+	filtered := make([]string, 0, len(values))
+	for _, value := range uniqueStrings(values) {
+		if _, ok := removeSet[value]; ok {
+			continue
+		}
+		filtered = append(filtered, value)
+	}
+	return filtered
+}
+
 func hasLanguage(profiles []repoProfile, target language) bool {
 	for _, profile := range profiles {
 		if profile.Language == target {
@@ -2132,6 +2259,8 @@ func envPairs(env map[string]string) []string {
 }
 
 func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) error {
+	allowReplaceUnmanaged := hasPatchFlag(args)
+	interactive := isInteractiveInstall(args)
 	for _, target := range plan.Targets {
 		if target != "claude" && target != "codex" && target != "gemini" {
 			continue
@@ -2144,22 +2273,18 @@ func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) 
 			}
 			continue
 		}
-		if hasPatchFlag(args) {
-			if err := os.WriteFile(path, []byte(patchManagedSupportSections(readFile(path), content)), 0o644); err != nil {
-				return err
-			}
-			continue
-		}
-		if isInteractiveInstall(args) {
-			approved, err := promptSupportFilePatch(path)
+		existing := readFile(path)
+		allowUnmanaged := allowReplaceUnmanaged
+		if !allowUnmanaged && interactive && supportFileHasUnmanagedManagedSections(existing) {
+			confirmed, err := promptSupportFilePatch(path)
 			if err != nil {
 				return err
 			}
-			if approved {
-				if err := os.WriteFile(path, []byte(patchManagedSupportSections(readFile(path), content)), 0o644); err != nil {
-					return err
-				}
-			}
+			allowUnmanaged = confirmed
+		}
+		merged := mergeManagedSupportSections(existing, content, allowUnmanaged)
+		if err := os.WriteFile(path, []byte(merged), 0o644); err != nil {
+			return err
 		}
 		if target == "gemini" {
 			agentsPath := supportFilePath(root, "codex")
@@ -2191,6 +2316,74 @@ func cleanupRemovedMonorepoTargets(root string, plan *monorepoPlan) error {
 		}
 	}
 	return nil
+}
+
+func cleanupStaleManagedSelections(root string, plan *monorepoPlan) error {
+	if plan == nil {
+		return nil
+	}
+	for _, target := range plan.Targets {
+		if err := removeStaleManagedFiles(root, target, plan.Previous, &plan.Config); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeStaleManagedFiles(root string, target string, previous *monorepoConfig, next *monorepoConfig) error {
+	if next == nil {
+		return nil
+	}
+	trackedPaths := ballastManagedPathsFromSupportFile(root, target)
+	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePaths(root, target, next)) {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] {
+			continue
+		}
+		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
+	}
+	for _, file := range stringDifference(allManagedSkillPaths(root, target), managedSkillPaths(root, target, next.Skills)) {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !allowConfigBackedStaleSkillRemoval(root, target, file, previous) {
+			continue
+		}
+		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
+	}
+	return nil
+}
+
+func allowConfigBackedStaleSkillRemoval(root string, target string, path string, previous *monorepoConfig) bool {
+	if target != "cursor" && target != "opencode" {
+		return false
+	}
+	if previous == nil {
+		return false
+	}
+	for _, previousPath := range managedSkillPaths(root, target, previous.Skills) {
+		if previousPath == path {
+			return true
+		}
+	}
+	return false
+}
+
+func allManagedRulePaths(root string, target string) []string {
+	languages := make([]string, 0, len(supportedLanguages))
+	for _, lang := range supportedLanguages {
+		languages = append(languages, string(lang))
+	}
+	return managedRulePaths(root, target, &monorepoConfig{
+		Agents:    supportedAgentIDs(),
+		Languages: languages,
+	})
+}
+
+func allManagedSkillPaths(root string, target string) []string {
+	return managedSkillPaths(root, target, supportedSkillIDs())
 }
 
 func removeManagedTargetFiles(root string, target string, config *monorepoConfig) error {
@@ -2507,6 +2700,8 @@ func patchInstalledRulesSection(existing string, canonical string) string {
 }
 
 const rootPlaceholder = "__BALLAST_ROOT__"
+const ballastManagedMarker = "Created by [Ballast]"
+const ballastManagedSectionNotice = "Created by Ballast. Do not edit this section."
 
 func patchManagedSupportSections(existing string, canonical string) string {
 	next := existing
@@ -2533,6 +2728,48 @@ func patchSupportSection(existing string, canonical string, heading string) stri
 		strings.TrimLeft(existing[existingRange[1]:], "\n")
 }
 
+func mergeManagedSupportSections(existing string, canonical string, allowUnmanaged bool) string {
+	next := existing
+	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
+		next = mergeSupportSection(next, canonical, heading, allowUnmanaged)
+	}
+	return next
+}
+
+func mergeSupportSection(existing string, canonical string, heading string, allowUnmanaged bool) string {
+	canonicalRange := findSectionRange(canonical, heading)
+	if canonicalRange == nil {
+		return existing
+	}
+	canonicalSection := strings.TrimRight(canonical[canonicalRange[0]:canonicalRange[1]], "\n")
+
+	existingRange := findSectionRange(existing, heading)
+	if existingRange == nil {
+		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
+	}
+	existingSection := existing[existingRange[0]:existingRange[1]]
+	if !allowUnmanaged && !strings.Contains(existingSection, ballastManagedSectionNotice) {
+		return existing
+	}
+
+	return strings.TrimRight(existing[:existingRange[0]], "\n") + "\n\n" +
+		canonicalSection + "\n\n" +
+		strings.TrimLeft(existing[existingRange[1]:], "\n")
+}
+
+func supportFileHasUnmanagedManagedSections(existing string) bool {
+	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
+		section := findSectionRange(existing, heading)
+		if section == nil {
+			continue
+		}
+		if !strings.Contains(existing[section[0]:section[1]], ballastManagedSectionNotice) {
+			return true
+		}
+	}
+	return false
+}
+
 func removeManagedSections(existing string) string {
 	next := existing
 	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
@@ -2543,6 +2780,75 @@ func removeManagedSections(existing string) string {
 		next = strings.TrimRight(next[:section[0]], "\n") + "\n\n" + strings.TrimLeft(next[section[1]:], "\n")
 	}
 	return strings.TrimRight(next, "\n") + "\n"
+}
+
+func ballastOwnsManagedFile(path string) bool {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	if strings.HasSuffix(path, ".skill") {
+		reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
+		if err != nil {
+			return false
+		}
+		for _, file := range reader.File {
+			if file.Name != "SKILL.md" {
+				continue
+			}
+			rc, err := file.Open()
+			if err != nil {
+				return false
+			}
+			data, readErr := io.ReadAll(rc)
+			_ = rc.Close()
+			if readErr != nil {
+				return false
+			}
+			return strings.Contains(string(data), ballastManagedMarker)
+		}
+		return false
+	}
+	return strings.Contains(string(content), ballastManagedMarker)
+}
+
+func ballastManagedPathsFromSupportFile(root string, target string) map[string]bool {
+	if target != "claude" && target != "codex" && target != "gemini" {
+		return nil
+	}
+	path := supportFilePath(root, target)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	tracked := map[string]bool{}
+	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
+		section := findSectionRange(string(content), heading)
+		if section == nil {
+			continue
+		}
+		sectionText := string(content[section[0]:section[1]])
+		if !strings.Contains(sectionText, ballastManagedSectionNotice) {
+			continue
+		}
+		for _, line := range strings.Split(sectionText, "\n") {
+			start := strings.Index(line, "`")
+			if start < 0 {
+				continue
+			}
+			rest := line[start+1:]
+			end := strings.Index(rest, "`")
+			if end < 0 {
+				continue
+			}
+			ref := strings.TrimSpace(rest[:end])
+			if ref == "" || filepath.IsAbs(ref) {
+				continue
+			}
+			tracked[filepath.Clean(filepath.Join(root, ref))] = true
+		}
+	}
+	return tracked
 }
 
 func findSectionRange(content string, heading string) []int {

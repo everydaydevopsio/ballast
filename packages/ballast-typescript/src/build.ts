@@ -16,6 +16,7 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
 const GIT_HOOKS_GUIDANCE_TOKEN = '{{BALLAST_GIT_HOOKS_GUIDANCE}}';
 const BALLAST_REPO_URL = 'https://github.com/everydaydevopsio/ballast';
+const BALLAST_MANAGED_COMMENT = `<!-- Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section. -->`;
 
 type HookMode = 'standalone' | 'monorepo';
 
@@ -469,12 +470,20 @@ export function buildCursorSkillFormat(skillId: string): string {
     'alwaysApply: false',
     '---',
     '',
+    BALLAST_MANAGED_COMMENT,
+    '',
     skill.body.trimEnd()
   ].join('\n');
 }
 
 export function buildSkillMarkdown(skillId: string): string {
-  return parseSkillMetadata(skillId).body.trimEnd() + '\n';
+  return (
+    [
+      BALLAST_MANAGED_COMMENT,
+      '',
+      parseSkillMetadata(skillId).body.trimEnd()
+    ].join('\n') + '\n'
+  );
 }
 
 export function buildClaudeSkill(
