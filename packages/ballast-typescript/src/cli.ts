@@ -17,6 +17,7 @@ export interface CliOptions {
   patch: boolean;
   yes: boolean;
   taskSystem: string;
+  repositoryFactsFile?: string;
 }
 
 export type ParseArgsResult =
@@ -117,6 +118,12 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       i++;
       continue;
     }
+    if (arg === '--repository-facts-file') {
+      const value = args[++i];
+      if (value) options.repositoryFactsFile = value.trim();
+      i++;
+      continue;
+    }
     if (arg === '--help' || arg === '-h') {
       return { help: true };
     }
@@ -151,6 +158,7 @@ Options:
   --force, -f               Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
+  --repository-facts-file   Optional path to wrapper-generated repository facts JSON
   --help, -h                Show this help
   --version, -v             Show version
 
@@ -236,7 +244,8 @@ export async function main(): Promise<void> {
     targets: cliOptions.targets,
     agents: cliOptions.agents.length > 0 ? cliOptions.agents : undefined,
     skills: cliOptions.skills.length > 0 ? cliOptions.skills : undefined,
-    taskSystem: cliOptions.taskSystem || undefined
+    taskSystem: cliOptions.taskSystem || undefined,
+    repositoryFactsFile: cliOptions.repositoryFactsFile
   };
 
   const exitCode = await runInstall(normalizedOptions);

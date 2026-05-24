@@ -167,3 +167,26 @@ Running `ballast install` from a directory that is its own git repository but do
 3. TypeScript, Python, and Go automated tests cover the git-boundary stop condition.
 4. Wrapper tests cover root resolution when a repo is anchored by `.rulesrc.json` and legacy Ballast config files.
 5. The examples smoke workflow runs an end-to-end git-boundary scenario that fails if install output is written to the parent directory.
+
+## Repository Facts Auto-Population
+
+### Problem
+
+Ballast scaffolds `AGENTS.md` and `CLAUDE.md` with a `Repository Facts` section, but currently leaves placeholder values. Agents then re-derive stable repository metadata repeatedly instead of using durable facts captured during install.
+
+### Requirements
+
+1. The `ballast` wrapper must discover repository facts once per invocation and pass them to backend installers through a temporary JSON file path provided in environment (`BALLAST_REPOSITORY_FACTS_FILE`) and optional backend CLI flag support (`--repository-facts-file`).
+2. TypeScript, Python, and Go backends must consume the wrapper-provided facts section when present and valid.
+3. On first-time support-file creation and on `--force` regeneration, generated `AGENTS.md`/`CLAUDE.md` content must include discovered values for detectable fields.
+4. Monorepo support-file generation in the wrapper must render the same discovered repository facts content.
+5. When a fact cannot be detected, the generated value must remain an explicit placeholder marker.
+6. Discovery and rendering must remain non-destructive and read-only outside writing Ballast-managed outputs.
+
+### Acceptance Criteria
+
+1. Given a repository with detectable git origin, default branch, and package-manager signals, running install produces `AGENTS.md` with detected values instead of `<OWNER/REPO>`, `<main>`, and package-manager placeholders.
+2. Given wrapper-driven monorepo install flows, generated support files include the same discovered facts.
+3. Given missing signals, generated support files retain placeholder markers for undetected fields.
+4. TypeScript, Python, and Go backends accept `--repository-facts-file` and honor `BALLAST_REPOSITORY_FACTS_FILE` when present.
+5. E2E coverage verifies populated repository facts in generated support files.

@@ -705,6 +705,8 @@ export function getSkillDescription(skillId: string): string {
 }
 
 function getRepositoryFactsSection(): string[] {
+  const fromEnv = loadRepositoryFactsSection();
+  if (fromEnv) return fromEnv;
   return [
     '## Repository Facts',
     '',
@@ -727,6 +729,23 @@ function getRepositoryFactsSection(): string[] {
     '',
     'Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.'
   ];
+}
+
+function loadRepositoryFactsSection(): string[] | null {
+  const path = process.env.BALLAST_REPOSITORY_FACTS_FILE?.trim();
+  if (!path) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path, 'utf8')) as {
+      repositoryFactsSection?: unknown;
+    };
+    if (!Array.isArray(parsed.repositoryFactsSection)) return null;
+    const lines = parsed.repositoryFactsSection.filter(
+      (line): line is string => typeof line === 'string'
+    );
+    return lines.length > 0 ? lines : null;
+  } catch {
+    return null;
+  }
 }
 
 export function buildCodexAgentsMd(

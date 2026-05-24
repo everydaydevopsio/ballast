@@ -1024,6 +1024,17 @@ def ballast_notice() -> str:
 
 
 def repository_facts_section() -> list[str]:
+    override_path = os.environ.get("BALLAST_REPOSITORY_FACTS_FILE", "").strip()
+    if override_path:
+        try:
+            payload = json.loads(Path(override_path).read_text(encoding="utf-8"))
+            lines = payload.get("repositoryFactsSection")
+            if isinstance(lines, list):
+                normalized = [line for line in lines if isinstance(line, str)]
+                if normalized:
+                    return normalized
+        except Exception:
+            pass
     return [
         "## Repository Facts",
         "",
@@ -1858,6 +1869,8 @@ def print_install_result(
 
 
 def run_install(args: argparse.Namespace) -> int:
+    if getattr(args, "repository_facts_file", None):
+        os.environ["BALLAST_REPOSITORY_FACTS_FILE"] = args.repository_facts_file
     language = (args.language or "python").strip().lower()
     if language not in LANGUAGES:
         print(f"Invalid --language. Use: {', '.join(LANGUAGES)}")
@@ -1998,6 +2011,10 @@ def parser() -> argparse.ArgumentParser:
         help="Merge upstream rule and skill updates into existing files",
     )
     install_cmd.add_argument("--yes", "-y", action="store_true")
+    install_cmd.add_argument(
+        "--repository-facts-file",
+        help="Optional path to wrapper-generated repository facts JSON",
+    )
     sub.add_parser(
         "doctor", help="Check local Ballast CLI versions and .rulesrc.json metadata"
     )
