@@ -2331,7 +2331,6 @@ func cleanupStaleManagedSelections(root string, plan *monorepoPlan) error {
 }
 
 func removeStaleManagedFiles(root string, target string, previous *monorepoConfig, next *monorepoConfig) error {
-	_ = previous
 	if next == nil {
 		return nil
 	}
@@ -2346,7 +2345,7 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
 	for _, file := range stringDifference(allManagedSkillPaths(root, target), managedSkillPaths(root, target, next.Skills)) {
-		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !allowConfigBackedStaleSkillRemoval(target, file) {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !allowConfigBackedStaleSkillRemoval(root, target, file, previous) {
 			continue
 		}
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -2357,8 +2356,19 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 	return nil
 }
 
-func allowConfigBackedStaleSkillRemoval(target string, path string) bool {
-	return target == "cursor" || target == "opencode"
+func allowConfigBackedStaleSkillRemoval(root string, target string, path string, previous *monorepoConfig) bool {
+	if target != "cursor" && target != "opencode" {
+		return false
+	}
+	if previous == nil {
+		return false
+	}
+	for _, previousPath := range managedSkillPaths(root, target, previous.Skills) {
+		if previousPath == path {
+			return true
+		}
+	}
+	return false
 }
 
 func allManagedRulePaths(root string, target string) []string {

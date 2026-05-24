@@ -3068,6 +3068,32 @@ func TestRemoveStaleManagedFilesDeletesConfigBackedOpencodeSkill(t *testing.T) {
 	}
 }
 
+func TestRemoveStaleManagedFilesPreservesUnmanagedOpencodeSkillNotInPreviousConfig(t *testing.T) {
+	root := t.TempDir()
+	skillPath := filepath.Join(root, ".opencode", "skills", "github-health-check.md")
+	mustWriteFile(t, skillPath, "user-authored skill at canonical path\n")
+
+	previous := &monorepoConfig{
+		Targets:   []string{"opencode"},
+		Agents:    []string{"local-dev"},
+		Skills:    []string{"owasp-security-scan"},
+		Languages: []string{"typescript"},
+	}
+	next := &monorepoConfig{
+		Targets:   []string{"opencode"},
+		Agents:    []string{"local-dev"},
+		Skills:    []string{"owasp-security-scan"},
+		Languages: []string{"typescript"},
+	}
+
+	if err := removeStaleManagedFiles(root, "opencode", previous, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles(opencode): %v", err)
+	}
+	if _, err := os.Stat(skillPath); err != nil {
+		t.Fatalf("expected unmanaged opencode skill to remain, got %v", err)
+	}
+}
+
 func TestRunMonorepoRemoveTargetCleansManagedRulesAndSupportFiles(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")

@@ -346,6 +346,7 @@ jobs:
             needs_typescript: true
           - name: doctor-after-lifecycle-change-e2e
             script: ./scripts/e2e-doctor-after-lifecycle-change.sh
+            needs_typescript: true
           - name: remove-skill-existing-install-e2e
             script: ./scripts/e2e-remove-skill-existing-install.sh
           - name: remove-agent-existing-install-e2e

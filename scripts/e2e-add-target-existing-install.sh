@@ -30,7 +30,7 @@ materialize_saved_install "${PROJECT}"
 
 (
   cd "${PROJECT}"
-  ballast install --target codex --agent linting --yes >/dev/null
+  ballast install --target codex --yes >/dev/null
 )
 
 assert_contains '"claude"' "${PROJECT}/.rulesrc.json"
