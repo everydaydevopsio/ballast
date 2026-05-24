@@ -313,7 +313,9 @@ def save_config(
                             and all(isinstance(item, str) for item in value)
                         ):
                             paths[key] = list(value)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
+            # Invalid/unreadable override payload should fall back to the
+            # built-in repository facts scaffold.
             pass
 
     if language not in languages:

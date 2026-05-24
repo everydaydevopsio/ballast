@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"slices"
@@ -1591,9 +1592,19 @@ func detectPackageManager(root string) string {
 		return "uv"
 	case fileExists(filepath.Join(root, "go.mod")):
 		return "go"
-	default:
+	}
+	metadata, ok := loadPackageJSONMetadata(root)
+	if !ok {
 		return ""
 	}
+	packageManager := strings.TrimSpace(metadata.PackageManager)
+	if packageManager == "" {
+		return ""
+	}
+	if index := strings.Index(packageManager, "@"); index > 0 {
+		return strings.TrimSpace(packageManager[:index])
+	}
+	return packageManager
 }
 
 func detectVersionFiles(root string) string {
@@ -1644,27 +1655,86 @@ func detectWorkflows(root string) (string, string) {
 }
 
 func detectPreferredCommands(root string) string {
-	makefile := filepath.Join(root, "Makefile")
-	if fileExists(makefile) {
-		return "make test, make lint, make build"
+	commands := []string{}
+	targets := parseMakeTargets(root)
+	for _, target := range []string{"test", "lint", "build"} {
+		if containsString(targets, target) {
+			commands = append(commands, "make "+target)
+		}
 	}
-	if fileExists(filepath.Join(root, "package.json")) {
-		return "npm/pnpm scripts: test, lint, build"
+	if metadata, ok := loadPackageJSONMetadata(root); ok {
+		for _, script := range []string{"test", "lint", "build", "format"} {
+			if _, exists := metadata.Scripts[script]; exists {
+				commands = append(commands, "package.json:"+script)
+			}
+		}
 	}
-	if fileExists(filepath.Join(root, "pyproject.toml")) {
-		return "uv run pytest, uv run ruff check"
-	}
-	if fileExists(filepath.Join(root, "go.mod")) {
-		return "go test ./..., gofmt -w"
+	return strings.Join(uniqueStrings(commands), ", ")
+}
+
+func detectCoverageThreshold(root string) string {
+	for _, candidate := range []string{
+		filepath.Join(root, "vitest.config.ts"),
+		filepath.Join(root, "vitest.config.js"),
+		filepath.Join(root, "jest.config.ts"),
+		filepath.Join(root, "jest.config.js"),
+	} {
+		content, err := os.ReadFile(candidate)
+		if err != nil {
+			continue
+		}
+		if threshold := parseCoverageThreshold(string(content)); threshold != "" {
+			return threshold
+		}
 	}
 	return ""
 }
 
-func detectCoverageThreshold(root string) string {
-	if fileExists(filepath.Join(root, "vitest.config.ts")) || fileExists(filepath.Join(root, "jest.config.js")) {
-		return "check test config"
+func parseCoverageThreshold(content string) string {
+	for _, pattern := range []string{
+		`(?m)lines\s*:\s*([0-9]{1,3})`,
+		`(?m)statements\s*:\s*([0-9]{1,3})`,
+		`(?m)functions\s*:\s*([0-9]{1,3})`,
+	} {
+		match := regexp.MustCompile(pattern).FindStringSubmatch(content)
+		if len(match) == 2 {
+			return match[1] + "%"
+		}
 	}
 	return ""
+}
+
+func parseMakeTargets(root string) []string {
+	content, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		return nil
+	}
+	targets := []string{}
+	for _, line := range strings.Split(string(content), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, ".") || strings.Contains(trimmed, "=") {
+			continue
+		}
+		index := strings.Index(trimmed, ":")
+		if index <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(trimmed[:index])
+		if name == "" || strings.Contains(name, " ") {
+			continue
+		}
+		targets = append(targets, name)
+	}
+	return uniqueStrings(targets)
+}
+
+func containsString(values []string, value string) bool {
+	for _, current := range values {
+		if current == value {
+			return true
+		}
+	}
+	return false
 }
 
 func detectGeneratedPaths(root string) string {
@@ -1680,6 +1750,7 @@ func detectGeneratedPaths(root string) string {
 
 type packageJSONMetadata struct {
 	Scripts              map[string]any `json:"scripts"`
+	PackageManager       string         `json:"packageManager"`
 	Dependencies         map[string]any `json:"dependencies"`
 	DevDependencies      map[string]any `json:"devDependencies"`
 	PeerDependencies     map[string]any `json:"peerDependencies"`
@@ -1689,6 +1760,22 @@ type packageJSONMetadata struct {
 	Browser              any            `json:"browser"`
 	Bin                  any            `json:"bin"`
 	Exports              any            `json:"exports"`
+}
+
+func loadPackageJSONMetadata(root string) (packageJSONMetadata, bool) {
+	packageJSONPath := filepath.Join(root, "package.json")
+	if !fileExists(packageJSONPath) {
+		return packageJSONMetadata{}, false
+	}
+	content, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		return packageJSONMetadata{}, false
+	}
+	var metadata packageJSONMetadata
+	if err := json.Unmarshal(content, &metadata); err != nil {
+		return packageJSONMetadata{}, false
+	}
+	return metadata, true
 }
 
 func javascriptComponentWarning(root string) string {

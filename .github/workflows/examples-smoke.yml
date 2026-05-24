@@ -287,6 +287,8 @@ jobs:
           - name: change-task-system-e2e
             script: ./scripts/e2e-change-task-system.sh
             needs_typescript: true
+          - name: repository-facts-populated-e2e
+            script: ./scripts/e2e-repository-facts-populated.sh
 
     steps:
       - name: Checkout ballast repo

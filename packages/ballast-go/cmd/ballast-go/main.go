@@ -424,6 +424,7 @@ Options:
   --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
+  --repository-facts-file   Optional path to wrapper-generated repository facts JSON
   --help, -h                Show this help
   --version, -v             Show version
 
