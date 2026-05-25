@@ -1091,6 +1091,47 @@ This section should be gone after force.
       );
     });
 
+    test('ignores hidden directories when detecting monorepo package.json files', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, 'package.json'),
+        JSON.stringify(
+          { name: 'single-root', private: true, workspaces: ['apps/*'] },
+          null,
+          2
+        )
+      );
+      fs.mkdirSync(path.join(tmpDir, '.codex', 'shadow'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, '.codex', 'shadow', 'package.json'),
+        JSON.stringify({ name: 'hidden-package', private: true }, null, 2)
+      );
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting'],
+          languages: ['typescript']
+        },
+        tmpDir
+      );
+
+      install({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        force: true,
+        saveConfig: false
+      });
+
+      const gitHooksFile = path.join(
+        tmpDir,
+        '.cursor',
+        'rules',
+        'git-hooks.mdc'
+      );
+      const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
+      expect(gitHooksContent).not.toContain('Use Husky for this monorepo.');
+    });
+
     test('writes python language files and uses python-specific content', () => {
       const result = install({
         projectRoot: tmpDir,

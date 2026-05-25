@@ -2207,6 +2207,9 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 		}
 		if d.IsDir() {
 			name := d.Name()
+			if path != root && strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
 			if name == ".git" || name == "node_modules" || name == ".venv" || name == "dist" || name == "build" || name == "vendor" || name == ".terraform" || name == ".terragrunt-cache" {
 				return filepath.SkipDir
 			}
