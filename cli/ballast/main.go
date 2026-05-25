@@ -1564,7 +1564,7 @@ func detectCanonicalRepo(root string) string {
 	if strings.HasPrefix(url, "ssh://git@github.com/") {
 		return strings.TrimPrefix(url, "ssh://git@github.com/")
 	}
-	return url
+	return ""
 }
 
 func detectDefaultBranch(root string) string {

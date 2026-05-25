@@ -314,8 +314,8 @@ def save_config(
                         ):
                             paths[key] = list(value)
         except (OSError, json.JSONDecodeError):
-            # Invalid/unreadable override payload should fall back to the
-            # built-in repository facts scaffold.
+            # Invalid/unreadable existing config should fall back to defaults
+            # while preserving current save behavior.
             pass
 
     if language not in languages:
@@ -1031,11 +1031,15 @@ def repository_facts_section() -> list[str]:
         try:
             payload = json.loads(Path(override_path).read_text(encoding="utf-8"))
             lines = payload.get("repositoryFactsSection")
-            if isinstance(lines, list):
-                normalized = [line for line in lines if isinstance(line, str)]
-                if normalized:
-                    return normalized
-        except Exception:
+            if (
+                isinstance(lines, list)
+                and lines
+                and all(isinstance(line, str) for line in lines)
+            ):
+                return lines
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            # Invalid/unreadable override payload should fall back to the
+            # built-in repository facts scaffold.
             pass
     return [
         "## Repository Facts",

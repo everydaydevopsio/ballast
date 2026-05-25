@@ -739,10 +739,16 @@ function loadRepositoryFactsSection(): string[] | null {
       repositoryFactsSection?: unknown;
     };
     if (!Array.isArray(parsed.repositoryFactsSection)) return null;
-    const lines = parsed.repositoryFactsSection.filter(
-      (line): line is string => typeof line === 'string'
-    );
-    return lines.length > 0 ? lines : null;
+    if (
+      !parsed.repositoryFactsSection.every(
+        (line): line is string => typeof line === 'string'
+      )
+    ) {
+      return null;
+    }
+    return parsed.repositoryFactsSection.length > 0
+      ? parsed.repositoryFactsSection
+      : null;
   } catch {
     return null;
   }
