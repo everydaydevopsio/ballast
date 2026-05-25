@@ -1094,7 +1094,11 @@ This section should be gone after force.
     test('ignores hidden directories when detecting monorepo package.json files', () => {
       fs.writeFileSync(
         path.join(tmpDir, 'package.json'),
-        JSON.stringify({ name: 'single-root', private: true }, null, 2)
+        JSON.stringify(
+          { name: 'single-root', private: true, workspaces: ['apps/*'] },
+          null,
+          2
+        )
       );
       fs.mkdirSync(path.join(tmpDir, '.codex', 'shadow'), { recursive: true });
       fs.writeFileSync(
