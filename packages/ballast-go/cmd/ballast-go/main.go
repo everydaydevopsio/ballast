@@ -205,6 +205,7 @@ func runInstall(args []string) int {
 	fs.BoolVar(patch, "p", false, "merge upstream rule and skill updates into existing files")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
+	repositoryFactsFile := fs.String("repository-facts-file", "", "optional path to wrapper-generated repository facts JSON")
 	if err := fs.Parse(trimCommand(args)); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -218,6 +219,9 @@ func runInstall(args []string) int {
 	}
 
 	lang := strings.ToLower(strings.TrimSpace(*language))
+	if strings.TrimSpace(*repositoryFactsFile) != "" {
+		_ = os.Setenv("BALLAST_REPOSITORY_FACTS_FILE", strings.TrimSpace(*repositoryFactsFile))
+	}
 	if !contains(languages, lang) {
 		fmt.Printf("Invalid --language. Use: %s\n", strings.Join(languages, ", "))
 		return 1
@@ -420,6 +424,7 @@ Options:
   --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
+  --repository-facts-file   Optional path to wrapper-generated repository facts JSON
   --help, -h                Show this help
   --version, -v             Show version
 
@@ -1237,6 +1242,18 @@ func ballastNotice() string {
 }
 
 func repositoryFactsSection() []string {
+	if overridePath := strings.TrimSpace(os.Getenv("BALLAST_REPOSITORY_FACTS_FILE")); overridePath != "" {
+		type factsPayload struct {
+			RepositoryFactsSection []string `json:"repositoryFactsSection"`
+		}
+		content, err := os.ReadFile(overridePath)
+		if err == nil {
+			var payload factsPayload
+			if json.Unmarshal(content, &payload) == nil && len(payload.RepositoryFactsSection) > 0 {
+				return payload.RepositoryFactsSection
+			}
+		}
+	}
 	return []string{
 		"## Repository Facts",
 		"",

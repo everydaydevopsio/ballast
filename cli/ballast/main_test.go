@@ -3460,7 +3460,8 @@ func TestBuildMonorepoSupportFileIncludesPublishingAndSkillsForCodex(t *testing.
 		},
 	}
 
-	content := buildMonorepoSupportFile(plan, "codex")
+	root := t.TempDir()
+	content := buildMonorepoSupportFile(root, plan, "codex")
 
 	if !strings.Contains(content, "## Repository Facts") {
 		t.Fatalf("expected repository facts section in codex support file, got %q", content)
@@ -3495,7 +3496,8 @@ func TestBuildMonorepoSupportFileIncludesSkillsForClaude(t *testing.T) {
 		},
 	}
 
-	content := buildMonorepoSupportFile(plan, "claude")
+	root := t.TempDir()
+	content := buildMonorepoSupportFile(root, plan, "claude")
 
 	if !strings.Contains(content, "## Installed skills") {
 		t.Fatalf("expected installed skills section in claude support file, got %q", content)
@@ -3514,7 +3516,8 @@ func TestBuildMonorepoSupportFileIncludesDocsForCodex(t *testing.T) {
 		},
 	}
 
-	content := buildMonorepoSupportFile(plan, "codex")
+	root := t.TempDir()
+	content := buildMonorepoSupportFile(root, plan, "codex")
 
 	if !strings.Contains(content, "`.codex/rules/common/docs.md`") {
 		t.Fatalf("expected docs rule entry in codex support file, got %q", content)

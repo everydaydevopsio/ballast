@@ -911,6 +911,7 @@ export interface RunInstallOptions {
   patch?: boolean;
   yes?: boolean;
   taskSystem?: string;
+  repositoryFactsFile?: string;
 }
 
 async function promptYesNo(
@@ -956,6 +957,9 @@ async function confirmSupportFileOverwrite(
 export async function runInstall(
   options: RunInstallOptions = {}
 ): Promise<number> {
+  if (options.repositoryFactsFile) {
+    process.env.BALLAST_REPOSITORY_FACTS_FILE = options.repositoryFactsFile;
+  }
   const projectRoot = options.projectRoot ?? findProjectRoot();
   const language = options.language ?? 'typescript';
   const priorConfig = loadConfig(projectRoot, language);

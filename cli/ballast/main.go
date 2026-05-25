@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"slices"
@@ -175,6 +176,11 @@ type monorepoPlan struct {
 	Previous    *monorepoConfig
 }
 
+type repositoryFactsPayload struct {
+	Version                int      `json:"version"`
+	RepositoryFactsSection []string `json:"repositoryFactsSection"`
+}
+
 func main() {
 	os.Exit(run(os.Args[1:]))
 }
@@ -221,6 +227,12 @@ func run(args []string) int {
 	}
 
 	root := findProjectRoot("")
+	repositoryFactsEnv, cleanupRepositoryFacts, err := prepareRepositoryFactsEnv(root)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	defer cleanupRepositoryFacts()
 	refreshConfigRequested := len(forwardedArgs) > 0 && forwardedArgs[0] == "install" && hasFlag(forwardedArgs, "--refresh-config", "")
 	normalizedArgs, err := normalizeInstallArgs(forwardedArgs, root)
 	if err != nil {
@@ -247,6 +259,7 @@ func run(args []string) int {
 					invocation.Env["BALLAST_REFRESH_SKILLS"] = "1"
 					invocation.Env["BALLAST_REFRESH_TASK_RULES"] = "1"
 				}
+				invocation.Env = mergeResolvedEnv(invocation.Env, repositoryFactsEnv)
 				resolved := resolveBackendCommand(invocation.Language, tool, invocation.Args, invocation.Env)
 				if !resolved.UseLocal {
 					if err := ensureInstalledFunc(tool); err != nil {
@@ -311,6 +324,7 @@ func run(args []string) int {
 			"BALLAST_REFRESH_TASK_RULES": "1",
 		}
 	}
+	singleEnv = mergeResolvedEnv(singleEnv, repositoryFactsEnv)
 	resolved := resolveBackendCommand(selectedLanguage, tool, forwardedArgs, singleEnv)
 	if !resolved.UseLocal {
 		if err := ensureInstalledFunc(tool); err != nil {
@@ -1459,8 +1473,284 @@ func cloneEnvMap(env map[string]string) map[string]string {
 	return cloned
 }
 
+func prepareRepositoryFactsEnv(root string) (map[string]string, func(), error) {
+	section := discoverRepositoryFactsSection(root)
+	payload := repositoryFactsPayload{
+		Version:                1,
+		RepositoryFactsSection: section,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, func() {}, fmt.Errorf("marshal repository facts payload: %w", err)
+	}
+	file, err := os.CreateTemp("", "ballast-repository-facts-*.json")
+	if err != nil {
+		return nil, func() {}, fmt.Errorf("create repository facts file: %w", err)
+	}
+	path := file.Name()
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		_ = os.Remove(path)
+		return nil, func() {}, fmt.Errorf("write repository facts file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		return nil, func() {}, fmt.Errorf("close repository facts file: %w", err)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		_ = os.Remove(path)
+		return nil, func() {}, fmt.Errorf("set repository facts file permissions: %w", err)
+	}
+	return map[string]string{"BALLAST_REPOSITORY_FACTS_FILE": path}, func() {
+		_ = os.Remove(path)
+	}, nil
+}
+
+func discoverRepositoryFactsSection(root string) []string {
+	canonicalRepo := detectCanonicalRepo(root)
+	defaultBranch := detectDefaultBranch(root)
+	packageManager := detectPackageManager(root)
+	versionFiles := detectVersionFiles(root)
+	configFiles := detectConfigFiles(root)
+	ciWorkflows, releaseWorkflows := detectWorkflows(root)
+	preferredCommands := detectPreferredCommands(root)
+	coverageThreshold := detectCoverageThreshold(root)
+	generatedPaths := detectGeneratedPaths(root)
+
+	withPlaceholder := func(value string, placeholder string) string {
+		if strings.TrimSpace(value) == "" {
+			return "<" + placeholder + ">"
+		}
+		return value
+	}
+
+	return []string{
+		"## Repository Facts",
+		"",
+		"Use this section for durable repo-specific facts that agents repeatedly need. Prefer facts stored here over re-deriving them with shell commands on every task.",
+		"",
+		"Keep only stable, reviewable metadata here. Do not store secrets, credentials, or ephemeral runtime state.",
+		"",
+		"Suggested facts to record:",
+		"",
+		fmt.Sprintf("- Canonical GitHub repo: `%s`", withPlaceholder(canonicalRepo, "OWNER/REPO")),
+		fmt.Sprintf("- Default branch: `%s`", withPlaceholder(defaultBranch, "main")),
+		fmt.Sprintf("- Primary package manager: `%s`", withPlaceholder(packageManager, "pnpm | npm | yarn | uv | go")),
+		fmt.Sprintf("- Version-file locations agents should check first: `%s`", withPlaceholder(versionFiles, ".nvmrc, packageManager, pyproject.toml, go.mod, etc.")),
+		fmt.Sprintf("- Canonical config files: `%s`", withPlaceholder(configFiles, "paths agents should read before falling back to discovery")),
+		fmt.Sprintf("- Primary CI workflows: `%s`", withPlaceholder(ciWorkflows, "workflow filenames")),
+		fmt.Sprintf("- Primary release/publish workflows: `%s`", withPlaceholder(releaseWorkflows, "workflow filenames")),
+		fmt.Sprintf("- Preferred build/test/lint/format/coverage commands: `%s`", withPlaceholder(preferredCommands, "commands")),
+		fmt.Sprintf("- Coverage threshold: `%s`", withPlaceholder(coverageThreshold, "value")),
+		fmt.Sprintf("- Generated or protected paths agents should avoid editing directly: `%s`", withPlaceholder(generatedPaths, "paths")),
+		"",
+		"Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.",
+	}
+}
+
+func detectCanonicalRepo(root string) string {
+	output, err := runCommandOutputFunc("git", []string{"-C", root, "remote", "get-url", "origin"})
+	if err != nil {
+		return ""
+	}
+	url := strings.TrimSpace(output)
+	url = strings.TrimSuffix(url, ".git")
+	if strings.HasPrefix(url, "git@github.com:") {
+		return strings.TrimPrefix(url, "git@github.com:")
+	}
+	if strings.HasPrefix(url, "https://github.com/") {
+		return strings.TrimPrefix(url, "https://github.com/")
+	}
+	if strings.HasPrefix(url, "ssh://git@github.com/") {
+		return strings.TrimPrefix(url, "ssh://git@github.com/")
+	}
+	return ""
+}
+
+func detectDefaultBranch(root string) string {
+	output, err := runCommandOutputFunc("git", []string{"-C", root, "symbolic-ref", "refs/remotes/origin/HEAD"})
+	if err != nil {
+		return ""
+	}
+	trimmed := strings.TrimSpace(output)
+	const prefix = "refs/remotes/origin/"
+	if strings.HasPrefix(trimmed, prefix) {
+		return strings.TrimPrefix(trimmed, prefix)
+	}
+	return trimmed
+}
+
+func detectPackageManager(root string) string {
+	switch {
+	case fileExists(filepath.Join(root, "pnpm-lock.yaml")):
+		return "pnpm"
+	case fileExists(filepath.Join(root, "yarn.lock")):
+		return "yarn"
+	case fileExists(filepath.Join(root, "package-lock.json")):
+		return "npm"
+	case fileExists(filepath.Join(root, "uv.lock")):
+		return "uv"
+	case fileExists(filepath.Join(root, "go.mod")):
+		return "go"
+	}
+	metadata, ok := loadPackageJSONMetadata(root)
+	if !ok {
+		return ""
+	}
+	packageManager := strings.TrimSpace(metadata.PackageManager)
+	if packageManager == "" {
+		return ""
+	}
+	if index := strings.Index(packageManager, "@"); index > 0 {
+		return strings.TrimSpace(packageManager[:index])
+	}
+	return packageManager
+}
+
+func detectVersionFiles(root string) string {
+	candidates := []string{".nvmrc", "package.json", "pyproject.toml", "uv.lock", "go.mod", ".python-version"}
+	found := []string{}
+	for _, candidate := range candidates {
+		if fileExists(filepath.Join(root, candidate)) {
+			found = append(found, candidate)
+		}
+	}
+	return strings.Join(found, ", ")
+}
+
+func detectConfigFiles(root string) string {
+	candidates := []string{"eslint.config.mjs", ".eslintrc", ".prettierrc", "tsconfig.json", "pyproject.toml", "ruff.toml", "go.mod"}
+	found := []string{}
+	for _, candidate := range candidates {
+		if fileExists(filepath.Join(root, candidate)) {
+			found = append(found, candidate)
+		}
+	}
+	return strings.Join(found, ", ")
+}
+
+func detectWorkflows(root string) (string, string) {
+	workflowDir := filepath.Join(root, ".github", "workflows")
+	entries, err := os.ReadDir(workflowDir)
+	if err != nil {
+		return "", ""
+	}
+	ci := []string{}
+	release := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := strings.ToLower(entry.Name())
+		if strings.Contains(name, "ci") || strings.Contains(name, "test") || strings.Contains(name, "lint") || strings.Contains(name, "build") {
+			ci = append(ci, entry.Name())
+		}
+		if strings.Contains(name, "release") || strings.Contains(name, "publish") {
+			release = append(release, entry.Name())
+		}
+	}
+	sort.Strings(ci)
+	sort.Strings(release)
+	return strings.Join(ci, ", "), strings.Join(release, ", ")
+}
+
+func detectPreferredCommands(root string) string {
+	commands := []string{}
+	targets := parseMakeTargets(root)
+	for _, target := range []string{"test", "lint", "build"} {
+		if containsString(targets, target) {
+			commands = append(commands, "make "+target)
+		}
+	}
+	if metadata, ok := loadPackageJSONMetadata(root); ok {
+		for _, script := range []string{"test", "lint", "build", "format"} {
+			if _, exists := metadata.Scripts[script]; exists {
+				commands = append(commands, "package.json:"+script)
+			}
+		}
+	}
+	return strings.Join(uniqueStrings(commands), ", ")
+}
+
+func detectCoverageThreshold(root string) string {
+	for _, candidate := range []string{
+		filepath.Join(root, "vitest.config.ts"),
+		filepath.Join(root, "vitest.config.js"),
+		filepath.Join(root, "jest.config.ts"),
+		filepath.Join(root, "jest.config.js"),
+	} {
+		content, err := os.ReadFile(candidate)
+		if err != nil {
+			continue
+		}
+		if threshold := parseCoverageThreshold(string(content)); threshold != "" {
+			return threshold
+		}
+	}
+	return ""
+}
+
+func parseCoverageThreshold(content string) string {
+	for _, pattern := range []string{
+		`(?m)lines\s*:\s*([0-9]{1,3})`,
+		`(?m)statements\s*:\s*([0-9]{1,3})`,
+		`(?m)functions\s*:\s*([0-9]{1,3})`,
+	} {
+		match := regexp.MustCompile(pattern).FindStringSubmatch(content)
+		if len(match) == 2 {
+			return match[1] + "%"
+		}
+	}
+	return ""
+}
+
+func parseMakeTargets(root string) []string {
+	content, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		return nil
+	}
+	targets := []string{}
+	for _, line := range strings.Split(string(content), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, ".") || strings.Contains(trimmed, "=") {
+			continue
+		}
+		index := strings.Index(trimmed, ":")
+		if index <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(trimmed[:index])
+		if name == "" || strings.Contains(name, " ") {
+			continue
+		}
+		targets = append(targets, name)
+	}
+	return uniqueStrings(targets)
+}
+
+func containsString(values []string, value string) bool {
+	for _, current := range values {
+		if current == value {
+			return true
+		}
+	}
+	return false
+}
+
+func detectGeneratedPaths(root string) string {
+	candidates := []string{"dist/", "build/", "coverage/", "generated/", ".ballast/"}
+	found := []string{}
+	for _, candidate := range candidates {
+		if fileExists(filepath.Join(root, strings.TrimSuffix(candidate, "/"))) {
+			found = append(found, candidate)
+		}
+	}
+	return strings.Join(found, ", ")
+}
+
 type packageJSONMetadata struct {
 	Scripts              map[string]any `json:"scripts"`
+	PackageManager       string         `json:"packageManager"`
 	Dependencies         map[string]any `json:"dependencies"`
 	DevDependencies      map[string]any `json:"devDependencies"`
 	PeerDependencies     map[string]any `json:"peerDependencies"`
@@ -1470,6 +1760,22 @@ type packageJSONMetadata struct {
 	Browser              any            `json:"browser"`
 	Bin                  any            `json:"bin"`
 	Exports              any            `json:"exports"`
+}
+
+func loadPackageJSONMetadata(root string) (packageJSONMetadata, bool) {
+	packageJSONPath := filepath.Join(root, "package.json")
+	if !fileExists(packageJSONPath) {
+		return packageJSONMetadata{}, false
+	}
+	content, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		return packageJSONMetadata{}, false
+	}
+	var metadata packageJSONMetadata
+	if err := json.Unmarshal(content, &metadata); err != nil {
+		return packageJSONMetadata{}, false
+	}
+	return metadata, true
 }
 
 func javascriptComponentWarning(root string) string {
@@ -2266,7 +2572,7 @@ func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) 
 			continue
 		}
 		path := supportFilePath(root, target)
-		content := buildMonorepoSupportFile(plan, target)
+		content := buildMonorepoSupportFile(root, plan, target)
 		if !fileExists(path) {
 			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 				return err
@@ -2289,7 +2595,7 @@ func updateMonorepoSupportFiles(root string, plan *monorepoPlan, args []string) 
 		if target == "gemini" {
 			agentsPath := supportFilePath(root, "codex")
 			if !fileExists(agentsPath) {
-				if err := os.WriteFile(agentsPath, []byte(buildMonorepoSupportFile(plan, "codex")), 0o644); err != nil {
+				if err := os.WriteFile(agentsPath, []byte(buildMonorepoSupportFile(root, plan, "codex")), 0o644); err != nil {
 					return err
 				}
 			}
@@ -2529,7 +2835,7 @@ func supportFilePath(root string, target string) string {
 	return filepath.Join(root, "AGENTS.md")
 }
 
-func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
+func buildMonorepoSupportFile(root string, plan *monorepoPlan, target string) string {
 	title := "# AGENTS.md"
 	intro := "This file provides shared repository guidance for agent tools that read AGENTS.md."
 	rulesDir := ".codex/rules"
@@ -2555,29 +2861,8 @@ func buildMonorepoSupportFile(plan *monorepoPlan, target string) string {
 	if target == "gemini" {
 		lines = append(lines, "@./AGENTS.md", "")
 	} else {
-		lines = append(lines,
-			"## Repository Facts",
-			"",
-			"Use this section for durable repo-specific facts that agents repeatedly need. Prefer facts stored here over re-deriving them with shell commands on every task.",
-			"",
-			"Keep only stable, reviewable metadata here. Do not store secrets, credentials, or ephemeral runtime state.",
-			"",
-			"Suggested facts to record:",
-			"",
-			"- Canonical GitHub repo: `<OWNER/REPO>`",
-			"- Default branch: `<main>`",
-			"- Primary package manager: `<pnpm | npm | yarn | uv | go>`",
-			"- Version-file locations agents should check first: `<.nvmrc, packageManager, pyproject.toml, go.mod, etc.>`",
-			"- Canonical config files: `<paths agents should read before falling back to discovery>`",
-			"- Primary CI workflows: `<workflow filenames>`",
-			"- Primary release/publish workflows: `<workflow filenames>`",
-			"- Preferred build/test/lint/format/coverage commands: `<commands>`",
-			"- Coverage threshold: `<value>`",
-			"- Generated or protected paths agents should avoid editing directly: `<paths>`",
-			"",
-			"Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.",
-			"",
-		)
+		lines = append(lines, discoverRepositoryFactsSection(root)...)
+		lines = append(lines, "")
 	}
 
 	lines = append(lines,
