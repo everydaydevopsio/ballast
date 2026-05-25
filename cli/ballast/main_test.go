@@ -1754,6 +1754,24 @@ func TestDetectRepoProfilesSkipsTerraformCaches(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesSkipsDotPrefixedDirectories(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".codex", "hidden-app", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langTypeScript, Paths: []string{filepath.Join(root, "apps", "frontend")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected dot-prefixed directories to be skipped; want %#v, got %#v", want, profiles)
+	}
+}
+
 func TestDetectLanguageSupportsAnsibleRequirementsYaml(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "requirements.yaml"), "---\n")

@@ -155,6 +155,7 @@ function countPackageJsonFiles(root: string): number {
     }
     for (const entry of entries) {
       if (entry.isDirectory()) {
+        if (entry.name.startsWith('.')) continue;
         if (ignoredDirs.has(entry.name)) continue;
         walk(path.join(dir, entry.name), depth + 1);
         continue;
