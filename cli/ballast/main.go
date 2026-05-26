@@ -635,6 +635,20 @@ func runUpdate(args []string) int {
 		fmt.Println("To upgrade a non-Homebrew install, download the latest release from GitHub.")
 		return 1
 	}
+	if runtime.GOOS == "darwin" {
+		if wrong, err := detectWrongBrewCask(); err == nil && wrong {
+			fmt.Println("WARNING: The core Homebrew cask \"ballast\" (an unrelated audio-balance app) is installed.")
+			fmt.Println("This conflicts with everydaydevopsio/ballast. Fixing automatically...")
+			_ = runCommandFunc("brew", []string{"uninstall", "--cask", "ballast"})
+			fmt.Println("Installing the correct cask from everydaydevopsio/ballast tap...")
+			if err := runCommandFunc("brew", []string{"install", "--cask", "everydaydevopsio/ballast/ballast"}); err != nil {
+				fmt.Printf("brew install failed: %v\n", err)
+				return 1
+			}
+			fmt.Println("ballast reinstalled from the correct tap. Run `ballast upgrade` to update .rulesrc.json and sync backend CLIs.")
+			return 0
+		}
+	}
 	fmt.Println("Updating Homebrew...")
 	if err := runCommandFunc("brew", []string{"update"}); err != nil {
 		fmt.Printf("brew update failed: %v\n", err)
@@ -1086,11 +1100,35 @@ func detectBrewInstall() bool {
 	return execPath == prefix || strings.HasPrefix(execPath, prefix+string(os.PathSeparator))
 }
 
+// detectWrongBrewCask checks whether the core Homebrew cask "ballast" (an
+// unrelated audio-balance app) is installed instead of the tap cask.  It
+// runs `brew info --cask ballast` and inspects the "From:" line; the core
+// cask comes from homebrew/homebrew-cask while the correct one comes from
+// everydaydevopsio/homebrew-ballast.
+func detectWrongBrewCask() (bool, error) {
+	out, err := runCommandOutputFunc("brew", []string{"info", "--cask", "ballast"})
+	if err != nil {
+		return false, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "From:") {
+			if strings.Contains(trimmed, "homebrew/homebrew-cask") || strings.Contains(trimmed, "Homebrew/homebrew-cask") {
+				return true, nil
+			}
+			return false, nil
+		}
+	}
+	return false, nil
+}
+
 // brewUpgradeArgs returns the brew subcommand arguments needed to upgrade
-// the ballast CLI: formula on Linux, cask on macOS.
+// the ballast CLI: formula on Linux, cask on macOS.  Both paths use the
+// fully-qualified tap name so Homebrew never resolves to the unrelated
+// core cask "ballast" (an audio-balance app).
 func brewUpgradeArgs() []string {
 	if runtime.GOOS == "darwin" {
-		return []string{"upgrade", "--cask", "ballast"}
+		return []string{"upgrade", "--cask", "everydaydevopsio/ballast/ballast"}
 	}
 	return []string{"upgrade", "--formula", "everydaydevopsio/ballast/ballast"}
 }

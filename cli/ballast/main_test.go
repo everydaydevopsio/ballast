@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -827,6 +828,9 @@ func TestRunUpdateRunsBrewWhenBrewInstalled(t *testing.T) {
 
 	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
 	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		if len(args) >= 3 && args[0] == "info" && args[1] == "--cask" {
+			return "==> ballast\nFrom: https://github.com/everydaydevopsio/homebrew-ballast/blob/HEAD/Casks/ballast.rb", nil
+		}
 		return "/opt/homebrew", nil
 	}
 	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
@@ -853,6 +857,13 @@ func TestRunUpdateRunsBrewWhenBrewInstalled(t *testing.T) {
 	}
 	if got := commands[1][1]; got != "upgrade" {
 		t.Fatalf("expected second command to be 'brew upgrade ...', got %v", commands[1])
+	}
+	// Verify fully-qualified tap name is used on macOS
+	if runtime.GOOS == "darwin" {
+		upgradeArgs := strings.Join(commands[1], " ")
+		if !strings.Contains(upgradeArgs, "everydaydevopsio/ballast/ballast") {
+			t.Fatalf("expected fully-qualified cask name, got %q", upgradeArgs)
+		}
 	}
 }
 
@@ -987,6 +998,9 @@ func TestRunUpdateSuccessMessage(t *testing.T) {
 
 	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
 	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		if len(args) >= 3 && args[0] == "info" && args[1] == "--cask" {
+			return "==> ballast\nFrom: https://github.com/everydaydevopsio/homebrew-ballast/blob/HEAD/Casks/ballast.rb", nil
+		}
 		return "/opt/homebrew", nil
 	}
 	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
@@ -1142,6 +1156,135 @@ func TestBrewUpgradeArgsReturnsNonEmpty(t *testing.T) {
 	}
 	if args[0] != "upgrade" {
 		t.Fatalf("expected first arg to be 'upgrade', got %q", args[0])
+	}
+}
+
+func TestBrewUpgradeArgsUsesFullyQualifiedName(t *testing.T) {
+	args := brewUpgradeArgs()
+	// Both darwin and linux should use the fully-qualified tap name
+	found := false
+	for _, a := range args {
+		if a == "everydaydevopsio/ballast/ballast" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected fully-qualified tap name in args, got %v", args)
+	}
+}
+
+func TestDetectWrongBrewCaskReturnsTrueForCoreCask(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "==> ballast (ballast): 2.0.0\nStatus Bar app\nhttps://jamsinclair.nz/ballast\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wrong {
+		t.Fatal("expected detectWrongBrewCask to return true for core cask")
+	}
+}
+
+func TestDetectWrongBrewCaskReturnsFalseForTapCask(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "==> ballast (ballast): 5.10.3\nCLI that installs AI agent rules\nFrom: https://github.com/everydaydevopsio/homebrew-ballast/blob/HEAD/Casks/ballast.rb", nil
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wrong {
+		t.Fatal("expected detectWrongBrewCask to return false for tap cask")
+	}
+}
+
+func TestDetectWrongBrewCaskReturnsFalseOnError(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "", errors.New("not installed")
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if wrong {
+		t.Fatal("expected false on error")
+	}
+}
+
+func TestRunUpdateFixesWrongCaskOnDarwin(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("darwin-only test")
+	}
+
+	originalRun := runCommandFunc
+	originalLookPath := execLookPathFunc
+	originalOutput := runCommandOutputFunc
+	originalExe := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		execLookPathFunc = originalLookPath
+		runCommandOutputFunc = originalOutput
+		osExecutableFunc = originalExe
+	})
+
+	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
+	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		if len(args) >= 3 && args[0] == "info" && args[1] == "--cask" {
+			return "==> ballast\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
+		}
+		return "/opt/homebrew", nil
+	}
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"update"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "unrelated audio-balance app") {
+		t.Fatalf("expected wrong-cask warning, got %q", output)
+	}
+
+	// Should uninstall wrong cask then install correct one
+	foundUninstall := false
+	foundInstall := false
+	for _, cmd := range commands {
+		joined := strings.Join(cmd, " ")
+		if strings.Contains(joined, "uninstall --cask ballast") {
+			foundUninstall = true
+		}
+		if strings.Contains(joined, "install --cask everydaydevopsio/ballast/ballast") {
+			foundInstall = true
+		}
+	}
+	if !foundUninstall {
+		t.Fatalf("expected uninstall of wrong cask, commands: %v", commands)
+	}
+	if !foundInstall {
+		t.Fatalf("expected install of correct cask, commands: %v", commands)
 	}
 }
 
