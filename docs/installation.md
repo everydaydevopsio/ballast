@@ -197,6 +197,7 @@ For single-language TypeScript installs, the `git-hooks` rules should use `pre-c
 
 - `--target, -t`: `cursor`, `claude`, `opencode`, `codex`, `gemini`; adds to saved targets in `.rulesrc.json`
 - `--remove-target`: remove one or more saved targets and clean up Ballast-managed files for them
+- `--remove-language`: remove one or more languages from `.rulesrc.json`, remove their `paths`, and clean up unused Ballast-managed rules
 - `--agent, -a`: comma-separated list (or `all`)
 - `--skill, -s`: comma-separated list
 - `--all`: install all available agents
@@ -207,7 +208,7 @@ For single-language TypeScript installs, the `git-hooks` rules should use `pre-c
 
 ## Wrapper Commands
 
-- `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings
+- `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, `--remove-language` removes language surfaces plus saved `paths` with cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings
 - `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically, and add `--patch` to merge backend file updates during that refresh
 - `ballast upgrade [--patch] [--force]`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it; `--patch` and `--force` forward to the backend refresh
 - `ballast install-cli [--language <typescript|python|go|ansible|terraform>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible` and `terraform` selections reuse the `ballast-go` backend.

@@ -412,6 +412,7 @@ func printUsage() {
 	fmt.Println("  ballast install --target cursor,claude --all")
 	fmt.Println("  ballast install --target gemini --all")
 	fmt.Println("  ballast install --remove-target codex")
+	fmt.Println("  ballast install --remove-language python")
 	fmt.Println("  ballast install --target claude --skill owasp-security-scan")
 	fmt.Println("  ballast install --refresh-config")
 	fmt.Println("  ballast install-cli --language python")
@@ -430,6 +431,7 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
+	fmt.Println("Install language behavior: `--remove-language` removes languages from `.rulesrc.json`, removes their `paths`, and prunes stale Ballast-managed rule files.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
 	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/terraform/`).")
 }
@@ -915,6 +917,48 @@ func normalizeInstallArgs(args []string, root string) ([]string, error) {
 		filtered = append(filtered, "--yes")
 	}
 	return filtered, nil
+}
+
+func parseRemoveLanguageValues(args []string) []string {
+	return findFlagValues(args, "--remove-language", "")
+}
+
+func validateSelectedLanguages(values []string) error {
+	if len(values) == 0 {
+		return nil
+	}
+	allowed := map[string]struct{}{}
+	for _, lang := range supportedLanguages {
+		allowed[string(lang)] = struct{}{}
+	}
+	for _, value := range values {
+		if _, ok := allowed[value]; !ok {
+			return fmt.Errorf(
+				"invalid --remove-language: %s (valid: %s)",
+				value,
+				strings.Join(languageNames(), ", "),
+			)
+		}
+	}
+	return nil
+}
+
+func filterProfilesByLanguage(profiles []repoProfile, removed []string) []repoProfile {
+	if len(removed) == 0 {
+		return profiles
+	}
+	removedSet := map[string]struct{}{}
+	for _, lang := range removed {
+		removedSet[lang] = struct{}{}
+	}
+	filtered := make([]repoProfile, 0, len(profiles))
+	for _, profile := range profiles {
+		if _, remove := removedSet[string(profile.Language)]; remove {
+			continue
+		}
+		filtered = append(filtered, profile)
+	}
+	return filtered
 }
 
 func ensureLocalToolDirs(root string) error {
@@ -1863,9 +1907,17 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			profiles = configProfiles
 		}
 	}
+	removeLanguages := parseRemoveLanguageValues(args)
+	if err := validateSelectedLanguages(removeLanguages); err != nil {
+		return nil, err
+	}
+	profiles = filterProfilesByLanguage(profiles, removeLanguages)
 
 	if len(profiles) < 2 {
-		return nil, nil
+		allowLanguageRemovalPlan := len(removeLanguages) > 0 && config != nil && len(config.Languages) > 1
+		if !allowLanguageRemovalPlan {
+			return nil, nil
+		}
 	}
 	if warning := javascriptComponentWarning(root); warning != "" && !profilesIncludeLanguage(profiles, langTypeScript) {
 		fmt.Fprintln(os.Stderr, "warning:", warning)
@@ -1905,7 +1957,8 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		}
 	}
 	cleanupOnly := len(removeTargets) > 0 && len(requestedTargets) == 0 && !explicitAgentSelection && !explicitSkillSelection
-	if !cleanupOnly && (len(requestedTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills))) {
+	languageCleanupOnly := len(removeLanguages) > 0 && !explicitAgentSelection && !explicitSkillSelection
+	if !cleanupOnly && !languageCleanupOnly && (len(requestedTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills))) {
 		return nil, errors.New("monorepo install requires --target and at least one of --agent/--all or --skill/--all-skills, or a root .rulesrc.json with target, agents/skills, languages, and paths")
 	}
 
@@ -1971,7 +2024,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
 	}
-	if cleanupOnly {
+	if cleanupOnly || languageCleanupOnly {
 		return &monorepoPlan{
 			Invocations: nil,
 			Config:      configToSave,
@@ -1981,6 +2034,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			Removed:     removeTargets,
 			Previous:    config,
 		}, nil
+	}
+	if len(profiles) == 0 {
+		return nil, errors.New("no languages remain after --remove-language; run with only --remove-language to clean up and persist config, or select a language with --language for single-language installs")
 	}
 
 	commonSelection := filterAgents(selectedAgents, commonAgentIDs())
@@ -2373,6 +2429,10 @@ func stripMonorepoFlags(args []string) []string {
 			i++
 			continue
 		}
+		if arg == "--remove-language" {
+			i++
+			continue
+		}
 		if arg == "--task-system" {
 			i++
 			continue
@@ -2381,6 +2441,9 @@ func stripMonorepoFlags(args []string) []string {
 			continue
 		}
 		if strings.HasPrefix(arg, "--remove-target=") {
+			continue
+		}
+		if strings.HasPrefix(arg, "--remove-language=") {
 			continue
 		}
 		if strings.HasPrefix(arg, "--task-system=") {
