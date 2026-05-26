@@ -7,6 +7,7 @@ trap 'rm -rf "${WORKDIR}"' EXIT
 
 # shellcheck source=./e2e/helpers.sh
 source "${REPO_ROOT}/scripts/e2e/helpers.sh"
+export BALLAST_E2E_TYPESCRIPT=1
 setup_ballast_e2e
 
 PROJECT="${WORKDIR}/add-remove-language-existing-install"

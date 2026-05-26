@@ -920,7 +920,16 @@ func normalizeInstallArgs(args []string, root string) ([]string, error) {
 }
 
 func parseRemoveLanguageValues(args []string) []string {
-	return findFlagValues(args, "--remove-language", "")
+	values := findFlagValues(args, "--remove-language", "")
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		token := strings.ToLower(strings.TrimSpace(value))
+		if token == "" {
+			continue
+		}
+		normalized = append(normalized, token)
+	}
+	return uniqueStrings(normalized)
 }
 
 func validateSelectedLanguages(values []string) error {

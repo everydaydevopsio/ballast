@@ -2329,6 +2329,39 @@ func TestParseRemoveLanguageValues(t *testing.T) {
 	}
 }
 
+func TestParseRemoveLanguageValuesNormalizesCase(t *testing.T) {
+	values := parseRemoveLanguageValues([]string{
+		"install",
+		"--remove-language=Python,GO",
+		"--remove-language",
+		"TypeScript",
+	})
+	if !reflect.DeepEqual(values, []string{"python", "go", "typescript"}) {
+		t.Fatalf("expected normalized remove-language values, got %#v", values)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidRemoveLanguage(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-language", "ruby", "--yes"})
+	if err == nil {
+		t.Fatalf("expected invalid remove-language error, got plan %#v", plan)
+	}
+	if !strings.Contains(err.Error(), "invalid --remove-language: ruby") {
+		t.Fatalf("expected invalid remove-language error, got %v", err)
+	}
+}
+
 func TestResolveMonorepoPlanRejectsInvalidConfiguredTargets(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
