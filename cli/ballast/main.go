@@ -639,7 +639,10 @@ func runUpdate(args []string) int {
 		if wrong, err := detectWrongBrewCask(); err == nil && wrong {
 			fmt.Println("WARNING: The core Homebrew cask \"ballast\" (an unrelated audio-balance app) is installed.")
 			fmt.Println("This conflicts with everydaydevopsio/ballast. Fixing automatically...")
-			_ = runCommandFunc("brew", []string{"uninstall", "--cask", "ballast"})
+			if err := runCommandFunc("brew", []string{"uninstall", "--cask", "ballast"}); err != nil {
+				fmt.Printf("brew uninstall of wrong cask failed: %v\n", err)
+				return 1
+			}
 			fmt.Println("Installing the correct cask from everydaydevopsio/ballast tap...")
 			if err := runCommandFunc("brew", []string{"install", "--cask", "everydaydevopsio/ballast/ballast"}); err != nil {
 				fmt.Printf("brew install failed: %v\n", err)
@@ -1102,24 +1105,32 @@ func detectBrewInstall() bool {
 
 // detectWrongBrewCask checks whether the core Homebrew cask "ballast" (an
 // unrelated audio-balance app) is installed instead of the tap cask.  It
-// runs `brew info --cask ballast` and inspects the "From:" line; the core
-// cask comes from homebrew/homebrew-cask while the correct one comes from
-// everydaydevopsio/homebrew-ballast.
+// runs `brew info --cask ballast` and inspects both the installed status
+// and the "From:" line; the core cask comes from homebrew/homebrew-cask
+// while the correct one comes from everydaydevopsio/homebrew-ballast.
 func detectWrongBrewCask() (bool, error) {
 	out, err := runCommandOutputFunc("brew", []string{"info", "--cask", "ballast"})
 	if err != nil {
 		return false, err
 	}
-	for _, line := range strings.Split(out, "\n") {
+	lines := strings.Split(out, "\n")
+	installed := false
+	fromCore := false
+	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "From:") {
-			if strings.Contains(trimmed, "homebrew/homebrew-cask") || strings.Contains(trimmed, "Homebrew/homebrew-cask") {
-				return true, nil
-			}
+		if strings.HasPrefix(trimmed, "Not installed") {
 			return false, nil
 		}
+		if strings.HasPrefix(trimmed, "Installed") {
+			installed = true
+		}
+		if strings.HasPrefix(trimmed, "From:") {
+			if strings.Contains(trimmed, "homebrew/homebrew-cask") || strings.Contains(trimmed, "Homebrew/homebrew-cask") {
+				fromCore = true
+			}
+		}
 	}
-	return false, nil
+	return installed && fromCore, nil
 }
 
 // brewUpgradeArgs returns the brew subcommand arguments needed to upgrade

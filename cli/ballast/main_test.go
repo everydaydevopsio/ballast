@@ -1179,7 +1179,7 @@ func TestDetectWrongBrewCaskReturnsTrueForCoreCask(t *testing.T) {
 	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
 
 	runCommandOutputFunc = func(name string, args []string) (string, error) {
-		return "==> ballast (ballast): 2.0.0\nStatus Bar app\nhttps://jamsinclair.nz/ballast\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
+		return "==> ballast (ballast): 2.0.0\nStatus Bar app\nhttps://jamsinclair.nz/ballast\nInstalled\n/opt/homebrew/Caskroom/ballast/2.0.0 (2.3MB)\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
 	}
 
 	wrong, err := detectWrongBrewCask()
@@ -1196,7 +1196,7 @@ func TestDetectWrongBrewCaskReturnsFalseForTapCask(t *testing.T) {
 	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
 
 	runCommandOutputFunc = func(name string, args []string) (string, error) {
-		return "==> ballast (ballast): 5.10.3\nCLI that installs AI agent rules\nFrom: https://github.com/everydaydevopsio/homebrew-ballast/blob/HEAD/Casks/ballast.rb", nil
+		return "==> ballast (ballast): 5.10.3\nCLI that installs AI agent rules\nInstalled\n/opt/homebrew/Caskroom/ballast/5.10.3\nFrom: https://github.com/everydaydevopsio/homebrew-ballast/blob/HEAD/Casks/ballast.rb", nil
 	}
 
 	wrong, err := detectWrongBrewCask()
@@ -1205,6 +1205,23 @@ func TestDetectWrongBrewCaskReturnsFalseForTapCask(t *testing.T) {
 	}
 	if wrong {
 		t.Fatal("expected detectWrongBrewCask to return false for tap cask")
+	}
+}
+
+func TestDetectWrongBrewCaskReturnsFalseWhenNotInstalled(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "==> ballast (ballast): 2.0.0\nStatus Bar app\nhttps://jamsinclair.nz/ballast\nNot installed\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wrong {
+		t.Fatal("expected detectWrongBrewCask to return false when core cask is not installed")
 	}
 }
 
@@ -1246,7 +1263,7 @@ func TestRunUpdateFixesWrongCaskOnDarwin(t *testing.T) {
 
 	runCommandOutputFunc = func(name string, args []string) (string, error) {
 		if len(args) >= 3 && args[0] == "info" && args[1] == "--cask" {
-			return "==> ballast\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
+			return "==> ballast\nInstalled\n/opt/homebrew/Caskroom/ballast/2.0.0\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
 		}
 		return "/opt/homebrew", nil
 	}
