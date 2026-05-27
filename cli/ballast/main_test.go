@@ -2319,6 +2319,45 @@ func TestResolveMonorepoPlanRemoveLanguageCleanupOnly(t *testing.T) {
 	}
 }
 
+func TestResolveMonorepoPlanRemoveLanguageWithTargetRunsInstallPath(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["linting"],
+  "skills": [],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(
+		root,
+		[]string{"install", "--target", "codex", "--remove-language", "python", "--yes"},
+	)
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) == 0 {
+		t.Fatalf("expected non-cleanup install plan with backend invocations, got %#v", plan.Invocations)
+	}
+	if !slices.Contains(plan.Config.Targets, "codex") {
+		t.Fatalf("expected saved config targets to include codex, got %#v", plan.Config.Targets)
+	}
+	if slices.Contains(plan.Config.Languages, "python") {
+		t.Fatalf("expected python removed from languages, got %#v", plan.Config.Languages)
+	}
+	if _, ok := plan.Config.Paths["python"]; ok {
+		t.Fatalf("expected python removed from paths, got %#v", plan.Config.Paths)
+	}
+}
+
 func TestParseRemoveLanguageValues(t *testing.T) {
 	values := parseRemoveLanguageValues([]string{
 		"install",

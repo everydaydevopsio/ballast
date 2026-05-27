@@ -1966,7 +1966,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		}
 	}
 	cleanupOnly := len(removeTargets) > 0 && len(requestedTargets) == 0 && !explicitAgentSelection && !explicitSkillSelection
-	languageCleanupOnly := len(removeLanguages) > 0 && !explicitAgentSelection && !explicitSkillSelection
+	languageCleanupOnly := len(removeLanguages) > 0 && len(installTargets) == 0 && len(removeTargets) == 0 && !explicitAgentSelection && !explicitSkillSelection
 	if !cleanupOnly && !languageCleanupOnly && (len(requestedTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills))) {
 		return nil, errors.New("monorepo install requires --target and at least one of --agent/--all or --skill/--all-skills, or a root .rulesrc.json with target, agents/skills, languages, and paths")
 	}
