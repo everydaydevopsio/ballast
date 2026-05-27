@@ -2446,6 +2446,121 @@ func TestResolveMonorepoPlanRemoveLastTargetCleanupOnly(t *testing.T) {
 	}
 }
 
+func TestResolveMonorepoPlanRemoveLanguageCleanupOnly(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["local-dev", "linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-language", "python", "--yes"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) != 0 {
+		t.Fatalf("expected cleanup-only plan with no backend invocations, got %#v", plan.Invocations)
+	}
+	if !reflect.DeepEqual(plan.Config.Languages, []string{"typescript"}) {
+		t.Fatalf("expected python to be removed from languages, got %#v", plan.Config.Languages)
+	}
+	if _, ok := plan.Config.Paths["python"]; ok {
+		t.Fatalf("expected python paths to be removed, got %#v", plan.Config.Paths)
+	}
+	if got := plan.Config.Paths["typescript"]; !reflect.DeepEqual(got, []string{"apps/frontend"}) {
+		t.Fatalf("expected typescript path to remain, got %#v", plan.Config.Paths)
+	}
+}
+
+func TestResolveMonorepoPlanRemoveLanguageWithTargetRunsInstallPath(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["linting"],
+  "skills": [],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(
+		root,
+		[]string{"install", "--target", "codex", "--remove-language", "python", "--yes"},
+	)
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) == 0 {
+		t.Fatalf("expected non-cleanup install plan with backend invocations, got %#v", plan.Invocations)
+	}
+	if !slices.Contains(plan.Config.Targets, "codex") {
+		t.Fatalf("expected saved config targets to include codex, got %#v", plan.Config.Targets)
+	}
+	if slices.Contains(plan.Config.Languages, "python") {
+		t.Fatalf("expected python removed from languages, got %#v", plan.Config.Languages)
+	}
+	if _, ok := plan.Config.Paths["python"]; ok {
+		t.Fatalf("expected python removed from paths, got %#v", plan.Config.Paths)
+	}
+}
+
+func TestParseRemoveLanguageValues(t *testing.T) {
+	values := parseRemoveLanguageValues([]string{
+		"install",
+		"--remove-language=python",
+	})
+	if !reflect.DeepEqual(values, []string{"python"}) {
+		t.Fatalf("expected remove-language values, got %#v", values)
+	}
+}
+
+func TestParseRemoveLanguageValuesNormalizesCase(t *testing.T) {
+	values := parseRemoveLanguageValues([]string{
+		"install",
+		"--remove-language=Python,GO",
+		"--remove-language",
+		"TypeScript",
+	})
+	if !reflect.DeepEqual(values, []string{"python", "go", "typescript"}) {
+		t.Fatalf("expected normalized remove-language values, got %#v", values)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidRemoveLanguage(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-language", "ruby", "--yes"})
+	if err == nil {
+		t.Fatalf("expected invalid remove-language error, got plan %#v", plan)
+	}
+	if !strings.Contains(err.Error(), "invalid --remove-language: ruby") {
+		t.Fatalf("expected invalid remove-language error, got %v", err)
+	}
+}
+
 func TestResolveMonorepoPlanRejectsInvalidConfiguredTargets(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
@@ -3397,6 +3512,63 @@ func TestRunMonorepoRemoveTargetDoesNotPersistConfigWhenCleanupFails(t *testing.
 	text := string(config)
 	if !strings.Contains(text, `"codex"`) || !strings.Contains(text, `"claude"`) {
 		t.Fatalf("expected config to remain unchanged after cleanup failure, got %q", text)
+	}
+}
+
+func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".codex", "rules", "python", "python-linting.md"),
+		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md"),
+		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--remove-language", "python", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "python", "python-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected python rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")); err != nil {
+		t.Fatalf("expected typescript rule to remain, got %v", err)
+	}
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	text := string(config)
+	if strings.Contains(text, `"python"`) || !strings.Contains(text, `"typescript"`) {
+		t.Fatalf("expected python removed and typescript retained in config, got %q", text)
 	}
 }
 
