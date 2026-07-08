@@ -412,6 +412,7 @@ func printUsage() {
 	fmt.Println("  ballast install --target cursor,claude --all")
 	fmt.Println("  ballast install --target gemini --all")
 	fmt.Println("  ballast install --remove-target codex")
+	fmt.Println("  ballast install --remove-language python")
 	fmt.Println("  ballast install --target claude --skill owasp-security-scan")
 	fmt.Println("  ballast install --refresh-config")
 	fmt.Println("  ballast install-cli --language python")
@@ -430,6 +431,7 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
+	fmt.Println("Install language behavior: `--remove-language` removes languages from `.rulesrc.json`, removes their `paths`, and prunes stale Ballast-managed rule files.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
 	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/terraform/`).")
 }
@@ -634,6 +636,23 @@ func runUpdate(args []string) int {
 		fmt.Println("ballast update is only supported for Homebrew installations.")
 		fmt.Println("To upgrade a non-Homebrew install, download the latest release from GitHub.")
 		return 1
+	}
+	if runtime.GOOS == "darwin" {
+		if wrong, err := detectWrongBrewCask(); err == nil && wrong {
+			fmt.Println("WARNING: The core Homebrew cask \"ballast\" (an unrelated audio-balance app) is installed.")
+			fmt.Println("This conflicts with everydaydevopsio/ballast. Fixing automatically...")
+			if err := runCommandFunc("brew", []string{"uninstall", "--cask", "ballast"}); err != nil {
+				fmt.Printf("brew uninstall of wrong cask failed: %v\n", err)
+				return 1
+			}
+			fmt.Println("Installing the correct cask from everydaydevopsio/ballast tap...")
+			if err := runCommandFunc("brew", []string{"install", "--cask", "everydaydevopsio/ballast/ballast"}); err != nil {
+				fmt.Printf("brew install failed: %v\n", err)
+				return 1
+			}
+			fmt.Println("ballast reinstalled from the correct tap. Run `ballast upgrade` to update .rulesrc.json and sync backend CLIs.")
+			return 0
+		}
 	}
 	fmt.Println("Updating Homebrew...")
 	if err := runCommandFunc("brew", []string{"update"}); err != nil {
@@ -917,6 +936,57 @@ func normalizeInstallArgs(args []string, root string) ([]string, error) {
 	return filtered, nil
 }
 
+func parseRemoveLanguageValues(args []string) []string {
+	values := findFlagValues(args, "--remove-language", "")
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		token := strings.ToLower(strings.TrimSpace(value))
+		if token == "" {
+			continue
+		}
+		normalized = append(normalized, token)
+	}
+	return uniqueStrings(normalized)
+}
+
+func validateSelectedLanguages(values []string) error {
+	if len(values) == 0 {
+		return nil
+	}
+	allowed := map[string]struct{}{}
+	for _, lang := range supportedLanguages {
+		allowed[string(lang)] = struct{}{}
+	}
+	for _, value := range values {
+		if _, ok := allowed[value]; !ok {
+			return fmt.Errorf(
+				"invalid --remove-language: %s (valid: %s)",
+				value,
+				strings.Join(languageNames(), ", "),
+			)
+		}
+	}
+	return nil
+}
+
+func filterProfilesByLanguage(profiles []repoProfile, removed []string) []repoProfile {
+	if len(removed) == 0 {
+		return profiles
+	}
+	removedSet := map[string]struct{}{}
+	for _, lang := range removed {
+		removedSet[lang] = struct{}{}
+	}
+	filtered := make([]repoProfile, 0, len(profiles))
+	for _, profile := range profiles {
+		if _, remove := removedSet[string(profile.Language)]; remove {
+			continue
+		}
+		filtered = append(filtered, profile)
+	}
+	return filtered
+}
+
 func ensureLocalToolDirs(root string) error {
 	if err := ensureGitignoreEntry(root, ".ballast/"); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: could not update .gitignore for .ballast/: %v\n", err)
@@ -1086,11 +1156,43 @@ func detectBrewInstall() bool {
 	return execPath == prefix || strings.HasPrefix(execPath, prefix+string(os.PathSeparator))
 }
 
+// detectWrongBrewCask checks whether the core Homebrew cask "ballast" (an
+// unrelated audio-balance app) is installed instead of the tap cask.  It
+// runs `brew info --cask ballast` and inspects both the installed status
+// and the "From:" line; the core cask comes from homebrew/homebrew-cask
+// while the correct one comes from everydaydevopsio/homebrew-ballast.
+func detectWrongBrewCask() (bool, error) {
+	out, err := runCommandOutputFunc("brew", []string{"info", "--cask", "ballast"})
+	if err != nil {
+		return false, err
+	}
+	lines := strings.Split(out, "\n")
+	installed := false
+	fromCore := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Not installed") {
+			return false, nil
+		}
+		if strings.HasPrefix(trimmed, "Installed") {
+			installed = true
+		}
+		if strings.HasPrefix(trimmed, "From:") {
+			if strings.Contains(trimmed, "homebrew/homebrew-cask") || strings.Contains(trimmed, "Homebrew/homebrew-cask") {
+				fromCore = true
+			}
+		}
+	}
+	return installed && fromCore, nil
+}
+
 // brewUpgradeArgs returns the brew subcommand arguments needed to upgrade
-// the ballast CLI: formula on Linux, cask on macOS.
+// the ballast CLI: formula on Linux, cask on macOS.  Both paths use the
+// fully-qualified tap name so Homebrew never resolves to the unrelated
+// core cask "ballast" (an audio-balance app).
 func brewUpgradeArgs() []string {
 	if runtime.GOOS == "darwin" {
-		return []string{"upgrade", "--cask", "ballast"}
+		return []string{"upgrade", "--cask", "everydaydevopsio/ballast/ballast"}
 	}
 	return []string{"upgrade", "--formula", "everydaydevopsio/ballast/ballast"}
 }
@@ -1863,9 +1965,17 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			profiles = configProfiles
 		}
 	}
+	removeLanguages := parseRemoveLanguageValues(args)
+	if err := validateSelectedLanguages(removeLanguages); err != nil {
+		return nil, err
+	}
+	profiles = filterProfilesByLanguage(profiles, removeLanguages)
 
 	if len(profiles) < 2 {
-		return nil, nil
+		allowLanguageRemovalPlan := len(removeLanguages) > 0 && config != nil && len(config.Languages) > 1
+		if !allowLanguageRemovalPlan {
+			return nil, nil
+		}
 	}
 	if warning := javascriptComponentWarning(root); warning != "" && !profilesIncludeLanguage(profiles, langTypeScript) {
 		fmt.Fprintln(os.Stderr, "warning:", warning)
@@ -1905,7 +2015,8 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		}
 	}
 	cleanupOnly := len(removeTargets) > 0 && len(requestedTargets) == 0 && !explicitAgentSelection && !explicitSkillSelection
-	if !cleanupOnly && (len(requestedTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills))) {
+	languageCleanupOnly := len(removeLanguages) > 0 && len(installTargets) == 0 && len(removeTargets) == 0 && !explicitAgentSelection && !explicitSkillSelection
+	if !cleanupOnly && !languageCleanupOnly && (len(requestedTargets) == 0 || ((len(installAgents) == 0 && !installAll) && (len(installSkills) == 0 && !installAllSkills))) {
 		return nil, errors.New("monorepo install requires --target and at least one of --agent/--all or --skill/--all-skills, or a root .rulesrc.json with target, agents/skills, languages, and paths")
 	}
 
@@ -1971,7 +2082,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
 	}
-	if cleanupOnly {
+	if cleanupOnly || languageCleanupOnly {
 		return &monorepoPlan{
 			Invocations: nil,
 			Config:      configToSave,
@@ -1981,6 +2092,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 			Removed:     removeTargets,
 			Previous:    config,
 		}, nil
+	}
+	if len(profiles) == 0 {
+		return nil, errors.New("no languages remain after --remove-language; run with only --remove-language to clean up and persist config, or select a language with --language for single-language installs")
 	}
 
 	commonSelection := filterAgents(selectedAgents, commonAgentIDs())
@@ -2373,6 +2487,10 @@ func stripMonorepoFlags(args []string) []string {
 			i++
 			continue
 		}
+		if arg == "--remove-language" {
+			i++
+			continue
+		}
 		if arg == "--task-system" {
 			i++
 			continue
@@ -2381,6 +2499,9 @@ func stripMonorepoFlags(args []string) []string {
 			continue
 		}
 		if strings.HasPrefix(arg, "--remove-target=") {
+			continue
+		}
+		if strings.HasPrefix(arg, "--remove-language=") {
 			continue
 		}
 		if strings.HasPrefix(arg, "--task-system=") {

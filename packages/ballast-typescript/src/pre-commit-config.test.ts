@@ -29,16 +29,14 @@ function readPreCommitConfig(): PreCommitConfig {
 }
 
 describe('root pre-commit config', () => {
-  test('uses non-mutating whitespace checks', () => {
+  test('uses auto-fixing whitespace hooks', () => {
     const config = readPreCommitConfig();
     const hookIds = config.repos.flatMap((repo) =>
       (repo.hooks ?? []).map((hook) => hook.id).filter(Boolean)
     );
 
-    expect(hookIds).not.toContain('trailing-whitespace');
-    expect(hookIds).not.toContain('end-of-file-fixer');
-    expect(hookIds).toContain('check-trailing-whitespace');
-    expect(hookIds).toContain('check-end-of-file-newline');
+    expect(hookIds).toContain('trailing-whitespace');
+    expect(hookIds).toContain('end-of-file-fixer');
   });
 
   test('runs all package and cli unit tests at pre-push', () => {

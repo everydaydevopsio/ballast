@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -112,7 +113,7 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 		}
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "ballastVersion":"5.0.2",
   "target":"claude",
@@ -167,7 +168,7 @@ func TestFindProjectRootUsesBallastConfigMarkers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			root := t.TempDir()
+			root := resolvedTempDir(t)
 			nested := filepath.Join(root, "apps", "child")
 			if err := os.MkdirAll(nested, 0o755); err != nil {
 				t.Fatalf("mkdir nested: %v", err)
@@ -192,7 +193,7 @@ func TestRunDoctorFixPrintsMode(t *testing.T) {
 	version = "5.0.2"
 	runCommandFunc = func(name string, args []string) error { return nil }
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	output := captureStdout(t, func() {
 		withWorkingDir(t, root, func() {
@@ -245,7 +246,7 @@ func TestRunDoctorFixInstallsBackendsAndRefreshesConfig(t *testing.T) {
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"claude","agents":["local-dev"]}`)
 
@@ -287,7 +288,7 @@ func TestRunDoctorFixUsesConfigVersionForBackendInstallsInsideSourceCheckout(t *
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -333,7 +334,7 @@ func TestRunDoctorFixUsesConfigVersionForBackendInstallsInsideSourceCheckout(t *
 }
 
 func TestEnsureLocalToolDirsAddsBallastToGitignore(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 
 	if err := ensureLocalToolDirs(root); err != nil {
 		t.Fatalf("ensureLocalToolDirs failed: %v", err)
@@ -349,7 +350,7 @@ func TestEnsureLocalToolDirsAddsBallastToGitignore(t *testing.T) {
 }
 
 func TestEnsureLocalToolDirsContinuesWhenGitignoreCannotBeUpdated(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	if err := os.Mkdir(filepath.Join(root, ".gitignore"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +391,7 @@ func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T)
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -449,7 +450,7 @@ func TestRunUpgradePatchForwardsPatchToRefreshInstall(t *testing.T) {
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -489,8 +490,8 @@ func TestRunUpgradeUsesLocalSourcesInsideSourceCheckout(t *testing.T) {
 	})
 	version = "5.0.6"
 
-	sourceRoot := t.TempDir()
-	projectRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
+	projectRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(sourceRoot, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -566,7 +567,7 @@ func TestRunUpgradeForceForwardsForceToRefreshInstall(t *testing.T) {
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -616,7 +617,7 @@ func TestRunDoctorFixForwardsSelectedLanguageToRefreshInstall(t *testing.T) {
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/project\n\ngo 1.24\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "ballastVersion":"5.0.5",
@@ -662,7 +663,7 @@ func TestRunDoctorFixSkipsRefreshWhenConfigIsMissing(t *testing.T) {
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 
 	if exitCode := runDoctorFix(root, langGo, false, false); exitCode != 0 {
@@ -691,9 +692,9 @@ func TestRunUpgradeRefreshesSelectedBackendOnceOutsideSourceCheckout(t *testing.
 	runCommandFunc = func(name string, args []string) error { return nil }
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
 	osExecutableFunc = func() (string, error) {
-		return filepath.Join(t.TempDir(), "outside-ballast", "ballast"), nil
+		return filepath.Join(resolvedTempDir(t), "outside-ballast", "ballast"), nil
 	}
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	refreshCount := 0
 	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
 		refreshCount++
@@ -742,7 +743,7 @@ func TestRunUpgradeRejectsUnknownOption(t *testing.T) {
 }
 
 func TestRunUpgradeRequiresExistingConfig(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	makeGitBoundary(t, root)
 	output := captureStdout(t, func() {
 		withWorkingDir(t, root, func() {
@@ -827,6 +828,9 @@ func TestRunUpdateRunsBrewWhenBrewInstalled(t *testing.T) {
 
 	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
 	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		if len(args) >= 3 && args[0] == "info" && args[1] == "--cask" {
+			return "==> ballast\nFrom: https://github.com/everydaydevopsio/homebrew-ballast/blob/HEAD/Casks/ballast.rb", nil
+		}
 		return "/opt/homebrew", nil
 	}
 	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
@@ -853,6 +857,13 @@ func TestRunUpdateRunsBrewWhenBrewInstalled(t *testing.T) {
 	}
 	if got := commands[1][1]; got != "upgrade" {
 		t.Fatalf("expected second command to be 'brew upgrade ...', got %v", commands[1])
+	}
+	// Verify fully-qualified tap name is used on macOS
+	if runtime.GOOS == "darwin" {
+		upgradeArgs := strings.Join(commands[1], " ")
+		if !strings.Contains(upgradeArgs, "everydaydevopsio/ballast/ballast") {
+			t.Fatalf("expected fully-qualified cask name, got %q", upgradeArgs)
+		}
 	}
 }
 
@@ -987,6 +998,9 @@ func TestRunUpdateSuccessMessage(t *testing.T) {
 
 	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
 	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		if len(args) >= 3 && args[0] == "info" && args[1] == "--cask" {
+			return "==> ballast\nFrom: https://github.com/everydaydevopsio/homebrew-ballast/blob/HEAD/Casks/ballast.rb", nil
+		}
 		return "/opt/homebrew", nil
 	}
 	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
@@ -1032,7 +1046,7 @@ func TestRunUpgradeDoesNotRunBrew(t *testing.T) {
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "ballastVersion":"5.0.5",
@@ -1145,6 +1159,152 @@ func TestBrewUpgradeArgsReturnsNonEmpty(t *testing.T) {
 	}
 }
 
+func TestBrewUpgradeArgsUsesFullyQualifiedName(t *testing.T) {
+	args := brewUpgradeArgs()
+	// Both darwin and linux should use the fully-qualified tap name
+	found := false
+	for _, a := range args {
+		if a == "everydaydevopsio/ballast/ballast" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected fully-qualified tap name in args, got %v", args)
+	}
+}
+
+func TestDetectWrongBrewCaskReturnsTrueForCoreCask(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "==> ballast (ballast): 2.0.0\nStatus Bar app\nhttps://jamsinclair.nz/ballast\nInstalled\n/opt/homebrew/Caskroom/ballast/2.0.0 (2.3MB)\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wrong {
+		t.Fatal("expected detectWrongBrewCask to return true for core cask")
+	}
+}
+
+func TestDetectWrongBrewCaskReturnsFalseForTapCask(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "==> ballast (ballast): 5.10.3\nCLI that installs AI agent rules\nInstalled\n/opt/homebrew/Caskroom/ballast/5.10.3\nFrom: https://github.com/everydaydevopsio/homebrew-ballast/blob/HEAD/Casks/ballast.rb", nil
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wrong {
+		t.Fatal("expected detectWrongBrewCask to return false for tap cask")
+	}
+}
+
+func TestDetectWrongBrewCaskReturnsFalseWhenNotInstalled(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "==> ballast (ballast): 2.0.0\nStatus Bar app\nhttps://jamsinclair.nz/ballast\nNot installed\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wrong {
+		t.Fatal("expected detectWrongBrewCask to return false when core cask is not installed")
+	}
+}
+
+func TestDetectWrongBrewCaskReturnsFalseOnError(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return "", errors.New("not installed")
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if wrong {
+		t.Fatal("expected false on error")
+	}
+}
+
+func TestRunUpdateFixesWrongCaskOnDarwin(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("darwin-only test")
+	}
+
+	originalRun := runCommandFunc
+	originalLookPath := execLookPathFunc
+	originalOutput := runCommandOutputFunc
+	originalExe := osExecutableFunc
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		execLookPathFunc = originalLookPath
+		runCommandOutputFunc = originalOutput
+		osExecutableFunc = originalExe
+	})
+
+	execLookPathFunc = func(file string) (string, error) { return "/opt/homebrew/bin/brew", nil }
+	osExecutableFunc = func() (string, error) { return "/opt/homebrew/bin/ballast", nil }
+
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		if len(args) >= 3 && args[0] == "info" && args[1] == "--cask" {
+			return "==> ballast\nInstalled\n/opt/homebrew/Caskroom/ballast/2.0.0\nFrom: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb", nil
+		}
+		return "/opt/homebrew", nil
+	}
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := run([]string{"update"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if !strings.Contains(output, "unrelated audio-balance app") {
+		t.Fatalf("expected wrong-cask warning, got %q", output)
+	}
+
+	// Should uninstall wrong cask then install correct one
+	foundUninstall := false
+	foundInstall := false
+	for _, cmd := range commands {
+		joined := strings.Join(cmd, " ")
+		if strings.Contains(joined, "uninstall --cask ballast") {
+			foundUninstall = true
+		}
+		if strings.Contains(joined, "install --cask everydaydevopsio/ballast/ballast") {
+			foundInstall = true
+		}
+	}
+	if !foundUninstall {
+		t.Fatalf("expected uninstall of wrong cask, commands: %v", commands)
+	}
+	if !foundInstall {
+		t.Fatalf("expected install of correct cask, commands: %v", commands)
+	}
+}
+
 func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
@@ -1160,7 +1320,7 @@ func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"claude","agents":["local-dev"]}`)
 
@@ -1195,7 +1355,7 @@ func TestRunInstallRefreshConfigCleansUpSingleLanguageStaleSelections(t *testing
 		return 0, nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"opencode","agents":["linting"],"skills":[]}`)
 	staleSkill := filepath.Join(root, ".opencode", "skills", "owasp-security-scan.md")
@@ -1225,7 +1385,7 @@ func TestRunInstallCLICommand(t *testing.T) {
 		return nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"install-cli", "--language", "python", "--version", "5.0.2"})
@@ -1254,7 +1414,7 @@ func TestRunInstallCLIGoUsesReleaseArchiveForPinnedVersion(t *testing.T) {
 		return nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/test\n\ngo 1.24\n")
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"install-cli", "--language", "go", "--version", "5.0.2"})
@@ -1296,7 +1456,7 @@ func TestRunInstallCLICommandInstallsAllLanguagesByDefault(t *testing.T) {
 		return nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"install-cli"})
@@ -1328,7 +1488,7 @@ func TestRunInstallCLICommandInstallsGoBackendForAnsibleLanguage(t *testing.T) {
 		return nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"install-cli", "--language", "ansible", "--version", "5.0.2"})
@@ -1361,7 +1521,7 @@ func TestRunInstallCLICommandInstallsGoBackendForTerraformLanguage(t *testing.T)
 		return nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".terraform-version"), "1.8.5\n")
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"install-cli", "--language", "terraform", "--version", "5.0.2"})
@@ -1387,7 +1547,7 @@ func TestRunInstallCLICreatesLocalBallastDirectories(t *testing.T) {
 
 	runCommandFunc = func(name string, args []string) error { return nil }
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"install-cli", "--language", "go", "--version", "5.0.2"})
@@ -1411,10 +1571,10 @@ func TestPythonInstallCommandErrorsForDevVersionOutsideSourceTree(t *testing.T) 
 
 	version = "dev"
 	osExecutableFunc = func() (string, error) {
-		return filepath.Join(t.TempDir(), "outside-ballast", "ballast"), nil
+		return filepath.Join(resolvedTempDir(t), "outside-ballast", "ballast"), nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	command, err := toolsByLanguage[langPython].installCommand("", root)
 	if err == nil {
 		t.Fatalf("expected dev version outside source tree to error, got command %#v", command)
@@ -1435,8 +1595,8 @@ func TestRunInstallCLIUsesLocalSourcesForDevWrapper(t *testing.T) {
 	})
 
 	version = "dev"
-	sourceRoot := t.TempDir()
-	projectRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
+	projectRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
@@ -1483,13 +1643,13 @@ func TestRunInstallCLIUsesLocalSourcesInsideSourceCheckoutForReleaseWrapper(t *t
 	})
 
 	version = "5.0.4"
-	sourceRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(sourceRoot, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
 	osExecutableFunc = func() (string, error) {
-		return filepath.Join(t.TempDir(), "bin", "ballast"), nil
+		return filepath.Join(resolvedTempDir(t), "bin", "ballast"), nil
 	}
 
 	var commands [][]string
@@ -1520,7 +1680,7 @@ func TestRunInstallCLIUsesLocalSourcesInsideSourceCheckoutForReleaseWrapper(t *t
 }
 
 func TestResolveLocalBackendCommandUsesGoBinaryForTerraform(t *testing.T) {
-	repoRoot := t.TempDir()
+	repoRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go"), "")
 
 	resolved := resolveLocalBackendCommand(repoRoot, langTerraform)
@@ -1530,7 +1690,7 @@ func TestResolveLocalBackendCommandUsesGoBinaryForTerraform(t *testing.T) {
 }
 
 func TestProjectLocalBackendCommandUsesGoBinaryForTerraform(t *testing.T) {
-	projectRoot := t.TempDir()
+	projectRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "")
 
 	resolved := projectLocalBackendCommand(projectRoot, langTerraform)
@@ -1545,7 +1705,7 @@ func TestSiblingBackendBinaryUsesGoBinaryForTerraform(t *testing.T) {
 		osExecutableFunc = originalExecutable
 	})
 
-	binDir := t.TempDir()
+	binDir := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(binDir, "ballast-go"), "")
 	osExecutableFunc = func() (string, error) {
 		return filepath.Join(binDir, "ballast"), nil
@@ -1571,13 +1731,13 @@ func TestRunInstallCLIUsesPinnedReleaseVersionsInsideSourceCheckout(t *testing.T
 	})
 
 	version = "5.0.6"
-	sourceRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(sourceRoot, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
 	osExecutableFunc = func() (string, error) {
-		return filepath.Join(t.TempDir(), "bin", "ballast"), nil
+		return filepath.Join(resolvedTempDir(t), "bin", "ballast"), nil
 	}
 
 	var commands [][]string
@@ -1619,14 +1779,14 @@ func TestRunInstallCLIUsesLocalSourcesFromNestedPackageDirForReleaseWrapper(t *t
 	})
 
 	version = "5.0.4"
-	sourceRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
 	nestedRoot := filepath.Join(sourceRoot, "packages", "ballast-python")
 	mustWriteFile(t, filepath.Join(sourceRoot, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
 	mustWriteFile(t, filepath.Join(nestedRoot, "pyproject.toml"), "[project]\nname='ballast-python'\n")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.24\n")
 	osExecutableFunc = func() (string, error) {
-		return filepath.Join(t.TempDir(), "bin", "ballast"), nil
+		return filepath.Join(resolvedTempDir(t), "bin", "ballast"), nil
 	}
 
 	var commands [][]string
@@ -1657,7 +1817,7 @@ func TestRunInstallCLIUsesLocalSourcesFromNestedPackageDirForReleaseWrapper(t *t
 }
 
 func TestDetectRepoProfilesFindsMultiLanguageMonorepo(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, "tools", "worker", "go.mod"), "module example.com/worker\n\ngo 1.24\n")
@@ -1682,7 +1842,7 @@ func TestDetectRepoProfilesFindsMultiLanguageMonorepo(t *testing.T) {
 }
 
 func TestDetectRepoProfilesFindsAnsibleProfile(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "ansible.cfg"), "[defaults]\n")
 	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "playbook.yml"), "---\n")
 
@@ -1700,7 +1860,7 @@ func TestDetectRepoProfilesFindsAnsibleProfile(t *testing.T) {
 }
 
 func TestDetectRepoProfilesFindsAnsibleProfileFromRequirementsYaml(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "requirements.yaml"), "---\n")
 
 	profiles, err := detectRepoProfiles(root)
@@ -1717,7 +1877,7 @@ func TestDetectRepoProfilesFindsAnsibleProfileFromRequirementsYaml(t *testing.T)
 }
 
 func TestDetectRepoProfilesFindsTerraformProfile(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform-version"), "1.8.5\n")
 	mustWriteFile(t, filepath.Join(root, "infra", "terraform", "versions.tf"), "terraform {}\n")
 
@@ -1735,7 +1895,7 @@ func TestDetectRepoProfilesFindsTerraformProfile(t *testing.T) {
 }
 
 func TestDetectRepoProfilesSkipsTerraformCaches(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform-version"), "1.8.5\n")
 	mustWriteFile(t, filepath.Join(root, "infra", "terraform", "versions.tf"), "terraform {}\n")
 	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform", "modules", "cached", "main.tf"), "terraform {}\n")
@@ -1755,7 +1915,7 @@ func TestDetectRepoProfilesSkipsTerraformCaches(t *testing.T) {
 }
 
 func TestDetectRepoProfilesSkipsDotPrefixedDirectories(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".codex", "hidden-app", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 
@@ -1773,7 +1933,7 @@ func TestDetectRepoProfilesSkipsDotPrefixedDirectories(t *testing.T) {
 }
 
 func TestDetectLanguageSupportsAnsibleRequirementsYaml(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "requirements.yaml"), "---\n")
 
 	got := detectLanguage(root)
@@ -1783,7 +1943,7 @@ func TestDetectLanguageSupportsAnsibleRequirementsYaml(t *testing.T) {
 }
 
 func TestDetectLanguagePrefersAnsibleMarkers(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
 	mustWriteFile(t, filepath.Join(root, "playbook.yml"), "---\n")
 
@@ -1794,7 +1954,7 @@ func TestDetectLanguagePrefersAnsibleMarkers(t *testing.T) {
 }
 
 func TestDetectLanguageSupportsTerraformMarkers(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".terraform-version"), "1.8.5\n")
 	mustWriteFile(t, filepath.Join(root, "versions.tf"), "terraform {}\n")
 
@@ -1805,7 +1965,7 @@ func TestDetectLanguageSupportsTerraformMarkers(t *testing.T) {
 }
 
 func TestDetectLanguageSupportsTerraformRulesConfig(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.terraform.json"), `{"target":"cursor","agents":["linting"]}`)
 
 	got := detectLanguage(root)
@@ -1815,7 +1975,7 @@ func TestDetectLanguageSupportsTerraformRulesConfig(t *testing.T) {
 }
 
 func TestDetectLanguageWarnsForJavaScriptPackageWithoutTsconfig(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), `{
   "name": "novnc-desktop",
   "private": true,
@@ -1840,7 +2000,7 @@ func TestDetectLanguageWarnsForJavaScriptPackageWithoutTsconfig(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanWarnsForJavaScriptRootWithoutTypeScriptProfile(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), `{
   "name": "novnc-desktop",
   "private": true,
@@ -1871,7 +2031,7 @@ func TestResolveMonorepoPlanWarnsForJavaScriptRootWithoutTypeScriptProfile(t *te
 }
 
 func TestResolveBackendCommandAddsAnsibleLanguageFlag(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
 	mustWriteFile(t, filepath.Join(root, ".ballast", "bin", "ballast-go"), "")
 
@@ -1888,7 +2048,7 @@ func TestResolveBackendCommandAddsAnsibleLanguageFlag(t *testing.T) {
 }
 
 func TestResolveBackendCommandAddsTerraformLanguageFlag(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".terraform-version"), "1.8.5\n")
 	mustWriteFile(t, filepath.Join(root, ".ballast", "bin", "ballast-go"), "")
 
@@ -1905,7 +2065,7 @@ func TestResolveBackendCommandAddsTerraformLanguageFlag(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "cursor",
   "agents": ["local-dev", "linting", "testing"],
@@ -1958,7 +2118,7 @@ func TestResolveMonorepoPlanUsesConfigAndSplitsCommonFromLanguageAgents(t *testi
 }
 
 func TestResolveMonorepoPlanInvokesOncePerLanguage(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend-a", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend-b", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
@@ -1976,7 +2136,7 @@ func TestResolveMonorepoPlanInvokesOncePerLanguage(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanAllIncludesExpectedCommonAgents(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 
@@ -2043,7 +2203,7 @@ func TestWithSkillSelectionReplacesExistingFlags(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanSupportsSkillOnlyConfig(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "claude",
   "skills": ["owasp-security-scan"],
@@ -2077,7 +2237,7 @@ func TestResolveMonorepoPlanSupportsSkillOnlyConfig(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanSkillOnlyInstallPreservesConfigAgents(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "claude",
   "agents": ["local-dev", "linting"],
@@ -2127,7 +2287,7 @@ func TestResolveMonorepoPlanSkillOnlyInstallPreservesConfigAgents(t *testing.T) 
 }
 
 func TestResolveMonorepoPlanAgentOnlyInstallPreservesConfigSkills(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "claude",
   "skills": ["owasp-security-scan"],
@@ -2162,7 +2322,7 @@ func TestResolveMonorepoPlanAgentOnlyInstallPreservesConfigSkills(t *testing.T) 
 }
 
 func TestResolveMonorepoPlanSkillOnlyInstallRejectsInvalidPersistedAgents(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "claude",
   "agents": ["not-an-agent"],
@@ -2187,7 +2347,7 @@ func TestResolveMonorepoPlanSkillOnlyInstallRejectsInvalidPersistedAgents(t *tes
 }
 
 func TestResolveMonorepoPlanAgentOnlyInstallRejectsInvalidPersistedSkills(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "claude",
   "skills": ["not-a-skill"],
@@ -2212,7 +2372,7 @@ func TestResolveMonorepoPlanAgentOnlyInstallRejectsInvalidPersistedSkills(t *tes
 }
 
 func TestResolveMonorepoPlanSkillOnlyInstallRetainsConfiguredAgents(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
@@ -2257,7 +2417,7 @@ func TestResolveMonorepoPlanSkillOnlyInstallRetainsConfiguredAgents(t *testing.T
 }
 
 func TestResolveMonorepoPlanRemoveLastTargetCleanupOnly(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "targets": ["codex"],
   "agents": ["local-dev", "linting"],
@@ -2286,8 +2446,123 @@ func TestResolveMonorepoPlanRemoveLastTargetCleanupOnly(t *testing.T) {
 	}
 }
 
-func TestResolveMonorepoPlanRejectsInvalidConfiguredTargets(t *testing.T) {
+func TestResolveMonorepoPlanRemoveLanguageCleanupOnly(t *testing.T) {
 	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["local-dev", "linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-language", "python", "--yes"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) != 0 {
+		t.Fatalf("expected cleanup-only plan with no backend invocations, got %#v", plan.Invocations)
+	}
+	if !reflect.DeepEqual(plan.Config.Languages, []string{"typescript"}) {
+		t.Fatalf("expected python to be removed from languages, got %#v", plan.Config.Languages)
+	}
+	if _, ok := plan.Config.Paths["python"]; ok {
+		t.Fatalf("expected python paths to be removed, got %#v", plan.Config.Paths)
+	}
+	if got := plan.Config.Paths["typescript"]; !reflect.DeepEqual(got, []string{"apps/frontend"}) {
+		t.Fatalf("expected typescript path to remain, got %#v", plan.Config.Paths)
+	}
+}
+
+func TestResolveMonorepoPlanRemoveLanguageWithTargetRunsInstallPath(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["linting"],
+  "skills": [],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(
+		root,
+		[]string{"install", "--target", "codex", "--remove-language", "python", "--yes"},
+	)
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Invocations) == 0 {
+		t.Fatalf("expected non-cleanup install plan with backend invocations, got %#v", plan.Invocations)
+	}
+	if !slices.Contains(plan.Config.Targets, "codex") {
+		t.Fatalf("expected saved config targets to include codex, got %#v", plan.Config.Targets)
+	}
+	if slices.Contains(plan.Config.Languages, "python") {
+		t.Fatalf("expected python removed from languages, got %#v", plan.Config.Languages)
+	}
+	if _, ok := plan.Config.Paths["python"]; ok {
+		t.Fatalf("expected python removed from paths, got %#v", plan.Config.Paths)
+	}
+}
+
+func TestParseRemoveLanguageValues(t *testing.T) {
+	values := parseRemoveLanguageValues([]string{
+		"install",
+		"--remove-language=python",
+	})
+	if !reflect.DeepEqual(values, []string{"python"}) {
+		t.Fatalf("expected remove-language values, got %#v", values)
+	}
+}
+
+func TestParseRemoveLanguageValuesNormalizesCase(t *testing.T) {
+	values := parseRemoveLanguageValues([]string{
+		"install",
+		"--remove-language=Python,GO",
+		"--remove-language",
+		"TypeScript",
+	})
+	if !reflect.DeepEqual(values, []string{"python", "go", "typescript"}) {
+		t.Fatalf("expected normalized remove-language values, got %#v", values)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidRemoveLanguage(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-language", "ruby", "--yes"})
+	if err == nil {
+		t.Fatalf("expected invalid remove-language error, got plan %#v", plan)
+	}
+	if !strings.Contains(err.Error(), "invalid --remove-language: ruby") {
+		t.Fatalf("expected invalid remove-language error, got %v", err)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidConfiguredTargets(t *testing.T) {
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "targets": ["cursor", "bogus"],
   "agents": ["local-dev", "linting"],
@@ -2308,7 +2583,7 @@ func TestResolveMonorepoPlanRejectsInvalidConfiguredTargets(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanIgnoresStaleRulesrcProfiles(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
@@ -2347,7 +2622,7 @@ func TestResolveMonorepoPlanIgnoresStaleRulesrcProfiles(t *testing.T) {
 }
 
 func TestRunMonorepoInstallExecutesEachBackendAtRepoRoot(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
@@ -2420,7 +2695,7 @@ func TestRunMonorepoInstallExecutesEachBackendAtRepoRoot(t *testing.T) {
 }
 
 func TestRunMonorepoInstallMergesRequestedTargetsIntoSavedConfig(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
@@ -2463,8 +2738,8 @@ func TestRunMonorepoInstallMergesRequestedTargetsIntoSavedConfig(t *testing.T) {
 }
 
 func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
-	sourceRoot := t.TempDir()
-	projectRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
+	projectRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -2547,8 +2822,8 @@ func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
 }
 
 func TestRunMonorepoInstallSupportsEnvProvidedSourceRoot(t *testing.T) {
-	sourceRoot := t.TempDir()
-	projectRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
+	projectRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -2574,7 +2849,7 @@ func TestRunMonorepoInstallSupportsEnvProvidedSourceRoot(t *testing.T) {
 		t.Fatalf("set BALLAST_REPO_ROOT: %v", err)
 	}
 	osExecutableFunc = func() (string, error) {
-		return filepath.Join(t.TempDir(), "bin", "ballast"), nil
+		return filepath.Join(resolvedTempDir(t), "bin", "ballast"), nil
 	}
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
 
@@ -2608,8 +2883,8 @@ func TestRunMonorepoInstallSupportsEnvProvidedSourceRoot(t *testing.T) {
 }
 
 func TestRunMonorepoInstallPrefersSiblingBackendsNextToWrapper(t *testing.T) {
-	sourceRoot := t.TempDir()
-	projectRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
+	projectRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -2671,8 +2946,8 @@ func TestRunMonorepoInstallPrefersSiblingBackendsNextToWrapper(t *testing.T) {
 }
 
 func TestRunSingleLanguageInstallPrefersLocalBackendWithoutNilEnvPanic(t *testing.T) {
-	sourceRoot := t.TempDir()
-	projectRoot := t.TempDir()
+	sourceRoot := resolvedTempDir(t)
+	projectRoot := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -2729,7 +3004,7 @@ func TestRunSingleLanguageInstallPrefersLocalBackendWithoutNilEnvPanic(t *testin
 }
 
 func TestRunSingleLanguageInstallReinstallsBackendWhenVersionMismatches(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "tsconfig.json"), "{}")
 
@@ -2802,7 +3077,7 @@ func TestEnsureInstalledUsesPinnedVersionWhenBackendVersionDiffers(t *testing.T)
 		return nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/test\n\ngo 1.24\n")
 	localBinary := filepath.Join(root, ".ballast", "bin", "ballast-go")
 	mustWriteFile(t, localBinary, "#!/usr/bin/env bash\necho 4.1.7\n")
@@ -2844,7 +3119,7 @@ func TestEnsureInstalledSkipsVersionCheckForDevWrapperBuilds(t *testing.T) {
 		return nil
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/test\n\ngo 1.24\n")
 	localBinary := filepath.Join(root, ".ballast", "bin", "ballast-go")
 	mustWriteFile(t, localBinary, "#!/usr/bin/env bash\necho 4.1.7\n")
@@ -2865,7 +3140,7 @@ func TestEnsureInstalledSkipsVersionCheckForDevWrapperBuilds(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanRejectsEscapingPathsFromConfig(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "cursor",
   "agents": ["linting"],
@@ -2886,7 +3161,7 @@ func TestResolveMonorepoPlanRejectsEscapingPathsFromConfig(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanRejectsUnsupportedAgents(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "target": "cursor",
   "agents": ["not-an-agent"],
@@ -2907,7 +3182,7 @@ func TestResolveMonorepoPlanRejectsUnsupportedAgents(t *testing.T) {
 }
 
 func TestRunMonorepoInstallDoesNotPersistConfigOnFailure(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
@@ -2951,7 +3226,7 @@ func TestDetectRepoProfilesPropagatesWalkErrors(t *testing.T) {
 		return errors.New("walk failed")
 	}
 
-	profiles, err := detectRepoProfiles(t.TempDir())
+	profiles, err := detectRepoProfiles(resolvedTempDir(t))
 	if err == nil {
 		t.Fatalf("expected walk error, got profiles %#v", profiles)
 	}
@@ -2961,7 +3236,7 @@ func TestDetectRepoProfilesPropagatesWalkErrors(t *testing.T) {
 }
 
 func TestUpdateMonorepoSupportFilesCreatesClaudeMdAtRoot(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	plan := &monorepoPlan{
 		Targets:  []string{"claude"},
 		Common:   []string{"local-dev"},
@@ -2992,7 +3267,7 @@ func TestUpdateMonorepoSupportFilesCreatesClaudeMdAtRoot(t *testing.T) {
 }
 
 func TestUpdateMonorepoSupportFilesPreservesUnmanagedSectionsWithoutPatch(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	plan := &monorepoPlan{
 		Targets:  []string{"claude"},
 		Common:   []string{"local-dev"},
@@ -3025,7 +3300,7 @@ func TestUpdateMonorepoSupportFilesPreservesUnmanagedSectionsWithoutPatch(t *tes
 }
 
 func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	rulePath := filepath.Join(root, ".codex", "rules", "common", "docs.md")
 	skillPath := filepath.Join(root, ".claude", "skills", "github-health-check.skill")
 	mustWriteFile(t, rulePath, "user-authored file at canonical path\n")
@@ -3061,7 +3336,7 @@ func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
 }
 
 func TestRemoveStaleManagedFilesDeletesConfigBackedOpencodeSkill(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	skillPath := filepath.Join(root, ".opencode", "skills", "github-health-check.md")
 	mustWriteFile(t, skillPath, "legacy managed skill without explicit marker\n")
 
@@ -3087,7 +3362,7 @@ func TestRemoveStaleManagedFilesDeletesConfigBackedOpencodeSkill(t *testing.T) {
 }
 
 func TestRemoveStaleManagedFilesPreservesUnmanagedOpencodeSkillNotInPreviousConfig(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	skillPath := filepath.Join(root, ".opencode", "skills", "github-health-check.md")
 	mustWriteFile(t, skillPath, "user-authored skill at canonical path\n")
 
@@ -3113,7 +3388,7 @@ func TestRemoveStaleManagedFilesPreservesUnmanagedOpencodeSkillNotInPreviousConf
 }
 
 func TestRunMonorepoRemoveTargetCleansManagedRulesAndSupportFiles(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
@@ -3192,7 +3467,7 @@ func TestRunMonorepoRemoveTargetCleansManagedRulesAndSupportFiles(t *testing.T) 
 }
 
 func TestRunMonorepoRemoveTargetDoesNotPersistConfigWhenCleanupFails(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
@@ -3240,12 +3515,69 @@ func TestRunMonorepoRemoveTargetDoesNotPersistConfigWhenCleanupFails(t *testing.
 	}
 }
 
+func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".codex", "rules", "python", "python-linting.md"),
+		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md"),
+		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--remove-language", "python", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "python", "python-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected python rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")); err != nil {
+		t.Fatalf("expected typescript rule to remain, got %v", err)
+	}
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	text := string(config)
+	if strings.Contains(text, `"python"`) || !strings.Contains(text, `"typescript"`) {
+		t.Fatalf("expected python removed and typescript retained in config, got %q", text)
+	}
+}
+
 // TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend asserts that a
 // taskSystem value written to .rulesrc.json by a backend invocation (simulating
 // what ballast-typescript does after prompting the user) is not clobbered by
 // the final saveMonorepoConfig call.
 func TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "targets": ["cursor"],
@@ -3299,7 +3631,7 @@ func TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend(t *testing.T) {
 // taskSystem already present in .rulesrc.json before the install runs is
 // carried through into the final saved config.
 func TestRunMonorepoInstallPreservesTaskSystemFromExistingConfig(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "targets": ["cursor"],
@@ -3338,7 +3670,7 @@ func TestRunMonorepoInstallPreservesTaskSystemFromExistingConfig(t *testing.T) {
 }
 
 func TestRunMonorepoRefreshConfigEnablesTaskAndSkillRefresh(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
@@ -3388,7 +3720,7 @@ func TestRunMonorepoRefreshConfigEnablesTaskAndSkillRefresh(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 
@@ -3415,7 +3747,7 @@ func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanRejectsMissingTaskSystemValue(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 
@@ -3426,7 +3758,7 @@ func TestResolveMonorepoPlanRejectsMissingTaskSystemValue(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanRejectsInvalidTaskSystemValue(t *testing.T) {
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
 
@@ -3478,7 +3810,7 @@ func TestBuildMonorepoSupportFileIncludesPublishingAndSkillsForCodex(t *testing.
 		},
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	content := buildMonorepoSupportFile(root, plan, "codex")
 
 	if !strings.Contains(content, "## Repository Facts") {
@@ -3514,7 +3846,7 @@ func TestBuildMonorepoSupportFileIncludesSkillsForClaude(t *testing.T) {
 		},
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	content := buildMonorepoSupportFile(root, plan, "claude")
 
 	if !strings.Contains(content, "## Installed skills") {
@@ -3534,12 +3866,24 @@ func TestBuildMonorepoSupportFileIncludesDocsForCodex(t *testing.T) {
 		},
 	}
 
-	root := t.TempDir()
+	root := resolvedTempDir(t)
 	content := buildMonorepoSupportFile(root, plan, "codex")
 
 	if !strings.Contains(content, "`.codex/rules/common/docs.md`") {
 		t.Fatalf("expected docs rule entry in codex support file, got %q", content)
 	}
+}
+
+// resolvedTempDir wraps t.TempDir and resolves symlinks so that path
+// comparisons work on macOS where /tmp is a symlink to /private/tmp.
+func resolvedTempDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatalf("resolve symlinks for %s: %v", dir, err)
+	}
+	return resolved
 }
 
 func mustWriteFile(t *testing.T, path string, content string) {
