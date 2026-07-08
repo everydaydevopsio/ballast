@@ -15,10 +15,11 @@ const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex', 'gemini'];
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
 const GIT_HOOKS_GUIDANCE_TOKEN = '{{BALLAST_GIT_HOOKS_GUIDANCE}}';
+const GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = '{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}';
 const BALLAST_REPO_URL = 'https://github.com/everydaydevopsio/ballast';
 const BALLAST_MANAGED_COMMENT = `<!-- Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section. -->`;
 
-type HookMode = 'standalone' | 'monorepo';
+type HookMode = 'pre-commit' | 'husky';
 
 interface BuildOptions {
   hookMode?: HookMode;
@@ -102,7 +103,7 @@ function getHookMode(
   }
   void agentId;
   void language;
-  return 'standalone';
+  return 'pre-commit';
 }
 
 function renderGitHooksGuidance(
@@ -111,13 +112,13 @@ function renderGitHooksGuidance(
 ): string {
   const hookMode = getHookMode('git-hooks', language, options);
   if (language === 'typescript') {
-    if (hookMode === 'monorepo') {
+    if (hookMode === 'husky') {
       return [
-        'Use Husky for this monorepo.',
+        'Use Husky for TypeScript-only repositories.',
         '',
         '- Install and initialize Husky.',
         "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
-        "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.",
+        "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript repositories run the build before the tests when the test command depends on generated output.",
         '- Keep the hook file executable with `chmod +x .husky/pre-commit`.',
         '- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.',
         "- Keep the hook in sync with the repo's linting workflow whenever the command changes."
@@ -125,8 +126,6 @@ function renderGitHooksGuidance(
     }
 
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for this repository layout.',
       '',
       '- Create `.pre-commit-config.yaml` at the repo root.',
@@ -140,8 +139,6 @@ function renderGitHooksGuidance(
 
   if (language === 'python') {
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for Python projects.',
       '',
       '- Create `.pre-commit-config.yaml` at the repo root.',
@@ -155,8 +152,6 @@ function renderGitHooksGuidance(
 
   if (language === 'go') {
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.',
       '',
       '- Create or update `.pre-commit-config.yaml` at the repo root.',
@@ -170,8 +165,6 @@ function renderGitHooksGuidance(
 
   if (language === 'ansible') {
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for Ansible repositories.',
       '',
       '- Create or update `.pre-commit-config.yaml` at the repo root.',
@@ -185,8 +178,6 @@ function renderGitHooksGuidance(
 
   if (language === 'terraform') {
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for Terraform repositories.',
       '',
       '- Create or update `.pre-commit-config.yaml` at the repo root.',
@@ -200,6 +191,38 @@ function renderGitHooksGuidance(
   }
 
   return '';
+}
+
+function renderGitHooksPreCommitGlob(
+  agentId: string,
+  language: Language,
+  options?: BuildOptions
+): string {
+  if (agentId !== 'git-hooks') {
+    return '';
+  }
+  if (
+    language === 'typescript' &&
+    getHookMode(agentId, language, options) === 'husky'
+  ) {
+    return '';
+  }
+  return "  - '.pre-commit-config.yaml'";
+}
+
+function applyHookTemplateVariables(
+  content: string,
+  agentId: string,
+  language: Language,
+  options?: BuildOptions
+): string {
+  if (!content.includes(GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN)) {
+    return content;
+  }
+  return content.replaceAll(
+    GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN,
+    renderGitHooksPreCommitGlob(agentId, language, options)
+  );
 }
 
 function applyHookGuidance(
@@ -527,7 +550,12 @@ export function buildCursorFormat(
   options?: BuildOptions
 ): string {
   const frontmatter = normalizeFrontmatter(
-    getTemplate(agentId, 'cursor-frontmatter.yaml', ruleSuffix, language)
+    applyHookTemplateVariables(
+      getTemplate(agentId, 'cursor-frontmatter.yaml', ruleSuffix, language),
+      agentId,
+      language,
+      options
+    )
   );
   const content = getContent(agentId, ruleSuffix, language, options);
   return frontmatter + '\n' + content;

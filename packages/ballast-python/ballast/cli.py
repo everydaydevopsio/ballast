@@ -47,6 +47,7 @@ SKILLS_BY_LANGUAGE = {
     "terraform": COMMON_SKILLS,
 }
 GIT_HOOKS_GUIDANCE_TOKEN = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
+GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
 
 
 def with_implicit_agents(agents: list[str]) -> list[str]:
@@ -606,13 +607,13 @@ def read_content(agent: str, language: str, suffix: str = "") -> str:
 
 def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
     if language == "typescript":
-        if hook_mode == "monorepo":
+        if hook_mode == "husky":
             return "\n".join(
                 [
-                    "- Use Husky for this monorepo.",
+                    "- Use Husky for TypeScript-only repositories.",
                     "- Install and initialize Husky.",
                     "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
-                    "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.",
+                    "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript repositories run the build before the tests when the test command depends on generated output.",
                     "- Keep the hook file executable with `chmod +x .husky/pre-commit`.",
                     "- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.",
                     "- Keep the hook in sync with the repo's linting workflow whenever the command changes.",
@@ -681,45 +682,9 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
     return ""
 
 
-def has_workspace_monorepo(root: Path) -> bool:
-    package_json = root / "package.json"
-    if not (root / "pnpm-workspace.yaml").exists():
-        if not package_json.exists():
-            return False
-        try:
-            raw = json.loads(package_json.read_text(encoding="utf-8"))
-        except Exception:
-            return False
-        if not raw.get("workspaces"):
-            return False
-
-    ignored = {
-        ".git",
-        "node_modules",
-        "dist",
-        "build",
-        "coverage",
-        ".next",
-        ".turbo",
-        ".pnpm-store",
-    }
-    count = 0
-    for current, dirs, files in os.walk(root):
-        rel = Path(current).relative_to(root)
-        if len(rel.parts) > 4:
-            dirs[:] = []
-            continue
-        dirs[:] = [name for name in dirs if name not in ignored]
-        if "package.json" in files:
-            count += 1
-            if count > 1:
-                return True
-    return False
-
-
 def resolve_ts_hook_mode(root: Path, language: str) -> str:
     if language != "typescript":
-        return "standalone"
+        return "pre-commit"
 
     config_path = root / ".rulesrc.json"
     if config_path.exists():
@@ -730,16 +695,14 @@ def resolve_ts_hook_mode(root: Path, language: str) -> str:
                 isinstance(languages, list)
                 and len({item for item in languages if isinstance(item, str)}) > 1
             ):
-                return "monorepo"
+                return "pre-commit"
             paths = raw.get("paths") or {}
             if isinstance(paths, dict) and len(paths.keys()) > 1:
-                return "monorepo"
+                return "pre-commit"
         except Exception:
             pass
 
-    if has_workspace_monorepo(root):
-        return "monorepo"
-    return "standalone"
+    return "husky"
 
 
 def apply_hook_guidance(
@@ -748,10 +711,34 @@ def apply_hook_guidance(
     if agent != "git-hooks" or GIT_HOOKS_GUIDANCE_TOKEN not in content:
         return content
     hook_mode = (
-        resolve_ts_hook_mode(root, language) if root is not None else "standalone"
+        resolve_ts_hook_mode(root, language) if root is not None else "pre-commit"
     )
     return content.replace(
         GIT_HOOKS_GUIDANCE_TOKEN, render_git_hooks_guidance(language, hook_mode)
+    )
+
+
+def render_git_hooks_pre_commit_glob(
+    agent: str, language: str, root: Path | None
+) -> str:
+    if agent != "git-hooks":
+        return ""
+    hook_mode = (
+        resolve_ts_hook_mode(root, language) if root is not None else "pre-commit"
+    )
+    if language == "typescript" and hook_mode == "husky":
+        return ""
+    return "  - '.pre-commit-config.yaml'"
+
+
+def apply_hook_template_variables(
+    content: str, agent: str, language: str, root: Path | None
+) -> str:
+    if GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN not in content:
+        return content
+    return content.replace(
+        GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN,
+        render_git_hooks_pre_commit_glob(agent, language, root),
     )
 
 
@@ -795,7 +782,12 @@ def build_content(
     )
     if target == "cursor":
         return (
-            read_template(agent, language, "cursor-frontmatter.yaml", suffix)
+            apply_hook_template_variables(
+                read_template(agent, language, "cursor-frontmatter.yaml", suffix),
+                agent,
+                language,
+                root,
+            )
             + "\n"
             + body
         )

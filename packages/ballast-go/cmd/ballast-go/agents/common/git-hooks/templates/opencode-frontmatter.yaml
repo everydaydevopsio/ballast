@@ -1,5 +1,5 @@
 ---
-description: Git hook specialist for pre-commit, pre-push, and Husky workflows
+description: Git hook specialist for repository commit and push hook workflows
 permission:
   edit: allow
   bash: allow
