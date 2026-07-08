@@ -2032,81 +2032,13 @@ func resolveTsHookMode(projectRoot, language string) string {
 		if content, err := os.ReadFile(configPath); err == nil {
 			if err := json.Unmarshal(content, &raw); err == nil {
 				if len(raw.Languages) > 1 || len(raw.Paths) > 1 {
-					return "monorepo"
+					return "standalone"
 				}
 			}
 		}
 	}
 
-	if hasWorkspaceMonorepo(projectRoot) {
-		return "monorepo"
-	}
-	return "standalone"
-}
-
-func hasWorkspaceMonorepo(projectRoot string) bool {
-	root := filepath.Clean(projectRoot)
-	if !exists(filepath.Join(root, "pnpm-workspace.yaml")) {
-		rootPackageJSON := filepath.Join(root, "package.json")
-		if !exists(rootPackageJSON) {
-			return false
-		}
-		var raw map[string]any
-		content, err := os.ReadFile(rootPackageJSON)
-		if err != nil {
-			return false
-		}
-		if err := json.Unmarshal(content, &raw); err != nil {
-			return false
-		}
-		if _, ok := raw["workspaces"]; !ok {
-			return false
-		}
-	}
-
-	ignored := map[string]bool{
-		".git":         true,
-		"node_modules": true,
-		"dist":         true,
-		"build":        true,
-		"coverage":     true,
-		".next":        true,
-		".turbo":       true,
-		".pnpm-store":  true,
-	}
-
-	count := 0
-	var walk func(string, int) bool
-	walk = func(dir string, depth int) bool {
-		if depth > 4 {
-			return false
-		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			return false
-		}
-		for _, entry := range entries {
-			name := entry.Name()
-			if entry.IsDir() {
-				if ignored[name] {
-					continue
-				}
-				if walk(filepath.Join(dir, name), depth+1) {
-					return true
-				}
-				continue
-			}
-			if name == "package.json" {
-				count++
-				if count > 1 {
-					return true
-				}
-			}
-		}
-		return false
-	}
-
-	return walk(root, 0)
+	return "monorepo"
 }
 
 func findProjectRoot(cwd string) (string, error) {

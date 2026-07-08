@@ -73,101 +73,30 @@ function resolveTsHookMode(
   }
 
   const configPath = path.join(projectRoot, '.rulesrc.json');
-  if (!fs.existsSync(configPath)) {
-    return 'standalone';
-  }
-
-  try {
-    const raw = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
-      languages?: unknown;
-      paths?: Record<string, unknown>;
-    };
-    const languages = Array.isArray(raw.languages)
-      ? raw.languages.filter(
-          (language): language is string => typeof language === 'string'
-        )
-      : [];
-    if (new Set(languages).size > 1) {
-      return 'monorepo';
-    }
-    const pathKeys = raw.paths ? Object.keys(raw.paths) : [];
-    if (pathKeys.length > 1) {
-      return 'monorepo';
-    }
-  } catch {
-    // Fall through to workspace-based detection.
-  }
-
-  if (hasWorkspaceMonorepo(projectRoot)) {
-    return 'monorepo';
-  }
-
-  return 'standalone';
-}
-
-function hasWorkspaceMonorepo(projectRoot: string): boolean {
-  const root = path.resolve(projectRoot);
-  if (!hasWorkspaceManifest(root)) {
-    return false;
-  }
-  return countPackageJsonFiles(root) > 1;
-}
-
-function hasWorkspaceManifest(root: string): boolean {
-  const rootPackageJson = path.join(root, 'package.json');
-  const pnpmWorkspaceYaml = path.join(root, 'pnpm-workspace.yaml');
-  if (fs.existsSync(pnpmWorkspaceYaml)) {
-    return true;
-  }
-  if (!fs.existsSync(rootPackageJson)) {
-    return false;
-  }
-  try {
-    const raw = JSON.parse(fs.readFileSync(rootPackageJson, 'utf8')) as {
-      workspaces?: unknown;
-    };
-    return Array.isArray(raw.workspaces) || !!raw.workspaces;
-  } catch {
-    return false;
-  }
-}
-
-function countPackageJsonFiles(root: string): number {
-  const ignoredDirs = new Set([
-    '.git',
-    'node_modules',
-    'dist',
-    'build',
-    'coverage',
-    '.next',
-    '.turbo',
-    '.pnpm-store'
-  ]);
-  let count = 0;
-
-  function walk(dir: string, depth: number): void {
-    if (depth > 4) return;
-    let entries: fs.Dirent[];
+  if (fs.existsSync(configPath)) {
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      const raw = JSON.parse(fs.readFileSync(configPath, 'utf8')) as {
+        languages?: unknown;
+        paths?: Record<string, unknown>;
+      };
+      const languages = Array.isArray(raw.languages)
+        ? raw.languages.filter(
+            (language): language is string => typeof language === 'string'
+          )
+        : [];
+      if (new Set(languages).size > 1) {
+        return 'standalone';
+      }
+      const pathKeys = raw.paths ? Object.keys(raw.paths) : [];
+      if (pathKeys.length > 1) {
+        return 'standalone';
+      }
     } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        if (entry.name.startsWith('.')) continue;
-        if (ignoredDirs.has(entry.name)) continue;
-        walk(path.join(dir, entry.name), depth + 1);
-        continue;
-      }
-      if (entry.isFile() && entry.name === 'package.json') {
-        count += 1;
-      }
+      // Fall through to the TypeScript-only default.
     }
   }
 
-  walk(root, 0);
-  return count;
+  return 'monorepo';
 }
 
 async function promptTargets(): Promise<Target[]> {

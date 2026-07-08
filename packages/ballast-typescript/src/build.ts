@@ -125,8 +125,6 @@ function renderGitHooksGuidance(
     }
 
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for this repository layout.',
       '',
       '- Create `.pre-commit-config.yaml` at the repo root.',
@@ -140,8 +138,6 @@ function renderGitHooksGuidance(
 
   if (language === 'python') {
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for Python projects.',
       '',
       '- Create `.pre-commit-config.yaml` at the repo root.',
@@ -155,8 +151,6 @@ function renderGitHooksGuidance(
 
   if (language === 'go') {
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.',
       '',
       '- Create or update `.pre-commit-config.yaml` at the repo root.',
@@ -170,8 +164,6 @@ function renderGitHooksGuidance(
 
   if (language === 'ansible') {
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for Ansible repositories.',
       '',
       '- Create or update `.pre-commit-config.yaml` at the repo root.',
@@ -185,8 +177,6 @@ function renderGitHooksGuidance(
 
   if (language === 'terraform') {
     return [
-      '## Git Hooks',
-      '',
       'Use `pre-commit` for Terraform repositories.',
       '',
       '- Create or update `.pre-commit-config.yaml` at the repo root.',

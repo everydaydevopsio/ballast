@@ -293,6 +293,9 @@ jobs:
           - name: add-remove-language-existing-install-e2e
             script: ./scripts/e2e-add-remove-language-existing-install.sh
             needs_typescript: true
+          - name: git-hooks-mode-policy-e2e
+            script: ./scripts/e2e-git-hooks-mode-policy.sh
+            needs_typescript: true
 
     steps:
       - name: Checkout ballast repo

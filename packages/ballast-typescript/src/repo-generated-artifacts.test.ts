@@ -92,7 +92,7 @@ describe('repo generated artifacts', () => {
     const optionsFor = (language: Language) => ({
       variables: { taskSystem },
       hookMode:
-        language === 'typescript' && configuredLanguages.length > 1
+        language === 'typescript' && configuredLanguages.length === 1
           ? ('monorepo' as const)
           : ('standalone' as const)
     });

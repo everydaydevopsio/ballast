@@ -681,42 +681,6 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
     return ""
 
 
-def has_workspace_monorepo(root: Path) -> bool:
-    package_json = root / "package.json"
-    if not (root / "pnpm-workspace.yaml").exists():
-        if not package_json.exists():
-            return False
-        try:
-            raw = json.loads(package_json.read_text(encoding="utf-8"))
-        except Exception:
-            return False
-        if not raw.get("workspaces"):
-            return False
-
-    ignored = {
-        ".git",
-        "node_modules",
-        "dist",
-        "build",
-        "coverage",
-        ".next",
-        ".turbo",
-        ".pnpm-store",
-    }
-    count = 0
-    for current, dirs, files in os.walk(root):
-        rel = Path(current).relative_to(root)
-        if len(rel.parts) > 4:
-            dirs[:] = []
-            continue
-        dirs[:] = [name for name in dirs if name not in ignored]
-        if "package.json" in files:
-            count += 1
-            if count > 1:
-                return True
-    return False
-
-
 def resolve_ts_hook_mode(root: Path, language: str) -> str:
     if language != "typescript":
         return "standalone"
@@ -730,16 +694,14 @@ def resolve_ts_hook_mode(root: Path, language: str) -> str:
                 isinstance(languages, list)
                 and len({item for item in languages if isinstance(item, str)}) > 1
             ):
-                return "monorepo"
+                return "standalone"
             paths = raw.get("paths") or {}
             if isinstance(paths, dict) and len(paths.keys()) > 1:
-                return "monorepo"
+                return "standalone"
         except Exception:
             pass
 
-    if has_workspace_monorepo(root):
-        return "monorepo"
-    return "standalone"
+    return "monorepo"
 
 
 def apply_hook_guidance(
