@@ -223,13 +223,13 @@ Supported install flags include:
 
 ## Monorepo and Hook Behavior
 
-For TypeScript installs, Ballast distinguishes between standalone and monorepo layouts to tailor linting hook guidance:
+For TypeScript installs, Ballast distinguishes between TypeScript-only and multi-language layouts to tailor linting hook guidance:
 
-- standalone TypeScript repos get `pre-commit` guidance
-- TypeScript workspace monorepos get Husky guidance
-- Python and Go profiles get their own `pre-commit` guidance
+- TypeScript-only repos get Husky guidance
+- multi-language repos get `pre-commit` guidance
+- Python and Go single-language profiles get their own `pre-commit` guidance
 
-The detection logic uses config metadata first and falls back to workspace manifest/package discovery.
+The detection logic uses config metadata and treats TypeScript-only installs as Husky-based by default.
 
 ## Release and Publishing Architecture
 
