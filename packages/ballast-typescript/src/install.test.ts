@@ -951,7 +951,7 @@ This section should be gone after force.
       expect(content).toContain('tfsec');
     });
 
-    test('uses pre-commit guidance for standalone typescript installs', () => {
+    test('uses husky guidance for typescript-only installs', () => {
       saveConfig(
         {
           targets: ['cursor'],
@@ -979,7 +979,9 @@ This section should be gone after force.
       expect(content).not.toContain('.pre-commit-config.yaml');
       expect(content).not.toContain('pre-commit install');
       expect(content).not.toContain('pre-commit install --hook-type pre-push');
-      expect(content).not.toContain('Use Husky for this monorepo.');
+      expect(content).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
 
       const gitHooksFile = path.join(
         tmpDir,
@@ -989,13 +991,16 @@ This section should be gone after force.
       );
       expect(fs.existsSync(gitHooksFile)).toBe(true);
       const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
-      expect(gitHooksContent).toContain('.pre-commit-config.yaml');
       expect(gitHooksContent).toContain(
-        'pre-commit install --hook-type pre-push'
+        'Use Husky for TypeScript-only repositories.'
       );
+      expect(gitHooksContent).toContain('lint-staged');
+      expect(gitHooksContent).toContain('.husky/pre-push');
+      expect(gitHooksContent).not.toContain('pre-commit install');
+      expect(gitHooksContent).not.toContain('.pre-commit-config.yaml');
     });
 
-    test('uses husky guidance for monorepo typescript installs', () => {
+    test('uses pre-commit guidance for multi-language installs', () => {
       saveConfig(
         {
           targets: ['cursor'],
@@ -1020,7 +1025,9 @@ This section should be gone after force.
         'typescript-linting.mdc'
       );
       const content = fs.readFileSync(cursorFile, 'utf8');
-      expect(content).not.toContain('Use Husky for this monorepo.');
+      expect(content).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
       expect(content).not.toContain('lint-staged');
       expect(content).not.toContain('.husky/pre-push');
       expect(content).not.toContain('pre-commit install');
@@ -1033,9 +1040,15 @@ This section should be gone after force.
       );
       expect(fs.existsSync(gitHooksFile)).toBe(true);
       const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
-      expect(gitHooksContent).toContain('Use Husky for this monorepo.');
-      expect(gitHooksContent).toContain('lint-staged');
-      expect(gitHooksContent).toContain('.husky/pre-push');
+      expect(gitHooksContent).toContain('.pre-commit-config.yaml');
+      expect(gitHooksContent).toContain(
+        'pre-commit install --hook-type pre-push'
+      );
+      expect(gitHooksContent).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
+      expect(gitHooksContent).not.toContain('lint-staged');
+      expect(gitHooksContent).not.toContain('.husky/pre-push');
     });
 
     test('uses husky guidance for typescript workspace monorepos even with one language', () => {
@@ -1087,11 +1100,11 @@ This section should be gone after force.
         'git-hooks.mdc'
       );
       expect(fs.readFileSync(gitHooksFile, 'utf8')).toContain(
-        'Use Husky for this monorepo.'
+        'Use Husky for TypeScript-only repositories.'
       );
     });
 
-    test('ignores hidden directories when detecting monorepo package.json files', () => {
+    test('uses pre-commit for multi-language installs even with a typescript workspace manifest', () => {
       fs.writeFileSync(
         path.join(tmpDir, 'package.json'),
         JSON.stringify(
@@ -1109,7 +1122,7 @@ This section should be gone after force.
         {
           targets: ['cursor'],
           agents: ['linting'],
-          languages: ['typescript']
+          languages: ['typescript', 'python']
         },
         tmpDir
       );
@@ -1129,7 +1142,13 @@ This section should be gone after force.
         'git-hooks.mdc'
       );
       const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
-      expect(gitHooksContent).not.toContain('Use Husky for this monorepo.');
+      expect(gitHooksContent).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
+      expect(gitHooksContent).not.toContain('lint-staged');
+      expect(gitHooksContent).toContain(
+        'pre-commit install --hook-type pre-push'
+      );
     });
 
     test('writes python language files and uses python-specific content', () => {

@@ -41,6 +41,7 @@ var ballastVersion = "dev"
 var frontmatterRegex = regexp.MustCompile(`(?s)^\s*---\n(.*?)\n---\n?`)
 var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
 var gitHooksGuidanceToken = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
+var gitHooksPreCommitGlobToken = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
 
 func withImplicitAgents(agents []string) []string {
 	resolved := slices.Clone(agents)
@@ -1845,6 +1846,7 @@ func buildContent(agentID, target, language, suffix, hookMode string) (string, e
 		if err != nil {
 			return "", err
 		}
+		front = applyHookTemplateVariables(front, agentID, language, hookMode)
 		return front + "\n" + content, nil
 	case "claude":
 		header, err := readTemplate(agentID, language, "claude-header.md", suffix)
@@ -1882,6 +1884,23 @@ func buildContent(agentID, target, language, suffix, hookMode string) (string, e
 	default:
 		return "", fmt.Errorf("unknown target: %s", target)
 	}
+}
+
+func renderGitHooksPreCommitGlob(agentID, language, hookMode string) string {
+	if agentID != "git-hooks" {
+		return ""
+	}
+	if language == "typescript" && hookMode == "husky" {
+		return ""
+	}
+	return "  - '.pre-commit-config.yaml'"
+}
+
+func applyHookTemplateVariables(content, agentID, language, hookMode string) string {
+	if !strings.Contains(content, gitHooksPreCommitGlobToken) {
+		return content
+	}
+	return strings.ReplaceAll(content, gitHooksPreCommitGlobToken, renderGitHooksPreCommitGlob(agentID, language, hookMode))
 }
 
 func listRuleSuffixes(agentID, language string) ([]string, error) {
@@ -1952,12 +1971,12 @@ func readTemplate(agentID, language, filename, suffix string) (string, error) {
 func renderGitHooksGuidance(language, hookMode string) string {
 	switch language {
 	case "typescript":
-		if hookMode == "monorepo" {
+		if hookMode == "husky" {
 			return strings.Join([]string{
-				"- Use Husky for this monorepo.",
+				"- Use Husky for TypeScript-only repositories.",
 				"- Install and initialize Husky.",
 				"- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
-				"- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.",
+				"- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript repositories run the build before the tests when the test command depends on generated output.",
 				"- Keep the hook file executable with `chmod +x .husky/pre-commit`.",
 				"- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.",
 				"- Keep the hook in sync with the repo's linting workflow whenever the command changes.",
@@ -2020,7 +2039,7 @@ func renderGitHooksGuidance(language, hookMode string) string {
 
 func resolveTsHookMode(projectRoot, language string) string {
 	if language != "typescript" {
-		return "standalone"
+		return "pre-commit"
 	}
 
 	configPath := filepath.Join(projectRoot, ".rulesrc.json")
@@ -2032,81 +2051,13 @@ func resolveTsHookMode(projectRoot, language string) string {
 		if content, err := os.ReadFile(configPath); err == nil {
 			if err := json.Unmarshal(content, &raw); err == nil {
 				if len(raw.Languages) > 1 || len(raw.Paths) > 1 {
-					return "monorepo"
+					return "pre-commit"
 				}
 			}
 		}
 	}
 
-	if hasWorkspaceMonorepo(projectRoot) {
-		return "monorepo"
-	}
-	return "standalone"
-}
-
-func hasWorkspaceMonorepo(projectRoot string) bool {
-	root := filepath.Clean(projectRoot)
-	if !exists(filepath.Join(root, "pnpm-workspace.yaml")) {
-		rootPackageJSON := filepath.Join(root, "package.json")
-		if !exists(rootPackageJSON) {
-			return false
-		}
-		var raw map[string]any
-		content, err := os.ReadFile(rootPackageJSON)
-		if err != nil {
-			return false
-		}
-		if err := json.Unmarshal(content, &raw); err != nil {
-			return false
-		}
-		if _, ok := raw["workspaces"]; !ok {
-			return false
-		}
-	}
-
-	ignored := map[string]bool{
-		".git":         true,
-		"node_modules": true,
-		"dist":         true,
-		"build":        true,
-		"coverage":     true,
-		".next":        true,
-		".turbo":       true,
-		".pnpm-store":  true,
-	}
-
-	count := 0
-	var walk func(string, int) bool
-	walk = func(dir string, depth int) bool {
-		if depth > 4 {
-			return false
-		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			return false
-		}
-		for _, entry := range entries {
-			name := entry.Name()
-			if entry.IsDir() {
-				if ignored[name] {
-					continue
-				}
-				if walk(filepath.Join(dir, name), depth+1) {
-					return true
-				}
-				continue
-			}
-			if name == "package.json" {
-				count++
-				if count > 1 {
-					return true
-				}
-			}
-		}
-		return false
-	}
-
-	return walk(root, 0)
+	return "husky"
 }
 
 func findProjectRoot(cwd string) (string, error) {
