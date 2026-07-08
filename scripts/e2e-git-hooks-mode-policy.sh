@@ -12,7 +12,7 @@ setup_ballast_e2e
 
 assert_husky_rule() {
   local path="$1"
-  assert_contains "Use Husky for this monorepo." "${path}"
+  assert_contains "Use Husky for TypeScript-only repositories." "${path}"
   assert_contains "lint-staged" "${path}"
   assert_contains ".husky/pre-push" "${path}"
   assert_not_contains ".pre-commit-config.yaml" "${path}"
@@ -23,7 +23,7 @@ assert_pre_commit_rule() {
   local path="$1"
   assert_contains ".pre-commit-config.yaml" "${path}"
   assert_contains "pre-commit install --hook-type pre-push" "${path}"
-  assert_not_contains "Use Husky for this monorepo." "${path}"
+  assert_not_contains "Use Husky for TypeScript-only repositories." "${path}"
   assert_not_contains "lint-staged" "${path}"
   assert_not_contains ".husky/pre-push" "${path}"
 }

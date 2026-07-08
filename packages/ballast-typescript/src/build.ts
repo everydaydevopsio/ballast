@@ -19,7 +19,7 @@ const GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = '{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}';
 const BALLAST_REPO_URL = 'https://github.com/everydaydevopsio/ballast';
 const BALLAST_MANAGED_COMMENT = `<!-- Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section. -->`;
 
-type HookMode = 'standalone' | 'monorepo';
+type HookMode = 'pre-commit' | 'husky';
 
 interface BuildOptions {
   hookMode?: HookMode;
@@ -103,7 +103,7 @@ function getHookMode(
   }
   void agentId;
   void language;
-  return 'standalone';
+  return 'pre-commit';
 }
 
 function renderGitHooksGuidance(
@@ -112,13 +112,13 @@ function renderGitHooksGuidance(
 ): string {
   const hookMode = getHookMode('git-hooks', language, options);
   if (language === 'typescript') {
-    if (hookMode === 'monorepo') {
+    if (hookMode === 'husky') {
       return [
-        'Use Husky for this monorepo.',
+        'Use Husky for TypeScript-only repositories.',
         '',
         '- Install and initialize Husky.',
         "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
-        "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.",
+        "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript repositories run the build before the tests when the test command depends on generated output.",
         '- Keep the hook file executable with `chmod +x .husky/pre-commit`.',
         '- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.',
         "- Keep the hook in sync with the repo's linting workflow whenever the command changes."
@@ -203,7 +203,7 @@ function renderGitHooksPreCommitGlob(
   }
   if (
     language === 'typescript' &&
-    getHookMode(agentId, language, options) === 'monorepo'
+    getHookMode(agentId, language, options) === 'husky'
   ) {
     return '';
   }

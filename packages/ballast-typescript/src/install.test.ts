@@ -979,7 +979,9 @@ This section should be gone after force.
       expect(content).not.toContain('.pre-commit-config.yaml');
       expect(content).not.toContain('pre-commit install');
       expect(content).not.toContain('pre-commit install --hook-type pre-push');
-      expect(content).not.toContain('Use Husky for this monorepo.');
+      expect(content).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
 
       const gitHooksFile = path.join(
         tmpDir,
@@ -989,7 +991,9 @@ This section should be gone after force.
       );
       expect(fs.existsSync(gitHooksFile)).toBe(true);
       const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
-      expect(gitHooksContent).toContain('Use Husky for this monorepo.');
+      expect(gitHooksContent).toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
       expect(gitHooksContent).toContain('lint-staged');
       expect(gitHooksContent).toContain('.husky/pre-push');
       expect(gitHooksContent).not.toContain('pre-commit install');
@@ -1021,7 +1025,9 @@ This section should be gone after force.
         'typescript-linting.mdc'
       );
       const content = fs.readFileSync(cursorFile, 'utf8');
-      expect(content).not.toContain('Use Husky for this monorepo.');
+      expect(content).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
       expect(content).not.toContain('lint-staged');
       expect(content).not.toContain('.husky/pre-push');
       expect(content).not.toContain('pre-commit install');
@@ -1038,7 +1044,9 @@ This section should be gone after force.
       expect(gitHooksContent).toContain(
         'pre-commit install --hook-type pre-push'
       );
-      expect(gitHooksContent).not.toContain('Use Husky for this monorepo.');
+      expect(gitHooksContent).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
       expect(gitHooksContent).not.toContain('lint-staged');
       expect(gitHooksContent).not.toContain('.husky/pre-push');
     });
@@ -1092,7 +1100,7 @@ This section should be gone after force.
         'git-hooks.mdc'
       );
       expect(fs.readFileSync(gitHooksFile, 'utf8')).toContain(
-        'Use Husky for this monorepo.'
+        'Use Husky for TypeScript-only repositories.'
       );
     });
 
@@ -1134,7 +1142,9 @@ This section should be gone after force.
         'git-hooks.mdc'
       );
       const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
-      expect(gitHooksContent).not.toContain('Use Husky for this monorepo.');
+      expect(gitHooksContent).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
       expect(gitHooksContent).not.toContain('lint-staged');
       expect(gitHooksContent).toContain(
         'pre-commit install --hook-type pre-push'

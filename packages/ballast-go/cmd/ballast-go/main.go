@@ -1890,7 +1890,7 @@ func renderGitHooksPreCommitGlob(agentID, language, hookMode string) string {
 	if agentID != "git-hooks" {
 		return ""
 	}
-	if language == "typescript" && hookMode == "monorepo" {
+	if language == "typescript" && hookMode == "husky" {
 		return ""
 	}
 	return "  - '.pre-commit-config.yaml'"
@@ -1971,12 +1971,12 @@ func readTemplate(agentID, language, filename, suffix string) (string, error) {
 func renderGitHooksGuidance(language, hookMode string) string {
 	switch language {
 	case "typescript":
-		if hookMode == "monorepo" {
+		if hookMode == "husky" {
 			return strings.Join([]string{
-				"- Use Husky for this monorepo.",
+				"- Use Husky for TypeScript-only repositories.",
 				"- Install and initialize Husky.",
 				"- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
-				"- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.",
+				"- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript repositories run the build before the tests when the test command depends on generated output.",
 				"- Keep the hook file executable with `chmod +x .husky/pre-commit`.",
 				"- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.",
 				"- Keep the hook in sync with the repo's linting workflow whenever the command changes.",
@@ -2039,7 +2039,7 @@ func renderGitHooksGuidance(language, hookMode string) string {
 
 func resolveTsHookMode(projectRoot, language string) string {
 	if language != "typescript" {
-		return "standalone"
+		return "pre-commit"
 	}
 
 	configPath := filepath.Join(projectRoot, ".rulesrc.json")
@@ -2051,13 +2051,13 @@ func resolveTsHookMode(projectRoot, language string) string {
 		if content, err := os.ReadFile(configPath); err == nil {
 			if err := json.Unmarshal(content, &raw); err == nil {
 				if len(raw.Languages) > 1 || len(raw.Paths) > 1 {
-					return "standalone"
+					return "pre-commit"
 				}
 			}
 		}
 	}
 
-	return "monorepo"
+	return "husky"
 }
 
 func findProjectRoot(cwd string) (string, error) {

@@ -607,13 +607,13 @@ def read_content(agent: str, language: str, suffix: str = "") -> str:
 
 def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
     if language == "typescript":
-        if hook_mode == "monorepo":
+        if hook_mode == "husky":
             return "\n".join(
                 [
-                    "- Use Husky for this monorepo.",
+                    "- Use Husky for TypeScript-only repositories.",
                     "- Install and initialize Husky.",
                     "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
-                    "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.",
+                    "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript repositories run the build before the tests when the test command depends on generated output.",
                     "- Keep the hook file executable with `chmod +x .husky/pre-commit`.",
                     "- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.",
                     "- Keep the hook in sync with the repo's linting workflow whenever the command changes.",
@@ -684,7 +684,7 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
 
 def resolve_ts_hook_mode(root: Path, language: str) -> str:
     if language != "typescript":
-        return "standalone"
+        return "pre-commit"
 
     config_path = root / ".rulesrc.json"
     if config_path.exists():
@@ -695,14 +695,14 @@ def resolve_ts_hook_mode(root: Path, language: str) -> str:
                 isinstance(languages, list)
                 and len({item for item in languages if isinstance(item, str)}) > 1
             ):
-                return "standalone"
+                return "pre-commit"
             paths = raw.get("paths") or {}
             if isinstance(paths, dict) and len(paths.keys()) > 1:
-                return "standalone"
+                return "pre-commit"
         except Exception:
             pass
 
-    return "monorepo"
+    return "husky"
 
 
 def apply_hook_guidance(
@@ -711,7 +711,7 @@ def apply_hook_guidance(
     if agent != "git-hooks" or GIT_HOOKS_GUIDANCE_TOKEN not in content:
         return content
     hook_mode = (
-        resolve_ts_hook_mode(root, language) if root is not None else "standalone"
+        resolve_ts_hook_mode(root, language) if root is not None else "pre-commit"
     )
     return content.replace(
         GIT_HOOKS_GUIDANCE_TOKEN, render_git_hooks_guidance(language, hook_mode)
@@ -724,9 +724,9 @@ def render_git_hooks_pre_commit_glob(
     if agent != "git-hooks":
         return ""
     hook_mode = (
-        resolve_ts_hook_mode(root, language) if root is not None else "standalone"
+        resolve_ts_hook_mode(root, language) if root is not None else "pre-commit"
     )
-    if language == "typescript" and hook_mode == "monorepo":
+    if language == "typescript" and hook_mode == "husky":
         return ""
     return "  - '.pre-commit-config.yaml'"
 

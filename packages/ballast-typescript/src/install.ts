@@ -67,9 +67,9 @@ function prompt(question: string): Promise<string> {
 function resolveTsHookMode(
   projectRoot: string,
   language: Language
-): 'standalone' | 'monorepo' {
+): 'pre-commit' | 'husky' {
   if (language !== 'typescript') {
-    return 'standalone';
+    return 'pre-commit';
   }
 
   const configPath = path.join(projectRoot, '.rulesrc.json');
@@ -85,18 +85,18 @@ function resolveTsHookMode(
           )
         : [];
       if (new Set(languages).size > 1) {
-        return 'standalone';
+        return 'pre-commit';
       }
       const pathKeys = raw.paths ? Object.keys(raw.paths) : [];
       if (pathKeys.length > 1) {
-        return 'standalone';
+        return 'pre-commit';
       }
     } catch {
       // Fall through to the TypeScript-only default.
     }
   }
 
-  return 'monorepo';
+  return 'husky';
 }
 
 async function promptTargets(): Promise<Target[]> {
