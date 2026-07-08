@@ -150,6 +150,7 @@ Use aws-live-health-review with PROFILE=prod-readonly to summarize AWS health ri
 
 ```bash
 brew tap everydaydevopsio/ballast
+brew trust everydaydevopsio/ballast   # required for third-party taps
 brew reinstall --formula everydaydevopsio/ballast/ballast
 ballast install --target cursor --all
 ballast doctor
@@ -163,6 +164,7 @@ ballast upgrade --force
 
 ```bash
 brew tap everydaydevopsio/ballast
+brew trust everydaydevopsio/ballast   # required for third-party taps
 brew install --cask everydaydevopsio/ballast/ballast
 ballast install --target cursor --all
 ballast doctor
@@ -207,6 +209,7 @@ If the tap still does not refresh, remove and re-add it:
 ```bash
 brew untap everydaydevopsio/ballast
 brew tap everydaydevopsio/ballast
+brew trust everydaydevopsio/ballast
 brew reinstall --formula everydaydevopsio/ballast/ballast
 ```
 
@@ -215,12 +218,14 @@ brew reinstall --formula everydaydevopsio/ballast/ballast
 ```bash
 brew untap everydaydevopsio/ballast
 brew tap everydaydevopsio/ballast
+brew trust everydaydevopsio/ballast
 brew install --cask everydaydevopsio/ballast/ballast
 ```
 
 Notes:
 
 - Always use the fully qualified name `everydaydevopsio/ballast/ballast` for both the Linux formula and the macOS cask. Plain `ballast` can resolve to an unrelated third-party package.
+- Recent Homebrew versions require `brew trust` for third-party taps before formulas or casks can be installed. Run `brew trust everydaydevopsio/ballast` after tapping.
 - Verify the installed version with `ballast --version`.
 
 ### TypeScript (npm)

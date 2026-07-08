@@ -35,19 +35,7 @@ You are a TypeScript linting specialist. Your role is to implement comprehensive
    - prettier: "prettier . --check"
    - prettier:fix: "prettier . --write"
 
-5. **Set Up Git Hooks**
-   ## Set Up Git Hooks with Husky
-
-Use Husky for this monorepo.
-
-- Install and initialize Husky.
-- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.
-- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript monorepos run the build before the tests when the test command depends on generated output.
-- Keep the hook file executable with `chmod +x .husky/pre-commit`.
-- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.
-- Keep the hook in sync with the repo's linting workflow whenever the command changes.
-
-6. **Create GitHub Actions Workflow**
+5. **Create GitHub Actions Workflow**
    - Create .github/workflows/lint.yaml
    - Run on pull requests to main branch
    - Set up Node.js environment
