@@ -47,6 +47,7 @@ SKILLS_BY_LANGUAGE = {
     "terraform": COMMON_SKILLS,
 }
 GIT_HOOKS_GUIDANCE_TOKEN = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
+GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
 
 
 def with_implicit_agents(agents: list[str]) -> list[str]:
@@ -717,6 +718,30 @@ def apply_hook_guidance(
     )
 
 
+def render_git_hooks_pre_commit_glob(
+    agent: str, language: str, root: Path | None
+) -> str:
+    if agent != "git-hooks":
+        return ""
+    hook_mode = (
+        resolve_ts_hook_mode(root, language) if root is not None else "standalone"
+    )
+    if language == "typescript" and hook_mode == "monorepo":
+        return ""
+    return "  - '.pre-commit-config.yaml'"
+
+
+def apply_hook_template_variables(
+    content: str, agent: str, language: str, root: Path | None
+) -> str:
+    if GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN not in content:
+        return content
+    return content.replace(
+        GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN,
+        render_git_hooks_pre_commit_glob(agent, language, root),
+    )
+
+
 def read_template(agent: str, language: str, filename: str, suffix: str = "") -> str:
     base, ext = filename.rsplit(".", 1)
     if suffix:
@@ -757,7 +782,12 @@ def build_content(
     )
     if target == "cursor":
         return (
-            read_template(agent, language, "cursor-frontmatter.yaml", suffix)
+            apply_hook_template_variables(
+                read_template(agent, language, "cursor-frontmatter.yaml", suffix),
+                agent,
+                language,
+                root,
+            )
             + "\n"
             + body
         )

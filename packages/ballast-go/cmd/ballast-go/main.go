@@ -41,6 +41,7 @@ var ballastVersion = "dev"
 var frontmatterRegex = regexp.MustCompile(`(?s)^\s*---\n(.*?)\n---\n?`)
 var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
 var gitHooksGuidanceToken = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
+var gitHooksPreCommitGlobToken = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
 
 func withImplicitAgents(agents []string) []string {
 	resolved := slices.Clone(agents)
@@ -1845,6 +1846,7 @@ func buildContent(agentID, target, language, suffix, hookMode string) (string, e
 		if err != nil {
 			return "", err
 		}
+		front = applyHookTemplateVariables(front, agentID, language, hookMode)
 		return front + "\n" + content, nil
 	case "claude":
 		header, err := readTemplate(agentID, language, "claude-header.md", suffix)
@@ -1882,6 +1884,23 @@ func buildContent(agentID, target, language, suffix, hookMode string) (string, e
 	default:
 		return "", fmt.Errorf("unknown target: %s", target)
 	}
+}
+
+func renderGitHooksPreCommitGlob(agentID, language, hookMode string) string {
+	if agentID != "git-hooks" {
+		return ""
+	}
+	if language == "typescript" && hookMode == "monorepo" {
+		return ""
+	}
+	return "  - '.pre-commit-config.yaml'"
+}
+
+func applyHookTemplateVariables(content, agentID, language, hookMode string) string {
+	if !strings.Contains(content, gitHooksPreCommitGlobToken) {
+		return content
+	}
+	return strings.ReplaceAll(content, gitHooksPreCommitGlobToken, renderGitHooksPreCommitGlob(agentID, language, hookMode))
 }
 
 func listRuleSuffixes(agentID, language string) ([]string, error) {

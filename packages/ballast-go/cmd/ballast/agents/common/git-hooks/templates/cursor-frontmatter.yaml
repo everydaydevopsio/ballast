@@ -2,6 +2,7 @@
 description: 'Git hook specialist - configure commit and push hooks that match the repository layout'
 alwaysApply: false
 globs:
+{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}
   - '.husky/**'
   - 'package.json'
   - 'pnpm-workspace.yaml'

@@ -15,6 +15,7 @@ const TARGETS: Target[] = ['cursor', 'claude', 'opencode', 'codex', 'gemini'];
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
 const GIT_HOOKS_GUIDANCE_TOKEN = '{{BALLAST_GIT_HOOKS_GUIDANCE}}';
+const GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = '{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}';
 const BALLAST_REPO_URL = 'https://github.com/everydaydevopsio/ballast';
 const BALLAST_MANAGED_COMMENT = `<!-- Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section. -->`;
 
@@ -190,6 +191,38 @@ function renderGitHooksGuidance(
   }
 
   return '';
+}
+
+function renderGitHooksPreCommitGlob(
+  agentId: string,
+  language: Language,
+  options?: BuildOptions
+): string {
+  if (agentId !== 'git-hooks') {
+    return '';
+  }
+  if (
+    language === 'typescript' &&
+    getHookMode(agentId, language, options) === 'monorepo'
+  ) {
+    return '';
+  }
+  return "  - '.pre-commit-config.yaml'";
+}
+
+function applyHookTemplateVariables(
+  content: string,
+  agentId: string,
+  language: Language,
+  options?: BuildOptions
+): string {
+  if (!content.includes(GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN)) {
+    return content;
+  }
+  return content.replaceAll(
+    GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN,
+    renderGitHooksPreCommitGlob(agentId, language, options)
+  );
 }
 
 function applyHookGuidance(
@@ -517,7 +550,12 @@ export function buildCursorFormat(
   options?: BuildOptions
 ): string {
   const frontmatter = normalizeFrontmatter(
-    getTemplate(agentId, 'cursor-frontmatter.yaml', ruleSuffix, language)
+    applyHookTemplateVariables(
+      getTemplate(agentId, 'cursor-frontmatter.yaml', ruleSuffix, language),
+      agentId,
+      language,
+      options
+    )
   );
   const content = getContent(agentId, ruleSuffix, language, options);
   return frontmatter + '\n' + content;
