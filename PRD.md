@@ -1,5 +1,34 @@
 # Product Requirements
 
+## Ballast Local State Bootstrap And Repair
+
+### Problem
+
+Ballast stores project-local backend CLIs under `.ballast/`, but the product contract does not clearly say whether that directory is required source state, generated state, or disposable cache state. Operators and AI agents need deterministic behavior when `.ballast/` is absent or incomplete so they can inspect, initialize, and repair a Ballast-managed repository without guessing.
+
+### Requirements
+
+1. `.ballast/` must be treated as generated, repository-local tool state that is safe to recreate and should remain ignored by git.
+2. `ballast install` must not require `.ballast/` to exist before installing agent rules or skills.
+3. Wrapper backend dispatch must recreate missing local tool directories when it needs to install a backend CLI.
+4. `ballast install-cli` must recreate `.ballast/bin` and `.ballast/tools` before installing backend CLIs.
+5. `ballast doctor` must report whether `.ballast/`, `.ballast/bin`, and `.ballast/tools` exist.
+6. `ballast doctor` must provide actionable remediation when `.ballast/` state is missing or incomplete.
+7. `ballast doctor --fix` must recreate missing `.ballast/` directories through the same local CLI install path.
+8. Agent guidance must explain how to check and repair Ballast local state.
+9. Ballast must ship a dedicated common skill for AI agents that covers Ballast-managed repository status, bootstrap, and repair workflows.
+10. Documentation must describe the dedicated Ballast skill and how to install it.
+
+### Acceptance Criteria
+
+1. Given a repository without `.ballast/`, `ballast doctor` reports `.ballast: missing` and recommends `ballast install-cli` or `ballast doctor --fix`.
+2. Given a repository with `.ballast/` but missing `.ballast/bin` or `.ballast/tools`, `ballast doctor` reports the incomplete state and recommends repair.
+3. Given a repository without `.ballast/`, `ballast install-cli --language go --version <version>` creates `.ballast/bin` and `.ballast/tools` before running the install command.
+4. Given a repository without `.ballast/`, `ballast doctor --fix` creates `.ballast/bin` and `.ballast/tools` before running backend install commands.
+5. Generated local-dev guidance tells agents to use `ballast doctor` to inspect Ballast local state and `ballast doctor --fix` or `ballast install-cli` to repair it.
+6. The new Ballast skill is available through `--skill ballast-project-maintenance` and `--all-skills`.
+7. README and installation docs document `.ballast/` as generated local state and list the Ballast project maintenance skill.
+
 ## Agent Development Environment Bootstrap
 
 ### Problem

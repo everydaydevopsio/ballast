@@ -101,6 +101,11 @@ var skillRegistry = []skillEntry{
 		Description: "audit AI rule and skill files for context density, duplication, and bloat",
 		Status:      statusActive,
 	},
+	{
+		ID:          "ballast-project-maintenance",
+		Description: "inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools",
+		Status:      statusActive,
+	},
 }
 
 // — Agent registry helpers —————————————————————————————————————————————————

@@ -166,6 +166,18 @@ type doctorBackendStatus struct {
 	Found    bool
 }
 
+type ballastLocalState struct {
+	RootStatus  string
+	BinStatus   string
+	ToolsStatus string
+}
+
+const (
+	localStatePresent    = "present"
+	localStateMissing    = "missing"
+	localStateUnreadable = "unreadable"
+)
+
 type monorepoPlan struct {
 	Invocations []backendInvocation
 	Config      monorepoConfig
@@ -924,6 +936,8 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	fmt.Println()
 
+	printDoctorLocalState(root)
+
 	fmt.Println("Config:")
 	configPath := filepath.Join(root, ".rulesrc.json")
 	config, err := loadDoctorConfig(root)
@@ -962,6 +976,57 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
 	}
 	fmt.Println()
+}
+
+func printDoctorLocalState(root string) {
+	state := inspectBallastLocalState(root)
+	fmt.Println("Local state:")
+	switch {
+	case state.RootStatus == localStateMissing:
+		fmt.Println("- .ballast: missing")
+	case state.RootStatus == localStateUnreadable || state.BinStatus == localStateUnreadable || state.ToolsStatus == localStateUnreadable:
+		fmt.Println("- .ballast: unreadable")
+	case state.BinStatus == localStatePresent && state.ToolsStatus == localStatePresent:
+		fmt.Println("- .ballast: present")
+	default:
+		fmt.Println("- .ballast: incomplete")
+	}
+	printLocalStatePath(".ballast/bin", state.BinStatus)
+	printLocalStatePath(".ballast/tools", state.ToolsStatus)
+	if state.RootStatus == localStateMissing || state.BinStatus == localStateMissing || state.ToolsStatus == localStateMissing {
+		fmt.Println("- remediation: Run `ballast doctor --fix` or `ballast install-cli` to recreate generated .ballast/ tool state.")
+	}
+	if state.RootStatus == localStateUnreadable || state.BinStatus == localStateUnreadable || state.ToolsStatus == localStateUnreadable {
+		fmt.Println("- remediation: Check the .ballast/ filesystem path and permissions before reinstalling local tool state.")
+	}
+	fmt.Println()
+}
+
+func printLocalStatePath(path string, status string) {
+	fmt.Printf("- %s: %s\n", path, status)
+}
+
+func inspectBallastLocalState(root string) ballastLocalState {
+	return ballastLocalState{
+		RootStatus:  localStatePathStatus(filepath.Join(root, ".ballast")),
+		BinStatus:   localStatePathStatus(filepath.Join(root, ".ballast", "bin")),
+		ToolsStatus: localStatePathStatus(filepath.Join(root, ".ballast", "tools")),
+	}
+}
+
+func localStatePathStatus(path string) string {
+	info, err := os.Stat(path)
+	return localStateStatusFromStat(info, err)
+}
+
+func localStateStatusFromStat(info os.FileInfo, err error) string {
+	if err == nil && info.IsDir() {
+		return localStatePresent
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return localStateMissing
+	}
+	return localStateUnreadable
 }
 
 func formatDoctorConfigPaths(languages []string, paths map[string][]string) string {

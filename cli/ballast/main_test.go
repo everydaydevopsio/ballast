@@ -328,6 +328,98 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 }
 
+func TestRunDoctorReportsMissingBallastState(t *testing.T) {
+	originalCollect := collectDoctorBackendsFunc
+	t.Cleanup(func() {
+		collectDoctorBackendsFunc = originalCollect
+	})
+	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
+		return []doctorBackendStatus{
+			{Name: "ballast-go", Found: false},
+		}
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"codex","agents":["local-dev"]}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"doctor"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	if !strings.Contains(output, "Local state:") {
+		t.Fatalf("expected local state section, got %q", output)
+	}
+	if !strings.Contains(output, "- .ballast: missing") {
+		t.Fatalf("expected missing .ballast state, got %q", output)
+	}
+	if !strings.Contains(output, "Run `ballast doctor --fix` or `ballast install-cli` to recreate generated .ballast/ tool state.") {
+		t.Fatalf("expected local state remediation, got %q", output)
+	}
+}
+
+func TestRunDoctorReportsIncompleteBallastState(t *testing.T) {
+	originalCollect := collectDoctorBackendsFunc
+	t.Cleanup(func() {
+		collectDoctorBackendsFunc = originalCollect
+	})
+	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"codex","agents":["local-dev"]}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"doctor"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	if !strings.Contains(output, "- .ballast: incomplete") {
+		t.Fatalf("expected incomplete .ballast state, got %q", output)
+	}
+	if !strings.Contains(output, "- .ballast/tools: missing") {
+		t.Fatalf("expected missing .ballast/tools state, got %q", output)
+	}
+}
+
+func TestLocalStateStatusDistinguishesPermissionErrors(t *testing.T) {
+	if got := localStateStatusFromStat(nil, os.ErrNotExist); got != localStateMissing {
+		t.Fatalf("expected missing status, got %q", got)
+	}
+	if got := localStateStatusFromStat(nil, os.ErrPermission); got != localStateUnreadable {
+		t.Fatalf("expected unreadable status, got %q", got)
+	}
+}
+
+func TestLocalStatePathStatusRequiresDirectory(t *testing.T) {
+	root := resolvedTempDir(t)
+	dirPath := filepath.Join(root, "dir")
+	filePath := filepath.Join(root, "file")
+	if err := os.Mkdir(dirPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filePath, "not a directory")
+
+	if got := localStatePathStatus(dirPath); got != localStatePresent {
+		t.Fatalf("expected directory to be present, got %q", got)
+	}
+	if got := localStatePathStatus(filePath); got != localStateUnreadable {
+		t.Fatalf("expected file path to be unreadable local state, got %q", got)
+	}
+}
+
 func TestFindProjectRootUsesBallastConfigMarkers(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -1729,6 +1821,9 @@ func TestRunInstallCLICreatesLocalBallastDirectories(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin")); err != nil {
 		t.Fatalf("expected .ballast/bin to exist, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "tools")); err != nil {
+		t.Fatalf("expected .ballast/tools to exist, got %v", err)
 	}
 }
 

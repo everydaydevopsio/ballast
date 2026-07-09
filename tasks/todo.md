@@ -1,5 +1,14 @@
 # Tasks
 
+- [x] Confirm issue #208 scope, operating mode, and governing PRD gap.
+- [x] Add PRD requirements for generated `.ballast/` state and Ballast repair skill support.
+- [x] Add failing coverage for missing `.ballast/` doctor/install-cli behavior and the new skill registry entry.
+- [x] Implement wrapper state reporting/remediation and the Ballast maintenance skill.
+- [x] Update docs, agent guidance, package mirrors, and generated local target outputs.
+- [x] Run targeted verification and capture evidence.
+
+## Previous Tasks
+
 - [x] Confirm issue #211 scope and governing operating mode.
 - [x] Add PRD requirements and acceptance criteria for `ballast setup-dev`.
 - [x] Add failing wrapper tests for Corepack/package-manager setup behavior.
@@ -7,8 +16,6 @@
 - [x] Update local-dev agent guidance and regenerated Ballast-managed outputs.
 - [x] Run targeted and full verification commands.
 - [x] Push branch, open PR, and request Copilot review.
-
-## Previous Tasks
 
 - [x] Confirm issue #144 root cause and affected backends.
 - [x] Add PRD acceptance criteria for managed skill refresh.

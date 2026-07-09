@@ -84,6 +84,28 @@ func TestRunInstallHelpFlag(t *testing.T) {
 	if !strings.Contains(output, "github-health-check") {
 		t.Fatalf("expected github-health-check in help output, got %q", output)
 	}
+	if !strings.Contains(output, "tasks") {
+		t.Fatalf("expected tasks agent in help output, got %q", output)
+	}
+}
+
+func TestListAgentsIncludesAllRegistryAgents(t *testing.T) {
+	got := listAgents("go")
+	want := []string{
+		"local-dev",
+		"docs",
+		"cicd",
+		"observability",
+		"publishing",
+		"git-hooks",
+		"tasks",
+		"linting",
+		"logging",
+		"testing",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
 }
 
 func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
@@ -95,6 +117,7 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"aws-weekly-security-review",
 		"github-health-check",
 		"ballast-audit",
+		"ballast-project-maintenance",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)

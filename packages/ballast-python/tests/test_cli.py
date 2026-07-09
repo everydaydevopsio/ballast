@@ -510,6 +510,7 @@ class PatchInstallTests(unittest.TestCase):
                 "aws-weekly-security-review",
                 "github-health-check",
                 "ballast-audit",
+                "ballast-project-maintenance",
             ],
         )
         self.assertEqual(

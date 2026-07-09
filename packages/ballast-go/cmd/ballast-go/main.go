@@ -25,7 +25,7 @@ import (
 var targets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
 var languages = []string{"typescript", "python", "go", "ansible", "terraform"}
 
-var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks"}
+var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var commonSkills = []string{
 	"owasp-security-scan",
@@ -34,6 +34,7 @@ var commonSkills = []string{
 	"aws-weekly-security-review",
 	"github-health-check",
 	"ballast-audit",
+	"ballast-project-maintenance",
 }
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
@@ -418,8 +419,8 @@ Commands:
 Options:
   --target, -t <platform>   AI platforms: %s (comma-separated or repeatable)
   --language, -l <lang>     Language profile: %s (default: go)
-  --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, git-hooks, logging, testing (comma-separated)
-  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, ballast-audit (comma-separated)
+  --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, git-hooks, tasks, logging, testing (comma-separated)
+  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, ballast-audit, ballast-project-maintenance (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
   --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
