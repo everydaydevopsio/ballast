@@ -205,6 +205,9 @@ func run(args []string) int {
 	if len(forwardedArgs) > 0 && forwardedArgs[0] == "update" {
 		return runUpdate(forwardedArgs[1:])
 	}
+	if len(forwardedArgs) > 0 && forwardedArgs[0] == "setup-dev" {
+		return runSetupDev(forwardedArgs[1:])
+	}
 
 	if hasVersionFlag(forwardedArgs) {
 		printVersion()
@@ -395,6 +398,7 @@ func printUsage() {
 	fmt.Println("Commands:")
 	fmt.Println("  install     Install agent rules for the detected or selected language (`--refresh-config` reuses saved .rulesrc.json settings)")
 	fmt.Println("  install-cli Install or upgrade backend CLIs (latest by default, or a specific --version)")
+	fmt.Println("  setup-dev   Prepare the repository development environment before agent work")
 	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config; add `--patch` with `--fix` to merge backend file updates during refresh)")
 	fmt.Println("  upgrade     Rewrite .rulesrc.json to the running ballast version and sync backend CLIs (`--patch` and `--force` forward to the backend refresh)")
 	fmt.Println("  update      Upgrade the ballast CLI itself via Homebrew (`brew update && brew upgrade ...`)")
@@ -416,6 +420,7 @@ func printUsage() {
 	fmt.Println("  ballast install --target claude --skill owasp-security-scan")
 	fmt.Println("  ballast install --refresh-config")
 	fmt.Println("  ballast install-cli --language python")
+	fmt.Println("  ballast setup-dev")
 	fmt.Println("  ballast doctor")
 	fmt.Println("  ballast doctor --fix")
 	fmt.Println("  ballast update")
@@ -610,6 +615,138 @@ func installCLIs(selectedLanguage language, version string) int {
 	}
 
 	return 0
+}
+
+type setupDevCommand struct {
+	Name        string
+	Args        []string
+	Remediation string
+}
+
+func runSetupDev(args []string) int {
+	if len(args) > 0 {
+		fmt.Printf("setup-dev does not accept arguments: %s\n", strings.Join(args, " "))
+		return 1
+	}
+
+	root := findProjectRoot("")
+	commands := setupDevCommands(root)
+	fmt.Printf("Preparing development environment in %s\n", root)
+	if len(commands) == 0 {
+		fmt.Println("No setup steps detected for this repository.")
+		return 0
+	}
+	fmt.Printf("Detected package manager: %s\n", commands[len(commands)-1].Name)
+
+	previousDir, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("setup-dev could not read current directory: %v\n", err)
+		return 1
+	}
+	if err := os.Chdir(root); err != nil {
+		fmt.Printf("setup-dev could not enter project root %s: %v\n", root, err)
+		return 1
+	}
+	defer func() {
+		if err := os.Chdir(previousDir); err != nil {
+			fmt.Printf("warning: could not restore working directory %s: %v\n", previousDir, err)
+		}
+	}()
+
+	for _, command := range commands {
+		fmt.Printf("Running: %s\n", formatCommand(command.Name, command.Args))
+		if err := runCommandFunc(command.Name, command.Args); err != nil {
+			fmt.Printf("setup command failed: %s\n", formatCommand(command.Name, command.Args))
+			fmt.Printf("Error: %v\n", err)
+			if command.Remediation != "" {
+				fmt.Printf("Manual remediation: %s\n", command.Remediation)
+			}
+			return 1
+		}
+	}
+	fmt.Println("Development environment setup complete.")
+	return 0
+}
+
+func setupDevCommands(root string) []setupDevCommand {
+	manager, declared := detectNodePackageManager(root)
+	if manager == "" {
+		return nil
+	}
+
+	commands := []setupDevCommand{}
+	if declared && corepackManagedPackageManager(manager) {
+		commands = append(commands, setupDevCommand{
+			Name:        "corepack",
+			Args:        []string{"enable"},
+			Remediation: "run `corepack enable`, then rerun `ballast setup-dev`.",
+		})
+	}
+	commands = append(commands, setupDevCommand{
+		Name:        manager,
+		Args:        []string{"install"},
+		Remediation: fmt.Sprintf("install `%s` or run `%s install` from the project root after fixing the package manager.", manager, manager),
+	})
+	return commands
+}
+
+func detectNodePackageManager(root string) (string, bool) {
+	metadata, ok := loadPackageJSONMetadata(root)
+	hasDeclaredPackageManager := false
+	if ok {
+		if manager := packageManagerName(metadata.PackageManager); manager != "" {
+			hasDeclaredPackageManager = true
+			if safeNodePackageManager(manager) {
+				return manager, true
+			}
+		}
+	}
+	switch {
+	case fileExists(filepath.Join(root, "pnpm-lock.yaml")):
+		return "pnpm", false
+	case fileExists(filepath.Join(root, "yarn.lock")):
+		return "yarn", false
+	case fileExists(filepath.Join(root, "package-lock.json")):
+		return "npm", false
+	case ok && !hasDeclaredPackageManager:
+		return "npm", false
+	default:
+		return "", false
+	}
+}
+
+func packageManagerName(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if index := strings.Index(trimmed, "@"); index > 0 {
+		trimmed = strings.TrimSpace(trimmed[:index])
+	}
+	return strings.ToLower(trimmed)
+}
+
+func safeNodePackageManager(manager string) bool {
+	switch manager {
+	case "npm", "pnpm", "yarn":
+		return true
+	default:
+		return false
+	}
+}
+
+func corepackManagedPackageManager(manager string) bool {
+	switch manager {
+	case "pnpm", "yarn":
+		return true
+	default:
+		return false
+	}
+}
+
+func formatCommand(name string, args []string) string {
+	parts := append([]string{name}, args...)
+	return strings.Join(parts, " ")
 }
 
 func runDoctor(selectedLanguage language, args []string) int {

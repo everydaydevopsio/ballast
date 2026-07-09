@@ -65,6 +65,177 @@ func TestRunWithoutArgsPrintsUsage(t *testing.T) {
 	}
 }
 
+func TestRunSetupDevEnablesCorepackAndInstallsDeclaredPnpm(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{"packageManager":"pnpm@10.27.0"}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"setup-dev"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	want := [][]string{
+		{"corepack", "enable"},
+		{"pnpm", "install"},
+	}
+	if !reflect.DeepEqual(commands, want) {
+		t.Fatalf("expected setup commands %#v, got %#v", want, commands)
+	}
+	if !strings.Contains(output, "Detected package manager: pnpm") {
+		t.Fatalf("expected detected package manager output, got %q", output)
+	}
+}
+
+func TestRunSetupDevInstallsNpmWithoutCorepack(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{"packageManager":"npm@10.8.2"}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"setup-dev"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	want := [][]string{{"npm", "install"}}
+	if !reflect.DeepEqual(commands, want) {
+		t.Fatalf("expected setup commands %#v, got %#v", want, commands)
+	}
+}
+
+func TestRunSetupDevDetectsNpmFromLockfile(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, "package-lock.json"), "{}")
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"setup-dev"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	want := [][]string{{"npm", "install"}}
+	if !reflect.DeepEqual(commands, want) {
+		t.Fatalf("expected setup commands %#v, got %#v", want, commands)
+	}
+}
+
+func TestRunSetupDevIgnoresUnsafeDeclaredPackageManager(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	runCommandFunc = func(name string, args []string) error {
+		t.Fatalf("expected no setup commands, got %s %v", name, args)
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{"packageManager":"./scripts/setup@1.0.0"}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"setup-dev"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	if !strings.Contains(output, "No setup steps detected") {
+		t.Fatalf("expected no-op setup output, got %q", output)
+	}
+}
+
+func TestRunSetupDevNoopsWithoutRecognizedManifests(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	runCommandFunc = func(name string, args []string) error {
+		t.Fatalf("expected no setup commands, got %s %v", name, args)
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"setup-dev"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	if !strings.Contains(output, "No setup steps detected") {
+		t.Fatalf("expected no-op setup output, got %q", output)
+	}
+}
+
+func TestRunSetupDevReportsActionableCommandFailure(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	runCommandFunc = func(name string, args []string) error {
+		return errors.New("not found")
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{"packageManager":"pnpm@10.27.0"}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"setup-dev"})
+			if exitCode != 1 {
+				t.Fatalf("expected exit code 1, got %d", exitCode)
+			}
+		})
+	})
+
+	if !strings.Contains(output, "setup command failed: corepack enable") {
+		t.Fatalf("expected failed command in output, got %q", output)
+	}
+	if !strings.Contains(output, "Manual remediation: run `corepack enable`") {
+		t.Fatalf("expected manual remediation in output, got %q", output)
+	}
+}
+
 func TestRunHelpAndVersionCommands(t *testing.T) {
 	t.Run("help command", func(t *testing.T) {
 		output := captureStdout(t, func() {

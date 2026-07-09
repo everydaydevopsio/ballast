@@ -13,6 +13,7 @@ The local-dev agent installs multiple rules:
 
 ## What It Provides
 
+- A canonical agent startup command: `ballast setup-dev`
 - `.nvmrc` for consistent Node versions
 - Dockerfile, `docker-compose.yaml`, and `docker-compose.local.yaml` with `develop.watch` for hot reload
 - A `Makefile` with `up`, `down`, and `logs` targets for both the base stack and local watch-mode stack
@@ -27,6 +28,7 @@ The local-dev agent installs multiple rules:
 
 ### Environment and Node
 
+- **"Prepare this repository before agent work"** — Run `ballast setup-dev` and follow its remediation output
 - **"Add .nvmrc with the Node version from our CI"** — Version consistency
 - **"Update the README with nvm setup instructions for new contributors"** — Onboarding
 - **"Create .env.example with all required environment variables"** — Env documentation

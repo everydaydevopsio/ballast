@@ -12,6 +12,12 @@ For the full playbook and examples, use `docs/agents/local-dev.md`.
 - Keep the first-run path short for new contributors.
 - Keep README and runbooks aligned with the actual developer workflow.
 
+## Agent Startup
+
+- If the `ballast` wrapper is available, run `ballast setup-dev` before inspecting or changing code.
+- Treat setup output as the source of truth for missing tools, skipped steps, and manual remediation.
+- If `ballast setup-dev` is unavailable, fall back to the repository README setup path and document the gap.
+
 ## Apply This Rule When
 
 - The task is about local setup, onboarding, `.nvmrc`, env files, Docker, Compose, or dev scripts.
