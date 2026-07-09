@@ -394,6 +394,18 @@ func TestRunDoctorReportsIncompleteBallastState(t *testing.T) {
 	}
 }
 
+func TestLocalStateStatusDistinguishesPermissionErrors(t *testing.T) {
+	if got := localStateStatusFromStatError(nil); got != localStatePresent {
+		t.Fatalf("expected present status, got %q", got)
+	}
+	if got := localStateStatusFromStatError(os.ErrNotExist); got != localStateMissing {
+		t.Fatalf("expected missing status, got %q", got)
+	}
+	if got := localStateStatusFromStatError(os.ErrPermission); got != localStateUnreadable {
+		t.Fatalf("expected unreadable status, got %q", got)
+	}
+}
+
 func TestFindProjectRootUsesBallastConfigMarkers(t *testing.T) {
 	tests := []struct {
 		name   string
