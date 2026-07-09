@@ -57,7 +57,7 @@ As of 2026-07-09, the repository has these open issues:
 - #93: Consolidate CI into a single ci.yml that fans out linting and testing across all languages
 - #92: Define how product requirements documents are created, maintained, synced with the app, and presented over time
 - #90: Add GitHub Actions Slack notifications for successful and failed builds
-- #81: Deploy ballast-python to the everydaydevopio organization on PyPI
+- #81: Deploy ballast-python to the everydaydevopsio organization on PyPI
 - #65: Improve ballast-go release installer portability by removing shell tool assumptions
 - #61: Support native Windows executable detection in TypeScript doctor
 - #11: First-run interview: collect project preferences (package manager, Git host, test framework, JS/TS)
@@ -67,7 +67,7 @@ As of 2026-07-09, the repository has these open issues:
 
 | Requested item | Coverage | Action |
 | --- | --- | --- |
-| What to do about a missing `.ballast` file; is there a Ballast skill? | New issue #208 | Created focused issue for missing-state behavior and skill support. |
+| What to do about a missing `.ballast/` directory; is there a Ballast skill? | New issue #208 | Created focused issue for missing-state behavior and skill support. |
 | Fix Husky so YAML and YML formatting checks run | New issue #209 | Created focused Husky YAML/YML issue. |
 | Have Husky run tests on push to GitHub | New issue #210 | Created focused Husky pre-push test issue. |
 | Install local dev environment on startup for AI agents; missing pnpm because Corepack was not enabled | Existing #94 and #128 partially cover prerequisites and package-manager detection; new issue #211 covers the startup command | Created focused setup command issue. |
@@ -136,7 +136,7 @@ This broadens Ballast from local rules into multi-agent and deployment orchestra
 13. #124: feat: Enhance Ballast toward a robust Agentic SDLC framework
 14. #92: Define how product requirements documents are created, maintained, synced with the app, and presented over time
 15. #90: Add GitHub Actions Slack notifications for successful and failed builds
-16. #81: Deploy ballast-python to the everydaydevopio organization on PyPI
+16. #81: Deploy ballast-python to the everydaydevopsio organization on PyPI
 17. #11: First-run interview: collect project preferences
 
 ## Near-Term Execution Plan
