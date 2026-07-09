@@ -6,7 +6,7 @@
 - [x] Update local-dev PR workflow guidance and package mirrors.
 - [x] Regenerate checked-in `.codex/` and `.claude/` local outputs.
 - [x] Run focused verification and capture evidence.
-- [ ] Push branch, open PR, request Copilot review, and resolve actionable comments.
+- [x] Push branch, open PR, request Copilot review, and resolve actionable comments.
 
 ## Previous Tasks
 
