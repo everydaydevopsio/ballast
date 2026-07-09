@@ -1,13 +1,21 @@
 # Tasks
 
+- [x] Confirm issue #213 scope, operating mode, and governing PRD gap.
+- [x] Add PRD requirements for Copilot review polling and per-thread replies.
+- [x] Add failing generated rule text coverage for the Copilot review loop.
+- [x] Update local-dev PR workflow guidance and package mirrors.
+- [x] Regenerate checked-in `.codex/` and `.claude/` local outputs.
+- [x] Run focused verification and capture evidence.
+- [ ] Push branch, open PR, request Copilot review, and resolve actionable comments.
+
+## Previous Tasks
+
 - [x] Confirm current issue-priority plan against live GitHub issue state.
 - [x] Close stale #211 after verifying PR #217 implemented `ballast setup-dev`.
 - [x] Verify #144 managed skill refresh behavior on current `main`.
 - [x] Close stale #144 with verification evidence.
 - [x] Update `plans/issue-priority-plan.md` so #209/#210 are the next implementation workstream.
 - [x] Push branch, open PR, request Copilot review, and check CI.
-
-## Previous Tasks
 
 - [x] Confirm issue #208 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for generated `.ballast/` state and Ballast repair skill support.
