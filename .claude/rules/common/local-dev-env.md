@@ -25,9 +25,10 @@ For the full playbook and examples, use `docs/agents/local-dev.md`.
 
 ## Branch Before Code
 
-Before modifying files, check the current branch with `git branch --show-current`.
+Before modifying files, check the current branch with `git branch --show-current` and determine the default branch with `git symbolic-ref --short refs/remotes/origin/HEAD` or `gh repo view --json defaultBranchRef`.
 
-- If the current branch is `main`, `master`, `develop`, or the repository default branch, create or switch to a task branch first.
+- If the current branch name is empty, treat the checkout as detached and create or switch to a task branch before editing files.
+- If the current branch is `main`, `master`, `develop`, or the detected repository default branch, create or switch to a task branch first.
 - Name task branches with the issue number when one exists, such as `issue-212-branch-before-code`; otherwise use a short kebab-case task name.
 - Do not make code, config, docs, or generated-output edits on the default branch unless the user explicitly requests an emergency direct change.
 - Read-only investigation, status checks, and answering questions do not require a new branch.

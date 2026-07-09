@@ -91,6 +91,8 @@ describe('build', () => {
       expect(content).toContain('make up-local');
       expect(content).toContain('## Branch Before Code');
       expect(content).toContain('git branch --show-current');
+      expect(content).toContain('refs/remotes/origin/HEAD');
+      expect(content).toContain('current branch name is empty');
       expect(content).toContain('issue-212-branch-before-code');
       expect(content).toContain('Read-only investigation');
     });
