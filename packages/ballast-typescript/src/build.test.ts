@@ -182,7 +182,9 @@ describe('build', () => {
       const content = getContent('testing', undefined, 'typescript');
       expect(content).toContain('web smoke test');
       expect(content).toContain('live route or health endpoint');
-      expect(content).toContain('Playwright');
+      expect(content).toContain(
+        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+      );
       expect(content).toContain(
         'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
       );
@@ -432,7 +434,9 @@ describe('build', () => {
     test('includes smoke and E2E guidance in generated Codex rules', () => {
       const testing = buildCodexFormat('testing');
       expect(testing).toContain('web smoke test');
-      expect(testing).toContain('Playwright');
+      expect(testing).toContain(
+        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+      );
       expect(testing).toContain(
         'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
       );

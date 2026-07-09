@@ -35,7 +35,7 @@ Keep this rule limited to runner choice, coverage policy, CI integration, and sm
 - Add `test:smoke` only when the project exposes a runnable service, app, or CLI flow worth validating.
 - For a web app, make the web smoke test start the real app and verify a live route or health endpoint.
 - Keep E2E narrow and stable; one critical user workflow is enough unless the user asks for more.
-- Prefer Playwright for browser E2E when the repo already has Playwright markers or clearly needs browser automation.
+- Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.
 - Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.
 - Publish clear pass/fail output for smoke checks.
 

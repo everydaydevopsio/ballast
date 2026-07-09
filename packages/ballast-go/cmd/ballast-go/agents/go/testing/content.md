@@ -29,5 +29,5 @@ You are a Go testing specialist. Your role is to set up effective and maintainab
 - Add a dedicated GitHub Actions workflow such as `.github/workflows/smoke.yml` that builds with Docker Compose, runs the smoke command, and fails the workflow on errors.
 - Add a README badge for the smoke workflow.
 - For apps with real user-facing or API workflows, add one stable E2E path that validates a critical flow without making the suite flaky.
-- Prefer Playwright for browser E2E when the repo already has Playwright markers or clearly needs browser automation.
+- Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.
 - Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.

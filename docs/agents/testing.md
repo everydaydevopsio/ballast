@@ -33,7 +33,7 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
 - Web smoke tests that use the repo Dockerfile and `docker-compose.yaml` for runnable apps and verify a live route or health endpoint
 - Explicit smoke-test pass/fail output
 - A smoke-test GitHub Action and matching README badge
-- Narrow end-to-end coverage for one critical workflow when the app has a real user flow, preferring Playwright for browser E2E when appropriate
+- Narrow end-to-end coverage for one critical workflow when the app has a real user flow, keeping an existing browser E2E framework when present and preferring Playwright only when Playwright markers already exist or browser automation is needed without an existing browser E2E framework
 
 ## Smoke and E2E Placement
 
