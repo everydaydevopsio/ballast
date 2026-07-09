@@ -18,6 +18,16 @@ For the full playbook and examples, use `docs/agents/local-dev.md`.
 - The user asks to prepare a repository for contributor use.
 - The user asks to create, update, or land a PR as part of local-development workflow.
 
+## Branch Before Code
+
+Before modifying files, check the current branch with `git branch --show-current`.
+
+- If the current branch is `main`, `master`, `develop`, or the repository default branch, create or switch to a task branch first.
+- Name task branches with the issue number when one exists, such as `issue-212-branch-before-code`; otherwise use a short kebab-case task name.
+- Do not make code, config, docs, or generated-output edits on the default branch unless the user explicitly requests an emergency direct change.
+- Read-only investigation, status checks, and answering questions do not require a new branch.
+- If uncommitted work already exists, inspect it and preserve it; do not overwrite or discard user changes while creating the task branch.
+
 ## Core Responsibilities
 
 1. Establish the local runtime baseline.
