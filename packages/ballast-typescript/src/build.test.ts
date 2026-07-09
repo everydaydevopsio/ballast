@@ -183,9 +183,11 @@ describe('build', () => {
       expect(content).toContain('web smoke test');
       expect(content).toContain('live route or health endpoint');
       expect(content).toContain('Playwright');
-      expect(content).toContain('local');
-      expect(content).toContain('pre-push');
-      expect(content).toContain('CI');
+      expect(content).toContain('targeted smoke checks during local work');
+      expect(content).toContain(
+        'put deterministic build/typecheck plus smoke checks in pre-push'
+      );
+      expect(content).toContain('run full smoke/E2E gates in CI');
       expect(content).toContain('one critical user workflow');
     });
 
@@ -196,9 +198,9 @@ describe('build', () => {
       expect(content).toContain('--help');
       expect(content).toContain('--version');
       expect(content).toContain('representative command');
-      expect(content).toContain('local');
-      expect(content).toContain('pre-push');
-      expect(content).toContain('CI');
+      expect(content).toContain('local packaged-command smoke checks');
+      expect(content).toContain('run them in pre-push');
+      expect(content).toContain('require them in CI');
     });
 
     test('throws for unknown agent', () => {
@@ -433,14 +435,20 @@ describe('build', () => {
       const testing = buildCodexFormat('testing');
       expect(testing).toContain('web smoke test');
       expect(testing).toContain('Playwright');
-      expect(testing).toContain('pre-push');
-      expect(testing).toContain('CI');
+      expect(testing).toContain('targeted smoke checks during local work');
+      expect(testing).toContain(
+        'put deterministic build/typecheck plus smoke checks in pre-push'
+      );
+      expect(testing).toContain('run full smoke/E2E gates in CI');
 
       const publishingCli = buildCodexFormat('publishing', 'cli');
       expect(publishingCli).toContain('packaged-command smoke');
       expect(publishingCli).toContain('--help');
       expect(publishingCli).toContain('--version');
       expect(publishingCli).toContain('representative command');
+      expect(publishingCli).toContain('local packaged-command smoke checks');
+      expect(publishingCli).toContain('run them in pre-push');
+      expect(publishingCli).toContain('require them in CI');
     });
   });
 
