@@ -84,6 +84,7 @@ Common skills (all languages):
 - `aws-weekly-security-review`
 - `github-health-check`
 - `ballast-audit`
+- `ballast-project-maintenance`
 
 Skill sources in this repo:
 
@@ -99,6 +100,7 @@ Skills are reusable task guides that Ballast installs for the target AI tool alo
 - `aws-weekly-security-review`: run a weekly read-only AWS security baseline review with prioritized findings
 - `github-health-check`: run a comprehensive GitHub repository health check covering CI status, open PRs, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
 - `ballast-audit`: audit AI rule and skill files for context density, duplication, and bloat
+- `ballast-project-maintenance`: inspect, bootstrap, and repair Ballast-managed repository state, including generated `.ballast/` local tools
 
 ### Install a skill
 
@@ -332,6 +334,8 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 - `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically, and add `--patch` to merge backend file updates during that refresh
 - `ballast upgrade [--patch] [--force]`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it; `--patch` and `--force` forward to the backend refresh
 - `ballast install-cli [--language <typescript|python|go|ansible|terraform>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible` and `terraform` selections reuse the `ballast-go` backend.
+
+`.ballast/` is generated local tool state, is ignored by git, and is safe to recreate. Run `ballast doctor` to inspect it; run `ballast doctor --fix` or `ballast install-cli` if `.ballast/`, `.ballast/bin`, or `.ballast/tools` is missing.
 
 ## Config Files
 

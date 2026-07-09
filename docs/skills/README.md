@@ -41,6 +41,13 @@ Ballast ships reusable skill guides alongside its agent rules.
 - Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
 - Installed by: `--skill ballast-audit` or `--all-skills`
 
+`ballast-project-maintenance`
+
+- Type: common skill
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Installed by: `--skill ballast-project-maintenance` or `--all-skills`
+- Focus: Ballast-managed repository status, `.ballast/` local tool repair, config refresh, and generated rule/skill maintenance
+
 ## Installation Targets
 
 Skills install to the target tool's expected location:
@@ -61,3 +68,4 @@ Codex also records installed skills in the root `AGENTS.md`. Claude records them
 - [aws-weekly-security-review.md](aws-weekly-security-review.md)
 - [github-health-check.md](github-health-check.md)
 - [ballast-audit.md](ballast-audit.md)
+- [ballast-project-maintenance.md](ballast-project-maintenance.md)

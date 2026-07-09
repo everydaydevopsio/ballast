@@ -34,6 +34,7 @@ var commonSkills = []string{
 	"aws-weekly-security-review",
 	"github-health-check",
 	"ballast-audit",
+	"ballast-project-maintenance",
 }
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
@@ -419,7 +420,7 @@ Options:
   --target, -t <platform>   AI platforms: %s (comma-separated or repeatable)
   --language, -l <lang>     Language profile: %s (default: go)
   --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, git-hooks, logging, testing (comma-separated)
-  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, ballast-audit (comma-separated)
+  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, ballast-audit, ballast-project-maintenance (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
   --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md

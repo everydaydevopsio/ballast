@@ -166,6 +166,12 @@ type doctorBackendStatus struct {
 	Found    bool
 }
 
+type ballastLocalState struct {
+	RootExists  bool
+	BinExists   bool
+	ToolsExists bool
+}
+
 type monorepoPlan struct {
 	Invocations []backendInvocation
 	Config      monorepoConfig
@@ -924,6 +930,8 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	fmt.Println()
 
+	printDoctorLocalState(root)
+
 	fmt.Println("Config:")
 	configPath := filepath.Join(root, ".rulesrc.json")
 	config, err := loadDoctorConfig(root)
@@ -962,6 +970,41 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
 	}
 	fmt.Println()
+}
+
+func printDoctorLocalState(root string) {
+	state := inspectBallastLocalState(root)
+	fmt.Println("Local state:")
+	switch {
+	case !state.RootExists:
+		fmt.Println("- .ballast: missing")
+	case state.BinExists && state.ToolsExists:
+		fmt.Println("- .ballast: present")
+	default:
+		fmt.Println("- .ballast: incomplete")
+	}
+	printLocalStatePath(".ballast/bin", state.BinExists)
+	printLocalStatePath(".ballast/tools", state.ToolsExists)
+	if !state.RootExists || !state.BinExists || !state.ToolsExists {
+		fmt.Println("- remediation: Run `ballast doctor --fix` or `ballast install-cli` to recreate generated .ballast/ tool state.")
+	}
+	fmt.Println()
+}
+
+func printLocalStatePath(path string, exists bool) {
+	if exists {
+		fmt.Printf("- %s: present\n", path)
+		return
+	}
+	fmt.Printf("- %s: missing\n", path)
+}
+
+func inspectBallastLocalState(root string) ballastLocalState {
+	return ballastLocalState{
+		RootExists:  fileExists(filepath.Join(root, ".ballast")),
+		BinExists:   fileExists(filepath.Join(root, ".ballast", "bin")),
+		ToolsExists: fileExists(filepath.Join(root, ".ballast", "tools")),
+	}
 }
 
 func formatDoctorConfigPaths(languages []string, paths map[string][]string) string {

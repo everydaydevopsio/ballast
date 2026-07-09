@@ -15,6 +15,8 @@ For the full playbook and examples, use `docs/agents/local-dev.md`.
 ## Agent Startup
 
 - If the `ballast` wrapper is available, run `ballast setup-dev` before inspecting or changing code.
+- Use `ballast doctor` to inspect Ballast-managed local state; if `.ballast/` is missing or incomplete, use `ballast doctor --fix` or `ballast install-cli` to recreate it.
+- Treat `.ballast/` as generated local tool state. Do not commit it.
 - Treat setup output as the source of truth for missing tools, skipped steps, and manual remediation.
 - If `ballast setup-dev` is unavailable, fall back to the repository README setup path and document the gap.
 

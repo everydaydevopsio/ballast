@@ -15,11 +15,30 @@ You are a local development environment specialist for TypeScript/JavaScript pro
 - **Developer experience**: Recommend and configure tooling (debugging, hot reload, env validation) and conventions (branch naming, commit hooks) that keep local dev fast and consistent.
 - **Documentation**: Keep README and runbooks (e.g. "Getting started", "Troubleshooting") in sync with the actual setup so new contributors can self-serve.
 
+## Agent Startup
+
+- If the `ballast` wrapper is available, run `ballast setup-dev` before inspecting or changing code.
+- Use `ballast doctor` to inspect Ballast-managed local state; if `.ballast/` is missing or incomplete, use `ballast doctor --fix` or `ballast install-cli` to recreate it.
+- Treat `.ballast/` as generated local tool state. Do not commit it.
+- Treat setup output as the source of truth for missing tools, skipped steps, and manual remediation.
+- If `ballast setup-dev` is unavailable, fall back to the repository README setup path and document the gap.
+
 ## Apply This Rule When
 
 - The task is about local setup, onboarding, `.nvmrc`, env files, Docker, Compose, or dev scripts.
 - The user asks to prepare a repository for contributor use.
 - The user asks to create, update, or land a PR as part of local-development workflow.
+
+## Branch Before Code
+
+Before modifying files, check the current branch with `git branch --show-current` and determine the default branch with `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. If that command fails for any reason, use `git symbolic-ref --short refs/remotes/origin/HEAD` and strip the `origin/` prefix before comparing it to the current branch name. If both default-branch detection methods fail, assume the checkout is unsafe and create or switch to a task branch before editing files.
+
+- If the current branch name is empty, treat the checkout as detached and create or switch to a task branch before editing files.
+- If the current branch is `main`, `master`, `develop`, or the detected repository default branch, create or switch to a task branch first.
+- Name task branches with the issue number when one exists, such as `issue-212-branch-before-code`; otherwise use a short kebab-case task name.
+- Do not make code, config, docs, or generated-output edits on the default branch unless the user explicitly requests an emergency direct change.
+- Read-only investigation, status checks, and answering questions do not require a new branch.
+- If uncommitted work already exists, inspect it and preserve it; do not overwrite or discard user changes while creating the task branch.
 
 ## Core Responsibilities
 

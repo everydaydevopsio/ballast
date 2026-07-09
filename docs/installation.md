@@ -214,6 +214,8 @@ For single-language TypeScript installs, the `git-hooks` rules should use Husky 
 - `ballast upgrade [--patch] [--force]`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it; `--patch` and `--force` forward to the backend refresh
 - `ballast install-cli [--language <typescript|python|go|ansible|terraform>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible` and `terraform` selections reuse the `ballast-go` backend.
 
+`.ballast/` is generated repository-local tool state for backend CLIs. It is safe to recreate and should remain ignored by git. `ballast install` does not require `.ballast/` to exist before installing rules or skills. Use `ballast doctor` to inspect `.ballast/`, `.ballast/bin`, and `.ballast/tools`; use `ballast doctor --fix` or `ballast install-cli` to recreate missing or incomplete local tool state.
+
 ## Config Persistence
 
 - Shared config (wrapper + TypeScript/Python/Go CLIs, current default): `.rulesrc.json`

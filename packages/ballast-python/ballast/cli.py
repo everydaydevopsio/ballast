@@ -38,6 +38,7 @@ COMMON_SKILLS = [
     "aws-weekly-security-review",
     "github-health-check",
     "ballast-audit",
+    "ballast-project-maintenance",
 ]
 SKILLS_BY_LANGUAGE = {
     "typescript": COMMON_SKILLS,
