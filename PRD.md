@@ -1,5 +1,30 @@
 # Product Requirements
 
+## Agent Development Environment Bootstrap
+
+### Problem
+
+AI agents need a deterministic first command that prepares a repository for local development before they inspect, edit, or test code. Without a canonical bootstrap path, agents may miss prerequisite setup such as enabling Corepack for a declared Node package manager, which can leave commands like `pnpm` unavailable even when the repository clearly declares them.
+
+### Requirements
+
+1. The Ballast wrapper must expose a canonical `setup-dev` command for agent startup.
+2. `setup-dev` must resolve the project root using the same root-detection behavior as other wrapper commands.
+3. For Node repositories with a declared `packageManager`, `setup-dev` must enable Corepack before running package-manager installs when the declared manager is managed through Corepack.
+4. `setup-dev` must install or verify dependencies using the detected repository package manager.
+5. Missing prerequisite and command failure output must name the failed command and provide actionable remediation.
+6. Repositories without recognized dependency manifests must be skipped with clear output instead of failing.
+7. Agent local-development guidance must tell agents to run `ballast setup-dev` as their first startup step when Ballast is available.
+
+### Acceptance Criteria
+
+1. Given a repository with `package.json` declaring `packageManager: "pnpm@..."`, `ballast setup-dev` runs `corepack enable` before `pnpm install`.
+2. Given a repository with npm lockfile/package-manager signals, `ballast setup-dev` runs `npm install` without requiring Corepack.
+3. Given a repository without recognized dependency manifests, `ballast setup-dev` exits successfully and prints that no setup steps were detected.
+4. Given a setup command failure, `ballast setup-dev` exits non-zero and prints the command that failed plus manual remediation guidance.
+5. Wrapper tests cover Corepack/package-manager behavior and the no-op path.
+6. Generated local-dev rule output references `ballast setup-dev` as the first agent startup step.
+
 ## Generated Rule Context Hygiene
 
 ### Problem

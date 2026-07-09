@@ -33,6 +33,12 @@ nvm use
 pnpm install
 ```
 
+AI agents should run the canonical bootstrap command before starting repository work:
+
+```bash
+ballast setup-dev
+```
+
 ## Packages
 
 - `@everydaydevopsio/ballast` (npm)

@@ -1,5 +1,15 @@
 # Tasks
 
+- [x] Confirm issue #211 scope and governing operating mode.
+- [x] Add PRD requirements and acceptance criteria for `ballast setup-dev`.
+- [x] Add failing wrapper tests for Corepack/package-manager setup behavior.
+- [x] Implement the canonical wrapper `setup-dev` command.
+- [x] Update local-dev agent guidance and regenerated Ballast-managed outputs.
+- [x] Run targeted and full verification commands.
+- [ ] Push branch, open PR, and request Copilot review.
+
+## Previous Tasks
+
 - [x] Confirm issue #144 root cause and affected backends.
 - [x] Add PRD acceptance criteria for managed skill refresh.
 - [x] Add failing unit coverage for TypeScript, Python, and Go skill refresh behavior.
@@ -7,8 +17,6 @@
 - [x] Implement the minimal cross-backend fix while preserving agent rule overwrite semantics.
 - [x] Run targeted and full verification commands.
 - [ ] Push branch, open PR, and request Copilot review.
-
-## Previous Tasks
 
 - [x] Confirm the operator-visible behavior gap in `ballast doctor`.
 - [x] Identify the governing requirements for the CLI output change.
