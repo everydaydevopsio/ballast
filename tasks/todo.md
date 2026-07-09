@@ -16,7 +16,7 @@
 - [x] Add failing wrapper smoke coverage for upgrade refreshing stale skill files.
 - [x] Implement the minimal cross-backend fix while preserving agent rule overwrite semantics.
 - [x] Run targeted and full verification commands.
-- [ ] Push branch, open PR, and request Copilot review.
+- [x] Push branch, open PR, and request Copilot review.
 
 - [x] Confirm the operator-visible behavior gap in `ballast doctor`.
 - [x] Identify the governing requirements for the CLI output change.
