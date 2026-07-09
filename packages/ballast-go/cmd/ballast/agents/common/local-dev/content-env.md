@@ -64,7 +64,7 @@ Before modifying files, check the current branch with `git branch --show-current
    - After PR creation and every push, poll Copilot and human review comments until the PR is ready.
    - Before changes, summarize actionable Copilot asks and related human-review asks.
    - Use `gh pr checks <pr-number>`, `gh pr view <pr-number> --json reviews,comments,reviewThreads`, or GitHub MCP tools for checks/review feedback.
-   - Reply directly on every addressed Copilot thread/comment; do the same for addressed human comments.
+   - Reply directly on addressed Copilot threads/comments, then resolve them; do the same for human comments.
    - Stop only when required checks are green and no unresolved actionable Copilot or human review comments remain.
 
 ## Node Guidance

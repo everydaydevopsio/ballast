@@ -256,7 +256,7 @@ Ballast-generated local-development rules treat PR hygiene as part of the agent 
 1. Generated local-development PR workflow guidance must instruct agents to poll for Copilot review comments after PR creation.
 2. Generated local-development PR workflow guidance must instruct agents to poll again after each push that updates an open PR.
 3. Agents must summarize actionable Copilot review asks before making code changes.
-4. Agents must reply directly on every Copilot review thread or comment they address.
+4. Agents must reply directly on every Copilot review thread or comment they address, then resolve the addressed thread when the review system supports it.
 5. The same review loop must remain compatible with human reviewer comments; Copilot-specific guidance must not cause agents to ignore human review feedback.
 6. The stop condition for PR readiness must be explicit: required checks are green and there are no unresolved actionable Copilot or human review comments.
 7. Generated guidance must include concrete command examples using `gh` or GitHub MCP tools where available.
@@ -264,7 +264,7 @@ Ballast-generated local-development rules treat PR hygiene as part of the agent 
 ### Acceptance Criteria
 
 1. Generated local-development rule output tells agents to check Copilot comments repeatedly during PR readiness work.
-2. Generated local-development rule output requires direct per-thread replies for addressed Copilot comments.
+2. Generated local-development rule output requires direct per-thread replies and thread resolution for addressed Copilot comments.
 3. Generated local-development rule output defines the stop condition for the review loop.
 4. Generated local-development rule output says the workflow also applies to human review comments.
 5. Automated tests cover the generated PR workflow rule text.
