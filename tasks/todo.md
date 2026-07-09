@@ -6,7 +6,7 @@
 - [x] Implement the canonical wrapper `setup-dev` command.
 - [x] Update local-dev agent guidance and regenerated Ballast-managed outputs.
 - [x] Run targeted and full verification commands.
-- [ ] Push branch, open PR, and request Copilot review.
+- [x] Push branch, open PR, and request Copilot review.
 
 ## Previous Tasks
 
