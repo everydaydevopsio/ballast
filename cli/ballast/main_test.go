@@ -4067,6 +4067,15 @@ func TestPatchManagedSupportSectionsUpdatesInstalledSkills(t *testing.T) {
 }
 
 func TestBuildMonorepoSupportFileIncludesPublishingAndSkillsForCodex(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		if name == "git" {
+			return "", errors.New("git unavailable in isolated test")
+		}
+		return originalOutput(name, args)
+	}
+
 	plan := &monorepoPlan{
 		Common:   []string{"local-dev", "publishing"},
 		Language: []string{"linting"},

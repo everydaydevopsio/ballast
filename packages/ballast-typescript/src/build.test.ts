@@ -178,6 +178,29 @@ describe('build', () => {
       expect(content).toContain('image digest');
     });
 
+    test('returns TypeScript testing content with web smoke and E2E placement guidance', () => {
+      const content = getContent('testing', undefined, 'typescript');
+      expect(content).toContain('web smoke test');
+      expect(content).toContain('live route or health endpoint');
+      expect(content).toContain('Playwright');
+      expect(content).toContain('local');
+      expect(content).toContain('pre-push');
+      expect(content).toContain('CI');
+      expect(content).toContain('one critical user workflow');
+    });
+
+    test('returns CLI publishing content with packaged-command smoke guidance', () => {
+      const content = getContent('publishing', 'cli');
+      expect(content).toContain('packaged-command smoke');
+      expect(content).toContain('built artifact');
+      expect(content).toContain('--help');
+      expect(content).toContain('--version');
+      expect(content).toContain('representative command');
+      expect(content).toContain('local');
+      expect(content).toContain('pre-push');
+      expect(content).toContain('CI');
+    });
+
     test('throws for unknown agent', () => {
       expect(() => getContent('nonexistent')).toThrow(/content.md/);
     });
@@ -404,6 +427,20 @@ describe('build', () => {
       const result = buildCodexFormat('linting');
       expect(result).toContain('# TypeScript Linting Rules');
       expect(result).toContain('## Your Responsibilities');
+    });
+
+    test('includes smoke and E2E guidance in generated Codex rules', () => {
+      const testing = buildCodexFormat('testing');
+      expect(testing).toContain('web smoke test');
+      expect(testing).toContain('Playwright');
+      expect(testing).toContain('pre-push');
+      expect(testing).toContain('CI');
+
+      const publishingCli = buildCodexFormat('publishing', 'cli');
+      expect(publishingCli).toContain('packaged-command smoke');
+      expect(publishingCli).toContain('--help');
+      expect(publishingCli).toContain('--version');
+      expect(publishingCli).toContain('representative command');
     });
   });
 

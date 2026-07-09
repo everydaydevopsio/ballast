@@ -1,5 +1,13 @@
 # Tasks
 
+- [x] Confirm issue #214 scope, approval, and coordination boundary with #145.
+- [x] Add PRD requirements for web smoke/E2E and CLI packaged-command smoke guidance.
+- [x] Add generated guidance tests for web smoke/E2E, Playwright preference, placement, and CLI packaged-command smoke checks.
+- [x] Update canonical testing and publishing guidance sources plus docs.
+- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
+- [x] Run focused tests and required sync/generation checks.
+- [ ] Push branch, open PR for #214, request Copilot review, and monitor CI/review comments.
+
 - [x] Confirm current issue-priority plan against live GitHub issue state.
 - [x] Close stale #211 after verifying PR #217 implemented `ballast setup-dev`.
 - [x] Verify #144 managed skill refresh behavior on current `main`.

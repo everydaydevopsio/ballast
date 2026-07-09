@@ -200,6 +200,31 @@ Some repositories contain browser or Node.js components that are still JavaScrip
 3. Given a repo with `tsconfig.json`, the warning is not emitted.
 4. Smoke coverage must exercise at least one single-language JavaScript package case and one mixed-language non-TypeScript monorepo case that emits the warning.
 
+## Smoke And End-to-End Test Guidance
+
+### Problem
+
+Ballast testing and publishing rules mention smoke tests, but they do not consistently define the expected product-level coverage for web applications and installable CLIs. Agents need concise generated guidance that distinguishes fast local checks, pre-push confidence checks, and CI release gates without requiring broad integration-framework detection work.
+
+### Requirements
+
+1. Generated testing guidance must define a baseline web smoke test for runnable web applications that starts the real app and verifies a live route or health endpoint.
+2. Generated testing guidance must define a narrow web end-to-end baseline for one critical user workflow when the repo has a browser application surface.
+3. Browser end-to-end guidance must prefer Playwright when the repo already uses Playwright or the app shape calls for browser automation, while leaving broader framework detection to the integration-framework detection workstream.
+4. Generated guidance must explain local, pre-push, and CI placement: fast unit and targeted smoke checks locally, deterministic smoke and required build/typecheck checks before push, and full smoke/E2E gates in CI.
+5. Generated CLI publishing/testing guidance must require packaged-command smoke tests that install or execute the built artifact, verify `--help` and `--version`, and run at least one representative command.
+6. Documentation must describe the same web smoke/E2E and CLI packaged-command smoke expectations.
+7. Automated generated-content tests must cover the smoke/E2E placement guidance and CLI packaged-command smoke guidance.
+
+### Acceptance Criteria
+
+1. Generated web testing rules include smoke and end-to-end expectations for runnable web apps.
+2. Generated testing rules prefer Playwright for browser E2E when appropriate without implementing the broader #145 framework-detection scope.
+3. Generated guidance explains which checks belong locally, in pre-push, and in CI.
+4. Generated CLI publishing/testing rules require packaged-command smoke tests for install/startup, help output, version output, and a representative command.
+5. `docs/agents/testing.md` and `docs/agents/publishing.md` include the same operator-facing guidance.
+6. Tests or snapshots fail if the generated guidance drops the required smoke/E2E or CLI packaged-command expectations.
+
 ## Git Repository Boundary Root Resolution
 
 ### Problem
