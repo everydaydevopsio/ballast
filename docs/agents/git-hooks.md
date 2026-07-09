@@ -20,7 +20,7 @@ Ballast auto-installs `git-hooks` whenever `linting` is selected so existing ins
 ## Hook Strategy
 
 - TypeScript-only repos use Husky at the repo root
-- TypeScript-only Husky pre-commit hooks stay fast with `lint-staged` or the repo formatter/linter, including explicit `.yaml` and `.yml` formatting checks
+- TypeScript-only Husky pre-commit hooks stay fast with `lint-staged` or the repo formatter/linter, including explicit formatting checks for `.yaml` and `.yml` files
 - TypeScript-only `.husky/pre-push` hooks run the detected or canonical package-manager test command, with build or typecheck first when the repo convention requires it
 - Multi-language repos use `pre-commit` at the repo root
 - Python, Go, Ansible, and Terraform use `pre-commit`
