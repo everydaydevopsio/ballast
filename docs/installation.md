@@ -194,7 +194,7 @@ Use `--patch` to merge upstream Ballast updates into an existing rule or skill f
 
 Use `--force` to reset a managed rule or skill file to canonical Ballast content. When `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` already exists, Ballast prompts before overwriting it; in non-interactive mode (`--yes` or CI), Ballast aborts instead of replacing the support file silently.
 
-For single-language TypeScript installs, the `git-hooks` rules should use Husky instead of `pre-commit`, keep formatting and linting in `pre-commit`, and add unit tests to the `.husky/pre-push` hook.
+For single-language TypeScript installs, the `git-hooks` rules should use Husky instead of `pre-commit`, keep formatting and linting in `.husky/pre-commit`, and add unit tests to the `.husky/pre-push` hook.
 
 ## Common CLI Options
 
