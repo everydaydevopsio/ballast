@@ -218,7 +218,13 @@ describe('build', () => {
         hookMode: 'husky'
       });
       expect(content).toContain('Use Husky for TypeScript-only repositories.');
+      expect(content).toContain('.yaml');
+      expect(content).toContain('.yml');
+      expect(content).toContain('lint-staged');
+      expect(content).toContain('repo formatter');
       expect(content).toContain('.husky/pre-push');
+      expect(content).toContain('package-manager test command');
+      expect(content).toContain('build or typecheck');
       expect(content).not.toContain('pre-commit install');
     });
 
@@ -547,7 +553,11 @@ alwaysApply: false
       );
       expect(result).toContain('Use Husky for TypeScript-only repositories.');
       expect(result).toContain('npx lint-staged');
+      expect(result).toContain('.yaml');
+      expect(result).toContain('.yml');
       expect(result).toContain('.husky/pre-push');
+      expect(result).toContain('package-manager test command');
+      expect(result).toContain('build or typecheck');
       expect(result).not.toContain('pre-commit install');
     });
 
