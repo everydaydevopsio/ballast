@@ -27,7 +27,7 @@ For the full playbook and examples, use `docs/agents/local-dev.md`.
 
 ## Branch Before Code
 
-Before modifying files, check the current branch with `git branch --show-current` and determine the default branch with `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. If `gh` is unavailable, use `git symbolic-ref --short refs/remotes/origin/HEAD` and strip the `origin/` prefix before comparing it to the current branch name.
+Before modifying files, check the current branch with `git branch --show-current` and determine the default branch with `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. If that command fails for any reason, use `git symbolic-ref --short refs/remotes/origin/HEAD` and strip the `origin/` prefix before comparing it to the current branch name. If both default-branch detection methods fail, assume the checkout is unsafe and create or switch to a task branch before editing files.
 
 - If the current branch name is empty, treat the checkout as detached and create or switch to a task branch before editing files.
 - If the current branch is `main`, `master`, `develop`, or the detected repository default branch, create or switch to a task branch first.
