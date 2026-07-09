@@ -1,6 +1,6 @@
 # Plan: Open Issue Review and Next Priorities
 
-**Status:** Proposed
+**Status:** Updated after #211 and #144 closure
 **Created:** 2026-07-09
 **Source:** Review of open GitHub issues and requested follow-up list
 
@@ -23,19 +23,20 @@ Reviewed all open GitHub issues for `everydaydevopsio/ballast` and compared them
   - Added remediation guidance pointing operators to `ballast doctor --fix` or `ballast install-cli`.
   - Added `ballast-project-maintenance` as a common skill for Ballast repository status, bootstrap, and repair workflows.
   - Updated docs, local-dev guidance, package mirrors, generated local `.claude/` and `.codex/` outputs, and focused tests.
+- #144: Bug: ballast upgrade refresh skips installed skills instead of updating them — implemented on `main` and closed after verification.
+  - Config-refresh flows now set managed skill refresh mode so `install --refresh-config`, `upgrade`, and `doctor --fix` rewrite selected skill files without requiring `--force`.
+  - Ordinary install behavior still skips existing skill files unless `--patch` or `--force` is selected.
+  - Verified with TypeScript, Python, Go, wrapper unit tests, and the upgrade-refresh smoke script.
 
 ## Open Issue Inventory
 
-As of 2026-07-09, the repository has these open issues:
+As of 2026-07-09 after closing completed #211 and #144, the repository has these open issues:
 
 - #215: Define Kubernetes deployment guidance with local Helm chart and external ArgoCD config
 - #214: Add smoke and E2E test guidance for web apps and CLIs
 - #213: Codify Copilot review polling and per-thread replies
-- #212: Require agents to create a new branch before modifying code
-- #211: Add a development-environment bootstrap command for AI agents
 - #210: Configure Husky pre-push hooks to run tests before pushing to GitHub
 - #209: Add YAML and YML formatting checks to Husky hook guidance
-- #208: Define .ballast bootstrap behavior and Ballast skill support
 - #188: Re-enable OpenCode as a first-class Ballast target
 - #175: Consider TTY detection for non-interactive mode in support file confirmation
 - #166: feat(doctor): detect drift and remove stale rules files
@@ -48,7 +49,6 @@ As of 2026-07-09, the repository has these open issues:
 - #149: feat: add interactive setup prompts to github-health-check skill for unconfigured sections
 - #147: Add GitHub repo setup workflow and best practices skill
 - #145: Detect integration test frameworks per language and prefer Playwright for browser-based apps
-- #144: Bug: ballast upgrade refresh skips installed skills instead of updating them
 - #133: Create MCP server so AI agents can configure and use Ballast directly
 - #128: Detect project package manager during setup and align Node/package-manager defaults to LTS
 - #124: feat: Enhance Ballast toward a robust Agentic SDLC framework
@@ -86,8 +86,8 @@ As of 2026-07-09, the repository has these open issues:
 
 - [x] #212: Require agents to create a new branch before modifying code — completed and merged via PR #216
 - [x] #211: Add a development-environment bootstrap command for AI agents — implemented and merged via PR #217
-- [x] #208: Define .ballast bootstrap behavior and Ballast skill support — implemented on branch `issue-208-ballast-bootstrap-skill`
-1. #144: Bug: ballast upgrade refresh skips installed skills instead of updating them
+- [x] #208: Define .ballast bootstrap behavior and Ballast skill support — completed and merged via PR #218
+- [x] #144: Bug: ballast upgrade refresh skips installed skills instead of updating them — implemented on `main` and verified before closure
 
 These reduce the chance that agents start from a broken environment, edit the wrong branch, or operate with stale Ballast-managed guidance.
 
@@ -143,7 +143,9 @@ This broadens Ballast from local rules into multi-agent and deployment orchestra
 
 - [x] Implement #212 first because branch safety should be in place before more agent automation is added. Completed via PR #216.
 - [x] Implement #211 as the first bootstrap step. Completed via PR #217 with `ballast setup-dev`, package-manager detection, Corepack enablement for `pnpm`/`yarn`, safety allowlisting, docs, generated rule updates, and tests.
-- [x] Implement #208 next so `.ballast/` missing-state detection and Ballast skill support can build on the new `setup-dev` command. Implemented on branch `issue-208-ballast-bootstrap-skill`.
+- [x] Implement #208 next so `.ballast/` missing-state detection and Ballast skill support can build on the new `setup-dev` command. Completed via PR #218.
+- [x] Close #211 after verifying PR #217 implemented the accepted bootstrap command behavior.
+- [x] Verify and close #144 after confirming managed skill refresh is implemented on `main`.
 1. Implement #209 and #210 as one git-hook workstream, with generated outputs regenerated in the same PR.
 2. Implement #214 with #145 in mind so generated testing guidance uses detected framework signals instead of generic defaults.
 3. Implement #213 before scaling PR automation or MCP workflows.
