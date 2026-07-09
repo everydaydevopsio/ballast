@@ -997,7 +997,7 @@ func printDoctorLocalState(root string) {
 		fmt.Println("- remediation: Run `ballast doctor --fix` or `ballast install-cli` to recreate generated .ballast/ tool state.")
 	}
 	if state.RootStatus == localStateUnreadable || state.BinStatus == localStateUnreadable || state.ToolsStatus == localStateUnreadable {
-		fmt.Println("- remediation: Check filesystem permissions for .ballast/ before reinstalling local tool state.")
+		fmt.Println("- remediation: Check the .ballast/ filesystem path and permissions before reinstalling local tool state.")
 	}
 	fmt.Println()
 }
