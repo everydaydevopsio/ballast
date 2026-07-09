@@ -113,7 +113,7 @@ describe('build', () => {
         'Before changes, summarize actionable Copilot asks and related human-review asks.'
       );
       expect(content).toContain(
-        'Reply directly on addressed Copilot threads/comments, then resolve them'
+        'Reply directly on addressed Copilot and human comments; resolve addressed review threads when supported.'
       );
       expect(content).toContain(
         'Stop only when required checks are green and no unresolved actionable Copilot or human review comments remain.'
