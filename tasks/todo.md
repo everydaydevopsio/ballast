@@ -6,7 +6,7 @@
 - [x] Update canonical testing and publishing guidance sources plus docs.
 - [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
 - [x] Run focused tests and required sync/generation checks.
-- [ ] Push branch, open PR for #214, request Copilot review, and monitor CI/review comments.
+- [x] Push branch, open PR for #214, request Copilot review, and monitor CI/review comments.
 
 - [x] Confirm current issue-priority plan against live GitHub issue state.
 - [x] Close stale #211 after verifying PR #217 implemented `ballast setup-dev`.
