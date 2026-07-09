@@ -117,8 +117,9 @@ function renderGitHooksGuidance(
         'Use Husky for TypeScript-only repositories.',
         '',
         '- Install and initialize Husky.',
-        "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`.",
-        "- Create `.husky/pre-push` with the repo's unit test command, and for TypeScript repositories run the build before the tests when the test command depends on generated output.",
+        "- Create `.husky/pre-commit` with the repo's fast lint command, such as `npx lint-staged`, and prefer the repo formatter or linter when it already exists.",
+        '- Include fast formatting checks for both `.yaml` and `.yml` files in the lint-staged or repo formatter configuration.',
+        "- Create `.husky/pre-push` with the detected or canonical package-manager test command, and run the repo's required build or typecheck command before tests when that is the repo convention.",
         '- Keep the hook file executable with `chmod +x .husky/pre-commit`.',
         '- Keep `.husky/pre-push` executable with `chmod +x .husky/pre-push`.',
         "- Keep the hook in sync with the repo's linting workflow whenever the command changes."
