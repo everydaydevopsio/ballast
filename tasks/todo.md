@@ -1,13 +1,20 @@
 # Tasks
 
+- [x] Confirm current issue-priority plan against live GitHub issue state.
+- [x] Close stale #211 after verifying PR #217 implemented `ballast setup-dev`.
+- [x] Verify #144 managed skill refresh behavior on current `main`.
+- [x] Close stale #144 with verification evidence.
+- [x] Update `plans/issue-priority-plan.md` so #209/#210 are the next implementation workstream.
+- [x] Push branch, open PR, request Copilot review, and check CI.
+
+## Previous Tasks
+
 - [x] Confirm issue #208 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for generated `.ballast/` state and Ballast repair skill support.
 - [x] Add failing coverage for missing `.ballast/` doctor/install-cli behavior and the new skill registry entry.
 - [x] Implement wrapper state reporting/remediation and the Ballast maintenance skill.
 - [x] Update docs, agent guidance, package mirrors, and generated local target outputs.
 - [x] Run targeted verification and capture evidence.
-
-## Previous Tasks
 
 - [x] Confirm issue #211 scope and governing operating mode.
 - [x] Add PRD requirements and acceptance criteria for `ballast setup-dev`.
