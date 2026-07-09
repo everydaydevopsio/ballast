@@ -200,7 +200,7 @@ When the project ships a runnable app or service, add a smoke-test path in addit
 
 4. **Add an end-to-end path when the app has a user-facing flow**
    - For web apps, add E2E coverage for at least one critical path such as app boot, login, health page, or a core workflow.
-   - Prefer Playwright for browser-based E2E unless the repo already uses a different framework.
+   - Prefer Playwright for browser E2E when the repo already has Playwright markers or clearly needs browser automation.
    - Keep E2E scope narrow and stable; one critical user workflow is enough unless the user asks for more.
    - Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.
 

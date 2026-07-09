@@ -183,11 +183,9 @@ describe('build', () => {
       expect(content).toContain('web smoke test');
       expect(content).toContain('live route or health endpoint');
       expect(content).toContain('Playwright');
-      expect(content).toContain('targeted smoke checks during local work');
       expect(content).toContain(
-        'put deterministic build/typecheck plus smoke checks in pre-push'
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
       );
-      expect(content).toContain('run full smoke/E2E gates in CI');
       expect(content).toContain('one critical user workflow');
     });
 
@@ -198,9 +196,9 @@ describe('build', () => {
       expect(content).toContain('--help');
       expect(content).toContain('--version');
       expect(content).toContain('representative command');
-      expect(content).toContain('local packaged-command smoke checks');
-      expect(content).toContain('run them in pre-push');
-      expect(content).toContain('require them in CI');
+      expect(content).toContain(
+        'Keep local packaged-command smoke checks fast, run them in pre-push when the packaged artifact can be built deterministically, and require them in CI before publish jobs.'
+      );
     });
 
     test('throws for unknown agent', () => {
@@ -435,20 +433,18 @@ describe('build', () => {
       const testing = buildCodexFormat('testing');
       expect(testing).toContain('web smoke test');
       expect(testing).toContain('Playwright');
-      expect(testing).toContain('targeted smoke checks during local work');
       expect(testing).toContain(
-        'put deterministic build/typecheck plus smoke checks in pre-push'
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
       );
-      expect(testing).toContain('run full smoke/E2E gates in CI');
 
       const publishingCli = buildCodexFormat('publishing', 'cli');
       expect(publishingCli).toContain('packaged-command smoke');
       expect(publishingCli).toContain('--help');
       expect(publishingCli).toContain('--version');
       expect(publishingCli).toContain('representative command');
-      expect(publishingCli).toContain('local packaged-command smoke checks');
-      expect(publishingCli).toContain('run them in pre-push');
-      expect(publishingCli).toContain('require them in CI');
+      expect(publishingCli).toContain(
+        'Keep local packaged-command smoke checks fast, run them in pre-push when the packaged artifact can be built deterministically, and require them in CI before publish jobs.'
+      );
     });
   });
 
