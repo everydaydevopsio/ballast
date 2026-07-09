@@ -127,6 +127,60 @@ func TestRunSetupDevInstallsNpmWithoutCorepack(t *testing.T) {
 	}
 }
 
+func TestRunSetupDevDetectsNpmFromLockfile(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, "package-lock.json"), "{}")
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"setup-dev"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	want := [][]string{{"npm", "install"}}
+	if !reflect.DeepEqual(commands, want) {
+		t.Fatalf("expected setup commands %#v, got %#v", want, commands)
+	}
+}
+
+func TestRunSetupDevIgnoresUnsafeDeclaredPackageManager(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	runCommandFunc = func(name string, args []string) error {
+		t.Fatalf("expected no setup commands, got %s %v", name, args)
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{"packageManager":"./scripts/setup@1.0.0"}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"setup-dev"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	if !strings.Contains(output, "No setup steps detected") {
+		t.Fatalf("expected no-op setup output, got %q", output)
+	}
+}
+
 func TestRunSetupDevNoopsWithoutRecognizedManifests(t *testing.T) {
 	originalRun := runCommandFunc
 	t.Cleanup(func() { runCommandFunc = originalRun })

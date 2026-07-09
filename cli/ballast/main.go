@@ -692,9 +692,13 @@ func setupDevCommands(root string) []setupDevCommand {
 
 func detectNodePackageManager(root string) (string, bool) {
 	metadata, ok := loadPackageJSONMetadata(root)
+	hasDeclaredPackageManager := false
 	if ok {
 		if manager := packageManagerName(metadata.PackageManager); manager != "" {
-			return manager, true
+			hasDeclaredPackageManager = true
+			if safeNodePackageManager(manager) {
+				return manager, true
+			}
 		}
 	}
 	switch {
@@ -704,7 +708,7 @@ func detectNodePackageManager(root string) (string, bool) {
 		return "yarn", false
 	case fileExists(filepath.Join(root, "package-lock.json")):
 		return "npm", false
-	case ok:
+	case ok && !hasDeclaredPackageManager:
 		return "npm", false
 	default:
 		return "", false
@@ -720,6 +724,15 @@ func packageManagerName(raw string) string {
 		trimmed = strings.TrimSpace(trimmed[:index])
 	}
 	return strings.ToLower(trimmed)
+}
+
+func safeNodePackageManager(manager string) bool {
+	switch manager {
+	case "npm", "pnpm", "yarn":
+		return true
+	default:
+		return false
+	}
 }
 
 func corepackManagedPackageManager(manager string) bool {
