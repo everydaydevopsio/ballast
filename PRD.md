@@ -82,6 +82,31 @@ Ballast-generated rule files for persistent agent context have accumulated large
 7. Root `.rulesrc.json` includes `claude` and `codex` so tracked generated artifacts for both targets can be refreshed by config-driven installs.
 8. `AGENTS.md` documents that PRs touching Ballast generator inputs or target policy must include regenerated local `.claude` and `.codex` artifacts.
 
+## TypeScript Husky Git Hook Guidance
+
+### Problem
+
+TypeScript-only repositories use Husky instead of `pre-commit`, but the generated Husky guidance does not explicitly require YAML formatting checks for both `.yaml` and `.yml` files or a tracked push-time test hook. YAML-heavy configuration such as GitHub Actions, Dependabot, Docker Compose, and Helm can drift outside TypeScript checks, and developers can push changes before the repo's canonical tests run.
+
+### Requirements
+
+1. TypeScript-only `git-hooks` guidance must use Husky and `lint-staged` or the repository's equivalent fast formatter/linter path for commit-time checks.
+2. TypeScript-only Husky pre-commit guidance must explicitly include both `.yaml` and `.yml` formatting checks.
+3. TypeScript-only Husky guidance must prefer the repository's existing formatter or linter command when one is already established.
+4. TypeScript-only Husky guidance must configure `.husky/pre-push` to run the detected or canonical package-manager test command.
+5. TypeScript-only Husky guidance must run the repository's required build or typecheck command before tests when that is the repo convention.
+6. Pre-commit must remain fast; heavier build, typecheck, and unit test work belongs in `pre-push`.
+7. Multi-language and non-TypeScript git-hook guidance must continue using `pre-commit` without inheriting Husky-specific instructions.
+8. Documentation must explain the TypeScript-only split between Husky pre-commit formatting and Husky pre-push tests.
+
+### Acceptance Criteria
+
+1. Generated TypeScript-only Husky `git-hooks` content mentions `.yaml` and `.yml` explicitly.
+2. Generated TypeScript-only Husky `git-hooks` content mentions `lint-staged` or the repo formatter/linter as the fast pre-commit path.
+3. Generated TypeScript-only Husky `git-hooks` content mentions `.husky/pre-push`, the package-manager test command, and build/typecheck before tests when the repo convention requires it.
+4. Multi-language TypeScript output continues to mention `.pre-commit-config.yaml` and `pre-commit install --hook-type pre-push`, and does not mention Husky or `lint-staged`.
+5. Unit and E2E coverage assert the Husky YAML/YML and pre-push guidance.
+
 ## Skill Patch Support And Support File Force Confirmation
 
 ### Problem
