@@ -395,14 +395,28 @@ func TestRunDoctorReportsIncompleteBallastState(t *testing.T) {
 }
 
 func TestLocalStateStatusDistinguishesPermissionErrors(t *testing.T) {
-	if got := localStateStatusFromStatError(nil); got != localStatePresent {
-		t.Fatalf("expected present status, got %q", got)
-	}
-	if got := localStateStatusFromStatError(os.ErrNotExist); got != localStateMissing {
+	if got := localStateStatusFromStat(nil, os.ErrNotExist); got != localStateMissing {
 		t.Fatalf("expected missing status, got %q", got)
 	}
-	if got := localStateStatusFromStatError(os.ErrPermission); got != localStateUnreadable {
+	if got := localStateStatusFromStat(nil, os.ErrPermission); got != localStateUnreadable {
 		t.Fatalf("expected unreadable status, got %q", got)
+	}
+}
+
+func TestLocalStatePathStatusRequiresDirectory(t *testing.T) {
+	root := resolvedTempDir(t)
+	dirPath := filepath.Join(root, "dir")
+	filePath := filepath.Join(root, "file")
+	if err := os.Mkdir(dirPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filePath, "not a directory")
+
+	if got := localStatePathStatus(dirPath); got != localStatePresent {
+		t.Fatalf("expected directory to be present, got %q", got)
+	}
+	if got := localStatePathStatus(filePath); got != localStateUnreadable {
+		t.Fatalf("expected file path to be unreadable local state, got %q", got)
 	}
 }
 

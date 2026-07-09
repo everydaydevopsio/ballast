@@ -1015,12 +1015,12 @@ func inspectBallastLocalState(root string) ballastLocalState {
 }
 
 func localStatePathStatus(path string) string {
-	_, err := os.Stat(path)
-	return localStateStatusFromStatError(err)
+	info, err := os.Stat(path)
+	return localStateStatusFromStat(info, err)
 }
 
-func localStateStatusFromStatError(err error) string {
-	if err == nil {
+func localStateStatusFromStat(info os.FileInfo, err error) string {
+	if err == nil && info.IsDir() {
 		return localStatePresent
 	}
 	if errors.Is(err, os.ErrNotExist) {
