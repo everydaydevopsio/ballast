@@ -104,6 +104,25 @@ describe('build', () => {
       expect(content).toContain('Read-only investigation');
     });
 
+    test('returns Copilot review loop guidance for local-dev PR workflow', () => {
+      const content = getContent('local-dev', 'env');
+      expect(content).toContain(
+        'After PR creation and every push, poll Copilot and human review comments until the PR is ready.'
+      );
+      expect(content).toContain(
+        'Before changes, summarize actionable Copilot asks and related human-review asks.'
+      );
+      expect(content).toContain(
+        'Reply directly on addressed Copilot and human comments; resolve addressed review threads when supported.'
+      );
+      expect(content).toContain(
+        'Stop only when required checks are green and no unresolved actionable Copilot or human review comments remain.'
+      );
+      expect(content).toContain('gh pr checks');
+      expect(content).toContain('gh pr view');
+      expect(content).toContain('GitHub MCP');
+    });
+
     test('returns mcp content for local-dev with ruleSuffix mcp', () => {
       const content = getContent('local-dev', 'mcp');
       expect(content).toContain('tasks');

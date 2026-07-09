@@ -62,9 +62,13 @@ Before modifying files, check the current branch with `git branch --show-current
    - Prefer fast checks in local hooks and heavier checks in pre-push or CI.
 
 5. Treat PR hygiene as part of local-dev workflow.
-   - Verify the correct reviewers are assigned when the repo expects that workflow.
-   - Inspect failing checks with `gh` and summarize the concrete failure.
-   - Reply directly on resolved review threads instead of leaving line comments unresolved.
+   - Verify expected reviewers are assigned.
+   - Inspect failing checks with `gh`; summarize the failure.
+   - After PR creation and every push, poll Copilot and human review comments until the PR is ready.
+   - Before changes, summarize actionable Copilot asks and related human-review asks.
+   - Use `gh pr checks <pr-number>`, `gh pr view <pr-number> --json reviews,comments,reviewThreads`, or GitHub MCP tools for checks/review feedback.
+   - Reply directly on addressed Copilot and human comments; resolve addressed review threads when supported.
+   - Stop only when required checks are green and no unresolved actionable Copilot or human review comments remain.
 
 ## Node Guidance
 

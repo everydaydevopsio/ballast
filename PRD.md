@@ -269,3 +269,27 @@ Ballast scaffolds `AGENTS.md` and `CLAUDE.md` with a `Repository Facts` section,
 3. Given missing signals, generated support files retain placeholder markers for undetected fields.
 4. TypeScript, Python, and Go backends accept `--repository-facts-file` and honor `BALLAST_REPOSITORY_FACTS_FILE` when present.
 5. E2E coverage verifies populated repository facts in generated support files.
+
+## PR Review Loop Guidance
+
+### Problem
+
+Ballast-generated local-development rules treat PR hygiene as part of the agent workflow, but they do not explicitly require agents to keep checking Copilot review feedback after PR creation and subsequent pushes. Agents can miss follow-up Copilot comments or mark work complete without replying directly on addressed review threads, leaving unresolved PR feedback for operators to clean up manually.
+
+### Requirements
+
+1. Generated local-development PR workflow guidance must instruct agents to poll for Copilot review comments after PR creation.
+2. Generated local-development PR workflow guidance must instruct agents to poll again after each push that updates an open PR.
+3. Agents must summarize actionable Copilot review asks before making code changes.
+4. Agents must reply directly on every Copilot review thread or comment they address, and must resolve addressed review threads when the review system supports thread resolution.
+5. The same review loop must remain compatible with human reviewer comments; Copilot-specific guidance must not cause agents to ignore human review feedback.
+6. The stop condition for PR readiness must be explicit: required checks are green and there are no unresolved actionable Copilot or human review comments.
+7. Generated guidance must include concrete command examples using `gh` or GitHub MCP tools where available.
+
+### Acceptance Criteria
+
+1. Generated local-development rule output tells agents to check Copilot comments repeatedly during PR readiness work.
+2. Generated local-development rule output requires direct per-thread replies and supported review-thread resolution for addressed Copilot comments.
+3. Generated local-development rule output defines the stop condition for the review loop.
+4. Generated local-development rule output says the workflow also applies to human review comments.
+5. Automated tests cover the generated PR workflow rule text.
