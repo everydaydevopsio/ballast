@@ -1,5 +1,31 @@
 # Product Requirements
 
+## Terraform Rule Best-Practices Alignment
+
+### Problem
+
+Ballast's Terraform linting and testing rules still describe an older validation baseline centered on `tfsec` and Terratest as optional add-ons. Terraform 1.6+ ships native tests, TFLint uses explicit provider/plugin configuration, tfsec has moved under Trivy, and many teams now need OpenTofu-compatible command guidance. Agents need generated Terraform rules that reflect those current practices without losing the conservative validation path for infrastructure changes.
+
+### Requirements
+
+1. Terraform linting guidance must keep `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, and recursive `tflint` as the baseline local and CI validation path.
+2. Terraform version guidance must keep `.terraform-version`/`tfenv` as the default Ballast path while allowing teams already standardized on `asdf` or `mise` to use those managers consistently.
+3. TFLint guidance must require `.tflint.hcl` plugin blocks for the active providers and `tflint --init` before recursive linting.
+4. Security scanning guidance must prefer `trivy config` for new work and describe `tfsec` as legacy-compatible because tfsec is now part of Trivy.
+5. Terraform testing guidance must document native `terraform test` for Terraform 1.6+ module assertions and Terratest for Go-backed or live integration tests.
+6. CI guidance for Terraform validation must include GitHub Actions `concurrency`, PR-time validation, plan/apply separation, and optional orchestration through Atlantis, Terraform Cloud, HCP Terraform, or OpenTofu-compatible platforms.
+7. OpenTofu guidance must acknowledge `tofu` as a compatible alternative when the repository standardizes on it, including `tofu fmt`, `tofu init -backend=false`, `tofu validate`, and `tofu test` equivalents.
+8. Terraform repo-layout guidance must prefer readable root files and independently testable modules without forcing a one-size-fits-all file split.
+
+### Acceptance Criteria
+
+1. Generated Terraform linting rules mention `trivy config` as the preferred new security scanner and `tfsec` as legacy-compatible.
+2. Generated Terraform linting rules require `.tflint.hcl` plugin blocks and `tflint --init` before recursive linting.
+3. Generated Terraform testing rules document native `terraform test` for Terraform 1.6+ and Terratest for Go-backed/live integration coverage.
+4. Generated Terraform testing rules include a GitHub Actions `concurrency` block and state that PR validation is separate from merge-gated apply workflows.
+5. Generated Terraform rules acknowledge OpenTofu command equivalents where relevant.
+6. Backend git-hook guidance no longer presents `tfsec` as the only Terraform security scanner.
+
 ## Ballast Local State Bootstrap And Repair
 
 ### Problem

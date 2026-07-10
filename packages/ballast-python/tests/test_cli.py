@@ -375,6 +375,39 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("Terraform linting specialist", content)
             self.assertIn(".terraform-version", content)
             self.assertIn("tfenv install", content)
+            self.assertIn("trivy config", content)
+            self.assertIn("tfsec", content)
+            self.assertIn("plugin blocks", content)
+            self.assertIn("tflint --init", content)
+            self.assertIn("OpenTofu", content)
+            self.assertIn("tofu fmt", content)
+
+    def test_install_supports_terraform_testing_best_practices(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "codex",
+                ["testing"],
+                [],
+                "terraform",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("testing", result.installed)
+            rule = root / ".codex" / "rules" / "terraform-testing.md"
+            self.assertTrue(rule.exists())
+            content = rule.read_text(encoding="utf-8")
+            self.assertIn("terraform test", content)
+            self.assertIn("Terraform 1.6", content)
+            self.assertIn("Terratest", content)
+            self.assertIn("concurrency:", content)
+            self.assertIn("PR validation", content)
+            self.assertIn("OpenTofu", content)
+            self.assertIn("tofu test", content)
 
     def test_install_creates_skill_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

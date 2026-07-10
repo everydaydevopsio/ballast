@@ -20,9 +20,11 @@ The **linting** agent provides language-appropriate linting, formatting, and CI 
   - Guidance for inventories, role layout, and idempotent task design
 - **Terraform**
   - `terraform fmt -check -recursive` for formatting
-  - `terraform validate` and `tflint` for static validation
-  - `tfsec` or `trivy config` security checks
-  - `tfenv` guidance with `.terraform-version`
+  - `terraform init -backend=false`, `terraform validate`, and recursive `tflint` for static validation
+  - `.tflint.hcl` plugin blocks plus `tflint --init` for provider rules
+  - `trivy config` security checks, with `tfsec` only for legacy-compatible pipelines
+  - `tfenv` guidance with `.terraform-version`, or the repo's established `asdf`/`mise` standard
+  - OpenTofu equivalents such as `tofu fmt`, `tofu init -backend=false`, and `tofu validate` when the repo standardizes on `tofu`
 
 ## What It Provides
 
@@ -40,7 +42,7 @@ Recommended command set:
 - Python: `ruff check .` and `ruff format .`
 - Go: `gofmt -w .` and `golangci-lint run`
 - Ansible: `ansible-lint`, `yamllint .`, and `ansible-playbook --syntax-check site.yml`
-- Terraform: `tfenv install && tfenv use`, `terraform fmt -check -recursive`, `terraform validate`, `tflint --recursive`, and `tfsec .`
+- Terraform: `tfenv install && tfenv use`, `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .`
 
 ## Prompts to Improve Your App
 

@@ -489,8 +489,51 @@ func TestInstallSupportsTerraformLanguageProfile(t *testing.T) {
 	if !strings.Contains(text, "Terraform linting specialist") {
 		t.Fatalf("expected terraform linting content, got %q", text)
 	}
-	if !strings.Contains(text, ".terraform-version") || !strings.Contains(text, "tfenv install") || !strings.Contains(text, "tfsec") {
+	if !strings.Contains(text, ".terraform-version") ||
+		!strings.Contains(text, "tfenv install") ||
+		!strings.Contains(text, "trivy config") ||
+		!strings.Contains(text, "tfsec") ||
+		!strings.Contains(text, "plugin blocks") ||
+		!strings.Contains(text, "tflint --init") ||
+		!strings.Contains(text, "OpenTofu") ||
+		!strings.Contains(text, "tofu fmt") {
 		t.Fatalf("expected terraform hook and tooling guidance, got %q", text)
+	}
+}
+
+func TestInstallSupportsTerraformTestingBestPractices(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex"},
+		agents:      []string{"testing"},
+		language:    "terraform",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if !slices.Contains(result.installed, "testing") {
+		t.Fatalf("expected terraform testing install, got %+v", result.installed)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".codex", "rules", "terraform-testing.md"))
+	if err != nil {
+		t.Fatalf("expected terraform-testing.md to exist: %v", err)
+	}
+	text := string(content)
+	for _, want := range []string{
+		"terraform test",
+		"Terraform 1.6",
+		"Terratest",
+		"concurrency:",
+		"PR validation",
+		"OpenTofu",
+		"tofu test",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("expected terraform testing content to mention %q, got %q", want, text)
+		}
 	}
 }
 
@@ -505,7 +548,9 @@ func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
 	if !strings.Contains(got, "tfenv install") {
 		t.Fatalf("expected terraform git-hooks content to mention tfenv install, got %q", got)
 	}
-	if !strings.Contains(got, "terraform fmt -check -recursive") || !strings.Contains(got, "tfsec") {
+	if !strings.Contains(got, "terraform fmt -check -recursive") ||
+		!strings.Contains(got, "trivy config") ||
+		!strings.Contains(got, "tfsec") {
 		t.Fatalf("expected terraform git-hooks content to mention terraform checks, got %q", got)
 	}
 }
