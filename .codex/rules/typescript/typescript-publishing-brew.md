@@ -83,7 +83,6 @@ In your `publish-cli.yml` GoReleaser step, ensure `HOMEBREW_TAP_GITHUB_TOKEN` is
 Add an installation section to `README.md`:
 
 ```markdown
-
 ## Installation
 
 ### Homebrew (macOS and Linux)

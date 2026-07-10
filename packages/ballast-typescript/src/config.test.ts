@@ -10,7 +10,9 @@ import {
   getLegacyRulesrcFilename,
   parseTargets,
   TASK_SYSTEMS,
-  DEFAULT_TASK_SYSTEM
+  DEFAULT_TASK_SYSTEM,
+  DEPLOYMENT_MODELS,
+  DEFAULT_DEPLOYMENT_MODEL
 } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -318,6 +320,85 @@ describe('config', () => {
       saveConfig({ targets: ['cursor'], agents: ['tasks'] }, tmpDir);
       const loaded = loadConfig(tmpDir);
       expect(loaded?.taskSystem).toBe('jira');
+    });
+  });
+
+  describe('deploymentModel', () => {
+    test('DEPLOYMENT_MODELS contains supported deployment models', () => {
+      expect(DEPLOYMENT_MODELS).toEqual([
+        'none',
+        'kubernetes',
+        'serverless',
+        'server',
+        'hosted'
+      ]);
+    });
+
+    test('DEFAULT_DEPLOYMENT_MODEL is none', () => {
+      expect(DEFAULT_DEPLOYMENT_MODEL).toBe('none');
+    });
+
+    test('saves and loads deploymentModel', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['publishing'],
+          ballastVersion: BALLAST_VERSION,
+          deploymentModel: 'kubernetes'
+        },
+        tmpDir
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.deploymentModel).toBe('kubernetes');
+    });
+
+    test('normalizes deploymentModel from config', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['publishing'],
+          deploymentModel: 'SERVERLESS'
+        })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.deploymentModel).toBe('serverless');
+    });
+
+    test('loads config without deploymentModel field', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({ targets: ['claude'], agents: ['local-dev'] })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.deploymentModel).toBeUndefined();
+    });
+
+    test('ignores invalid deploymentModel value', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['publishing'],
+          deploymentModel: 'kuberntes'
+        })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.deploymentModel).toBeUndefined();
+    });
+
+    test('preserves existing deploymentModel when saving without one', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['publishing'],
+          deploymentModel: 'hosted'
+        },
+        tmpDir
+      );
+      saveConfig({ targets: ['cursor'], agents: ['publishing'] }, tmpDir);
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.deploymentModel).toBe('hosted');
     });
   });
 

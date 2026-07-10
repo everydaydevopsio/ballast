@@ -1,4 +1,4 @@
-description: 'REST API publishing specialist - Docker CD with Kubernetes health probes and Helm chart update'
+description: 'REST API publishing specialist - Docker or platform service CD with runtime health checks'
 alwaysApply: false
 globs:
   - 'Dockerfile'

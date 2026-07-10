@@ -43,6 +43,8 @@ var frontmatterRegex = regexp.MustCompile(`(?s)^\s*---\n(.*?)\n---\n?`)
 var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
 var gitHooksGuidanceToken = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
 var gitHooksPreCommitGlobToken = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
+var deploymentModelGuidanceToken = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
+var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
 
 func withImplicitAgents(agents []string) []string {
 	resolved := slices.Clone(agents)
@@ -71,24 +73,26 @@ var embeddedAgentsFS embed.FS
 var embeddedSkillsFS embed.FS
 
 type rulesConfig struct {
-	Targets        []string            `json:"targets,omitempty"`
-	Agents         []string            `json:"agents"`
-	Skills         []string            `json:"skills,omitempty"`
-	BallastVersion string              `json:"ballastVersion,omitempty"`
-	Languages      []string            `json:"languages,omitempty"`
-	Paths          map[string][]string `json:"paths,omitempty"`
-	TaskSystem     string              `json:"taskSystem,omitempty"`
+	Targets         []string            `json:"targets,omitempty"`
+	Agents          []string            `json:"agents"`
+	Skills          []string            `json:"skills,omitempty"`
+	BallastVersion  string              `json:"ballastVersion,omitempty"`
+	Languages       []string            `json:"languages,omitempty"`
+	Paths           map[string][]string `json:"paths,omitempty"`
+	TaskSystem      string              `json:"taskSystem,omitempty"`
+	DeploymentModel string              `json:"deploymentModel,omitempty"`
 }
 
 type rawRulesConfig struct {
-	Target         string              `json:"target,omitempty"`
-	Targets        []string            `json:"targets,omitempty"`
-	Agents         []string            `json:"agents,omitempty"`
-	Skills         []string            `json:"skills,omitempty"`
-	BallastVersion string              `json:"ballastVersion,omitempty"`
-	Languages      []string            `json:"languages,omitempty"`
-	Paths          map[string][]string `json:"paths,omitempty"`
-	TaskSystem     string              `json:"taskSystem,omitempty"`
+	Target          string              `json:"target,omitempty"`
+	Targets         []string            `json:"targets,omitempty"`
+	Agents          []string            `json:"agents,omitempty"`
+	Skills          []string            `json:"skills,omitempty"`
+	BallastVersion  string              `json:"ballastVersion,omitempty"`
+	Languages       []string            `json:"languages,omitempty"`
+	Paths           map[string][]string `json:"paths,omitempty"`
+	TaskSystem      string              `json:"taskSystem,omitempty"`
+	DeploymentModel string              `json:"deploymentModel,omitempty"`
 }
 
 type installResult struct {
@@ -114,28 +118,30 @@ type agentError struct {
 }
 
 type resolveOptions struct {
-	projectRoot string
-	targets     []string
-	agents      []string
-	skills      []string
-	all         bool
-	allSkills   bool
-	yes         bool
-	language    string
+	projectRoot     string
+	targets         []string
+	agents          []string
+	skills          []string
+	all             bool
+	allSkills       bool
+	yes             bool
+	language        string
+	deploymentModel string
 }
 
 type installOptions struct {
-	projectRoot string
-	targets     []string
-	agents      []string
-	skills      []string
-	language    string
-	force       bool
-	patch       bool
-	patchClaude bool
-	patchGemini bool
-	skipSupport map[string]struct{}
-	saveConfig  bool
+	projectRoot     string
+	targets         []string
+	agents          []string
+	skills          []string
+	language        string
+	force           bool
+	patch           bool
+	patchClaude     bool
+	patchGemini     bool
+	skipSupport     map[string]struct{}
+	saveConfig      bool
+	deploymentModel string
 }
 
 type markdownSection struct {
@@ -205,6 +211,7 @@ func runInstall(args []string) int {
 	force := fs.Bool("force", false, "overwrite existing rule and skill files; prompts before replacing support files")
 	patch := fs.Bool("patch", false, "merge upstream rule and skill updates into existing files")
 	fs.BoolVar(patch, "p", false, "merge upstream rule and skill updates into existing files")
+	deploymentModelFlag := fs.String("deployment-model", "", "deployment model for publishing apps: none|kubernetes|serverless|server|hosted")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	repositoryFactsFile := fs.String("repository-facts-file", "", "optional path to wrapper-generated repository facts JSON")
@@ -228,6 +235,11 @@ func runInstall(args []string) int {
 		fmt.Printf("Invalid --language. Use: %s\n", strings.Join(languages, ", "))
 		return 1
 	}
+	deploymentModel := normalizeDeploymentModel(*deploymentModelFlag)
+	if deploymentModel != "" && !contains(deploymentModels, deploymentModel) {
+		fmt.Printf("Invalid --deployment-model. Use: %s\n", strings.Join(deploymentModels, ", "))
+		return 1
+	}
 
 	root, err := findProjectRoot("")
 	if err != nil {
@@ -236,14 +248,15 @@ func runInstall(args []string) int {
 	}
 
 	resolved, err := resolveTargetAndAgents(resolveOptions{
-		projectRoot: root,
-		targets:     targetFlags,
-		agents:      splitAgents(*agent),
-		skills:      splitCSV(*skill),
-		all:         *all,
-		allSkills:   *allSkills,
-		yes:         *yes,
-		language:    lang,
+		projectRoot:     root,
+		targets:         targetFlags,
+		agents:          splitAgents(*agent),
+		skills:          splitCSV(*skill),
+		all:             *all,
+		allSkills:       *allSkills,
+		yes:             *yes,
+		language:        lang,
+		deploymentModel: deploymentModel,
 	})
 	if err != nil {
 		fmt.Println(err)
@@ -325,17 +338,18 @@ func runInstall(args []string) int {
 		}
 	}
 	result := install(installOptions{
-		projectRoot: root,
-		targets:     resolved.Targets,
-		agents:      resolved.Agents,
-		skills:      resolved.Skills,
-		language:    lang,
-		force:       *force,
-		patch:       *patch,
-		patchClaude: patchClaude,
-		patchGemini: patchGemini,
-		skipSupport: skippedSupport,
-		saveConfig:  true,
+		projectRoot:     root,
+		targets:         resolved.Targets,
+		agents:          resolved.Agents,
+		skills:          resolved.Skills,
+		language:        lang,
+		force:           *force,
+		patch:           *patch,
+		patchClaude:     patchClaude,
+		patchGemini:     patchGemini,
+		skipSupport:     skippedSupport,
+		saveConfig:      true,
+		deploymentModel: resolved.DeploymentModel,
 	})
 
 	if len(result.errors) > 0 {
@@ -423,6 +437,7 @@ Options:
   --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, ballast-audit, ballast-project-maintenance (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
+  --deployment-model <mode> Deployment model for publishing apps: %s
   --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -435,12 +450,13 @@ Examples:
   ballast-go install --target cursor --agent linting
   ballast-go install --target claude --skill owasp-security-scan
   ballast-go install --target codex --skill aws-health-review
+  ballast-go install --target codex --agent publishing --deployment-model kubernetes
   ballast-go install --target cursor,claude,gemini --agent linting
   ballast-go install --language python --target cursor --all
   ballast-go install --target claude --all --force
   ballast-go install --target cursor --agent linting --patch
   ballast-go install --yes --target cursor --target codex --all
-`, resolveVersion(), strings.Join(targets, ", "), strings.Join(languages, ", "))
+`, resolveVersion(), strings.Join(targets, ", "), strings.Join(languages, ", "), strings.Join(deploymentModels, ", "))
 }
 
 func hasHelpFlag(args []string) bool {
@@ -633,6 +649,9 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		if strings.TrimSpace(config.TaskSystem) != "" {
 			lines = append(lines, fmt.Sprintf("- taskSystem: %s", config.TaskSystem))
 		}
+		if strings.TrimSpace(config.DeploymentModel) != "" {
+			lines = append(lines, fmt.Sprintf("- deploymentModel: %s", config.DeploymentModel))
+		}
 		if configVersion == "" || compareVersions(configVersion, targetVersion) < 0 {
 			recommendations = append(
 				recommendations,
@@ -720,6 +739,16 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	if config != nil && len(opts.targets) == 0 && len(flagAgents) == 0 && len(flagSkills) == 0 {
 		next := *config
 		next.Agents = withImplicitAgents(config.Agents)
+		if contains(next.Agents, "publishing") {
+			deploymentModel, err := resolveDeploymentModelForPublishing(
+				strings.TrimSpace(next.DeploymentModel),
+				ci,
+			)
+			if err != nil {
+				return nil, err
+			}
+			next.DeploymentModel = deploymentModel
+		}
 		return &next, nil
 	}
 
@@ -743,9 +772,20 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	} else if config != nil {
 		resolvedSkills = slices.Clone(config.Skills)
 	}
+	deploymentModel := opts.deploymentModel
+	if deploymentModel == "" && config != nil {
+		deploymentModel = normalizeDeploymentModel(config.DeploymentModel)
+	}
 
 	if len(resolvedTargets) > 0 && (len(resolvedAgents) > 0 || len(resolvedSkills) > 0) {
-		return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills}, nil
+		if contains(resolvedAgents, "publishing") {
+			var err error
+			deploymentModel, err = resolveDeploymentModelForPublishing(deploymentModel, ci)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, DeploymentModel: deploymentModel}, nil
 	}
 
 	if ci {
@@ -773,8 +813,15 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 			return nil, err
 		}
 	}
+	if contains(resolvedAgents, "publishing") {
+		var err error
+		deploymentModel, err = resolveDeploymentModelForPublishing(deploymentModel, ci)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills}, nil
+	return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, DeploymentModel: deploymentModel}, nil
 }
 
 func install(opts installOptions) installResult {
@@ -795,10 +842,11 @@ func install(opts installOptions) installResult {
 
 	if opts.saveConfig {
 		if err := saveConfig(opts.projectRoot, opts.language, rulesConfig{
-			Targets:   targets,
-			Agents:    opts.agents,
-			Skills:    opts.skills,
-			Languages: []string{opts.language},
+			Targets:         targets,
+			Agents:          opts.agents,
+			Skills:          opts.skills,
+			Languages:       []string{opts.language},
+			DeploymentModel: opts.deploymentModel,
 		}); err != nil {
 			result.errors = append(result.errors, agentError{agent: "config", err: err.Error()})
 			return result
@@ -840,7 +888,7 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
 				}
-				content, err := buildContent(agentID, target, opts.language, suffix, hookMode)
+				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, opts.deploymentModel)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
@@ -1836,8 +1884,8 @@ func patchCodexAgentsMD(existing, canonical string) string {
 	return current
 }
 
-func buildContent(agentID, target, language, suffix, hookMode string) (string, error) {
-	content, err := readContent(agentID, language, suffix, hookMode)
+func buildContent(agentID, target, language, suffix, hookMode, deploymentModel string) (string, error) {
+	content, err := readContent(agentID, language, suffix, hookMode, deploymentModel)
 	if err != nil {
 		return "", err
 	}
@@ -1897,6 +1945,53 @@ func renderGitHooksPreCommitGlob(agentID, language, hookMode string) string {
 	return "  - '.pre-commit-config.yaml'"
 }
 
+func normalizeDeploymentModel(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func renderDeploymentModelGuidance(deploymentModel string) string {
+	switch normalizeDeploymentModel(deploymentModel) {
+	case "kubernetes":
+		return strings.Join([]string{
+			"Kubernetes deployment model:",
+			"- Treat app deployment ownership as Kubernetes-native unless repo docs say otherwise.",
+			"- Keep application Helm charts in the app repository under `charts/<app>/` with chart tests and schema validation.",
+			"- Keep ArgoCD `Application` or `ApplicationSet` resources, environment values, and promotion state in the configured GitOps repository.",
+			"- CI should publish immutable images and charts; GitOps changes should promote those versions by environment.",
+		}, "\n")
+	case "serverless":
+		return strings.Join([]string{
+			"Serverless deployment model:",
+			"- Treat deployable apps as functions, jobs, queues, event rules, and managed cloud resources.",
+			"- Keep infrastructure definitions close to the owning service unless the repo documents a shared infrastructure boundary.",
+			"- CI should package immutable artifacts, run provider validation, and promote environment-specific configuration explicitly.",
+		}, "\n")
+	case "server":
+		return strings.Join([]string{
+			"Self-managed server deployment model:",
+			"- Treat deployable apps as services on provisioned hosts, VMs, or bare-metal servers.",
+			"- Keep systemd, process manager, reverse proxy, secrets, and rollback instructions aligned with the runtime environment.",
+			"- CI should build immutable artifacts and deployment automation should perform health checks before traffic cutover.",
+		}, "\n")
+	case "hosted":
+		return strings.Join([]string{
+			"Hosted platform deployment model:",
+			"- Treat deployable apps as hosted-platform workloads such as Vercel, Netlify, Railway, Render, Fly.io, or similar services.",
+			"- Keep provider configuration, environment variables, preview environments, and production promotion rules documented with the app.",
+			"- CI should validate builds and let the hosted platform own rollout mechanics unless the repo defines a separate release gate.",
+		}, "\n")
+	default:
+		return "No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`."
+	}
+}
+
+func applyDeploymentModelGuidance(content, agentID, deploymentModel string) string {
+	if agentID != "publishing" || !strings.Contains(content, deploymentModelGuidanceToken) {
+		return content
+	}
+	return strings.ReplaceAll(content, deploymentModelGuidanceToken, renderDeploymentModelGuidance(deploymentModel))
+}
+
 func applyHookTemplateVariables(content, agentID, language, hookMode string) string {
 	if !strings.Contains(content, gitHooksPreCommitGlobToken) {
 		return content
@@ -1931,7 +2026,7 @@ func listRuleSuffixes(agentID, language string) ([]string, error) {
 	return suffixes, nil
 }
 
-func readContent(agentID, language, suffix, hookMode string) (string, error) {
+func readContent(agentID, language, suffix, hookMode, deploymentModel string) (string, error) {
 	name := "content.md"
 	if suffix != "" {
 		name = "content-" + suffix + ".md"
@@ -1940,11 +2035,11 @@ func readContent(agentID, language, suffix, hookMode string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("agent %q has no %s", agentID, name)
 	}
-	content := string(bytes)
-	if agentID != "git-hooks" || !strings.Contains(content, gitHooksGuidanceToken) {
-		return content, nil
+	content := applyDeploymentModelGuidance(string(bytes), agentID, deploymentModel)
+	if agentID == "git-hooks" && strings.Contains(content, gitHooksGuidanceToken) {
+		content = strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode))
 	}
-	return strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode)), nil
+	return content, nil
 }
 
 func readTemplate(agentID, language, filename, suffix string) (string, error) {
@@ -2145,13 +2240,14 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		return nil
 	}
 	return &rulesConfig{
-		Targets:        targets,
-		Agents:         raw.Agents,
-		Skills:         raw.Skills,
-		BallastVersion: raw.BallastVersion,
-		Languages:      raw.Languages,
-		Paths:          raw.Paths,
-		TaskSystem:     raw.TaskSystem,
+		Targets:         targets,
+		Agents:          raw.Agents,
+		Skills:          raw.Skills,
+		BallastVersion:  raw.BallastVersion,
+		Languages:       raw.Languages,
+		Paths:           raw.Paths,
+		TaskSystem:      raw.TaskSystem,
+		DeploymentModel: normalizeDeploymentModel(raw.DeploymentModel),
 	}
 }
 
@@ -2169,11 +2265,18 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		if strings.TrimSpace(cfg.TaskSystem) == "" {
 			cfg.TaskSystem = existing.TaskSystem
 		}
+		if strings.TrimSpace(cfg.DeploymentModel) == "" {
+			cfg.DeploymentModel = existing.DeploymentModel
+		}
 		cfg.Targets = mergeStringLists(existing.Targets, cfg.Targets)
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)
 		cfg.Paths = mergeLanguagePaths(existing.Paths, cfg.Languages)
 	} else {
 		cfg.Paths = mergeLanguagePaths(nil, cfg.Languages)
+	}
+	cfg.DeploymentModel = normalizeDeploymentModel(cfg.DeploymentModel)
+	if cfg.DeploymentModel != "" && !contains(deploymentModels, cfg.DeploymentModel) {
+		return fmt.Errorf("invalid deploymentModel %q; use one of: %s", cfg.DeploymentModel, strings.Join(deploymentModels, ", "))
 	}
 	bytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -2367,6 +2470,42 @@ func promptSkills(language string) ([]string, error) {
 			return resolved, nil
 		}
 		fmt.Printf("Invalid skills. Use \"all\" or comma-separated: %s\n", strings.Join(allowed, ", "))
+	}
+}
+
+func resolveDeploymentModelForPublishing(current string, nonInteractive bool) (string, error) {
+	model := normalizeDeploymentModel(current)
+	if model != "" {
+		if !contains(deploymentModels, model) {
+			return "", fmt.Errorf("invalid deploymentModel %q; use one of: %s", model, strings.Join(deploymentModels, ", "))
+		}
+		return model, nil
+	}
+	if nonInteractive {
+		return "none", nil
+	}
+	return promptDeploymentModel()
+}
+
+func promptDeploymentModel() (string, error) {
+	allowed := strings.Join(deploymentModels, ", ")
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf("Deployment model for publishing apps [%s] (default: none): ", allowed)
+		line, err := reader.ReadString('\n')
+		if err != nil && !errors.Is(err, os.ErrClosed) {
+			if len(strings.TrimSpace(line)) == 0 {
+				return "", err
+			}
+		}
+		value := normalizeDeploymentModel(line)
+		if value == "" {
+			return "none", nil
+		}
+		if contains(deploymentModels, value) {
+			return value, nil
+		}
+		fmt.Printf("Invalid deployment model. Choose one of: %s\n", allowed)
 	}
 }
 

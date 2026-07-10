@@ -38,8 +38,11 @@ import {
   parseTargets,
   TASK_SYSTEMS,
   DEFAULT_TASK_SYSTEM,
+  DEPLOYMENT_MODELS,
+  DEFAULT_DEPLOYMENT_MODEL,
   type Target,
-  type TaskSystem
+  type TaskSystem,
+  type DeploymentModel
 } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -177,6 +180,21 @@ async function promptTaskSystem(): Promise<TaskSystem> {
   return promptTaskSystem();
 }
 
+async function promptDeploymentModel(): Promise<DeploymentModel> {
+  const line = await prompt(
+    `Deployment model (${DEPLOYMENT_MODELS.join(', ')}) [${DEFAULT_DEPLOYMENT_MODEL}]: `
+  );
+  if (!line) return DEFAULT_DEPLOYMENT_MODEL;
+  const token = line.trim().toLowerCase();
+  if ((DEPLOYMENT_MODELS as readonly string[]).includes(token)) {
+    return token as DeploymentModel;
+  }
+  console.error(
+    `Invalid deployment model. Choose one of: ${DEPLOYMENT_MODELS.join(', ')}`
+  );
+  return promptDeploymentModel();
+}
+
 export interface ResolveTargetAndAgentsOptions {
   projectRoot?: string;
   target?: string;
@@ -285,6 +303,7 @@ export interface InstallOptions {
   skipSupportFiles?: string[];
   saveConfig?: boolean;
   taskSystem?: TaskSystem;
+  deploymentModel?: DeploymentModel;
 }
 
 export interface InstallResult {
@@ -534,7 +553,8 @@ export function install(options: InstallOptions): InstallResult {
     patchGeminiMd = false,
     skipSupportFiles = [],
     saveConfig: persist,
-    taskSystem
+    taskSystem,
+    deploymentModel
   } = options;
   const effectiveAgents = withImplicitAgents(agents);
   const installed: string[] = [];
@@ -570,6 +590,10 @@ export function install(options: InstallOptions): InstallResult {
     (effectiveAgents.includes('tasks') &&
       taskSystem !== undefined &&
       taskSystem !== (existingConfig?.taskSystem ?? DEFAULT_TASK_SYSTEM));
+  const resolvedDeploymentModel =
+    deploymentModel ??
+    existingConfig?.deploymentModel ??
+    DEFAULT_DEPLOYMENT_MODEL;
 
   if (persist) {
     saveConfig(
@@ -581,7 +605,10 @@ export function install(options: InstallOptions): InstallResult {
         languages: [language],
         taskSystem: effectiveAgents.includes('tasks')
           ? resolvedTaskSystem
-          : (taskSystem ?? existingConfig?.taskSystem)
+          : (taskSystem ?? existingConfig?.taskSystem),
+        deploymentModel: effectiveAgents.includes('publishing')
+          ? resolvedDeploymentModel
+          : (deploymentModel ?? existingConfig?.deploymentModel)
       },
       projectRoot
     );
@@ -617,8 +644,12 @@ export function install(options: InstallOptions): InstallResult {
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
-        const buildVariables: Record<string, string> =
-          agentId === 'tasks' ? { taskSystem: resolvedTaskSystem } : {};
+        const buildVariables: Record<string, string> = {
+          ...(agentId === 'tasks' ? { taskSystem: resolvedTaskSystem } : {}),
+          ...(agentId === 'publishing'
+            ? { deploymentModel: resolvedDeploymentModel }
+            : {})
+        };
         const content = buildContent(
           agentId,
           target,
@@ -841,6 +872,7 @@ export interface RunInstallOptions {
   patch?: boolean;
   yes?: boolean;
   taskSystem?: string;
+  deploymentModel?: string;
   repositoryFactsFile?: string;
 }
 
@@ -949,6 +981,34 @@ export async function runInstall(
     }
   }
 
+  const normalizedDeploymentModel = options.deploymentModel
+    ?.trim()
+    .toLowerCase();
+  if (
+    normalizedDeploymentModel &&
+    !(DEPLOYMENT_MODELS as readonly string[]).includes(
+      normalizedDeploymentModel
+    )
+  ) {
+    console.error(
+      `Invalid --deployment-model value: "${normalizedDeploymentModel}". Valid values: ${DEPLOYMENT_MODELS.join(', ')}`
+    );
+    return 1;
+  }
+  const deploymentModelFromFlag = normalizedDeploymentModel
+    ? (normalizedDeploymentModel as DeploymentModel)
+    : undefined;
+  let resolvedDeploymentModel: DeploymentModel | undefined =
+    deploymentModelFromFlag ?? priorConfig?.deploymentModel ?? undefined;
+  if (agents.includes('publishing')) {
+    if (isCiMode() || options.yes || deploymentModelFromFlag) {
+      resolvedDeploymentModel =
+        resolvedDeploymentModel ?? DEFAULT_DEPLOYMENT_MODEL;
+    } else if (resolvedDeploymentModel === undefined) {
+      resolvedDeploymentModel = await promptDeploymentModel();
+    }
+  }
+
   const explicitAgentSelection =
     Boolean(options.all) || options.agents !== undefined;
   const agentsToPersist =
@@ -978,7 +1038,8 @@ export async function runInstall(
       skills,
       ballastVersion: BALLAST_VERSION,
       languages: [language],
-      taskSystem: resolvedTaskSystem
+      taskSystem: resolvedTaskSystem,
+      deploymentModel: resolvedDeploymentModel
     },
     projectRoot
   );
@@ -1029,7 +1090,8 @@ export async function runInstall(
         ? [supportDecision.skipSupportFile]
         : [],
       saveConfig: false,
-      taskSystem: resolvedTaskSystem
+      taskSystem: resolvedTaskSystem,
+      deploymentModel: resolvedDeploymentModel
     });
 
     if (result.errors.length > 0) {

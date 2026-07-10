@@ -16,6 +16,7 @@ describe('doctor', () => {
       [],
       {},
       null,
+      null,
       [
         {
           name: 'ballast-typescript',
@@ -58,6 +59,7 @@ describe('doctor', () => {
         ansible: ['infra/ansible']
       },
       'jira',
+      'hosted',
       [
         {
           name: 'ballast-typescript',
@@ -83,6 +85,7 @@ describe('doctor', () => {
       '- paths: typescript=apps/web; ansible=infra/ansible'
     );
     expect(output).toContain('- taskSystem: jira');
+    expect(output).toContain('- deploymentModel: hosted');
     expect(output).toContain('- No action needed.');
   });
 
@@ -98,11 +101,13 @@ describe('doctor', () => {
       [],
       {},
       null,
+      'kubernetes',
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'cli'
     );
     const output = formatDoctorReport(report);
     expect(output).toContain('Detected app type: cli');
+    expect(output).toContain('- deploymentModel: kubernetes');
   });
 
   test('omits detected app type line when unknown', () => {
@@ -116,6 +121,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      null,
       null,
       [],
       'unknown'
@@ -135,6 +141,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      null,
       null,
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'web'
@@ -157,6 +164,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      null,
       null,
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'api'

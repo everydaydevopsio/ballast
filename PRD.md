@@ -250,6 +250,38 @@ Ballast testing and publishing rules mention smoke tests, but they do not consis
 5. `docs/agents/testing.md` and `docs/agents/publishing.md` include the same operator-facing guidance.
 6. Tests or snapshots fail if the generated guidance drops the required smoke/E2E or CLI packaged-command expectations.
 
+## Deployment Model Configuration
+
+### Problem
+
+Ballast publishing guidance currently bakes in one Kubernetes deployment shape. Repositories use different app deployment models, and agents need a durable repository-level answer so generated publishing rules do not assume Kubernetes, serverless platforms, hosted platforms, or self-managed servers incorrectly. The same setup flow that captures the durable task system should capture deployment model when publishing rules are installed.
+
+### Requirements
+
+1. Ballast must support a repository-level `deploymentModel` config value with valid values `none`, `kubernetes`, `serverless`, `server`, and `hosted`.
+2. Interactive install must prompt for `deploymentModel` only when the `publishing` agent is selected and no prior deployment model or explicit flag exists.
+3. Non-interactive install must default `deploymentModel` to `none` when the `publishing` agent is selected without an explicit value or existing config.
+4. CLI installs must accept `--deployment-model <model>` and reject invalid values with a clear list of valid options.
+5. Wrapper monorepo installs must persist, validate, and forward `deploymentModel` to backend invocations that install the `publishing` agent.
+6. `.rulesrc.json` must preserve an existing deployment model across installs that do not explicitly change it.
+7. `ballast doctor` must display configured `deploymentModel` when present.
+8. Generated publishing guidance must render model-specific deployment guidance:
+   - `kubernetes`: application repo owns `charts/<app>/`; a separate GitOps repo owns ArgoCD `Application` or `ApplicationSet` configuration; CI publishes image tags or digests and updates the GitOps repo when image references are environment-specific there.
+   - `serverless`: guidance covers managed function/container platforms, environment configuration, least-privilege deploy credentials, and preview/stage/prod promotion.
+   - `server`: guidance covers self-managed VM or bare-metal deploys, service managers, artifact transfer, rollback, health checks, and secrets outside the repo.
+   - `hosted`: guidance covers hosted app platforms such as Vercel, Netlify, Render, Railway, or Fly.io, including platform config ownership, environment variables, previews, and production promotion.
+   - `none`: guidance avoids app deployment assumptions and keeps library/CLI publishing guidance intact.
+
+### Acceptance Criteria
+
+1. Given an interactive install selecting `publishing` with no prior config, Ballast prompts for `deploymentModel`.
+2. Given `--deployment-model kubernetes`, `.rulesrc.json` stores `"deploymentModel": "kubernetes"` and generated publishing guidance uses the local Helm chart plus external ArgoCD GitOps model.
+3. Given an invalid deployment model, install exits non-zero and prints the valid values.
+4. Given a non-interactive install selecting `publishing` without a deployment model, `.rulesrc.json` stores `"deploymentModel": "none"`.
+5. Given an existing `.rulesrc.json` with `deploymentModel`, later installs preserve it unless `--deployment-model` is provided.
+6. `ballast doctor` prints `- deploymentModel: <value>` when configured.
+7. Automated tests cover config parsing/persistence, CLI parsing, install prompt/default behavior, wrapper forwarding, doctor output, and generated publishing guidance.
+
 ## Git Repository Boundary Root Resolution
 
 ### Problem

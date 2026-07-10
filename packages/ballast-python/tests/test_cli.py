@@ -37,6 +37,7 @@ class PatchInstallTests(unittest.TestCase):
                     "ansible": ["infra/ansible"],
                 },
                 "taskSystem": "jira",
+                "deploymentModel": "serverless",
             },
             [
                 {
@@ -66,6 +67,7 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("- languages: typescript, ansible", output)
         self.assertIn("- paths: typescript=apps/web; ansible=infra/ansible", output)
         self.assertIn("- taskSystem: jira", output)
+        self.assertIn("- deploymentModel: serverless", output)
 
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:
@@ -98,11 +100,35 @@ class PatchInstallTests(unittest.TestCase):
 
         self.assertEqual(args.target, ["cursor,claude", "codex"])
 
+    def test_parser_accepts_deployment_model(self) -> None:
+        args = cli.parser().parse_args(
+            [
+                "install",
+                "--target",
+                "codex",
+                "--agent",
+                "publishing",
+                "--deployment-model",
+                "kubernetes",
+            ]
+        )
+
+        self.assertEqual(args.deployment_model, "kubernetes")
+
     def test_build_content_for_gemini_prefers_non_codex_header(self) -> None:
         content = cli.build_content("linting", "gemini", "python")
 
         self.assertIn("# Python Linting Rules", content)
         self.assertNotIn("Codex (CLI and app)", content)
+
+    def test_build_content_renders_publishing_deployment_model_token(self) -> None:
+        content = cli.build_content(
+            "publishing", "codex", "python", "apps", deployment_model="kubernetes"
+        )
+
+        self.assertIn("Kubernetes deployment model", content)
+        self.assertIn("charts/<app>/", content)
+        self.assertNotIn("{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}", content)
 
     def test_destination_rejects_invalid_rule_subdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -219,6 +245,37 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn('"languages": [', content)
             self.assertIn('"python"', content)
             self.assertIn('"paths": {', content)
+
+    def test_run_install_writes_deployment_model_for_publishing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_git_boundary(root)
+            old_cwd = Path.cwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--agent",
+                        "publishing",
+                        "--deployment-model",
+                        "hosted",
+                        "--yes",
+                    ]
+                )
+                exit_code = cli.run_install(args)
+            finally:
+                os.chdir(old_cwd)
+
+            self.assertEqual(exit_code, 0)
+            config = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"deploymentModel": "hosted"', config)
+            content = (root / ".codex" / "rules" / "publishing-apps.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("Hosted platform deployment model", content)
 
     def test_run_install_writes_multi_target_shared_rulesrc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -590,7 +647,7 @@ class PatchInstallTests(unittest.TestCase):
             args = cli.parser().parse_args(["install", "--yes"])
             resolved = cli.resolve_target_and_agents(args, root, "python")
 
-            self.assertEqual(resolved, (["claude"], [], ["owasp-security-scan"]))
+            self.assertEqual(resolved, (["claude"], [], ["owasp-security-scan"], ""))
 
     def test_resolve_target_and_agents_supports_multi_target_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -612,6 +669,7 @@ class PatchInstallTests(unittest.TestCase):
                     ["cursor", "claude"],
                     ["linting", "git-hooks"],
                     ["owasp-security-scan"],
+                    "",
                 ),
             )
 
@@ -638,6 +696,7 @@ class PatchInstallTests(unittest.TestCase):
                     ["cursor", "claude"],
                     ["linting"],
                     ["owasp-security-scan"],
+                    "",
                 ),
             )
 

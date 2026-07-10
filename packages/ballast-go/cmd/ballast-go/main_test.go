@@ -152,7 +152,8 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 				"typescript": {"apps/web"},
 				"ansible":    {"infra/ansible"},
 			},
-			TaskSystem: "jira",
+			TaskSystem:      "jira",
+			DeploymentModel: "serverless",
 		},
 		[]installedCLIStatus{
 			{Name: "ballast-typescript", Version: "5.0.2", Path: "/tmp/ballast-typescript"},
@@ -178,6 +179,9 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 	if !strings.Contains(output, "- taskSystem: jira") {
 		t.Fatalf("expected task system in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "- deploymentModel: serverless") {
+		t.Fatalf("expected deployment model in doctor output, got %q", output)
 	}
 }
 
@@ -491,7 +495,7 @@ func TestInstallSupportsTerraformLanguageProfile(t *testing.T) {
 }
 
 func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
-	got, err := readContent("git-hooks", "terraform", "", "standalone")
+	got, err := readContent("git-hooks", "terraform", "", "standalone", "none")
 	if err != nil {
 		t.Fatalf("read terraform git-hooks content: %v", err)
 	}
@@ -793,7 +797,7 @@ func TestBuildGeminiMDIncludesRepositoryFactsAndSkills(t *testing.T) {
 }
 
 func TestBuildContentGeminiIncludesMandates(t *testing.T) {
-	content, err := buildContent("linting", "gemini", "go", "", "standalone")
+	content, err := buildContent("linting", "gemini", "go", "", "standalone", "none")
 	if err != nil {
 		t.Fatalf("buildContent(gemini): %v", err)
 	}
@@ -806,6 +810,23 @@ func TestBuildContentGeminiIncludesMandates(t *testing.T) {
 	}
 	if !strings.Contains(content, "Go linting specialist") {
 		t.Fatalf("expected go linting body, got %q", content)
+	}
+}
+
+func TestBuildContentRendersPublishingDeploymentModelToken(t *testing.T) {
+	content, err := buildContent("publishing", "codex", "go", "apps", "standalone", "kubernetes")
+	if err != nil {
+		t.Fatalf("buildContent(publishing): %v", err)
+	}
+
+	if strings.Contains(content, deploymentModelGuidanceToken) {
+		t.Fatalf("expected deployment model token to be replaced, got %q", content)
+	}
+	if !strings.Contains(content, "Kubernetes deployment model") {
+		t.Fatalf("expected kubernetes guidance, got %q", content)
+	}
+	if !strings.Contains(content, "charts/<app>/") {
+		t.Fatalf("expected app chart guidance, got %q", content)
 	}
 }
 
@@ -1493,6 +1514,56 @@ func TestRunInstallWritesSharedRulesrcForMultipleTargets(t *testing.T) {
 	}
 }
 
+func TestRunInstallWritesDeploymentModelForPublishing(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	exitCode := runInstall([]string{"install", "--target", "codex", "--agent", "publishing", "--deployment-model", "hosted", "--yes"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, `"deploymentModel": "hosted"`) {
+		t.Fatalf("expected deploymentModel in config: %s", text)
+	}
+
+	ruleContent, err := os.ReadFile(filepath.Join(tmpDir, ".codex", "rules", "publishing-apps.md"))
+	if err != nil {
+		t.Fatalf("read publishing-apps.md: %v", err)
+	}
+	if !strings.Contains(string(ruleContent), "Hosted platform deployment model") {
+		t.Fatalf("expected hosted guidance in publishing rule: %s", string(ruleContent))
+	}
+}
+
+func TestRunInstallRejectsInvalidDeploymentModel(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := runInstall([]string{"install", "--target", "codex", "--agent", "publishing", "--deployment-model", "bogus", "--yes"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+	if !strings.Contains(output, "Invalid --deployment-model") {
+		t.Fatalf("expected invalid deployment model message, got %q", output)
+	}
+}
+
 func TestRunInstallForceSupportFileDeclinedSkipsFile(t *testing.T) {
 	t.Setenv("CI", "")
 	t.Setenv("GITHUB_ACTIONS", "")
@@ -1719,7 +1790,7 @@ func TestNormalizeTargetsDetailedReturnsInvalidTokens(t *testing.T) {
 
 func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"],"taskSystem":"jira"}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"],"taskSystem":"jira","deploymentModel":"SERVERLESS"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1732,6 +1803,9 @@ func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	}
 	if cfg.TaskSystem != "jira" {
 		t.Fatalf("expected taskSystem to be loaded from config, got %#v", cfg)
+	}
+	if cfg.DeploymentModel != "serverless" {
+		t.Fatalf("expected deploymentModel to be normalized from config, got %#v", cfg)
 	}
 }
 

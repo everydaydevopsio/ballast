@@ -69,6 +69,7 @@ describe('repo generated artifacts', () => {
       languages?: string[];
       skills?: string[];
       taskSystem?: string;
+      deploymentModel?: string;
     };
 
     const configuredLanguages: Language[] = Array.isArray(rulesrc.languages)
@@ -81,6 +82,7 @@ describe('repo generated artifacts', () => {
       ? rulesrc.skills
       : [];
     const taskSystem = rulesrc.taskSystem ?? 'github';
+    const deploymentModel = rulesrc.deploymentModel ?? 'none';
 
     const candidates = new Map<string, Candidate[]>();
     const ruleSubdirs: Array<string | null> = [
@@ -90,7 +92,7 @@ describe('repo generated artifacts', () => {
     ];
 
     const optionsFor = (language: Language) => ({
-      variables: { taskSystem },
+      variables: { taskSystem, deploymentModel },
       hookMode:
         language === 'typescript' && configuredLanguages.length === 1
           ? ('husky' as const)

@@ -294,8 +294,9 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
     "typescript":["apps/web"],
     "ansible":["infra/ansible"]
   },
-  "taskSystem":"jira"
-}`)
+	  "taskSystem":"jira",
+	  "deploymentModel":"kubernetes"
+	}`)
 
 	output := captureStdout(t, func() {
 		withWorkingDir(t, root, func() {
@@ -325,6 +326,9 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 	if !strings.Contains(output, "taskSystem: jira") {
 		t.Fatalf("expected config task system in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "deploymentModel: kubernetes") {
+		t.Fatalf("expected config deployment model in doctor output, got %q", output)
 	}
 }
 
@@ -3893,6 +3897,60 @@ func TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend(t *testing.T) {
 	}
 }
 
+// TestRunMonorepoInstallPreservesDeploymentModelWrittenByBackend asserts that a
+// deploymentModel value written to .rulesrc.json by a backend invocation is not
+// clobbered by the final saveMonorepoConfig call.
+func TestRunMonorepoInstallPreservesDeploymentModelWrittenByBackend(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["cursor"],
+  "agents": ["publishing", "linting"],
+  "languages": ["typescript"],
+  "paths": {"typescript": ["apps/frontend"]}
+}`)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	callCount := 0
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		callCount++
+		// Simulate the common backend invocation writing deploymentModel after
+		// prompting/defaulting the user.
+		if callCount == 1 {
+			mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["cursor"],
+  "agents": ["publishing", "linting"],
+  "deploymentModel": "hosted",
+  "languages": ["typescript"],
+  "paths": {"typescript": ["apps/frontend"]}
+}`)
+		}
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--target", "cursor", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	if !strings.Contains(string(config), `"deploymentModel": "hosted"`) {
+		t.Fatalf("expected deploymentModel to be preserved in final .rulesrc.json, got %q", string(config))
+	}
+}
+
 // TestRunMonorepoInstallPreservesTaskSystemFromExistingConfig asserts that a
 // taskSystem already present in .rulesrc.json before the install runs is
 // carried through into the final saved config.
@@ -4012,6 +4070,30 @@ func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
 	}
 }
 
+func TestResolveMonorepoPlanNormalizesDeploymentModelFlagForBackend(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "publishing", "--deployment-model=kubernetes", "--yes"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil || len(plan.Invocations) != 1 {
+		t.Fatalf("expected one common invocation, got %#v", plan)
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if strings.Contains(got, "--deployment-model=kubernetes") {
+		t.Fatalf("expected normalized deployment-model flag, got %q", got)
+	}
+	if !strings.Contains(got, "--deployment-model kubernetes") {
+		t.Fatalf("expected spaced deployment-model flag for backend, got %q", got)
+	}
+	if plan.Config.DeploymentModel != "kubernetes" {
+		t.Fatalf("expected deploymentModel in saved config, got %#v", plan.Config)
+	}
+}
+
 func TestResolveMonorepoPlanRejectsMissingTaskSystemValue(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
@@ -4020,6 +4102,17 @@ func TestResolveMonorepoPlanRejectsMissingTaskSystemValue(t *testing.T) {
 	_, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "tasks", "--task-system", "--yes"})
 	if err == nil || !strings.Contains(err.Error(), "missing value for --task-system") {
 		t.Fatalf("expected missing-value error, got %v", err)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidDeploymentModelValue(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	_, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "publishing", "--deployment-model=kuberntes", "--yes"})
+	if err == nil || !strings.Contains(err.Error(), "invalid --deployment-model") {
+		t.Fatalf("expected invalid deployment-model error, got %v", err)
 	}
 }
 
