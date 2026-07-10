@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.pytest_cache
+.claude
+agents
+skills
+*.log
+.DS_Store
