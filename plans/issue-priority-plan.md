@@ -1,6 +1,6 @@
 # Plan: Open Issue Review and Next Priorities
 
-**Status:** Updated after #211 and #144 closure
+**Status:** Updated after #209, #210, #213, and #214 completion
 **Created:** 2026-07-09
 **Source:** Review of open GitHub issues and requested follow-up list
 
@@ -17,7 +17,7 @@ Reviewed all open GitHub issues for `everydaydevopsio/ballast` and compared them
   - Hardened package-manager execution with an allowlist so untrusted `packageManager` values are ignored.
   - Added focused Go tests for declared package managers, lockfile fallback, no-op behavior, unsafe package-manager values, and failure output.
   - Updated `PRD.md`, README/docs, local-dev guidance, generated `.claude/` and `.codex/` rule outputs, and package payload copies.
-- #208: Define .ballast bootstrap behavior and Ballast skill support — implemented on branch `issue-208-ballast-bootstrap-skill`.
+- #208: Define .ballast bootstrap behavior and Ballast skill support — completed and merged via PR #218.
   - Defined `.ballast/` as generated repository-local tool state that is ignored by git and safe to recreate.
   - Added `ballast doctor` local-state reporting for missing and incomplete `.ballast/`, `.ballast/bin`, and `.ballast/tools`.
   - Added remediation guidance pointing operators to `ballast doctor --fix` or `ballast install-cli`.
@@ -27,16 +27,25 @@ Reviewed all open GitHub issues for `everydaydevopsio/ballast` and compared them
   - Config-refresh flows now set managed skill refresh mode so `install --refresh-config`, `upgrade`, and `doctor --fix` rewrite selected skill files without requiring `--force`.
   - Ordinary install behavior still skips existing skill files unless `--patch` or `--force` is selected.
   - Verified with TypeScript, Python, Go, wrapper unit tests, and the upgrade-refresh smoke script.
+- #209 and #210: YAML/YML formatting checks and Husky pre-push test guidance — completed and merged via PR #220.
+  - Updated TypeScript Husky hook guidance so YAML and YML formatting checks are included.
+  - Added pre-push test guidance for local verification before pushing to GitHub.
+  - Regenerated Ballast-managed `.claude/` and `.codex/` rule outputs and verified the generated artifacts.
+- #213: Codify Copilot review polling and per-thread replies — completed and merged via PR #221.
+  - Added explicit Copilot review-loop guidance for polling review threads, replying per thread, and continuing until no unresolved Copilot comments remain.
+  - Updated docs, generated agent rules, package mirrors, and regression tests for the PR review workflow.
+- #214: Add smoke and E2E test guidance for web apps and CLIs — completed and merged via PR #222.
+  - Added web smoke guidance to start the real app and verify a live route or health endpoint.
+  - Added conditional Playwright guidance that preserves an existing browser E2E framework and prefers Playwright when Playwright markers exist or browser automation is needed without an existing framework.
+  - Added local/pre-push/CI placement guidance for fast unit tests, targeted smoke checks, deterministic build/typecheck, and full smoke/E2E gates.
+  - Added packaged-command smoke guidance for installable CLIs.
+  - Synced canonical guidance into generated `.claude/` and `.codex/` outputs and package mirrors, with tests covering the generated content.
 
 ## Open Issue Inventory
 
-As of 2026-07-09 after closing completed #211 and #144, the repository has these open issues:
+As of 2026-07-10 after closing completed #209, #210, #213, and #214, the repository has these open issues:
 
 - #215: Define Kubernetes deployment guidance with local Helm chart and external ArgoCD config
-- #214: Add smoke and E2E test guidance for web apps and CLIs
-- #213: Codify Copilot review polling and per-thread replies
-- #210: Configure Husky pre-push hooks to run tests before pushing to GitHub
-- #209: Add YAML and YML formatting checks to Husky hook guidance
 - #188: Re-enable OpenCode as a first-class Ballast target
 - #175: Consider TTY detection for non-interactive mode in support file confirmation
 - #166: feat(doctor): detect drift and remove stale rules files
@@ -68,13 +77,13 @@ As of 2026-07-09 after closing completed #211 and #144, the repository has these
 | Requested item | Coverage | Action |
 | --- | --- | --- |
 | What to do about a missing `.ballast/` directory; is there a Ballast skill? | New issue #208 | Created focused issue for missing-state behavior and skill support. |
-| Fix Husky so YAML and YML formatting checks run | New issue #209 | Created focused Husky YAML/YML issue. |
-| Have Husky run tests on push to GitHub | New issue #210 | Created focused Husky pre-push test issue. |
+| Fix Husky so YAML and YML formatting checks run | New issue #209 | Completed and closed via PR #220. |
+| Have Husky run tests on push to GitHub | New issue #210 | Completed and closed via PR #220. |
 | Install local dev environment on startup for AI agents; missing pnpm because Corepack was not enabled | Existing #94 and #128 partially cover prerequisites and package-manager detection; new issue #211 covers the startup command | Created focused setup command issue. |
-| Need a loop for checking Copilot comments | New issue #213 | Created focused Copilot polling issue. |
-| Force commenting on Copilot comments | New issue #213 | Covered with per-thread reply requirement. |
+| Need a loop for checking Copilot comments | New issue #213 | Completed and closed via PR #221. |
+| Force commenting on Copilot comments | New issue #213 | Completed with per-thread reply requirements in PR #221. |
 | Deployment to Kubernetes with Helm chart in local repo and ArgoCD config in separate repo | New issue #215 | Created focused split-repo GitOps deployment issue. |
-| Add smoke and E2E tests for web and CLIs | Existing #145 and #10 partially cover framework detection and agent validation; new issue #214 covers product web/CLI smoke and E2E guidance | Created focused test guidance issue. |
+| Add smoke and E2E tests for web and CLIs | Existing #145 and #10 partially cover framework detection and agent validation; new issue #214 covers product web/CLI smoke and E2E guidance | Completed and closed via PR #222. |
 | Need a command to setup development environment before an AI agent can run | New issue #211 | Same bootstrap command issue. |
 | Always create a new branch when modifying code | New issue #212 | Created focused branch-before-code policy issue. |
 | Create rules for creating plans and converting them to ADRs | Existing #154 | No new issue needed. |
@@ -93,20 +102,20 @@ These reduce the chance that agents start from a broken environment, edit the wr
 
 ### P1: Make local and CI verification reliable
 
-1. #210: Configure Husky pre-push hooks to run tests before pushing to GitHub
-2. #209: Add YAML and YML formatting checks to Husky hook guidance
-3. #214: Add smoke and E2E test guidance for web apps and CLIs
-4. #145: Detect integration test frameworks per language and prefer Playwright for browser-based apps
-5. #93: Consolidate CI into a single ci.yml that fans out linting and testing across all languages
+- [x] #210: Configure Husky pre-push hooks to run tests before pushing to GitHub — completed and merged via PR #220
+- [x] #209: Add YAML and YML formatting checks to Husky hook guidance — completed and merged via PR #220
+- [x] #214: Add smoke and E2E test guidance for web apps and CLIs — completed and merged via PR #222
+1. #145: Detect integration test frameworks per language and prefer Playwright for browser-based apps
+2. #93: Consolidate CI into a single ci.yml that fans out linting and testing across all languages
 
 This builds a coherent path from local hooks to smoke/E2E validation to canonical CI.
 
 ### P2: Improve PR review and delivery workflow
 
-1. #213: Codify Copilot review polling and per-thread replies
-2. #154: Add plan-lifecycle rule: Plan -> ADR lifecycle for non-trivial features
-3. #159: Add TDD process discipline to testing agent rules
-4. #158: Reconcile tasks/todo.md format with global EXECUTION_TEMPLATES standard
+- [x] #213: Codify Copilot review polling and per-thread replies — completed and merged via PR #221
+1. #154: Add plan-lifecycle rule: Plan -> ADR lifecycle for non-trivial features
+2. #159: Add TDD process discipline to testing agent rules
+3. #158: Reconcile tasks/todo.md format with global EXECUTION_TEMPLATES standard
 
 These make agent work easier to review, preserve implementation context, and keep planning artifacts consistent.
 
@@ -146,9 +155,12 @@ This broadens Ballast from local rules into multi-agent and deployment orchestra
 - [x] Implement #208 next so `.ballast/` missing-state detection and Ballast skill support can build on the new `setup-dev` command. Completed via PR #218.
 - [x] Close #211 after verifying PR #217 implemented the accepted bootstrap command behavior.
 - [x] Verify and close #144 after confirming managed skill refresh is implemented on `main`.
-1. Implement #209 and #210 as one git-hook workstream, with generated outputs regenerated in the same PR.
-2. Implement #214 with #145 in mind so generated testing guidance uses detected framework signals instead of generic defaults.
-3. Implement #213 before scaling PR automation or MCP workflows.
+- [x] Implement #209 and #210 as one git-hook workstream, with generated outputs regenerated in the same PR. Completed via PR #220.
+- [x] Implement #214 with #145 in mind so generated testing guidance uses detected framework signals instead of generic defaults. Completed via PR #222.
+- [x] Implement #213 before scaling PR automation or MCP workflows. Completed via PR #221.
+1. Implement #215 next to define Kubernetes deployment guidance with an in-repo Helm chart and separate-repo ArgoCD config.
+2. Implement #145 next in the verification stream, using the #214 guidance as the policy baseline for framework detection and Playwright preference.
+3. Implement #93 after #145 so consolidated CI can incorporate the updated framework-detection and smoke/E2E guidance.
 4. Implement #154 after the task format issue #158 is resolved, or explicitly design #154 to tolerate the current `tasks/TODO.md` format until #158 lands.
 
 ## Notes
