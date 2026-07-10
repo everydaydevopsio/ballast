@@ -352,6 +352,19 @@ describe('config', () => {
       expect(loaded?.deploymentModel).toBe('kubernetes');
     });
 
+    test('normalizes deploymentModel from config', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['publishing'],
+          deploymentModel: 'SERVERLESS'
+        })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.deploymentModel).toBe('serverless');
+    });
+
     test('loads config without deploymentModel field', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),

@@ -199,6 +199,8 @@ describe('build', () => {
       expect(content).toContain('ArgoCD');
       expect(content).toContain('GitOps repository');
       expect(content).toContain('image digest');
+      expect(content).toContain('## App Deployment Model');
+      expect(content).not.toContain('## Kubernetes');
     });
 
     test('returns hosted deployment guidance when deploymentModel is hosted', () => {

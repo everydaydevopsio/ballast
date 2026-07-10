@@ -21,8 +21,6 @@ You are a publishing specialist for web applications deployed as Docker containe
 
 Web apps use **continuous deployment** — every merge to `main` deploys. There is no manual version bump or `workflow_dispatch` trigger. If a named semver release is also needed (e.g. for a public API), create a separate `release.yml` workflow that responds to `v*` tags.
 
-## Deployment Model
-
 No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.
 
 ## Workflow Trigger and Concurrency

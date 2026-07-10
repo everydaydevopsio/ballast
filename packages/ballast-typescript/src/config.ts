@@ -259,11 +259,11 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
   ) {
     config.taskSystem = record.taskSystem as TaskSystem;
   }
-  if (
-    typeof record.deploymentModel === 'string' &&
-    (DEPLOYMENT_MODELS as readonly string[]).includes(record.deploymentModel)
-  ) {
-    config.deploymentModel = record.deploymentModel as DeploymentModel;
+  if (typeof record.deploymentModel === 'string') {
+    const deploymentModel = record.deploymentModel.trim().toLowerCase();
+    if ((DEPLOYMENT_MODELS as readonly string[]).includes(deploymentModel)) {
+      config.deploymentModel = deploymentModel as DeploymentModel;
+    }
   }
   return config;
 }

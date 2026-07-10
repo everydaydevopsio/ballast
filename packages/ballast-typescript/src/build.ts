@@ -247,9 +247,7 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
   switch (deploymentModel) {
     case 'kubernetes':
       return [
-        '## Kubernetes: Local Helm Chart + External ArgoCD GitOps',
-        '',
-        'Use this model when the app deploys to Kubernetes and GitOps reconciles runtime state.',
+        'Kubernetes: local Helm chart + external ArgoCD GitOps.',
         '',
         '- Application repository ownership:',
         '  - keep the Helm chart in `charts/<app>/` in the application repository',
@@ -270,9 +268,7 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'serverless':
       return [
-        '## Serverless Deployment Model',
-        '',
-        'Use this model for managed function or container platforms such as AWS Lambda, Cloud Run, Azure Functions, or equivalent services.',
+        'Serverless deployment model for managed function or container platforms such as AWS Lambda, Cloud Run, Azure Functions, or equivalent services.',
         '',
         '- Keep infrastructure definitions or platform manifests close to the service unless the team has a dedicated infra repository.',
         '- Build immutable artifacts before deployment and promote the same artifact between preview, staging, and production when the platform supports it.',
@@ -283,9 +279,7 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'server':
       return [
-        '## Server Deployment Model',
-        '',
-        'Use this model for self-managed VM, VPS, or bare-metal deployments.',
+        'Server deployment model for self-managed VM, VPS, or bare-metal deployments.',
         '',
         '- Build a versioned artifact or container image in CI; do not build production artifacts manually on the server.',
         '- Deploy through a repeatable script or workflow that transfers the artifact, updates configuration, restarts the service manager, and verifies health.',
@@ -296,9 +290,7 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'hosted':
       return [
-        '## Hosted App Platform Deployment Model',
-        '',
-        'Use this model for hosted platforms such as Vercel, Netlify, Render, Railway, Fly.io, or similar app platforms.',
+        'Hosted app platform deployment model for services such as Vercel, Netlify, Render, Railway, Fly.io, or similar app platforms.',
         '',
         '- Keep platform configuration in the app repo when the platform supports checked-in config files.',
         '- Keep environment variables and secrets in the hosted platform, not in generated workflows.',
@@ -309,11 +301,7 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'none':
     default:
-      return [
-        '## Deployment Model',
-        '',
-        'No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.'
-      ].join('\n');
+      return 'No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.';
   }
 }
 

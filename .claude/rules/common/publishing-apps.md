@@ -66,8 +66,6 @@ For TypeScript or Node CLI apps distributed through npmjs:
 
 ## App Deployment Model
 
-## Deployment Model
-
 No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.
 
 ### Container Registry Targets
