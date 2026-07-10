@@ -1,5 +1,16 @@
 # Tasks
 
+- [x] Confirm issue #215 broader deployment-model scope, operating mode, and PRD requirements.
+- [x] Add PRD requirements for deployment model prompts, flags, persistence, doctor output, and publishing guidance.
+- [x] Add failing tests for deployment model config parsing, CLI flags, install prompting, wrapper forwarding, and doctor output.
+- [x] Implement deployment model support across TypeScript backend, wrapper, and Python/Go metadata surfaces as needed.
+- [x] Update canonical publishing guidance for Kubernetes, serverless, server, and hosted deployment models.
+- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
+- [x] Run focused tests and required sync/generation checks.
+- [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
+
+## Previous Tasks
+
 - [x] Confirm issue #214 scope, approval, and coordination boundary with #145.
 - [x] Add PRD requirements for web smoke/E2E and CLI packaged-command smoke guidance.
 - [x] Add generated guidance tests for web smoke/E2E, Playwright preference, placement, and CLI packaged-command smoke checks.
@@ -7,8 +18,6 @@
 - [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
 - [x] Run focused tests and required sync/generation checks.
 - [x] Push branch, open PR for #214, request Copilot review, and monitor CI/review comments.
-
-## Previous Tasks
 
 - [x] Confirm issue #213 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for Copilot review polling and per-thread replies.

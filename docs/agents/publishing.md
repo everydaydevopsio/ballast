@@ -17,9 +17,21 @@ The publishing agent installs multiple rules:
 - TypeScript publishing guidance for npmjs
 - Python publishing guidance for PyPI
 - Go publishing guidance for GitHub tags and GitHub Releases
-- Web app publishing guidance for Docker images in GHCR or Docker Hub plus Helm charts in a separate repo
+- Web app publishing guidance for Docker images in GHCR or Docker Hub plus deployment-model-specific release flow
 - Release validation, tag-based publishing, and least-privilege permission patterns
 - Packaged-command smoke tests for installable CLIs: install or execute the built artifact, check `--help`, check `--version`, and run one representative command before publishing
+
+## Deployment Model
+
+When the publishing agent is installed, Ballast records `deploymentModel` in `.rulesrc.json`. Valid values are:
+
+- `none` — no app deployment assumptions; keep library, SDK, and CLI publishing guidance active.
+- `kubernetes` — app repo owns `charts/<app>/`; a separate GitOps repo owns ArgoCD `Application` or `ApplicationSet` configuration and environment-specific deployment state.
+- `serverless` — managed function or container platforms such as AWS Lambda, Cloud Run, or Azure Functions.
+- `server` — self-managed VM, VPS, or bare-metal deployment with a repeatable artifact transfer, service restart, health check, and rollback path.
+- `hosted` — app platforms such as Vercel, Netlify, Render, Railway, or Fly.io.
+
+Use `ballast install --agent publishing --deployment-model kubernetes` for non-interactive setup. Interactive installs prompt for the deployment model only when the publishing agent is selected.
 
 ## CLI Smoke Placement
 
@@ -47,5 +59,5 @@ The publishing agent installs multiple rules:
 - **"Publish our Node CLI to npm with provenance"** — npm app distribution
 - **"Publish our Python CLI to PyPI with console entry points"** — Python app packaging
 - **"Release our Go CLI binaries to GitHub with checksums"** — Binary release automation
-- **"Publish our web app image to GHCR and update the Helm chart repo"** — Container + chart release flow
-- **"Publish our web app to Docker Hub and pin the Helm chart to the image digest"** — Immutable deployment release flow
+- **"Publish our web app image to GHCR and update the GitOps repo"** — Container + Kubernetes GitOps release flow
+- **"Publish our web app to Docker Hub and pin production to the image digest"** — Immutable deployment release flow

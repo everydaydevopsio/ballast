@@ -133,7 +133,7 @@ Generated behavior:
 - Root common rules under directories such as `.cursor/rules/common/`
 - Root language rules under directories such as `.cursor/rules/typescript/`, `.claude/rules/python/`, `.gemini/rules/go/`, and `.codex/rules/go/`
 - Language-specific filenames include the language prefix in both single-language and monorepo installs, for example `typescript-linting.mdc`, `python-testing.md`, and `go-logging.md`
-- Root `.rulesrc.json` containing `target`, `agents`, `skills`, `languages`, and detected `paths`
+- Root `.rulesrc.json` containing `target`, `agents`, `skills`, `languages`, detected `paths`, and deployment model when publishing is configured
 - Root `CLAUDE.md`, `GEMINI.md`, or `AGENTS.md` created when needed for Claude/Gemini/Codex installs
 - Skills install into target-specific skill locations such as `.claude/skills/aws-health-review.skill`, `.gemini/rules/aws-live-health-review.md`, and `.cursor/rules/aws-weekly-security-review.mdc`
 - Discovery scans skip dot-prefixed directories (for example `.git`, `.codex`, `.claude`) unless explicitly allowlisted by future configuration support
@@ -164,6 +164,7 @@ Example root config:
     "testing"
   ],
   "skills": ["owasp-security-scan", "aws-health-review"],
+  "deploymentModel": "kubernetes",
   "languages": ["typescript", "python", "go", "ansible", "terraform"],
   "paths": {
     "typescript": ["apps/frontend"],
@@ -205,6 +206,7 @@ For single-language TypeScript installs, the `git-hooks` rules should use Husky 
 - `--skill, -s`: comma-separated list
 - `--all`: install all available agents
 - `--all-skills`: install all available skills
+- `--deployment-model`: deployment model for the publishing agent: `none`, `kubernetes`, `serverless`, `server`, or `hosted`
 - `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files
 - `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
@@ -226,7 +228,7 @@ For single-language TypeScript installs, the `git-hooks` rules should use Husky 
   - Python CLI (legacy): `.rulesrc.python.json`
   - Go CLI (legacy): `.rulesrc.go.json`
 
-Saved config values include `target`, `agents`, and `skills`. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
+Saved config values include `target`, `agents`, `skills`, `taskSystem`, and `deploymentModel`. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
 
 ## Install Paths
 

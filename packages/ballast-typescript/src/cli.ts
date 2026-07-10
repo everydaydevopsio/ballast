@@ -4,7 +4,7 @@ import { runInstall } from './install';
 import { LANGUAGES, Language, AGENT_IDS, SKILL_IDS } from './agents';
 import { runDoctor } from './doctor';
 import { BALLAST_VERSION } from './version';
-import { TASK_SYSTEMS } from './config';
+import { TASK_SYSTEMS, DEPLOYMENT_MODELS } from './config';
 
 export interface CliOptions {
   targets: string[];
@@ -17,6 +17,7 @@ export interface CliOptions {
   patch: boolean;
   yes: boolean;
   taskSystem: string;
+  deploymentModel: string;
   repositoryFactsFile?: string;
 }
 
@@ -46,7 +47,8 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     force: false,
     patch: false,
     yes: false,
-    taskSystem: ''
+    taskSystem: '',
+    deploymentModel: ''
   };
   let i = 0;
   while (i < args.length) {
@@ -118,6 +120,12 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       i++;
       continue;
     }
+    if (arg === '--deployment-model') {
+      const value = args[++i];
+      if (value) options.deploymentModel = value.trim().toLowerCase();
+      i++;
+      continue;
+    }
     if (arg === '--repository-facts-file') {
       const value = args[++i];
       if (value) options.repositoryFactsFile = value.trim();
@@ -155,6 +163,7 @@ Options:
   --all                     Install all agents
   --all-skills              Install all skills
   --task-system <system>    Task system for the tasks agent: ${TASK_SYSTEMS.join(', ')} (default: github)
+  --deployment-model <model> Deployment model for the publishing agent: ${DEPLOYMENT_MODELS.join(', ')} (default: none)
   --force, -f               Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -245,6 +254,7 @@ export async function main(): Promise<void> {
     agents: cliOptions.agents.length > 0 ? cliOptions.agents : undefined,
     skills: cliOptions.skills.length > 0 ? cliOptions.skills : undefined,
     taskSystem: cliOptions.taskSystem || undefined,
+    deploymentModel: cliOptions.deploymentModel || undefined,
     repositoryFactsFile: cliOptions.repositoryFactsFile
   };
 

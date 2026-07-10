@@ -294,8 +294,9 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
     "typescript":["apps/web"],
     "ansible":["infra/ansible"]
   },
-  "taskSystem":"jira"
-}`)
+	  "taskSystem":"jira",
+	  "deploymentModel":"kubernetes"
+	}`)
 
 	output := captureStdout(t, func() {
 		withWorkingDir(t, root, func() {
@@ -325,6 +326,9 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 	if !strings.Contains(output, "taskSystem: jira") {
 		t.Fatalf("expected config task system in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "deploymentModel: kubernetes") {
+		t.Fatalf("expected config deployment model in doctor output, got %q", output)
 	}
 }
 
@@ -4012,6 +4016,30 @@ func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
 	}
 }
 
+func TestResolveMonorepoPlanNormalizesDeploymentModelFlagForBackend(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "publishing", "--deployment-model=kubernetes", "--yes"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil || len(plan.Invocations) != 1 {
+		t.Fatalf("expected one common invocation, got %#v", plan)
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if strings.Contains(got, "--deployment-model=kubernetes") {
+		t.Fatalf("expected normalized deployment-model flag, got %q", got)
+	}
+	if !strings.Contains(got, "--deployment-model kubernetes") {
+		t.Fatalf("expected spaced deployment-model flag for backend, got %q", got)
+	}
+	if plan.Config.DeploymentModel != "kubernetes" {
+		t.Fatalf("expected deploymentModel in saved config, got %#v", plan.Config)
+	}
+}
+
 func TestResolveMonorepoPlanRejectsMissingTaskSystemValue(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
@@ -4020,6 +4048,17 @@ func TestResolveMonorepoPlanRejectsMissingTaskSystemValue(t *testing.T) {
 	_, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "tasks", "--task-system", "--yes"})
 	if err == nil || !strings.Contains(err.Error(), "missing value for --task-system") {
 		t.Fatalf("expected missing-value error, got %v", err)
+	}
+}
+
+func TestResolveMonorepoPlanRejectsInvalidDeploymentModelValue(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	_, err := resolveMonorepoPlan(root, []string{"install", "--target", "cursor", "--agent", "publishing", "--deployment-model=kuberntes", "--yes"})
+	if err == nil || !strings.Contains(err.Error(), "invalid --deployment-model") {
+		t.Fatalf("expected invalid deployment-model error, got %v", err)
 	}
 }
 

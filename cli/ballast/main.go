@@ -134,16 +134,18 @@ var resolveInstalledVersionFunc = resolveInstalledVersion
 var collectDoctorBackendsFunc = collectDoctorBackends
 
 var supportedTaskSystems = []string{"github", "jira", "linear"}
+var supportedDeploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
 
 type monorepoConfig struct {
-	Target         string              `json:"target,omitempty"`
-	Targets        []string            `json:"targets,omitempty"`
-	Agents         []string            `json:"agents,omitempty"`
-	Skills         []string            `json:"skills,omitempty"`
-	BallastVersion string              `json:"ballastVersion,omitempty"`
-	Languages      []string            `json:"languages,omitempty"`
-	Paths          map[string][]string `json:"paths,omitempty"`
-	TaskSystem     string              `json:"taskSystem,omitempty"`
+	Target          string              `json:"target,omitempty"`
+	Targets         []string            `json:"targets,omitempty"`
+	Agents          []string            `json:"agents,omitempty"`
+	Skills          []string            `json:"skills,omitempty"`
+	BallastVersion  string              `json:"ballastVersion,omitempty"`
+	Languages       []string            `json:"languages,omitempty"`
+	Paths           map[string][]string `json:"paths,omitempty"`
+	TaskSystem      string              `json:"taskSystem,omitempty"`
+	DeploymentModel string              `json:"deploymentModel,omitempty"`
 }
 
 type repoProfile struct {
@@ -430,6 +432,7 @@ func printUsage() {
 	fmt.Println("  ballast install --remove-target codex")
 	fmt.Println("  ballast install --remove-language python")
 	fmt.Println("  ballast install --target claude --skill owasp-security-scan")
+	fmt.Println("  ballast install --target codex --agent publishing --deployment-model kubernetes")
 	fmt.Println("  ballast install --refresh-config")
 	fmt.Println("  ballast install-cli --language python")
 	fmt.Println("  ballast setup-dev")
@@ -449,6 +452,7 @@ func printUsage() {
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Install language behavior: `--remove-language` removes languages from `.rulesrc.json`, removes their `paths`, and prunes stale Ballast-managed rule files.")
+	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app deployment guidance as one of none, kubernetes, serverless, server, or hosted.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
 	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/terraform/`).")
 }
@@ -974,6 +978,9 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	if strings.TrimSpace(config.TaskSystem) != "" {
 		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
+	}
+	if strings.TrimSpace(config.DeploymentModel) != "" {
+		fmt.Printf("- deploymentModel: %s\n", config.DeploymentModel)
 	}
 	fmt.Println()
 }
@@ -2146,6 +2153,10 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if err != nil {
 		return nil, err
 	}
+	requestedDeploymentModel, err := parseDeploymentModelFlag(args)
+	if err != nil {
+		return nil, err
+	}
 
 	config, err := loadMonorepoConfig(root)
 	if err != nil {
@@ -2271,14 +2282,22 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if requestedTaskSystem != "" {
 		savedTaskSystem = requestedTaskSystem
 	}
+	var savedDeploymentModel string
+	if config != nil {
+		savedDeploymentModel = config.DeploymentModel
+	}
+	if requestedDeploymentModel != "" {
+		savedDeploymentModel = requestedDeploymentModel
+	}
 	configToSave := monorepoConfig{
-		Targets:        savedTargets,
-		Agents:         persistAgents,
-		Skills:         persistSkills,
-		BallastVersion: normalizeVersion(resolveVersion()),
-		Languages:      make([]string, 0, len(profiles)),
-		Paths:          map[string][]string{},
-		TaskSystem:     savedTaskSystem,
+		Targets:         savedTargets,
+		Agents:          persistAgents,
+		Skills:          persistSkills,
+		BallastVersion:  normalizeVersion(resolveVersion()),
+		Languages:       make([]string, 0, len(profiles)),
+		Paths:           map[string][]string{},
+		TaskSystem:      savedTaskSystem,
+		DeploymentModel: savedDeploymentModel,
 	}
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
@@ -2306,6 +2325,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
 	if requestedTaskSystem != "" && slices.Contains(configToSave.Agents, "tasks") {
 		commonArgs = append(commonArgs, "--task-system", requestedTaskSystem)
+	}
+	if requestedDeploymentModel != "" && slices.Contains(configToSave.Agents, "publishing") {
+		commonArgs = append(commonArgs, "--deployment-model", requestedDeploymentModel)
 	}
 	if len(commonSelection) > 0 || len(selectedSkills) > 0 {
 		commonLanguage := profiles[0].Language
@@ -2651,6 +2673,41 @@ func parseTaskSystemFlag(args []string) (string, error) {
 	)
 }
 
+func parseDeploymentModelFlag(args []string) (string, error) {
+	raw := ""
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "--deployment-model=") {
+			raw = strings.TrimSpace(strings.TrimPrefix(arg, "--deployment-model="))
+			continue
+		}
+		if arg != "--deployment-model" {
+			continue
+		}
+		if i+1 >= len(args) {
+			return "", errors.New("missing value for --deployment-model")
+		}
+		candidate := strings.TrimSpace(args[i+1])
+		if candidate == "" || strings.HasPrefix(candidate, "-") {
+			return "", errors.New("missing value for --deployment-model")
+		}
+		raw = candidate
+		i++
+	}
+	if raw == "" {
+		return "", nil
+	}
+	normalized := strings.ToLower(raw)
+	if slices.Contains(supportedDeploymentModels, normalized) {
+		return normalized, nil
+	}
+	return "", fmt.Errorf(
+		"invalid --deployment-model: %s (valid: %s)",
+		raw,
+		strings.Join(supportedDeploymentModels, ", "),
+	)
+}
+
 func findFlagValue(args []string, longFlag string, shortFlag string) string {
 	values := findFlagValues(args, longFlag, shortFlag)
 	if len(values) == 0 {
@@ -2697,6 +2754,10 @@ func stripMonorepoFlags(args []string) []string {
 			i++
 			continue
 		}
+		if arg == "--deployment-model" {
+			i++
+			continue
+		}
 		if strings.HasPrefix(arg, "--language=") {
 			continue
 		}
@@ -2707,6 +2768,9 @@ func stripMonorepoFlags(args []string) []string {
 			continue
 		}
 		if strings.HasPrefix(arg, "--task-system=") {
+			continue
+		}
+		if strings.HasPrefix(arg, "--deployment-model=") {
 			continue
 		}
 		filtered = append(filtered, arg)

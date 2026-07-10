@@ -58,18 +58,9 @@ For TypeScript or Node CLI apps distributed through npmjs:
 - Prefer npm trusted publishing with `id-token: write`.
 - Verify the packaged CLI starts successfully from the built artifact before publishing.
 
-## Web Apps: Docker Image + Separate Helm Chart Repo
+## App Deployment Model
 
-For web apps deployed to Kubernetes, prefer a two-repository release model:
-
-- Application repository:
-  - build and publish the Docker image
-  - produce immutable image references
-  - do not keep deployment-environment chart changes in the same release commit by default
-- Helm chart repository:
-  - owns the chart, values, and deployment metadata
-  - is updated after the application image is published
-  - records the new image tag or digest in a chart release commit
+{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}
 
 ### Container Registry Targets
 
@@ -104,36 +95,14 @@ When building the workflow:
   - GHCR: `contents: read`, `packages: write`
   - Docker Hub: `contents: read` plus Docker Hub credentials from secrets
 
-### Separate Helm Chart Repository
-
-After the image publish succeeds, update a separate Helm chart repository rather than mixing chart release state into the app repository.
-
-The Helm chart repo should contain:
-
-- one chart per deployable app
-- `values.yaml` defaults
-- environment-specific values files only when the team intentionally stores them there
-- image repository and tag or digest fields that can be updated automatically
-
-Preferred automation flow:
-
-1. Publish the app image to GHCR or Docker Hub.
-2. Capture the pushed tag and digest.
-3. Check out the separate Helm chart repository in a later job or workflow.
-4. Update chart values to the new image tag or digest.
-5. Bump the chart version when chart contents changed.
-6. Commit and push the chart update.
-7. Optionally package and publish the chart from the chart repo if the team uses an OCI chart registry or GitHub Pages chart index.
-
-### Helm Update Rules
+### Image Reference Rules
 
 - Prefer digest pinning for production deployments when the platform supports it.
-- Keep the application version and chart version distinct:
+- Keep the application version and deployment-manifest version distinct:
   - app version tracks the shipped container
-  - chart version tracks deployment-manifest changes
-- Do not overwrite unrelated chart values during automation.
-- If multiple environments exist, make the target environment or values file explicit in the workflow inputs.
-- If the chart repo is private, use a dedicated token scoped to that repository only.
+  - chart, manifest, or platform config version tracks deployment-shape changes
+- Do not overwrite unrelated environment values during automation.
+- If multiple environments exist, make the target environment explicit in workflow inputs or promotion controls.
 
 ### What to Generate
 
@@ -141,15 +110,15 @@ For a web app release workflow, generate:
 
 - a Docker image publish job for GHCR or Docker Hub
 - outputs exposing the published image tag and digest
-- a follow-up job or reusable workflow that updates the separate Helm chart repo
+- a deployment-model-specific follow-up job or reusable workflow when an environment should move to the new image
 - clear secrets and permissions documentation in the workflow comments or README
 
 ### What Not to Do
 
 - Do not deploy mutable `latest` tags by default.
 - Do not hardcode long-lived registry passwords in workflow files.
-- Do not keep the chart repo update step hidden inside a shell script with no visible diff.
-- Do not update a Helm chart in-place in the app repo when the team has chosen a separate chart repository model.
+- Do not hide deployment state changes inside a shell script with no visible diff or audit trail.
+- Do not assume Kubernetes-specific Helm or ArgoCD ownership when `deploymentModel` is not `kubernetes`.
 
 ## Python Apps: PyPI
 
@@ -195,4 +164,4 @@ For Go apps and CLIs:
 - When a repository publishes a CLI, desktop helper, or installable service package.
 - When the release artifact is intended for direct installation by end users.
 - When a project needs app-focused packaging guidance instead of library-only rules.
-- When a web app is released as a container image and deployed through a separate Helm chart repository.
+- When a web app is released as a container image and deployed through the configured deployment model.

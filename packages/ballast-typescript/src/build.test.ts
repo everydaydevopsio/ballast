@@ -183,8 +183,10 @@ describe('build', () => {
       expect(content).toContain('GitHub Releases');
     });
 
-    test('returns publishing apps content for web app containers and helm repos', () => {
-      const content = getContent('publishing', 'apps');
+    test('returns publishing apps content for Kubernetes GitOps deployments', () => {
+      const content = getContent('publishing', 'apps', 'typescript', {
+        variables: { deploymentModel: 'kubernetes' }
+      });
       expect(content).toContain('release_type');
       expect(content).toContain('v<version>');
       expect(content).toContain(
@@ -193,8 +195,19 @@ describe('build', () => {
       expect(content).toContain('WyriHaximus/github-action-next-semvers');
       expect(content).toContain('ghcr.io');
       expect(content).toContain('Docker Hub');
-      expect(content).toContain('Helm chart repository');
+      expect(content).toContain('charts/<app>/');
+      expect(content).toContain('ArgoCD');
+      expect(content).toContain('GitOps repository');
       expect(content).toContain('image digest');
+    });
+
+    test('returns hosted deployment guidance when deploymentModel is hosted', () => {
+      const content = getContent('publishing', 'apps', 'typescript', {
+        variables: { deploymentModel: 'hosted' }
+      });
+      expect(content).toContain('Vercel');
+      expect(content).toContain('Railway');
+      expect(content).toContain('preview deployments');
     });
 
     test('returns TypeScript testing content with web smoke and E2E placement guidance', () => {

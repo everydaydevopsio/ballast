@@ -7,9 +7,18 @@ const LEGACY_TYPESCRIPT_RULESRC_FILENAME = '.rulesrc.ts.json';
 const TARGETS = ['cursor', 'claude', 'opencode', 'codex', 'gemini'] as const;
 export const TASK_SYSTEMS = ['github', 'jira', 'linear'] as const;
 export const DEFAULT_TASK_SYSTEM = 'github' as const;
+export const DEPLOYMENT_MODELS = [
+  'none',
+  'kubernetes',
+  'serverless',
+  'server',
+  'hosted'
+] as const;
+export const DEFAULT_DEPLOYMENT_MODEL = 'none' as const;
 
 export type Target = (typeof TARGETS)[number];
 export type TaskSystem = (typeof TASK_SYSTEMS)[number];
+export type DeploymentModel = (typeof DEPLOYMENT_MODELS)[number];
 
 export interface RulesConfig {
   targets: Target[];
@@ -19,6 +28,7 @@ export interface RulesConfig {
   languages?: string[];
   paths?: Record<string, string[]>;
   taskSystem?: TaskSystem;
+  deploymentModel?: DeploymentModel;
 }
 
 export function getRulesrcFilename(): string {
@@ -176,6 +186,11 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     nextConfig = { ...nextConfig, taskSystem };
   }
 
+  const deploymentModel = config.deploymentModel ?? existing?.deploymentModel;
+  if (deploymentModel) {
+    nextConfig = { ...nextConfig, deploymentModel };
+  }
+
   fs.writeFileSync(filePath, JSON.stringify(nextConfig, null, 2), 'utf8');
 }
 
@@ -201,6 +216,7 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     languages?: unknown;
     paths?: unknown;
     taskSystem?: unknown;
+    deploymentModel?: unknown;
   };
   const targets = normalizeTargets(record.targets ?? record.target);
   if (targets.length === 0 || !Array.isArray(record.agents)) {
@@ -242,6 +258,12 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     (TASK_SYSTEMS as readonly string[]).includes(record.taskSystem)
   ) {
     config.taskSystem = record.taskSystem as TaskSystem;
+  }
+  if (
+    typeof record.deploymentModel === 'string' &&
+    (DEPLOYMENT_MODELS as readonly string[]).includes(record.deploymentModel)
+  ) {
+    config.deploymentModel = record.deploymentModel as DeploymentModel;
   }
   return config;
 }

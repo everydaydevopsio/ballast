@@ -4,7 +4,7 @@ You are a publishing specialist for REST API services deployed as Docker contain
 
 ## Goals
 
-- Use the same container publishing and Helm chart update model as web apps.
+- Use the same container publishing and deployment model as web apps.
 - Ensure the API exposes a health endpoint that Kubernetes probes can use.
 - Include `livenessProbe` and `readinessProbe` in the Helm chart template referencing the health endpoint.
 - Distinguish private (GHCR) vs public (Docker Hub) image publishing based on the API's audience.
@@ -13,6 +13,8 @@ You are a publishing specialist for REST API services deployed as Docker contain
 
 REST API apps use **continuous deployment** — every merge to `main` deploys. See the web app publishing rule for the full `deploy-web.yml` workflow template; the same workflow applies here. The only differences are the health endpoint requirements and Helm chart probe configuration.
 
+{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}
+
 ## CI Workflow
 
 Use the same `deploy-web.yml` workflow template as the web app publishing rule:
@@ -20,7 +22,7 @@ Use the same `deploy-web.yml` workflow template as the web app publishing rule:
 - Trigger on `push` to `main`.
 - `concurrency: cancel-in-progress: true`.
 - Build and push the Docker image tagged with `sha-<short-sha>` and `latest`.
-- Update the Helm chart repo with the new image digest.
+- Update deployment state according to the configured deployment model.
 
 Name the workflow file `deploy-api.yml` (or keep `deploy-web.yml` if there is only one service).
 
@@ -129,7 +131,7 @@ Grant `packages: write` to the build job for GHCR. Remove it for Docker Hub.
 | `GITHUB_TOKEN` | GHCR push (automatic) |
 | `DOCKERHUB_USERNAME` | Docker Hub push |
 | `DOCKERHUB_TOKEN` | Docker Hub push |
-| `HELM_CHART_REPO_TOKEN` | Helm chart repo write access |
+| `DEPLOYMENT_STATE_REPO_TOKEN` | External deployment state or GitOps repo write access |
 
 ## README Badge
 

@@ -46,7 +46,8 @@ describe('parseArgs', () => {
       force: false,
       patch: false,
       yes: false,
-      taskSystem: ''
+      taskSystem: '',
+      deploymentModel: ''
     });
   });
 
@@ -70,7 +71,8 @@ describe('parseArgs', () => {
       force: false,
       patch: false,
       yes: false,
-      taskSystem: ''
+      taskSystem: '',
+      deploymentModel: ''
     });
   });
 
@@ -97,7 +99,8 @@ describe('parseArgs', () => {
       force: false,
       patch: false,
       yes: false,
-      taskSystem: ''
+      taskSystem: '',
+      deploymentModel: ''
     });
   });
 
@@ -125,7 +128,37 @@ describe('parseArgs', () => {
       force: false,
       patch: false,
       yes: true,
-      taskSystem: 'jira'
+      taskSystem: 'jira',
+      deploymentModel: ''
+    });
+  });
+
+  test('parses --deployment-model flag', () => {
+    expect(
+      parseArgs([
+        'node',
+        'ballast-typescript',
+        'install',
+        '--target',
+        'cursor',
+        '--agent',
+        'publishing',
+        '--deployment-model',
+        'kubernetes',
+        '--yes'
+      ])
+    ).toEqual({
+      targets: ['cursor'],
+      agents: ['publishing'],
+      skills: [],
+      language: 'typescript',
+      all: false,
+      allSkills: false,
+      force: false,
+      patch: false,
+      yes: true,
+      taskSystem: '',
+      deploymentModel: 'kubernetes'
     });
   });
 });

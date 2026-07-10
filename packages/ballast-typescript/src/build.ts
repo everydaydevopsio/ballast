@@ -16,6 +16,7 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
 const GIT_HOOKS_GUIDANCE_TOKEN = '{{BALLAST_GIT_HOOKS_GUIDANCE}}';
 const GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = '{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}';
+const DEPLOYMENT_MODEL_GUIDANCE_TOKEN = '{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}';
 const BALLAST_REPO_URL = 'https://github.com/everydaydevopsio/ballast';
 const BALLAST_MANAGED_COMMENT = `<!-- Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section. -->`;
 
@@ -241,6 +242,98 @@ function applyHookGuidance(
   );
 }
 
+function renderDeploymentModelGuidance(options?: BuildOptions): string {
+  const deploymentModel = options?.variables?.deploymentModel ?? 'none';
+  switch (deploymentModel) {
+    case 'kubernetes':
+      return [
+        '## Kubernetes: Local Helm Chart + External ArgoCD GitOps',
+        '',
+        'Use this model when the app deploys to Kubernetes and GitOps reconciles runtime state.',
+        '',
+        '- Application repository ownership:',
+        '  - keep the Helm chart in `charts/<app>/` in the application repository',
+        '  - keep reusable chart defaults in `charts/<app>/values.yaml`',
+        '  - keep chart templates, probes, service, ingress, and workload manifests with the app code they deploy',
+        '  - publish container images to GHCR or Docker Hub and capture the immutable image digest',
+        '- GitOps repository ownership:',
+        '  - keep ArgoCD `Application` or `ApplicationSet` configuration in a separate GitOps repository',
+        '  - keep environment-specific ArgoCD sources, destinations, sync policy, and promotion rules there',
+        '  - keep environment-specific values files in the GitOps repo when environments differ by cluster, namespace, domain, secret reference, or scaling policy',
+        '- CI/CD flow:',
+        '  - build, test, and publish the app image from the application repository',
+        '  - update `charts/<app>/` in the app repo only when chart templates or defaults change',
+        '  - update the GitOps repository when an environment should point at a new image tag or digest',
+        '  - prefer digest pinning for production deployments and include the image tag for human traceability',
+        '  - use a fine-grained token or GitHub App credential scoped only to the GitOps repository',
+        '- Do not move the Helm chart to the GitOps repo just to update image references. Keep chart ownership with the app and environment ownership with GitOps.'
+      ].join('\n');
+    case 'serverless':
+      return [
+        '## Serverless Deployment Model',
+        '',
+        'Use this model for managed function or container platforms such as AWS Lambda, Cloud Run, Azure Functions, or equivalent services.',
+        '',
+        '- Keep infrastructure definitions or platform manifests close to the service unless the team has a dedicated infra repository.',
+        '- Build immutable artifacts before deployment and promote the same artifact between preview, staging, and production when the platform supports it.',
+        '- Use least-privilege OIDC or scoped deploy credentials; do not store long-lived cloud keys in the repository.',
+        '- Keep environment variables and secrets in the platform secret manager, not in generated workflow files.',
+        '- Include smoke checks after deploy that hit a health endpoint, function URL, or representative invocation.',
+        '- Document rollback as reverting the deployed version, alias, revision, or traffic split.'
+      ].join('\n');
+    case 'server':
+      return [
+        '## Server Deployment Model',
+        '',
+        'Use this model for self-managed VM, VPS, or bare-metal deployments.',
+        '',
+        '- Build a versioned artifact or container image in CI; do not build production artifacts manually on the server.',
+        '- Deploy through a repeatable script or workflow that transfers the artifact, updates configuration, restarts the service manager, and verifies health.',
+        '- Use `systemd`, Docker Compose, Nomad, or the existing service manager consistently and document the owner.',
+        '- Keep secrets outside the repo in the server secret store, environment manager, or deployment platform.',
+        '- Include health checks and rollback steps for the previous artifact or image digest.',
+        '- Avoid SSH commands that mutate production without logging the artifact version and result.'
+      ].join('\n');
+    case 'hosted':
+      return [
+        '## Hosted App Platform Deployment Model',
+        '',
+        'Use this model for hosted platforms such as Vercel, Netlify, Render, Railway, Fly.io, or similar app platforms.',
+        '',
+        '- Keep platform configuration in the app repo when the platform supports checked-in config files.',
+        '- Keep environment variables and secrets in the hosted platform, not in generated workflows.',
+        '- Use preview deployments for pull requests when the platform supports them.',
+        '- Promote to production from protected branches, release tags, or explicit platform promotion controls.',
+        '- Run smoke checks against the deployed preview or production URL before marking deployment complete.',
+        '- Document platform ownership, project name, production URL, and rollback procedure.'
+      ].join('\n');
+    case 'none':
+    default:
+      return [
+        '## Deployment Model',
+        '',
+        'No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.'
+      ].join('\n');
+  }
+}
+
+function applyDeploymentModelGuidance(
+  content: string,
+  agentId: string,
+  options?: BuildOptions
+): string {
+  if (
+    agentId !== 'publishing' ||
+    !content.includes(DEPLOYMENT_MODEL_GUIDANCE_TOKEN)
+  ) {
+    return content;
+  }
+  return content.replaceAll(
+    DEPLOYMENT_MODEL_GUIDANCE_TOKEN,
+    renderDeploymentModelGuidance(options)
+  );
+}
+
 /** Rule file convention: content.md (main) and content-<suffix>.md (e.g. content-mcp.md) */
 const CONTENT_PREFIX = 'content';
 const CONTENT_MAIN = `${CONTENT_PREFIX}.md`;
@@ -302,7 +395,11 @@ export function getContent(
       raw = raw.replaceAll(`{{${key}}}`, value);
     }
   }
-  return applyHookGuidance(raw, agentId, language, options);
+  return applyDeploymentModelGuidance(
+    applyHookGuidance(raw, agentId, language, options),
+    agentId,
+    options
+  );
 }
 
 /**

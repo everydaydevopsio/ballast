@@ -2047,6 +2047,107 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(raw.targets).toEqual(['cursor', 'claude']);
     });
 
+    test('defaults deploymentModel to none for non-interactive publishing installs', async () => {
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['publishing'],
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.deploymentModel).toBe('none');
+    });
+
+    test('stores explicit deploymentModel for publishing installs', async () => {
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['publishing'],
+        deploymentModel: 'kubernetes',
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.deploymentModel).toBe('kubernetes');
+      expect(
+        fs.readFileSync(
+          path.join(tmpDir, '.codex', 'rules', 'publishing-apps.md'),
+          'utf8'
+        )
+      ).toContain('charts/<app>/');
+    });
+
+    test('rejects invalid deploymentModel values', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['publishing'],
+        deploymentModel: 'kuberntes',
+        yes: true
+      });
+
+      expect(exitCode).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Invalid --deployment-model value: "kuberntes". Valid values: none, kubernetes, serverless, server, hosted'
+      );
+    });
+
+    test('prompts for deploymentModel when publishing is selected interactively', async () => {
+      const answers = ['codex', 'publishing', '', 'hosted'];
+      const createInterfaceSpy = jest
+        .spyOn(readline, 'createInterface')
+        .mockImplementation(
+          () =>
+            ({
+              question: (_prompt: string, cb: (answer: string) => void) =>
+                cb(answers.shift() ?? ''),
+              close: () => {}
+            }) as unknown as readline.Interface
+        );
+
+      const exitCode = await runInstall({ projectRoot: tmpDir });
+
+      expect(exitCode).toBe(0);
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.deploymentModel).toBe('hosted');
+      createInterfaceSpy.mockRestore();
+    });
+
+    test('preserves existing deploymentModel when adding another agent', async () => {
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['publishing'],
+          deploymentModel: 'serverless'
+        },
+        tmpDir
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['docs'],
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.deploymentModel).toBe('serverless');
+    });
+
     test('writes files to correct locations for given target', async () => {
       const exitCode = await runInstall({
         projectRoot: tmpDir,

@@ -49,6 +49,8 @@ SKILLS_BY_LANGUAGE = {
 }
 GIT_HOOKS_GUIDANCE_TOKEN = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
 GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
+DEPLOYMENT_MODEL_GUIDANCE_TOKEN = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
+DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "hosted"]
 
 
 def with_implicit_agents(agents: list[str]) -> list[str]:
@@ -259,6 +261,8 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
             return None
         ballast_version_value = data.get("ballastVersion")
         skills = data.get("skills")
+        task_system = data.get("taskSystem")
+        deployment_model = data.get("deploymentModel")
         return {
             "targets": targets,
             "agents": agents,
@@ -282,6 +286,12 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
             }
             if isinstance(data.get("paths"), dict)
             else {},
+            "taskSystem": task_system if isinstance(task_system, str) else None,
+            "deploymentModel": (
+                deployment_model.strip().lower()
+                if isinstance(deployment_model, str)
+                else None
+            ),
         }
     except Exception:
         return None
@@ -293,10 +303,13 @@ def save_config(
     target: str | list[str],
     agents: list[str],
     skills: list[str] | None = None,
+    deployment_model: str | None = None,
 ) -> None:
     file_path = root / rulesrc_filename(language)
     languages: list[str] = []
     paths: dict[str, list[str]] = {}
+    task_system: str | None = None
+    existing_deployment_model: str | None = None
     if file_path.exists():
         try:
             raw = json.loads(file_path.read_text(encoding="utf-8"))
@@ -315,6 +328,10 @@ def save_config(
                             and all(isinstance(item, str) for item in value)
                         ):
                             paths[key] = list(value)
+                if isinstance(raw.get("taskSystem"), str):
+                    task_system = raw["taskSystem"]
+                if isinstance(raw.get("deploymentModel"), str):
+                    existing_deployment_model = raw["deploymentModel"].strip().lower()
         except (OSError, json.JSONDecodeError):
             # Invalid/unreadable existing config should fall back to defaults
             # while preserving current save behavior.
@@ -327,19 +344,32 @@ def save_config(
             paths[item] = ["."]
 
     targets = normalize_target_tokens(target)
+    normalized_deployment_model = (
+        (deployment_model or existing_deployment_model or "").strip().lower()
+    )
+    if (
+        normalized_deployment_model
+        and normalized_deployment_model not in DEPLOYMENT_MODELS
+    ):
+        raise ValueError(
+            "invalid deploymentModel "
+            f"{normalized_deployment_model!r}; use one of: {', '.join(DEPLOYMENT_MODELS)}"
+        )
+    payload: dict[str, object] = {
+        "targets": targets,
+        "agents": agents,
+        "skills": skills or [],
+        "ballastVersion": ballast_version(),
+        "languages": languages,
+        "paths": paths,
+    }
+    if task_system:
+        payload["taskSystem"] = task_system
+    if normalized_deployment_model:
+        payload["deploymentModel"] = normalized_deployment_model
 
     file_path.write_text(
-        json.dumps(
-            {
-                "targets": targets,
-                "agents": agents,
-                "skills": skills or [],
-                "ballastVersion": ballast_version(),
-                "languages": languages,
-                "paths": paths,
-            },
-            indent=2,
-        ),
+        json.dumps(payload, indent=2),
         encoding="utf-8",
     )
 
@@ -482,6 +512,7 @@ def build_doctor_report(
         languages = config.get("languages")
         paths = config.get("paths")
         task_system = config.get("taskSystem")
+        deployment_model = config.get("deploymentModel")
         if isinstance(targets, list) and all(
             isinstance(target, str) for target in targets
         ):
@@ -513,6 +544,8 @@ def build_doctor_report(
                 lines.append(f"- paths: {formatted_paths}")
         if isinstance(task_system, str) and task_system.strip():
             lines.append(f"- taskSystem: {task_system}")
+        if isinstance(deployment_model, str) and deployment_model.strip():
+            lines.append(f"- deploymentModel: {deployment_model}")
 
     lines.extend(["", "Recommendations:"])
     if recommendations:
@@ -743,6 +776,59 @@ def apply_hook_template_variables(
     )
 
 
+def normalize_deployment_model(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def render_deployment_model_guidance(deployment_model: str | None) -> str:
+    match normalize_deployment_model(deployment_model):
+        case "kubernetes":
+            lines = [
+                "Kubernetes deployment model:",
+                "- Treat app deployment ownership as Kubernetes-native unless repo docs say otherwise.",
+                "- Keep application Helm charts in the app repository under `charts/<app>/` with chart tests and schema validation.",
+                "- Keep ArgoCD `Application` or `ApplicationSet` resources, environment values, and promotion state in the configured GitOps repository.",
+                "- CI should publish immutable images and charts; GitOps changes should promote those versions by environment.",
+            ]
+        case "serverless":
+            lines = [
+                "Serverless deployment model:",
+                "- Treat deployable apps as functions, jobs, queues, event rules, and managed cloud resources.",
+                "- Keep infrastructure definitions close to the owning service unless the repo documents a shared infrastructure boundary.",
+                "- CI should package immutable artifacts, run provider validation, and promote environment-specific configuration explicitly.",
+            ]
+        case "server":
+            lines = [
+                "Self-managed server deployment model:",
+                "- Treat deployable apps as services on provisioned hosts, VMs, or bare-metal servers.",
+                "- Keep systemd, process manager, reverse proxy, secrets, and rollback instructions aligned with the runtime environment.",
+                "- CI should build immutable artifacts and deployment automation should perform health checks before traffic cutover.",
+            ]
+        case "hosted":
+            lines = [
+                "Hosted platform deployment model:",
+                "- Treat deployable apps as hosted-platform workloads such as Vercel, Netlify, Railway, Render, Fly.io, or similar services.",
+                "- Keep provider configuration, environment variables, preview environments, and production promotion rules documented with the app.",
+                "- CI should validate builds and let the hosted platform own rollout mechanics unless the repo defines a separate release gate.",
+            ]
+        case _:
+            lines = [
+                "No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.",
+            ]
+    return "\n".join(lines)
+
+
+def apply_deployment_model_guidance(
+    content: str, agent: str, deployment_model: str | None
+) -> str:
+    if agent != "publishing" or DEPLOYMENT_MODEL_GUIDANCE_TOKEN not in content:
+        return content
+    return content.replace(
+        DEPLOYMENT_MODEL_GUIDANCE_TOKEN,
+        render_deployment_model_guidance(deployment_model),
+    )
+
+
 def read_template(agent: str, language: str, filename: str, suffix: str = "") -> str:
     base, ext = filename.rsplit(".", 1)
     if suffix:
@@ -776,10 +862,19 @@ def render_gemini_mandates() -> str:
 
 
 def build_content(
-    agent: str, target: str, language: str, suffix: str = "", root: Path | None = None
+    agent: str,
+    target: str,
+    language: str,
+    suffix: str = "",
+    root: Path | None = None,
+    deployment_model: str | None = None,
 ) -> str:
-    body = apply_hook_guidance(
-        read_content(agent, language, suffix), agent, language, root
+    body = apply_deployment_model_guidance(
+        apply_hook_guidance(
+            read_content(agent, language, suffix), agent, language, root
+        ),
+        agent,
+        deployment_model,
     )
     if target == "cursor":
         return (
@@ -1536,6 +1631,35 @@ def prompt_skills(language: str) -> list[str]:
     return prompt_skills(language)
 
 
+def prompt_deployment_model() -> str:
+    value = prompt(
+        "Deployment model for publishing apps "
+        f"[{', '.join(DEPLOYMENT_MODELS)}] (default: none): "
+    )
+    normalized = normalize_deployment_model(value)
+    if not normalized:
+        return "none"
+    if normalized in DEPLOYMENT_MODELS:
+        return normalized
+    print(f"Invalid deployment model. Choose one of: {', '.join(DEPLOYMENT_MODELS)}")
+    return prompt_deployment_model()
+
+
+def resolve_deployment_model_for_publishing(
+    current: str | None, non_interactive: bool
+) -> str:
+    normalized = normalize_deployment_model(current)
+    if normalized:
+        if normalized not in DEPLOYMENT_MODELS:
+            raise ValueError(
+                f"invalid deploymentModel {normalized!r}; use one of: {', '.join(DEPLOYMENT_MODELS)}"
+            )
+        return normalized
+    if non_interactive:
+        return "none"
+    return prompt_deployment_model()
+
+
 def resolve_requested_targets(raw: object) -> list[str]:
     if raw is None:
         return []
@@ -1548,7 +1672,7 @@ def resolve_requested_targets(raw: object) -> list[str]:
 
 def resolve_target_and_agents(
     args: argparse.Namespace, root: Path, language: str
-) -> tuple[list[str], list[str], list[str]] | None:
+) -> tuple[list[str], list[str], list[str], str | None] | None:
     cfg = load_config(root, language)
     ci = is_ci_mode() or bool(args.yes)
 
@@ -1563,6 +1687,16 @@ def resolve_target_and_agents(
         if (getattr(args, "skill", None) or bool(getattr(args, "all_skills", False)))
         else None
     )
+    deployment_model_from_flag = normalize_deployment_model(
+        getattr(args, "deployment_model", "")
+    )
+    if (
+        deployment_model_from_flag
+        and deployment_model_from_flag not in DEPLOYMENT_MODELS
+    ):
+        raise ValueError(
+            f"Invalid --deployment-model. Use: {', '.join(DEPLOYMENT_MODELS)}"
+        )
 
     if (
         cfg
@@ -1570,10 +1704,17 @@ def resolve_target_and_agents(
         and agents_from_flag is None
         and skills_from_flag is None
     ):
+        agents = with_implicit_agents(list(cfg["agents"]))
+        deployment_model = normalize_deployment_model(cfg.get("deploymentModel"))
+        if "publishing" in agents:
+            deployment_model = resolve_deployment_model_for_publishing(
+                deployment_model, ci
+            )
         return (
             list(cfg["targets"]),
-            with_implicit_agents(list(cfg["agents"])),
+            agents,
             list(cfg.get("skills") or []),
+            deployment_model,
         )
 
     targets = target_from_flag or (list(cfg["targets"]) if cfg else None)
@@ -1587,9 +1728,16 @@ def resolve_target_and_agents(
         if skills_from_flag is not None
         else (list(cfg.get("skills") or []) if cfg else [])
     )
+    deployment_model = deployment_model_from_flag or (
+        normalize_deployment_model(cfg.get("deploymentModel")) if cfg else ""
+    )
 
     if targets and ((agents and len(agents) > 0) or len(skills) > 0):
-        return targets, agents or [], skills
+        if agents and "publishing" in agents:
+            deployment_model = resolve_deployment_model_for_publishing(
+                deployment_model, ci
+            )
+        return targets, agents or [], skills, deployment_model
 
     if ci:
         return None
@@ -1597,7 +1745,9 @@ def resolve_target_and_agents(
     resolved_targets = targets if targets else prompt_targets()
     resolved_agents = agents if agents and len(agents) > 0 else prompt_agents(language)
     resolved_skills = skills if skills else prompt_skills(language)
-    return resolved_targets, resolved_agents, resolved_skills
+    if "publishing" in resolved_agents:
+        deployment_model = resolve_deployment_model_for_publishing(deployment_model, ci)
+    return resolved_targets, resolved_agents, resolved_skills, deployment_model
 
 
 def install(
@@ -1612,6 +1762,7 @@ def install(
     patch_claude_md: bool = False,
     patch_gemini_md: bool = False,
     skip_support_files: set[str] | None = None,
+    deployment_model: str | None = None,
 ) -> InstallResult:
     result = InstallResult()
     agents = with_implicit_agents(agents)
@@ -1626,7 +1777,7 @@ def install(
         result.errors.append(("gitignore", str(err)))
 
     if persist:
-        save_config(root, language, target, agents, skills)
+        save_config(root, language, target, agents, skills, deployment_model)
 
     config_for_support_files = load_config(root, language)
     support_agents = with_implicit_agents(
@@ -1654,7 +1805,9 @@ def install(
             for suffix in list_rule_suffixes(agent, language):
                 basename = rule_basename(agent, language, suffix)
                 dst = destination(root, target, basename)
-                content = build_content(agent, target, language, suffix, root)
+                content = build_content(
+                    agent, target, language, suffix, root, deployment_model
+                )
                 if dst.exists() and not force and not patch:
                     agent_skipped = True
                     agent_processed = True
@@ -1798,11 +1951,12 @@ def install_for_targets(
     persist: bool,
     patch_claude_md: bool = False,
     patch_gemini_md: bool = False,
+    deployment_model: str | None = None,
 ) -> list[tuple[str, InstallResult]]:
     results: list[tuple[str, InstallResult]] = []
     agents = with_implicit_agents(agents)
     if persist:
-        save_config(root, language, targets, agents, skills)
+        save_config(root, language, targets, agents, skills, deployment_model)
 
     for target in targets:
         results.append(
@@ -1819,6 +1973,7 @@ def install_for_targets(
                     False,
                     patch_claude_md,
                     patch_gemini_md,
+                    deployment_model=deployment_model,
                 ),
             )
         )
@@ -1876,7 +2031,11 @@ def run_install(args: argparse.Namespace) -> int:
         return 1
 
     root = resolve_project_root(Path.cwd())
-    resolved = resolve_target_and_agents(args, root, language)
+    try:
+        resolved = resolve_target_and_agents(args, root, language)
+    except ValueError as err:
+        print(err)
+        return 1
     if not resolved:
         print(
             "In CI/non-interactive mode (--yes or CI env), --target and at least one of --agent/--all or --skill/--all-skills are required when config is missing."
@@ -1886,7 +2045,11 @@ def run_install(args: argparse.Namespace) -> int:
         )
         return 1
 
-    targets, agents, skills = resolved
+    if len(resolved) == 3:
+        targets, agents, skills = resolved
+        deployment_model = None
+    else:
+        targets, agents, skills, deployment_model = resolved
     if any(target not in TARGETS for target in targets):
         print(f"Invalid --target. Use: {', '.join(TARGETS)}")
         return 1
@@ -1920,7 +2083,14 @@ def run_install(args: argparse.Namespace) -> int:
         support_decisions[target] = skipped_support_file
 
     per_target_results: list[tuple[str, InstallResult]] = []
-    save_config(root, language, targets, with_implicit_agents(agents), skills)
+    save_config(
+        root,
+        language,
+        targets,
+        with_implicit_agents(agents),
+        skills,
+        deployment_model,
+    )
     for target in targets:
         skipped_support_file = support_decisions.get(target)
         if skipped_support_file:
@@ -1942,6 +2112,7 @@ def run_install(args: argparse.Namespace) -> int:
                     patch_claude_md,
                     patch_gemini_md,
                     {skipped_support_file} if skipped_support_file else None,
+                    deployment_model,
                 ),
             )
         )
@@ -1997,6 +2168,11 @@ def parser() -> argparse.ArgumentParser:
     install_cmd.add_argument("--skill", "-s")
     install_cmd.add_argument("--all", action="store_true")
     install_cmd.add_argument("--all-skills", action="store_true")
+    install_cmd.add_argument(
+        "--deployment-model",
+        choices=DEPLOYMENT_MODELS,
+        help="Deployment model for publishing apps",
+    )
     install_cmd.add_argument(
         "--force",
         "-f",
