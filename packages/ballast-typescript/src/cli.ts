@@ -28,6 +28,14 @@ export type ParseArgsResult =
   | { doctor: true }
   | { list: true };
 
+function readFlagValue(args: string[], index: number, flag: string): string {
+  const value = args[index + 1];
+  if (!value || value.startsWith('-')) {
+    throw new Error(`Missing value for ${flag}`);
+  }
+  return value;
+}
+
 export function parseArgs(argv: string[]): ParseArgsResult {
   const args = argv.slice(2);
   const command = args[0];
@@ -54,39 +62,33 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   while (i < args.length) {
     const arg = args[i];
     if (arg === '--target' || arg === '-t') {
-      const value = args[++i];
-      if (value) {
-        options.targets = options.targets.concat(
-          value.split(',').map((s) => s.trim())
-        );
-      }
-      i++;
+      const value = readFlagValue(args, i, arg);
+      options.targets = options.targets.concat(
+        value.split(',').map((s) => s.trim())
+      );
+      i += 2;
       continue;
     }
     if (arg === '--agent' || arg === '-a') {
-      const value = args[++i];
-      if (value) {
-        options.agents = options.agents.concat(
-          value.split(',').map((s) => s.trim())
-        );
-      }
-      i++;
+      const value = readFlagValue(args, i, arg);
+      options.agents = options.agents.concat(
+        value.split(',').map((s) => s.trim())
+      );
+      i += 2;
       continue;
     }
     if (arg === '--language' || arg === '-l') {
-      const value = args[++i];
-      if (value) options.language = value.trim().toLowerCase();
-      i++;
+      const value = readFlagValue(args, i, arg);
+      options.language = value.trim().toLowerCase();
+      i += 2;
       continue;
     }
     if (arg === '--skill' || arg === '-s') {
-      const value = args[++i];
-      if (value) {
-        options.skills = options.skills.concat(
-          value.split(',').map((s) => s.trim())
-        );
-      }
-      i++;
+      const value = readFlagValue(args, i, arg);
+      options.skills = options.skills.concat(
+        value.split(',').map((s) => s.trim())
+      );
+      i += 2;
       continue;
     }
     if (arg === '--all') {
@@ -115,21 +117,21 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       continue;
     }
     if (arg === '--task-system') {
-      const value = args[++i];
-      if (value) options.taskSystem = value.trim().toLowerCase();
-      i++;
+      const value = readFlagValue(args, i, arg);
+      options.taskSystem = value.trim().toLowerCase();
+      i += 2;
       continue;
     }
     if (arg === '--deployment-model') {
-      const value = args[++i];
-      if (value) options.deploymentModel = value.trim().toLowerCase();
-      i++;
+      const value = readFlagValue(args, i, arg);
+      options.deploymentModel = value.trim().toLowerCase();
+      i += 2;
       continue;
     }
     if (arg === '--repository-facts-file') {
-      const value = args[++i];
-      if (value) options.repositoryFactsFile = value.trim();
-      i++;
+      const value = readFlagValue(args, i, arg);
+      options.repositoryFactsFile = value.trim();
+      i += 2;
       continue;
     }
     if (arg === '--help' || arg === '-h') {

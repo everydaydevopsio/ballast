@@ -161,4 +161,36 @@ describe('parseArgs', () => {
       deploymentModel: 'kubernetes'
     });
   });
+
+  test('rejects missing --task-system value', () => {
+    expect(() =>
+      parseArgs([
+        'node',
+        'ballast-typescript',
+        'install',
+        '--target',
+        'cursor',
+        '--agent',
+        'tasks',
+        '--task-system',
+        '--yes'
+      ])
+    ).toThrow('Missing value for --task-system');
+  });
+
+  test('rejects missing --deployment-model value', () => {
+    expect(() =>
+      parseArgs([
+        'node',
+        'ballast-typescript',
+        'install',
+        '--target',
+        'cursor',
+        '--agent',
+        'publishing',
+        '--deployment-model',
+        '--yes'
+      ])
+    ).toThrow('Missing value for --deployment-model');
+  });
 });
