@@ -3897,6 +3897,60 @@ func TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend(t *testing.T) {
 	}
 }
 
+// TestRunMonorepoInstallPreservesDeploymentModelWrittenByBackend asserts that a
+// deploymentModel value written to .rulesrc.json by a backend invocation is not
+// clobbered by the final saveMonorepoConfig call.
+func TestRunMonorepoInstallPreservesDeploymentModelWrittenByBackend(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["cursor"],
+  "agents": ["publishing", "linting"],
+  "languages": ["typescript"],
+  "paths": {"typescript": ["apps/frontend"]}
+}`)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	callCount := 0
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		callCount++
+		// Simulate the common backend invocation writing deploymentModel after
+		// prompting/defaulting the user.
+		if callCount == 1 {
+			mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["cursor"],
+  "agents": ["publishing", "linting"],
+  "deploymentModel": "hosted",
+  "languages": ["typescript"],
+  "paths": {"typescript": ["apps/frontend"]}
+}`)
+		}
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--target", "cursor", "--all", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	if !strings.Contains(string(config), `"deploymentModel": "hosted"`) {
+		t.Fatalf("expected deploymentModel to be preserved in final .rulesrc.json, got %q", string(config))
+	}
+}
+
 // TestRunMonorepoInstallPreservesTaskSystemFromExistingConfig asserts that a
 // taskSystem already present in .rulesrc.json before the install runs is
 // carried through into the final saved config.

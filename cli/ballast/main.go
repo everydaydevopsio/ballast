@@ -311,6 +311,9 @@ func run(args []string) int {
 			if plan.Config.TaskSystem == "" {
 				plan.Config.TaskSystem = readTaskSystem(root)
 			}
+			if plan.Config.DeploymentModel == "" {
+				plan.Config.DeploymentModel = readDeploymentModel(root)
+			}
 			if err := saveMonorepoConfig(root, plan.Config); err != nil {
 				fmt.Println(err)
 				return 1
@@ -2439,6 +2442,27 @@ func readTaskSystem(root string) string {
 		return ""
 	}
 	return raw.TaskSystem
+}
+
+// readDeploymentModel reads only the deploymentModel field from .rulesrc.json.
+// It does not validate Languages/Paths so it works on configs written by a
+// single-language backend invocation during a fresh monorepo install.
+func readDeploymentModel(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		return ""
+	}
+	var raw struct {
+		DeploymentModel string `json:"deploymentModel"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return ""
+	}
+	value := strings.ToLower(strings.TrimSpace(raw.DeploymentModel))
+	if !slices.Contains(supportedDeploymentModels, value) {
+		return ""
+	}
+	return value
 }
 
 func saveMonorepoConfig(root string, config monorepoConfig) error {
