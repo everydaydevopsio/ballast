@@ -14,7 +14,11 @@ assert_husky_rule() {
   local path="$1"
   assert_contains "Use Husky for TypeScript-only repositories." "${path}"
   assert_contains "lint-staged" "${path}"
+  assert_contains ".yaml" "${path}"
+  assert_contains ".yml" "${path}"
   assert_contains ".husky/pre-push" "${path}"
+  assert_contains "package-manager test command" "${path}"
+  assert_contains "build or typecheck" "${path}"
   assert_not_contains ".pre-commit-config.yaml" "${path}"
   assert_not_contains "pre-commit install" "${path}"
 }

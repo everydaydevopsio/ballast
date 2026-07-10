@@ -104,6 +104,25 @@ describe('build', () => {
       expect(content).toContain('Read-only investigation');
     });
 
+    test('returns Copilot review loop guidance for local-dev PR workflow', () => {
+      const content = getContent('local-dev', 'env');
+      expect(content).toContain(
+        'After PR creation and every push, poll Copilot and human review comments until the PR is ready.'
+      );
+      expect(content).toContain(
+        'Before changes, summarize actionable Copilot asks and related human-review asks.'
+      );
+      expect(content).toContain(
+        'Reply directly on addressed Copilot and human comments; resolve addressed review threads when supported.'
+      );
+      expect(content).toContain(
+        'Stop only when required checks are green and no unresolved actionable Copilot or human review comments remain.'
+      );
+      expect(content).toContain('gh pr checks');
+      expect(content).toContain('gh pr view');
+      expect(content).toContain('GitHub MCP');
+    });
+
     test('returns mcp content for local-dev with ruleSuffix mcp', () => {
       const content = getContent('local-dev', 'mcp');
       expect(content).toContain('tasks');
@@ -191,6 +210,18 @@ describe('build', () => {
       expect(content).toContain('one critical user workflow');
     });
 
+    test('returns Python testing content with web smoke and E2E placement guidance', () => {
+      const content = getContent('testing', undefined, 'python');
+      expect(content).toContain('web smoke test');
+      expect(content).toContain('live route or health endpoint');
+      expect(content).toContain(
+        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+      );
+      expect(content).toContain(
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
+      );
+    });
+
     test('returns CLI publishing content with packaged-command smoke guidance', () => {
       const content = getContent('publishing', 'cli');
       expect(content).toContain('packaged-command smoke');
@@ -243,7 +274,13 @@ describe('build', () => {
         hookMode: 'husky'
       });
       expect(content).toContain('Use Husky for TypeScript-only repositories.');
+      expect(content).toContain('.yaml');
+      expect(content).toContain('.yml');
+      expect(content).toContain('lint-staged');
+      expect(content).toContain('repo formatter');
       expect(content).toContain('.husky/pre-push');
+      expect(content).toContain('package-manager test command');
+      expect(content).toContain('build or typecheck');
       expect(content).not.toContain('pre-commit install');
     });
 
@@ -441,6 +478,15 @@ describe('build', () => {
         'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
       );
 
+      const pythonTesting = buildCodexFormat('testing', undefined, 'python');
+      expect(pythonTesting).toContain('web smoke test');
+      expect(pythonTesting).toContain(
+        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+      );
+      expect(pythonTesting).toContain(
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
+      );
+
       const publishingCli = buildCodexFormat('publishing', 'cli');
       expect(publishingCli).toContain('packaged-command smoke');
       expect(publishingCli).toContain('--help');
@@ -592,7 +638,11 @@ alwaysApply: false
       );
       expect(result).toContain('Use Husky for TypeScript-only repositories.');
       expect(result).toContain('npx lint-staged');
+      expect(result).toContain('.yaml');
+      expect(result).toContain('.yml');
       expect(result).toContain('.husky/pre-push');
+      expect(result).toContain('package-manager test command');
+      expect(result).toContain('build or typecheck');
       expect(result).not.toContain('pre-commit install');
     });
 

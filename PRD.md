@@ -82,6 +82,31 @@ Ballast-generated rule files for persistent agent context have accumulated large
 7. Root `.rulesrc.json` includes `claude` and `codex` so tracked generated artifacts for both targets can be refreshed by config-driven installs.
 8. `AGENTS.md` documents that PRs touching Ballast generator inputs or target policy must include regenerated local `.claude` and `.codex` artifacts.
 
+## TypeScript Husky Git Hook Guidance
+
+### Problem
+
+TypeScript-only repositories use Husky instead of `pre-commit`, but the generated Husky guidance does not explicitly require YAML formatting checks for both `.yaml` and `.yml` files or a tracked push-time test hook. YAML-heavy configuration such as GitHub Actions, Dependabot, Docker Compose, and Helm can drift outside TypeScript checks, and developers can push changes before the repo's canonical tests run.
+
+### Requirements
+
+1. TypeScript-only `git-hooks` guidance must use Husky and `lint-staged` or the repository's equivalent fast formatter/linter path for commit-time checks.
+2. TypeScript-only Husky pre-commit guidance must explicitly include both `.yaml` and `.yml` formatting checks.
+3. TypeScript-only Husky guidance must prefer the repository's existing formatter or linter command when one is already established.
+4. TypeScript-only Husky guidance must configure `.husky/pre-push` to run the detected or canonical package-manager test command.
+5. TypeScript-only Husky guidance must run the repository's required build or typecheck command before tests when that is the repo convention.
+6. Pre-commit must remain fast; heavier build, typecheck, and unit test work belongs in `pre-push`.
+7. Multi-language and non-TypeScript git-hook guidance must continue using `pre-commit` without inheriting Husky-specific instructions.
+8. Documentation must explain the TypeScript-only split between Husky pre-commit formatting and Husky pre-push tests.
+
+### Acceptance Criteria
+
+1. Generated TypeScript-only Husky `git-hooks` content mentions `.yaml` and `.yml` explicitly.
+2. Generated TypeScript-only Husky `git-hooks` content mentions `lint-staged` or the repo formatter/linter as the fast pre-commit path.
+3. Generated TypeScript-only Husky `git-hooks` content mentions `.husky/pre-push`, the package-manager test command, and build/typecheck before tests when the repo convention requires it.
+4. Multi-language TypeScript output continues to mention `.pre-commit-config.yaml` and `pre-commit install --hook-type pre-push`, and does not mention Husky or `lint-staged`.
+5. Unit and E2E coverage assert the Husky YAML/YML and pre-push guidance.
+
 ## Skill Patch Support And Support File Force Confirmation
 
 ### Problem
@@ -269,3 +294,27 @@ Ballast scaffolds `AGENTS.md` and `CLAUDE.md` with a `Repository Facts` section,
 3. Given missing signals, generated support files retain placeholder markers for undetected fields.
 4. TypeScript, Python, and Go backends accept `--repository-facts-file` and honor `BALLAST_REPOSITORY_FACTS_FILE` when present.
 5. E2E coverage verifies populated repository facts in generated support files.
+
+## PR Review Loop Guidance
+
+### Problem
+
+Ballast-generated local-development rules treat PR hygiene as part of the agent workflow, but they do not explicitly require agents to keep checking Copilot review feedback after PR creation and subsequent pushes. Agents can miss follow-up Copilot comments or mark work complete without replying directly on addressed review threads, leaving unresolved PR feedback for operators to clean up manually.
+
+### Requirements
+
+1. Generated local-development PR workflow guidance must instruct agents to poll for Copilot review comments after PR creation.
+2. Generated local-development PR workflow guidance must instruct agents to poll again after each push that updates an open PR.
+3. Agents must summarize actionable Copilot review asks before making code changes.
+4. Agents must reply directly on every Copilot review thread or comment they address, and must resolve addressed review threads when the review system supports thread resolution.
+5. The same review loop must remain compatible with human reviewer comments; Copilot-specific guidance must not cause agents to ignore human review feedback.
+6. The stop condition for PR readiness must be explicit: required checks are green and there are no unresolved actionable Copilot or human review comments.
+7. Generated guidance must include concrete command examples using `gh` or GitHub MCP tools where available.
+
+### Acceptance Criteria
+
+1. Generated local-development rule output tells agents to check Copilot comments repeatedly during PR readiness work.
+2. Generated local-development rule output requires direct per-thread replies and supported review-thread resolution for addressed Copilot comments.
+3. Generated local-development rule output defines the stop condition for the review loop.
+4. Generated local-development rule output says the workflow also applies to human review comments.
+5. Automated tests cover the generated PR workflow rule text.

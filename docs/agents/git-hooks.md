@@ -4,7 +4,7 @@ The **git-hooks** agent owns local Git hook orchestration for Ballast-managed re
 
 ## What It Sets Up
 
-- Husky + `lint-staged` for TypeScript-only repos
+- Husky with `lint-staged` or the repo formatter/linter for TypeScript-only repos
 - `pre-commit` for multi-language repos and non-TypeScript language profiles
 - `pre-push` hooks that run unit tests
 - maintenance guidance such as `pre-commit autoupdate` and executable hook scripts
@@ -20,6 +20,8 @@ Ballast auto-installs `git-hooks` whenever `linting` is selected so existing ins
 ## Hook Strategy
 
 - TypeScript-only repos use Husky at the repo root
+- TypeScript-only Husky pre-commit hooks stay fast with `lint-staged` or the repo formatter/linter, including explicit formatting checks for `.yaml` and `.yml` files
+- TypeScript-only `.husky/pre-push` hooks run the detected or canonical package-manager test command, with build or typecheck first when the repo convention requires it
 - Multi-language repos use `pre-commit` at the repo root
 - Python, Go, Ansible, and Terraform use `pre-commit`
 - `pre-push` runs the repo's unit test command

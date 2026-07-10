@@ -8,14 +8,30 @@
 - [x] Run focused tests and required sync/generation checks.
 - [x] Push branch, open PR for #214, request Copilot review, and monitor CI/review comments.
 
+## Previous Tasks
+
+- [x] Confirm issue #213 scope, operating mode, and governing PRD gap.
+- [x] Add PRD requirements for Copilot review polling and per-thread replies.
+- [x] Add failing generated rule text coverage for the Copilot review loop.
+- [x] Update local-dev PR workflow guidance and package mirrors.
+- [x] Regenerate checked-in `.codex/` and `.claude/` local outputs.
+- [x] Run focused verification and capture evidence.
+- [x] Push branch, open PR, request Copilot review, and resolve actionable comments.
+
+- [x] Confirm issue #209/#210 scope, operating mode, and governing PRD gap.
+- [x] Add PRD requirements for TypeScript Husky YAML/YML formatting and pre-push tests.
+- [x] Add failing coverage for Husky YAML/YML and pre-push test guidance while preserving multi-language pre-commit output.
+- [x] Implement generated Husky guidance and documentation updates.
+- [x] Confirm repo-local `.codex` and `.claude` outputs remain unchanged because this repo is multi-language and should keep pre-commit guidance.
+- [x] Run focused tests and E2E hook policy smoke coverage.
+- [x] Push branch, open PR, request Copilot review, and resolve actionable review comments.
+
 - [x] Confirm current issue-priority plan against live GitHub issue state.
 - [x] Close stale #211 after verifying PR #217 implemented `ballast setup-dev`.
 - [x] Verify #144 managed skill refresh behavior on current `main`.
 - [x] Close stale #144 with verification evidence.
 - [x] Update `plans/issue-priority-plan.md` so #209/#210 are the next implementation workstream.
 - [x] Push branch, open PR, request Copilot review, and check CI.
-
-## Previous Tasks
 
 - [x] Confirm issue #208 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for generated `.ballast/` state and Ballast repair skill support.
