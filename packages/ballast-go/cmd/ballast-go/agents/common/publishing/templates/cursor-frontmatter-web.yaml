@@ -1,4 +1,4 @@
-description: 'Web app publishing specialist - Docker to GHCR/Docker Hub with Helm chart CD on push to main'
+description: 'Web app publishing specialist - Docker or platform app CD on push to main'
 alwaysApply: false
 globs:
   - 'Dockerfile'

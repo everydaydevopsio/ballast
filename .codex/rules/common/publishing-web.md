@@ -8,7 +8,7 @@ These rules help design and maintain release workflows for libraries, SDKs, and 
 ---
 # Web App Publishing Agent
 
-You are a publishing specialist for web applications deployed as Docker containers to Kubernetes.
+You are a publishing specialist for web applications deployed as Docker containers or platform-native app artifacts.
 
 ## Goals
 
@@ -101,11 +101,14 @@ jobs:
   update_deployment_state:
     needs: build_and_push
     runs-on: ubuntu-latest
+    # Include this job only when the configured deployment model has external
+    # state to update. Hosted, serverless, server, or none models may replace
+    # or omit this job entirely.
     steps:
       - name: Checkout deployment state repo
         uses: actions/checkout@v4
         with:
-          repository: OWNER/gitops        # for Kubernetes: external ArgoCD GitOps repo
+          repository: OWNER/deployment-state
           token: ${{ secrets.DEPLOYMENT_STATE_REPO_TOKEN }}
           path: deployment-state
 
@@ -119,9 +122,9 @@ jobs:
           IMAGE_DIGEST="${{ needs.build_and_push.outputs.image_digest }}"
           IMAGE_TAG="sha-$(echo '${{ github.sha }}' | head -c 7)"
           # Kubernetes model: update the environment values referenced by ArgoCD.
-          # Hosted/serverless/server models: replace this with the platform's deployment-state update.
-          yq -i '.image.digest = strenv(IMAGE_DIGEST)' environments/prod/<app>/values.yaml
-          yq -i '.image.tag = strenv(IMAGE_TAG)' environments/prod/<app>/values.yaml
+          # Hosted/serverless/server models: replace or remove this block.
+          yq -i '.image.digest = strenv(IMAGE_DIGEST)' path/to/deployment-state.yaml
+          yq -i '.image.tag = strenv(IMAGE_TAG)' path/to/deployment-state.yaml
 
       - name: Commit and push deployment state update
         run: |
@@ -179,12 +182,13 @@ Add a badge for the deploy workflow:
 
 - Do not push mutable `latest` tags as the only tag; always include the SHA tag so deploys are traceable.
 - Use `docker/setup-buildx-action` and `cache-from: type=gha` to speed up repeated builds.
-- The deployment state update job should be a no-op (early exit) when there are no changes, to avoid empty commits.
+- The deployment state update job should be omitted when the deployment model does not use an external state repository.
+- When present, the deployment state update job should be a no-op (early exit) when there are no changes, to avoid empty commits.
 - For Kubernetes, keep the Helm chart in `charts/<app>/` in the application repo and keep ArgoCD environment configuration in the separate GitOps repo.
 - If multiple environments exist (staging, production), make the target environment explicit in workflow inputs or use separate workflows.
 
 ## When to Apply
 
-- When a web application is deployed to Kubernetes via a Helm chart.
+- When a web application is deployed from a container image or platform-native app artifact.
 - When every merge to `main` should trigger a new deployment.
-- When the team wants immutable image references in their Helm chart.
+- When the team wants immutable image references or artifact identifiers in deployment state.

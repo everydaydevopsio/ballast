@@ -164,7 +164,7 @@ For Go apps and CLIs:
 - Keep installation instructions in `README.md` aligned with the actual release channel.
 - Publish checksums for downloadable binaries when the app ships archives.
 - Ensure version output from the binary or CLI matches the release tag.
-- For web apps, keep the published container image and Helm chart update linked by version or digest in release notes or workflow outputs.
+- For web apps, keep the published container image or app artifact linked to the deployment-state update by version, digest, or platform release ID.
 - The workflow-dispatch `release_type` input should decide whether the next app tag is patch, minor, or major.
 
 ## When to Apply
