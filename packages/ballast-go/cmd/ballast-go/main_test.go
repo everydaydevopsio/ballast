@@ -549,7 +549,11 @@ func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
 		t.Fatalf("expected terraform git-hooks content to mention tfenv install, got %q", got)
 	}
 	if !strings.Contains(got, "terraform fmt -check -recursive") ||
-		!strings.Contains(got, "trivy config") ||
+		!strings.Contains(got, "terraform init -backend=false") ||
+		!strings.Contains(got, "terraform validate") ||
+		!strings.Contains(got, "tflint --init") ||
+		!strings.Contains(got, "tflint --recursive") ||
+		!strings.Contains(got, "trivy config .") ||
 		!strings.Contains(got, "tfsec") {
 		t.Fatalf("expected terraform git-hooks content to mention terraform checks, got %q", got)
 	}

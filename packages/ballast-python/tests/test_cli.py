@@ -1004,6 +1004,18 @@ Keep team-specific usage notes.
             self.assertIn("pre-commit install --hook-type pre-push", content)
             self.assertIn("ansible-playbook --syntax-check", content)
 
+    def test_render_terraform_git_hooks_guidance_uses_initialized_commands(
+        self,
+    ) -> None:
+        content = cli.render_git_hooks_guidance("terraform", "pre-commit")
+        self.assertIn("terraform fmt -check -recursive", content)
+        self.assertIn("terraform init -backend=false", content)
+        self.assertIn("terraform validate", content)
+        self.assertIn("tflint --init", content)
+        self.assertIn("tflint --recursive", content)
+        self.assertIn("trivy config .", content)
+        self.assertIn("tfsec", content)
+
     def test_patch_preserves_existing_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

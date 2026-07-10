@@ -53,7 +53,7 @@ Recommended baseline commands:
 - Python: `pytest`
 - Go: `go test ./...`
 - Ansible: `ansible-playbook --syntax-check site.yml` and `ansible-playbook --check --diff site.yml`
-- Terraform: `tfenv install && tfenv use`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, `trivy config .`, and `terraform test`
+- Terraform: `tfenv install && tfenv use`, `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, `trivy config .`, and `terraform test`
 
 ## Prompts to Improve Your App
 
