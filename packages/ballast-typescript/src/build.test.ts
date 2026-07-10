@@ -197,6 +197,43 @@ describe('build', () => {
       expect(content).toContain('image digest');
     });
 
+    test('returns TypeScript testing content with web smoke and E2E placement guidance', () => {
+      const content = getContent('testing', undefined, 'typescript');
+      expect(content).toContain('web smoke test');
+      expect(content).toContain('live route or health endpoint');
+      expect(content).toContain(
+        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+      );
+      expect(content).toContain(
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
+      );
+      expect(content).toContain('one critical user workflow');
+    });
+
+    test('returns Python testing content with web smoke and E2E placement guidance', () => {
+      const content = getContent('testing', undefined, 'python');
+      expect(content).toContain('web smoke test');
+      expect(content).toContain('live route or health endpoint');
+      expect(content).toContain(
+        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+      );
+      expect(content).toContain(
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
+      );
+    });
+
+    test('returns CLI publishing content with packaged-command smoke guidance', () => {
+      const content = getContent('publishing', 'cli');
+      expect(content).toContain('packaged-command smoke');
+      expect(content).toContain('built artifact');
+      expect(content).toContain('--help');
+      expect(content).toContain('--version');
+      expect(content).toContain('representative command');
+      expect(content).toContain(
+        'Keep local packaged-command smoke checks fast, run them in pre-push when the packaged artifact can be built deterministically, and require them in CI before publish jobs.'
+      );
+    });
+
     test('throws for unknown agent', () => {
       expect(() => getContent('nonexistent')).toThrow(/content.md/);
     });
@@ -429,6 +466,35 @@ describe('build', () => {
       const result = buildCodexFormat('linting');
       expect(result).toContain('# TypeScript Linting Rules');
       expect(result).toContain('## Your Responsibilities');
+    });
+
+    test('includes smoke and E2E guidance in generated Codex rules', () => {
+      const testing = buildCodexFormat('testing');
+      expect(testing).toContain('web smoke test');
+      expect(testing).toContain(
+        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+      );
+      expect(testing).toContain(
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
+      );
+
+      const pythonTesting = buildCodexFormat('testing', undefined, 'python');
+      expect(pythonTesting).toContain('web smoke test');
+      expect(pythonTesting).toContain(
+        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+      );
+      expect(pythonTesting).toContain(
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
+      );
+
+      const publishingCli = buildCodexFormat('publishing', 'cli');
+      expect(publishingCli).toContain('packaged-command smoke');
+      expect(publishingCli).toContain('--help');
+      expect(publishingCli).toContain('--version');
+      expect(publishingCli).toContain('representative command');
+      expect(publishingCli).toContain(
+        'Keep local packaged-command smoke checks fast, run them in pre-push when the packaged artifact can be built deterministically, and require them in CI before publish jobs.'
+      );
     });
   });
 

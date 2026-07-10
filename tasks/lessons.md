@@ -1,5 +1,13 @@
 # Lessons
 
+## 2026-07-09 Repository Facts Tests Must Isolate Git Discovery
+- Incident/bug: A Go support-file test passed directly but failed under the pre-push hook because Git push environment allowed repository-fact discovery to return the real remote/default branch.
+- Root cause pattern: Tests asserting placeholder repository facts did not stub the package-level command runner used for `git` discovery.
+- Early signal missed: The test used a temp directory but still allowed external `git -C <temp>` behavior to inherit hook-time Git context.
+- Preventative rule: Tests expecting placeholder repository facts must stub git command discovery or create an explicit isolated git fixture.
+- Validation added (test/check/alert): `TestBuildMonorepoSupportFileIncludesPublishingAndSkillsForCodex` now stubs `git` command output, and `scripts/run-unit-tests-pre-push.sh` passes under the branch.
+- Next trigger to detect sooner: When a test depends on absent repo metadata, audit package-level command hooks and Git environment inheritance.
+
 ## 2026-04-29 Managed Skill Files Must Refresh on Upgrade
 - Incident/bug: `ballast upgrade` replayed saved skill selections but left existing skill files stale unless `--force` was passed.
 - Root cause pattern: Generated skill artifacts reused agent-rule overwrite semantics even though skills are Ballast-managed shipped content.

@@ -30,10 +30,16 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
 - Repeatable test commands for local development
 - CI checks for each language profile
 - Coverage visibility with configurable thresholds
-- Smoke tests that use the repo Dockerfile and `docker-compose.yaml` for runnable apps
+- Web smoke tests that use the repo Dockerfile and `docker-compose.yaml` for runnable apps and verify a live route or health endpoint
 - Explicit smoke-test pass/fail output
 - A smoke-test GitHub Action and matching README badge
-- Narrow end-to-end coverage for one critical workflow when the app has a real user flow
+- Narrow end-to-end coverage for one critical workflow when the app has a real user flow, keeping an existing browser E2E framework when present and preferring Playwright only when Playwright markers already exist or browser automation is needed without an existing browser E2E framework
+
+## Smoke and E2E Placement
+
+- Local: run fast unit tests and targeted smoke checks while developing.
+- Pre-push: run deterministic build/typecheck checks plus smoke tests that do not require long-lived external services.
+- CI: run the full smoke and E2E gate for runnable web apps before merge or release.
 
 ## Monorepo Usage
 

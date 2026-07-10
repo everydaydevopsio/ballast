@@ -1,5 +1,15 @@
 # Tasks
 
+- [x] Confirm issue #214 scope, approval, and coordination boundary with #145.
+- [x] Add PRD requirements for web smoke/E2E and CLI packaged-command smoke guidance.
+- [x] Add generated guidance tests for web smoke/E2E, Playwright preference, placement, and CLI packaged-command smoke checks.
+- [x] Update canonical testing and publishing guidance sources plus docs.
+- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
+- [x] Run focused tests and required sync/generation checks.
+- [x] Push branch, open PR for #214, request Copilot review, and monitor CI/review comments.
+
+## Previous Tasks
+
 - [x] Confirm issue #213 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for Copilot review polling and per-thread replies.
 - [x] Add failing generated rule text coverage for the Copilot review loop.
@@ -7,8 +17,6 @@
 - [x] Regenerate checked-in `.codex/` and `.claude/` local outputs.
 - [x] Run focused verification and capture evidence.
 - [x] Push branch, open PR, request Copilot review, and resolve actionable comments.
-
-## Previous Tasks
 
 - [x] Confirm issue #209/#210 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for TypeScript Husky YAML/YML formatting and pre-push tests.

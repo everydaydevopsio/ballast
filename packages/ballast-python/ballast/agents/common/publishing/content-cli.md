@@ -51,7 +51,7 @@ version: 2
 project_name: <your-cli-name>
 
 release:
-  name_template: "<your-cli-name> v{{ .Version }}"
+  name_template: '<your-cli-name> v{{ .Version }}'
 
 builds:
   - id: <your-cli-name>
@@ -74,7 +74,7 @@ builds:
 
 archives:
   - id: <your-cli-name>
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
     formats: [tar.gz]
     format_overrides:
       - goos: windows
@@ -169,7 +169,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
-          version: 'v2.14.0'       # pin to an explicit version; check for the latest at github.com/goreleaser/goreleaser/releases
+          version: 'v2.14.0' # pin to an explicit version; check for the latest at github.com/goreleaser/goreleaser/releases
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -182,6 +182,7 @@ jobs:
 - Run `go test ./...` before publish.
 - Use `CGO_ENABLED=0` for portable binaries.
 - Set distinct `checksum.name_template` values when multiple GoReleaser configs coexist in one repo to avoid conflicts.
+- Add a packaged-command smoke check that runs the built artifact before release.
 
 ## TypeScript/Node CLIs: npmjs
 
@@ -217,6 +218,8 @@ For Python CLI apps distributed through PyPI:
 ## App-Specific Requirements
 
 - Smoke-test the installed CLI from the built artifact before publishing.
+- The packaged-command smoke test must install or execute the built artifact, check `<cli> --help`, check `<cli> --version`, and run one representative command.
+- Keep local packaged-command smoke checks fast, run them in pre-push when the packaged artifact can be built deterministically, and require them in CI before publish jobs.
 - Keep installation instructions in `README.md` aligned with the actual release channel.
 - Publish checksums for downloadable binaries.
 - Ensure version output from the CLI (`<cli> --version`) matches the release tag.

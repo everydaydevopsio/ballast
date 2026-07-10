@@ -3,6 +3,7 @@
 These rules provide testing setup for TypeScript/JavaScript projects: Jest by default, Vitest for Vite projects, 50% coverage default, and a test step in the build GitHub Action.
 
 ---
+
 # Testing Agent
 
 You are a testing specialist for TypeScript and JavaScript projects. Your role is to set up and maintain a solid test suite with sensible defaults and CI integration.
@@ -185,6 +186,7 @@ When the project ships a runnable app or service, add a smoke-test path in addit
    - Use the repository's actual app `Dockerfile`, not a separate fake smoke-test Dockerfile for the application under test.
    - If the app has dependent services, use `docker-compose.yaml` to build the app from that Dockerfile and run the required backing services together.
    - If the repo already has `docker-compose.local.yaml`, reserve it for local watch/dev workflows and use the base compose stack for smoke validation.
+   - For a web app, make the web smoke test start the real app and verify a live route or health endpoint.
 
 2. **Make smoke tests produce explicit pass/fail output**
    - Add a smoke test command or script that exits non-zero on failure.
@@ -198,8 +200,9 @@ When the project ships a runnable app or service, add a smoke-test path in addit
 
 4. **Add an end-to-end path when the app has a user-facing flow**
    - For web apps, add E2E coverage for at least one critical path such as app boot, login, health page, or a core workflow.
-   - Prefer Playwright for browser-based E2E unless the repo already uses a different framework.
-   - Keep E2E scope narrow and stable; the smoke test should prove deployability, while E2E should prove one real workflow.
+   - Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.
+   - Keep E2E scope narrow and stable; one critical user workflow is enough unless the user asks for more.
+   - Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.
 
 5. **Add a status badge**
    - Add a README badge for the smoke-test workflow so the repo shows smoke-test status alongside CI/release badges.

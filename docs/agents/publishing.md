@@ -19,6 +19,13 @@ The publishing agent installs multiple rules:
 - Go publishing guidance for GitHub tags and GitHub Releases
 - Web app publishing guidance for Docker images in GHCR or Docker Hub plus Helm charts in a separate repo
 - Release validation, tag-based publishing, and least-privilege permission patterns
+- Packaged-command smoke tests for installable CLIs: install or execute the built artifact, check `--help`, check `--version`, and run one representative command before publishing
+
+## CLI Smoke Placement
+
+- Local: run the packaged-command smoke check when changing command startup, packaging metadata, or release scripts.
+- Pre-push: run the smoke check when the artifact can be built deterministically without publishing.
+- CI: require the smoke check before publish jobs and before any release artifact is promoted.
 
 ## Prompts to Improve Your App
 
