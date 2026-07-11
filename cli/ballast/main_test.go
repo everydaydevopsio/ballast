@@ -3842,6 +3842,48 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	}
 }
 
+func TestRunMonorepoRemoveLanguageCleansConfigBackedRuleWithoutMarker(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname = \"api\"\n")
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md"),
+		"# TypeScript Linting Rules\n\nlegacy generated content without marker\n",
+	)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--remove-language", "typescript", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected config-backed markerless typescript rule to be removed, got err=%v", err)
+	}
+}
+
 // TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend asserts that a
 // taskSystem value written to .rulesrc.json by a backend invocation (simulating
 // what ballast-typescript does after prompting the user) is not clobbered by

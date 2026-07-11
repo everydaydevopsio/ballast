@@ -3140,7 +3140,7 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 	}
 	trackedPaths := ballastManagedPathsFromSupportFile(root, target)
 	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePaths(root, target, next)) {
-		if !ballastOwnsManagedFile(file) && !trackedPaths[file] {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !allowConfigBackedStaleRuleRemoval(root, target, file, previous) {
 			continue
 		}
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -3158,6 +3158,22 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
 	return nil
+}
+
+func allowConfigBackedStaleRuleRemoval(root string, target string, path string, previous *monorepoConfig) bool {
+	if previous == nil {
+		return false
+	}
+	previousLanguageRules := &monorepoConfig{
+		Agents:    filterAgents(previous.Agents, languageAgentIDs()),
+		Languages: previous.Languages,
+	}
+	for _, previousPath := range managedRulePaths(root, target, previousLanguageRules) {
+		if previousPath == path {
+			return true
+		}
+	}
+	return false
 }
 
 func allowConfigBackedStaleSkillRemoval(root string, target string, path string, previous *monorepoConfig) bool {
