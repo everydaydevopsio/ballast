@@ -22,8 +22,10 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
   - Molecule or localhost playbook smoke tests for roles and inventories
 - **Terraform**
   - `terraform fmt -check -recursive` and `terraform validate`
-  - `tflint` and `tfsec`/`trivy config` for lint and security coverage
+  - `tflint` and `trivy config` for lint and security coverage, with `tfsec` only for legacy-compatible pipelines
   - `terraform init -backend=false` smoke setup plus plan-review guidance
+  - Native `terraform test` for Terraform 1.6+ module assertions and Terratest for Go-backed/live integration coverage
+  - OpenTofu equivalents such as `tofu test` when the repo standardizes on `tofu`
 
 ## What It Provides
 
@@ -51,7 +53,7 @@ Recommended baseline commands:
 - Python: `pytest`
 - Go: `go test ./...`
 - Ansible: `ansible-playbook --syntax-check site.yml` and `ansible-playbook --check --diff site.yml`
-- Terraform: `tfenv install && tfenv use`, `terraform init -backend=false`, `terraform validate`, `tflint --recursive`, and `tfsec .`
+- Terraform: `tfenv install && tfenv use`, `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, `trivy config .`, and `terraform test`
 
 ## Prompts to Improve Your App
 
@@ -63,4 +65,4 @@ Recommended baseline commands:
 - **"Add a smoke-test badge to the README"** — Status visibility
 - **"Add one stable end-to-end test for the login flow"** — Critical-path E2E
 - **"Add Ansible syntax-check and check-mode validation to CI"** — Infrastructure safety
-- **"Add Terraform validate, tflint, and tfsec to CI with tfenv version pinning"** — Terraform safety
+- **"Add Terraform validate, tflint, Trivy config scanning, and terraform test to CI with tfenv version pinning"** — Terraform safety

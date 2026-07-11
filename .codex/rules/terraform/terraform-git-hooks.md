@@ -22,7 +22,7 @@ You are a Git hook specialist. Your role is to establish local Git hook orchestr
 - Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.
 - Install hooks with `pre-commit install`.
 - Install the pre-push hook with `pre-commit install --hook-type pre-push`.
-- Run `terraform fmt -check -recursive`, `terraform validate`, `tflint`, and `tfsec` from the hook configuration.
+- Run `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .` from the hook configuration; keep `tfsec` only for legacy-compatible pipelines.
 - Keep `.terraform/`, state files, and plan files out of Git.
 - Keep the configuration current with `pre-commit autoupdate`.
 

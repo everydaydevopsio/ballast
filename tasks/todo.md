@@ -1,5 +1,15 @@
 # Tasks
 
+- [x] Confirm issue #160 scope, operating mode, and Terraform/OpenTofu tooling sources.
+- [x] Add PRD requirements for Terraform linting, testing, CI, security scanner, and OpenTofu guidance.
+- [x] Add failing generated-content coverage for Terraform best-practice guidance.
+- [x] Update canonical Terraform rule content, docs, and backend git-hook snippets.
+- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
+- [x] Run focused tests and required sync/generation checks.
+- [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
+
+## Previous Tasks
+
 - [x] Confirm issue #215 broader deployment-model scope, operating mode, and PRD requirements.
 - [x] Add PRD requirements for deployment model prompts, flags, persistence, doctor output, and publishing guidance.
 - [x] Add failing tests for deployment model config parsing, CLI flags, install prompting, wrapper forwarding, and doctor output.
@@ -8,8 +18,6 @@
 - [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
 - [x] Run focused tests and required sync/generation checks.
 - [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
-
-## Previous Tasks
 
 - [x] Confirm issue #214 scope, approval, and coordination boundary with #145.
 - [x] Add PRD requirements for web smoke/E2E and CLI packaged-command smoke guidance.

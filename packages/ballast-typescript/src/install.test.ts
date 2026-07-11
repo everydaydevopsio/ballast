@@ -948,7 +948,41 @@ This section should be gone after force.
       expect(content).toContain('.terraform-version');
       expect(content).toContain('tfenv install');
       expect(content).toContain('terraform fmt -check -recursive');
+      expect(content).toContain('trivy config');
       expect(content).toContain('tfsec');
+      expect(content).toContain('plugin blocks');
+      expect(content).toContain('tflint --init');
+      expect(content).toContain('OpenTofu');
+      expect(content).toContain('tofu fmt');
+    });
+
+    test('writes terraform testing rules with native tests and CI guidance', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['testing'],
+        language: 'terraform',
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installed).toContain('testing');
+      const ruleFile = path.join(
+        tmpDir,
+        '.codex',
+        'rules',
+        'terraform-testing.md'
+      );
+      expect(fs.existsSync(ruleFile)).toBe(true);
+      const content = fs.readFileSync(ruleFile, 'utf8');
+      expect(content).toContain('terraform test');
+      expect(content).toContain('Terraform 1.6');
+      expect(content).toContain('Terratest');
+      expect(content).toContain('concurrency:');
+      expect(content).toContain('PR validation');
+      expect(content).toContain('apply');
+      expect(content).toContain('OpenTofu');
+      expect(content).toContain('tofu test');
     });
 
     test('uses husky guidance for typescript-only installs', () => {

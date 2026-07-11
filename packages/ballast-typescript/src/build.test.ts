@@ -311,6 +311,17 @@ describe('build', () => {
       expect(content).toContain('pre-commit autoupdate');
     });
 
+    test('returns initialized terraform git-hooks command guidance', () => {
+      const content = getContent('git-hooks', undefined, 'terraform');
+      expect(content).toContain('terraform fmt -check -recursive');
+      expect(content).toContain('terraform init -backend=false');
+      expect(content).toContain('terraform validate');
+      expect(content).toContain('tflint --init');
+      expect(content).toContain('tflint --recursive');
+      expect(content).toContain('trivy config .');
+      expect(content).toContain('tfsec');
+    });
+
     test('returns husky git-hooks content for typescript', () => {
       const content = getContent('git-hooks', undefined, 'typescript', {
         hookMode: 'husky'
