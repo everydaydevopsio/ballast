@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -2175,6 +2176,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if err != nil {
 		return nil, err
 	}
+	promptReader := bufio.NewReader(os.Stdin)
 
 	config, err := loadMonorepoConfig(root)
 	if err != nil {
@@ -2299,6 +2301,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		Saved:          configValue(config, taskSystemOption.FieldName),
 		Selected:       slices.Contains(persistAgents, "tasks"),
 		NonInteractive: !isInteractiveInstall(args),
+		Reader:         promptReader,
 	})
 	if err != nil {
 		return nil, err
@@ -2309,6 +2312,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		Saved:          configValue(config, deploymentModelOption.FieldName),
 		Selected:       slices.Contains(persistAgents, "publishing"),
 		NonInteractive: !isInteractiveInstall(args),
+		Reader:         promptReader,
 	})
 	if err != nil {
 		return nil, err
@@ -2697,6 +2701,7 @@ type requiredInstallOptionResolution struct {
 	Saved          string
 	Selected       bool
 	NonInteractive bool
+	Reader         *bufio.Reader
 }
 
 func parseTaskSystemFlag(args []string) (string, error) {
@@ -2777,16 +2782,27 @@ func resolveRequiredInstallOption(resolution requiredInstallOptionResolution) (s
 	if resolution.NonInteractive {
 		return resolution.Option.DefaultValue, nil
 	}
-	return promptRequiredInstallOption(resolution.Option)
+	return promptRequiredInstallOption(resolution.Option, resolution.Reader)
 }
 
-func promptRequiredInstallOption(option requiredInstallOption) (string, error) {
+func promptRequiredInstallOption(option requiredInstallOption, reader *bufio.Reader) (string, error) {
+	if reader == nil {
+		reader = bufio.NewReader(os.Stdin)
+	}
 	allowed := strings.Join(option.Allowed, ", ")
 	for {
 		fmt.Printf("%s [%s] (default: %s): ", option.PromptLabel, allowed, option.DefaultValue)
-		var response string
-		if _, err := fmt.Scanln(&response); err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) || strings.Contains(err.Error(), "unexpected newline") || strings.Contains(err.Error(), "expected newline") {
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+				if strings.TrimSpace(response) != "" {
+					value := strings.ToLower(strings.TrimSpace(response))
+					if slices.Contains(option.Allowed, value) {
+						return value, nil
+					}
+					fmt.Printf("Invalid %s. Choose one of: %s\n", option.FieldName, allowed)
+					continue
+				}
 				return option.DefaultValue, nil
 			}
 			return "", err
@@ -3462,12 +3478,16 @@ func isInteractiveInstall(args []string) bool {
 
 func promptSupportFilePatch(path string) (bool, error) {
 	fmt.Printf("Existing %s found. Patch the Installed agent rules section? [y/N]: ", filepath.Base(path))
-	var response string
-	if _, err := fmt.Scanln(&response); err != nil {
-		if errors.Is(err, os.ErrClosed) || strings.Contains(err.Error(), "unexpected newline") || strings.Contains(err.Error(), "expected newline") {
-			return false, nil
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+			if strings.TrimSpace(response) == "" {
+				return false, nil
+			}
+		} else {
+			return false, err
 		}
-		return false, err
 	}
 	value := strings.ToLower(strings.TrimSpace(response))
 	return value == "y" || value == "yes", nil

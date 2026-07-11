@@ -693,6 +693,7 @@ func runDoctor() int {
 func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	config := loadConfig(opts.projectRoot, opts.language)
 	ci := isCIMode() || opts.yes
+	promptReader := bufio.NewReader(os.Stdin)
 
 	flagAgents := opts.agents
 	if opts.all {
@@ -713,6 +714,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 				Saved:          next.TaskSystem,
 				Selected:       true,
 				NonInteractive: ci,
+				Reader:         promptReader,
 			})
 			if err != nil {
 				return nil, err
@@ -726,6 +728,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 				Saved:          next.DeploymentModel,
 				Selected:       true,
 				NonInteractive: ci,
+				Reader:         promptReader,
 			})
 			if err != nil {
 				return nil, err
@@ -767,6 +770,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 				Saved:          configValue(config, "taskSystem"),
 				Selected:       true,
 				NonInteractive: ci,
+				Reader:         promptReader,
 			})
 			if err != nil {
 				return nil, err
@@ -780,6 +784,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 				Saved:          configValue(config, "deploymentModel"),
 				Selected:       true,
 				NonInteractive: ci,
+				Reader:         promptReader,
 			})
 			if err != nil {
 				return nil, err
@@ -821,6 +826,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 			Saved:          configValue(config, "taskSystem"),
 			Selected:       true,
 			NonInteractive: ci,
+			Reader:         promptReader,
 		})
 		if err != nil {
 			return nil, err
@@ -834,6 +840,7 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 			Saved:          configValue(config, "deploymentModel"),
 			Selected:       true,
 			NonInteractive: ci,
+			Reader:         promptReader,
 		})
 		if err != nil {
 			return nil, err
@@ -2515,6 +2522,7 @@ type requiredInstallOptionResolution struct {
 	Saved          string
 	Selected       bool
 	NonInteractive bool
+	Reader         *bufio.Reader
 }
 
 func taskSystemRequiredOption() requiredInstallOption {
@@ -2552,16 +2560,27 @@ func resolveRequiredInstallOption(resolution requiredInstallOptionResolution) (s
 	if resolution.NonInteractive {
 		return resolution.Option.DefaultValue, nil
 	}
-	return promptRequiredInstallOption(resolution.Option)
+	return promptRequiredInstallOption(resolution.Option, resolution.Reader)
 }
 
-func promptRequiredInstallOption(option requiredInstallOption) (string, error) {
+func promptRequiredInstallOption(option requiredInstallOption, reader *bufio.Reader) (string, error) {
+	if reader == nil {
+		reader = bufio.NewReader(os.Stdin)
+	}
 	allowed := strings.Join(option.Allowed, ", ")
 	for {
 		fmt.Printf("%s [%s] (default: %s): ", option.PromptLabel, allowed, option.DefaultValue)
-		var response string
-		if _, err := fmt.Scanln(&response); err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) || strings.Contains(err.Error(), "unexpected newline") || strings.Contains(err.Error(), "expected newline") {
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+				if strings.TrimSpace(response) != "" {
+					value := normalizeRequiredInstallOptionValue(response)
+					if contains(option.Allowed, value) {
+						return value, nil
+					}
+					fmt.Printf("Invalid %s. Choose one of: %s\n", option.FieldName, allowed)
+					continue
+				}
 				return option.DefaultValue, nil
 			}
 			return "", err
