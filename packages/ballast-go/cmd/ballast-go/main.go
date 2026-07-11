@@ -1072,7 +1072,7 @@ func install(opts installOptions) installResult {
 
 		if target == "claude" && !disableSupportFiles {
 			claudePath := claudeMDPath(opts.projectRoot)
-			shouldPatchClaude := exists(claudePath) && !opts.force || opts.patch || opts.patchClaude
+			shouldPatchClaude := (exists(claudePath) && !opts.force) || opts.patch || opts.patchClaude
 			if _, skipped := opts.skipSupport[claudePath]; skipped {
 				if !contains(result.declinedSupportFiles, claudePath) {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, claudePath)
@@ -1102,7 +1102,7 @@ func install(opts installOptions) installResult {
 
 		if target == "gemini" && !disableSupportFiles {
 			geminiPath := geminiMDPath(opts.projectRoot)
-			shouldPatchGemini := exists(geminiPath) && !opts.force || opts.patch || opts.patchGemini
+			shouldPatchGemini := (exists(geminiPath) && !opts.force) || opts.patch || opts.patchGemini
 			if _, skipped := opts.skipSupport[geminiPath]; skipped {
 				if !contains(result.declinedSupportFiles, geminiPath) {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, geminiPath)

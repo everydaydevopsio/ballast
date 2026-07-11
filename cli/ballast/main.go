@@ -2704,26 +2704,6 @@ type requiredInstallOptionResolution struct {
 	Reader         *bufio.Reader
 }
 
-func parseTaskSystemFlag(args []string) (string, error) {
-	return parseRequiredInstallOptionFlag(args, requiredInstallOption{
-		FieldName:    "taskSystem",
-		FlagName:     "--task-system",
-		PromptLabel:  "Task system for tasks",
-		Allowed:      supportedTaskSystems,
-		DefaultValue: "github",
-	})
-}
-
-func parseDeploymentModelFlag(args []string) (string, error) {
-	return parseRequiredInstallOptionFlag(args, requiredInstallOption{
-		FieldName:    "deploymentModel",
-		FlagName:     "--deployment-model",
-		PromptLabel:  "App deployment model for publishing (use none for CLI/library/SDK-only projects)",
-		Allowed:      supportedDeploymentModels,
-		DefaultValue: "none",
-	})
-}
-
 func parseRequiredInstallOptionFlag(args []string, option requiredInstallOption) (string, error) {
 	raw := ""
 	for i := 0; i < len(args); i++ {
@@ -3155,8 +3135,9 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		return nil
 	}
 	trackedPaths := ballastManagedPathsFromSupportFile(root, target)
+	configBackedStaleRulePaths := configBackedStaleRulePathSet(root, target, previous)
 	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePaths(root, target, next)) {
-		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !allowConfigBackedStaleRuleRemoval(root, target, file, previous) {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !configBackedStaleRulePaths[file] {
 			continue
 		}
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -3176,20 +3157,19 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 	return nil
 }
 
-func allowConfigBackedStaleRuleRemoval(root string, target string, path string, previous *monorepoConfig) bool {
+func configBackedStaleRulePathSet(root string, target string, previous *monorepoConfig) map[string]bool {
+	paths := map[string]bool{}
 	if previous == nil {
-		return false
+		return paths
 	}
 	previousLanguageRules := &monorepoConfig{
 		Agents:    filterAgents(previous.Agents, languageAgentIDs()),
 		Languages: previous.Languages,
 	}
 	for _, previousPath := range managedRulePaths(root, target, previousLanguageRules) {
-		if previousPath == path {
-			return true
-		}
+		paths[previousPath] = true
 	}
-	return false
+	return paths
 }
 
 func allowConfigBackedStaleSkillRemoval(root string, target string, path string, previous *monorepoConfig) bool {
