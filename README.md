@@ -325,12 +325,12 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 - `--all`: install all agents for the selected language
 - `--all-skills`: install all available skills for the selected language
 - `--task-system`: task system for the tasks agent: `github`, `jira`, or `linear`
-- `--deployment-model`: deployment model for the publishing agent: `none`, `kubernetes`, `serverless`, `server`, or `hosted`
+- `--deployment-model`: app/service deployment model for publishing: `none`, `kubernetes`, `serverless`, `server`, or `hosted`; use `none` for CLI, library, or SDK-only projects
 - `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`
 - `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
 
-When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value, interactive installs prompt for `taskSystem` and `deploymentModel`; `--yes` uses defaults.
+When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value, interactive installs prompt for `taskSystem` and app `deploymentModel`; `--yes` uses defaults. For CLI, library, or SDK-only projects, choose `none` for `deploymentModel`.
 
 ## Wrapper Commands
 

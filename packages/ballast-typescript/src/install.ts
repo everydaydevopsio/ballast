@@ -182,7 +182,7 @@ async function promptTaskSystem(): Promise<TaskSystem> {
 
 async function promptDeploymentModel(): Promise<DeploymentModel> {
   const line = await prompt(
-    `Deployment model (${DEPLOYMENT_MODELS.join(', ')}) [${DEFAULT_DEPLOYMENT_MODEL}]: `
+    `App deployment model for publishing (use none for CLI/library/SDK-only projects) (${DEPLOYMENT_MODELS.join(', ')}) [${DEFAULT_DEPLOYMENT_MODEL}]: `
   );
   if (!line) return DEFAULT_DEPLOYMENT_MODEL;
   const token = line.trim().toLowerCase();

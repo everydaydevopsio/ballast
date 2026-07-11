@@ -30,6 +30,6 @@ assert_contains 'linear' "${PROJECT}/.codex/rules/tasks-task-system.md"
 assert_not_contains '{{taskSystem}}' "${PROJECT}/.codex/rules/tasks-task-system.md"
 assert_contains 'Serverless deployment model:' "${PROJECT}/.codex/rules/publishing-apps.md"
 assert_doctor_contains "${OUTPUT}" "Task system for tasks"
-assert_doctor_contains "${OUTPUT}" "Deployment model for publishing apps"
+assert_doctor_contains "${OUTPUT}" "App deployment model for publishing (use none for CLI/library/SDK-only projects)"
 
 echo "PASS: go-first-run-required-options-e2e"

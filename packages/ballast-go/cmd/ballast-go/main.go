@@ -216,7 +216,7 @@ func runInstall(args []string) int {
 	patch := fs.Bool("patch", false, "merge upstream rule and skill updates into existing files")
 	fs.BoolVar(patch, "p", false, "merge upstream rule and skill updates into existing files")
 	taskSystemFlag := fs.String("task-system", "", "task system for tasks: github|jira|linear")
-	deploymentModelFlag := fs.String("deployment-model", "", "deployment model for publishing apps: none|kubernetes|serverless|server|hosted")
+	deploymentModelFlag := fs.String("deployment-model", "", "app/service deployment model for publishing; use none for CLI/library/SDK-only projects: none|kubernetes|serverless|server|hosted")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	repositoryFactsFile := fs.String("repository-facts-file", "", "optional path to wrapper-generated repository facts JSON")
@@ -404,7 +404,7 @@ Options:
   --all                     Install all agents
   --all-skills              Install all skills
   --task-system <system>    Task system for tasks: %s
-  --deployment-model <mode> Deployment model for publishing apps: %s
+  --deployment-model <mode> App/service deployment model for publishing; use none for CLI/library/SDK-only projects: %s
   --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -2537,7 +2537,7 @@ func taskSystemRequiredOption() requiredInstallOption {
 func deploymentModelRequiredOption() requiredInstallOption {
 	return requiredInstallOption{
 		FieldName:    "deploymentModel",
-		PromptLabel:  "Deployment model for publishing apps",
+		PromptLabel:  "App deployment model for publishing (use none for CLI/library/SDK-only projects)",
 		Allowed:      deploymentModels,
 		DefaultValue: "none",
 	}

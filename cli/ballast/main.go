@@ -456,7 +456,7 @@ func printUsage() {
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Install language behavior: `--remove-language` removes languages from `.rulesrc.json`, removes their `paths`, and prunes stale Ballast-managed rule files.")
-	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app deployment guidance as one of none, kubernetes, serverless, server, or hosted.")
+	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app/service deployment guidance as one of none, kubernetes, serverless, server, or hosted. Use `none` for CLI, library, or SDK-only projects.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
 	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/terraform/`).")
 }
@@ -2163,7 +2163,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	deploymentModelOption := requiredInstallOption{
 		FieldName:    "deploymentModel",
 		FlagName:     "--deployment-model",
-		PromptLabel:  "Deployment model for publishing apps",
+		PromptLabel:  "App deployment model for publishing (use none for CLI/library/SDK-only projects)",
 		Allowed:      supportedDeploymentModels,
 		DefaultValue: "none",
 	}
@@ -2718,7 +2718,7 @@ func parseDeploymentModelFlag(args []string) (string, error) {
 	return parseRequiredInstallOptionFlag(args, requiredInstallOption{
 		FieldName:    "deploymentModel",
 		FlagName:     "--deployment-model",
-		PromptLabel:  "Deployment model for publishing apps",
+		PromptLabel:  "App deployment model for publishing (use none for CLI/library/SDK-only projects)",
 		Allowed:      supportedDeploymentModels,
 		DefaultValue: "none",
 	})

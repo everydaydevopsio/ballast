@@ -1633,7 +1633,7 @@ def prompt_skills(language: str) -> list[str]:
 
 def prompt_deployment_model() -> str:
     value = prompt(
-        "Deployment model for publishing apps "
+        "App deployment model for publishing (use none for CLI/library/SDK-only projects) "
         f"[{', '.join(DEPLOYMENT_MODELS)}] (default: none): "
     )
     normalized = normalize_deployment_model(value)
@@ -2146,7 +2146,7 @@ def parser() -> argparse.ArgumentParser:
     install_cmd.add_argument(
         "--deployment-model",
         choices=DEPLOYMENT_MODELS,
-        help="Deployment model for publishing apps",
+        help="App/service deployment model for publishing; use none for CLI/library/SDK-only projects",
     )
     install_cmd.add_argument(
         "--force",
