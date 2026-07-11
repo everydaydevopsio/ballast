@@ -1688,7 +1688,7 @@ Keep my custom responsibilities.
         );
       });
 
-      test('claude skips existing CLAUDE.md unless patch is approved', () => {
+      test('claude patches existing CLAUDE.md by default', () => {
         fs.writeFileSync(
           path.join(tmpDir, 'CLAUDE.md'),
           `# CLAUDE.md
@@ -1696,6 +1696,12 @@ Keep my custom responsibilities.
 ## Team Notes
 
 Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in \`.claude/rules/\` when they apply:
+
+- \`.claude/rules/old.md\` — Old rule
 `
         );
 
@@ -1707,12 +1713,19 @@ Keep this section.
           saveConfig: false
         });
 
-        expect(result.skippedSupportFiles).toContain(
+        expect(result.installedSupportFiles).toContain(
           path.join(tmpDir, 'CLAUDE.md')
         );
-        expect(
-          fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8')
-        ).toContain('## Team Notes');
+        expect(result.skippedSupportFiles).not.toContain(
+          path.join(tmpDir, 'CLAUDE.md')
+        );
+        const claudeMd = fs.readFileSync(
+          path.join(tmpDir, 'CLAUDE.md'),
+          'utf8'
+        );
+        expect(claudeMd).toContain('## Team Notes');
+        expect(claudeMd).toContain('`.claude/rules/typescript-linting.md`');
+        expect(claudeMd).not.toContain('`.claude/rules/old.md`');
       });
 
       test('claude patch updates installed rules section without removing user notes', () => {
@@ -1883,7 +1896,7 @@ Read and follow these rule files in \`.gemini/rules/\` when they apply:
         expect(fs.existsSync(path.join(tmpDir, 'AGENTS.md'))).toBe(false);
       });
 
-      test('gemini skips existing GEMINI.md unless patch is approved', () => {
+      test('gemini patches existing GEMINI.md by default', () => {
         fs.writeFileSync(
           path.join(tmpDir, 'GEMINI.md'),
           `# GEMINI.md
@@ -1891,6 +1904,12 @@ Read and follow these rule files in \`.gemini/rules/\` when they apply:
 ## Team Notes
 
 Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in \`.gemini/rules/\` when they apply:
+
+- \`.gemini/rules/old.md\` — Old rule
 `
         );
 
@@ -1902,12 +1921,19 @@ Keep this section.
           saveConfig: false
         });
 
-        expect(result.skippedSupportFiles).toContain(
+        expect(result.installedSupportFiles).toContain(
           path.join(tmpDir, 'GEMINI.md')
         );
-        expect(
-          fs.readFileSync(path.join(tmpDir, 'GEMINI.md'), 'utf8')
-        ).toContain('## Team Notes');
+        expect(result.skippedSupportFiles).not.toContain(
+          path.join(tmpDir, 'GEMINI.md')
+        );
+        const geminiMd = fs.readFileSync(
+          path.join(tmpDir, 'GEMINI.md'),
+          'utf8'
+        );
+        expect(geminiMd).toContain('## Team Notes');
+        expect(geminiMd).toContain('`.gemini/rules/typescript-linting.md`');
+        expect(geminiMd).not.toContain('`.gemini/rules/old.md`');
       });
 
       test('codex: writes to .codex/rules/<agent>.md and AGENTS.md', () => {

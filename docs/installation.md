@@ -178,7 +178,7 @@ Example root config:
 
 Manual path overrides are supported by editing the root `.rulesrc.json` before the next `ballast install`.
 
-If `CLAUDE.md`, `GEMINI.md`, or `AGENTS.md` already exists, Ballast creates the file when missing. New `CLAUDE.md` and `AGENTS.md` support files include a user-managed `Repository Facts` section for durable repo metadata such as `OWNER/REPO`, default branch, canonical config paths, workflow filenames, preferred commands, coverage thresholds, and generated paths agents should not edit directly. Gemini installs generate `GEMINI.md` and ensure `AGENTS.md` exists so the shared repository facts remain available through the `@./AGENTS.md` include. `--patch` updates only the Ballast-managed `Installed agent rules` and `Installed skills` sections for these files; the `Repository Facts` section remains user-managed.
+If `CLAUDE.md`, `GEMINI.md`, or `AGENTS.md` already exists and `--force` is not set, Ballast patches only the Ballast-managed `Installed agent rules` and `Installed skills` sections and preserves user-managed sections. Ballast creates the file when missing. New `CLAUDE.md` and `AGENTS.md` support files include a user-managed `Repository Facts` section for durable repo metadata such as `OWNER/REPO`, default branch, canonical config paths, workflow filenames, preferred commands, coverage thresholds, and generated paths agents should not edit directly. Gemini installs generate `GEMINI.md` and ensure `AGENTS.md` exists so the shared repository facts remain available through the `@./AGENTS.md` include. The `Repository Facts` section remains user-managed.
 
 ### Per-language fallback
 
@@ -189,7 +189,7 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ballast-go install --target cursor --all
 ```
 
-Ballast preserves existing rule and skill files unless you explicitly choose `--patch` or `--force`.
+Ballast preserves existing rule and skill files unless you explicitly choose `--patch` or `--force`. Existing support files (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) are patched by default when `--force` is not set.
 
 Use `--patch` to merge upstream Ballast updates into an existing rule or skill file while preserving user-edited sections.
 
@@ -206,10 +206,13 @@ For single-language TypeScript installs, the `git-hooks` rules should use Husky 
 - `--skill, -s`: comma-separated list
 - `--all`: install all available agents
 - `--all-skills`: install all available skills
+- `--task-system`: task system for the tasks agent: `github`, `jira`, or `linear`
 - `--deployment-model`: deployment model for the publishing agent: `none`, `kubernetes`, `serverless`, `server`, or `hosted`
 - `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files
 - `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
+
+When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value, interactive installs prompt for `taskSystem` and `deploymentModel`; `--yes` uses defaults.
 
 ## Wrapper Commands
 

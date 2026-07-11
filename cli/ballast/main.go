@@ -2152,11 +2152,26 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, nil
 	}
 
-	requestedTaskSystem, err := parseTaskSystemFlag(args)
+	taskSystemOption := requiredInstallOption{
+		FieldName:    "taskSystem",
+		FlagName:     "--task-system",
+		PromptLabel:  "Task system for tasks",
+		Allowed:      supportedTaskSystems,
+		DefaultValue: "github",
+	}
+	deploymentModelOption := requiredInstallOption{
+		FieldName:    "deploymentModel",
+		FlagName:     "--deployment-model",
+		PromptLabel:  "Deployment model for publishing apps",
+		Allowed:      supportedDeploymentModels,
+		DefaultValue: "none",
+	}
+
+	requestedTaskSystem, err := parseRequiredInstallOptionFlag(args, taskSystemOption)
 	if err != nil {
 		return nil, err
 	}
-	requestedDeploymentModel, err := parseDeploymentModelFlag(args)
+	requestedDeploymentModel, err := parseRequiredInstallOptionFlag(args, deploymentModelOption)
 	if err != nil {
 		return nil, err
 	}
@@ -2278,19 +2293,25 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, err
 	}
 
-	var savedTaskSystem string
-	if config != nil {
-		savedTaskSystem = config.TaskSystem
+	savedTaskSystem, err := resolveRequiredInstallOption(requiredInstallOptionResolution{
+		Option:         taskSystemOption,
+		Requested:      requestedTaskSystem,
+		Saved:          configValue(config, taskSystemOption.FieldName),
+		Selected:       slices.Contains(persistAgents, "tasks"),
+		NonInteractive: !isInteractiveInstall(args),
+	})
+	if err != nil {
+		return nil, err
 	}
-	if requestedTaskSystem != "" {
-		savedTaskSystem = requestedTaskSystem
-	}
-	var savedDeploymentModel string
-	if config != nil {
-		savedDeploymentModel = config.DeploymentModel
-	}
-	if requestedDeploymentModel != "" {
-		savedDeploymentModel = requestedDeploymentModel
+	savedDeploymentModel, err := resolveRequiredInstallOption(requiredInstallOptionResolution{
+		Option:         deploymentModelOption,
+		Requested:      requestedDeploymentModel,
+		Saved:          configValue(config, deploymentModelOption.FieldName),
+		Selected:       slices.Contains(persistAgents, "publishing"),
+		NonInteractive: !isInteractiveInstall(args),
+	})
+	if err != nil {
+		return nil, err
 	}
 	configToSave := monorepoConfig{
 		Targets:         savedTargets,
@@ -2326,11 +2347,11 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	baseArgs := withTargetSelection(stripMonorepoFlags(args), requestedTargets)
 	plan := make([]backendInvocation, 0, len(profiles)+1)
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
-	if requestedTaskSystem != "" && slices.Contains(configToSave.Agents, "tasks") {
-		commonArgs = append(commonArgs, "--task-system", requestedTaskSystem)
+	if savedTaskSystem != "" && slices.Contains(configToSave.Agents, "tasks") {
+		commonArgs = append(commonArgs, "--task-system", savedTaskSystem)
 	}
-	if requestedDeploymentModel != "" && slices.Contains(configToSave.Agents, "publishing") {
-		commonArgs = append(commonArgs, "--deployment-model", requestedDeploymentModel)
+	if savedDeploymentModel != "" && slices.Contains(configToSave.Agents, "publishing") {
+		commonArgs = append(commonArgs, "--deployment-model", savedDeploymentModel)
 	}
 	if len(commonSelection) > 0 || len(selectedSkills) > 0 {
 		commonLanguage := profiles[0].Language
@@ -2339,7 +2360,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		}
 		tool := toolsByLanguage[commonLanguage]
 		env := monorepoInvocationEnv("common")
-		if requestedTaskSystem != "" && slices.Contains(commonSelection, "tasks") {
+		if savedTaskSystem != "" && slices.Contains(commonSelection, "tasks") && savedTaskSystem != configValue(config, taskSystemOption.FieldName) {
 			env["BALLAST_REFRESH_TASK_RULES"] = "1"
 		}
 		plan = append(plan, backendInvocation{
@@ -2662,58 +2683,59 @@ func splitAgentValues(raw string) []string {
 	return agents
 }
 
+type requiredInstallOption struct {
+	FieldName    string
+	FlagName     string
+	PromptLabel  string
+	Allowed      []string
+	DefaultValue string
+}
+
+type requiredInstallOptionResolution struct {
+	Option         requiredInstallOption
+	Requested      string
+	Saved          string
+	Selected       bool
+	NonInteractive bool
+}
+
 func parseTaskSystemFlag(args []string) (string, error) {
-	raw := ""
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if strings.HasPrefix(arg, "--task-system=") {
-			raw = strings.TrimSpace(strings.TrimPrefix(arg, "--task-system="))
-			continue
-		}
-		if arg != "--task-system" {
-			continue
-		}
-		if i+1 >= len(args) {
-			return "", errors.New("missing value for --task-system")
-		}
-		candidate := strings.TrimSpace(args[i+1])
-		if candidate == "" || strings.HasPrefix(candidate, "-") {
-			return "", errors.New("missing value for --task-system")
-		}
-		raw = candidate
-		i++
-	}
-	if raw == "" {
-		return "", nil
-	}
-	normalized := strings.ToLower(raw)
-	if slices.Contains(supportedTaskSystems, normalized) {
-		return normalized, nil
-	}
-	return "", fmt.Errorf(
-		"invalid --task-system: %s (valid: %s)",
-		raw,
-		strings.Join(supportedTaskSystems, ", "),
-	)
+	return parseRequiredInstallOptionFlag(args, requiredInstallOption{
+		FieldName:    "taskSystem",
+		FlagName:     "--task-system",
+		PromptLabel:  "Task system for tasks",
+		Allowed:      supportedTaskSystems,
+		DefaultValue: "github",
+	})
 }
 
 func parseDeploymentModelFlag(args []string) (string, error) {
+	return parseRequiredInstallOptionFlag(args, requiredInstallOption{
+		FieldName:    "deploymentModel",
+		FlagName:     "--deployment-model",
+		PromptLabel:  "Deployment model for publishing apps",
+		Allowed:      supportedDeploymentModels,
+		DefaultValue: "none",
+	})
+}
+
+func parseRequiredInstallOptionFlag(args []string, option requiredInstallOption) (string, error) {
 	raw := ""
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if strings.HasPrefix(arg, "--deployment-model=") {
-			raw = strings.TrimSpace(strings.TrimPrefix(arg, "--deployment-model="))
+		if strings.HasPrefix(arg, option.FlagName+"=") {
+			raw = strings.TrimSpace(strings.TrimPrefix(arg, option.FlagName+"="))
 			continue
 		}
-		if arg != "--deployment-model" {
+		if arg != option.FlagName {
 			continue
 		}
 		if i+1 >= len(args) {
-			return "", errors.New("missing value for --deployment-model")
+			return "", fmt.Errorf("missing value for %s", option.FlagName)
 		}
 		candidate := strings.TrimSpace(args[i+1])
 		if candidate == "" || strings.HasPrefix(candidate, "-") {
-			return "", errors.New("missing value for --deployment-model")
+			return "", fmt.Errorf("missing value for %s", option.FlagName)
 		}
 		raw = candidate
 		i++
@@ -2722,14 +2744,76 @@ func parseDeploymentModelFlag(args []string) (string, error) {
 		return "", nil
 	}
 	normalized := strings.ToLower(raw)
-	if slices.Contains(supportedDeploymentModels, normalized) {
+	if slices.Contains(option.Allowed, normalized) {
 		return normalized, nil
 	}
 	return "", fmt.Errorf(
-		"invalid --deployment-model: %s (valid: %s)",
+		"invalid %s: %s (valid: %s)",
+		option.FlagName,
 		raw,
-		strings.Join(supportedDeploymentModels, ", "),
+		strings.Join(option.Allowed, ", "),
 	)
+}
+
+func resolveRequiredInstallOption(resolution requiredInstallOptionResolution) (string, error) {
+	if resolution.Requested != "" {
+		return resolution.Requested, nil
+	}
+	saved := strings.ToLower(strings.TrimSpace(resolution.Saved))
+	if saved != "" {
+		if slices.Contains(resolution.Option.Allowed, saved) {
+			return saved, nil
+		}
+		return "", fmt.Errorf(
+			"invalid %s %q; use one of: %s",
+			resolution.Option.FieldName,
+			resolution.Saved,
+			strings.Join(resolution.Option.Allowed, ", "),
+		)
+	}
+	if !resolution.Selected {
+		return "", nil
+	}
+	if resolution.NonInteractive {
+		return resolution.Option.DefaultValue, nil
+	}
+	return promptRequiredInstallOption(resolution.Option)
+}
+
+func promptRequiredInstallOption(option requiredInstallOption) (string, error) {
+	allowed := strings.Join(option.Allowed, ", ")
+	for {
+		fmt.Printf("%s [%s] (default: %s): ", option.PromptLabel, allowed, option.DefaultValue)
+		var response string
+		if _, err := fmt.Scanln(&response); err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) || strings.Contains(err.Error(), "unexpected newline") || strings.Contains(err.Error(), "expected newline") {
+				return option.DefaultValue, nil
+			}
+			return "", err
+		}
+		value := strings.ToLower(strings.TrimSpace(response))
+		if value == "" {
+			return option.DefaultValue, nil
+		}
+		if slices.Contains(option.Allowed, value) {
+			return value, nil
+		}
+		fmt.Printf("Invalid %s. Choose one of: %s\n", option.FieldName, allowed)
+	}
+}
+
+func configValue(config *monorepoConfig, field string) string {
+	if config == nil {
+		return ""
+	}
+	switch field {
+	case "taskSystem":
+		return config.TaskSystem
+	case "deploymentModel":
+		return config.DeploymentModel
+	default:
+		return ""
+	}
 }
 
 func findFlagValue(args []string, longFlag string, shortFlag string) string {

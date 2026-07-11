@@ -4070,6 +4070,50 @@ func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
 	}
 }
 
+func TestResolveMonorepoPlanPromptsForRequiredFirstRunOptions(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	originalStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = reader
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		_ = reader.Close()
+	})
+	if _, err := writer.WriteString("linear\nserverless\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "codex", "--all"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil || len(plan.Invocations) == 0 {
+		t.Fatalf("expected monorepo plan, got %#v", plan)
+	}
+	if plan.Config.TaskSystem != "linear" {
+		t.Fatalf("expected prompted taskSystem in saved config, got %#v", plan.Config)
+	}
+	if plan.Config.DeploymentModel != "serverless" {
+		t.Fatalf("expected prompted deploymentModel in saved config, got %#v", plan.Config)
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if !strings.Contains(got, "--task-system linear") {
+		t.Fatalf("expected prompted task-system forwarded to backend, got %q", got)
+	}
+	if !strings.Contains(got, "--deployment-model serverless") {
+		t.Fatalf("expected prompted deployment-model forwarded to backend, got %q", got)
+	}
+}
+
 func TestResolveMonorepoPlanNormalizesDeploymentModelFlagForBackend(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")

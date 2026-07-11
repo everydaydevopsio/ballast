@@ -538,7 +538,7 @@ func TestInstallSupportsTerraformTestingBestPractices(t *testing.T) {
 }
 
 func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
-	got, err := readContent("git-hooks", "terraform", "", "standalone", "none")
+	got, err := readContent("git-hooks", "terraform", "", "standalone", "github", "none")
 	if err != nil {
 		t.Fatalf("read terraform git-hooks content: %v", err)
 	}
@@ -846,7 +846,7 @@ func TestBuildGeminiMDIncludesRepositoryFactsAndSkills(t *testing.T) {
 }
 
 func TestBuildContentGeminiIncludesMandates(t *testing.T) {
-	content, err := buildContent("linting", "gemini", "go", "", "standalone", "none")
+	content, err := buildContent("linting", "gemini", "go", "", "standalone", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent(gemini): %v", err)
 	}
@@ -863,7 +863,7 @@ func TestBuildContentGeminiIncludesMandates(t *testing.T) {
 }
 
 func TestBuildContentRendersPublishingDeploymentModelToken(t *testing.T) {
-	content, err := buildContent("publishing", "codex", "go", "apps", "standalone", "kubernetes")
+	content, err := buildContent("publishing", "codex", "go", "apps", "standalone", "github", "kubernetes")
 	if err != nil {
 		t.Fatalf("buildContent(publishing): %v", err)
 	}
@@ -1601,6 +1601,100 @@ func TestRunInstallWritesDeploymentModelForPublishing(t *testing.T) {
 	}
 }
 
+func TestRunInstallPromptsForTaskSystemAndDeploymentModelOnFirstRun(t *testing.T) {
+	t.Setenv("CI", "")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("TF_BUILD", "")
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = reader
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		_ = reader.Close()
+	})
+	if _, err := writer.WriteString("linear\nserverless\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	exitCode := runInstall([]string{"install", "--target", "codex", "--language", "go", "--all"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, `"taskSystem": "linear"`) {
+		t.Fatalf("expected prompted taskSystem in config: %s", text)
+	}
+	if !strings.Contains(text, `"deploymentModel": "serverless"`) {
+		t.Fatalf("expected prompted deploymentModel in config: %s", text)
+	}
+	taskRule, err := os.ReadFile(filepath.Join(tmpDir, ".codex", "rules", "tasks-task-system.md"))
+	if err != nil {
+		t.Fatalf("read tasks-task-system.md: %v", err)
+	}
+	if !strings.Contains(string(taskRule), "linear") || strings.Contains(string(taskRule), "{{taskSystem}}") {
+		t.Fatalf("expected task rule to render prompted task system: %s", string(taskRule))
+	}
+}
+
+func TestRunInstallDefaultsRequiredOptionsInNonInteractiveMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	exitCode := runInstall([]string{"install", "--target", "codex", "--language", "go", "--all", "--yes"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, `"taskSystem": "github"`) {
+		t.Fatalf("expected default taskSystem in config: %s", text)
+	}
+	if !strings.Contains(text, `"deploymentModel": "none"`) {
+		t.Fatalf("expected default deploymentModel in config: %s", text)
+	}
+}
+
 func TestRunInstallRejectsInvalidDeploymentModel(t *testing.T) {
 	output := captureStdout(t, func() {
 		exitCode := runInstall([]string{"install", "--target", "codex", "--agent", "publishing", "--deployment-model", "bogus", "--yes"})
@@ -1610,6 +1704,18 @@ func TestRunInstallRejectsInvalidDeploymentModel(t *testing.T) {
 	})
 	if !strings.Contains(output, "Invalid --deployment-model") {
 		t.Fatalf("expected invalid deployment model message, got %q", output)
+	}
+}
+
+func TestRunInstallRejectsInvalidTaskSystem(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := runInstall([]string{"install", "--target", "codex", "--agent", "tasks", "--task-system", "notion", "--yes"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+	if !strings.Contains(output, "Invalid --task-system") {
+		t.Fatalf("expected invalid task system message, got %q", output)
 	}
 }
 
@@ -1893,7 +1999,7 @@ func TestPatchFlagUpdatesClaudeMDSection(t *testing.T) {
 	}
 }
 
-func TestInstallPatchUpdatesCodexAgentsMDSectionOnly(t *testing.T) {
+func TestInstallUpdatesCodexAgentsMDSectionByDefault(t *testing.T) {
 	tmpDir := t.TempDir()
 	rulePath := filepath.Join(tmpDir, ".codex", "rules", "go-linting.md")
 	if err := os.MkdirAll(filepath.Dir(rulePath), 0o755); err != nil {
@@ -1920,11 +2026,14 @@ Keep my custom rule text.
 		agents:      []string{"linting"},
 		language:    "go",
 		force:       false,
-		patch:       true,
+		patch:       false,
 		saveConfig:  false,
 	})
 	if len(result.errors) > 0 {
 		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if contains(result.skippedSupportFiles, agentsMD) {
+		t.Fatalf("expected AGENTS.md to be patched by default, got skipped support files: %#v", result.skippedSupportFiles)
 	}
 
 	content, err := os.ReadFile(agentsMD)

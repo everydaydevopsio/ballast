@@ -1192,7 +1192,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 
             self.assertFalse((root / "AGENTS.md").exists())
 
-    def test_install_skips_existing_gemini_md_without_patch(self) -> None:
+    def test_install_patches_existing_gemini_md_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "GEMINI.md").write_text(
@@ -1201,6 +1201,12 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 ## Team Notes
 
 Keep this section.
+
+## Installed agent rules
+
+Read and follow these rule files in `.gemini/rules/` when they apply:
+
+- `.gemini/rules/old.md` - Old rule
 """,
                 encoding="utf-8",
             )
@@ -1209,9 +1215,12 @@ Keep this section.
                 root, "gemini", ["linting"], [], "python", False, False, False
             )
 
-            self.assertIn(str(root / "GEMINI.md"), result.skipped_support_files)
+            self.assertIn(str(root / "GEMINI.md"), result.installed_support_files)
+            self.assertNotIn(str(root / "GEMINI.md"), result.skipped_support_files)
             gemini_md = (root / "GEMINI.md").read_text(encoding="utf-8")
             self.assertIn("## Team Notes", gemini_md)
+            self.assertIn("`.gemini/rules/python-linting.md`", gemini_md)
+            self.assertNotIn("`.gemini/rules/old.md`", gemini_md)
             self.assertFalse((root / "AGENTS.md").exists())
 
     def test_patch_updates_gemini_md_section_only(self) -> None:

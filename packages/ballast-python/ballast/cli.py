@@ -1872,11 +1872,11 @@ def install(
 
     if target == "claude" and not disable_support_files:
         claude_md = root / "CLAUDE.md"
-        should_patch_claude_md = patch or patch_claude_md
+        should_patch_claude_md = (
+            (claude_md.exists() and not force) or patch or patch_claude_md
+        )
         if str(claude_md) in skipped_support_files:
             result.declined_support_files.append(str(claude_md))
-        elif claude_md.exists() and not force and not should_patch_claude_md:
-            result.skipped_support_files.append(str(claude_md))
         else:
             try:
                 content = build_claude_md(support_agents, support_skills, language)
@@ -1894,11 +1894,11 @@ def install(
 
     if target == "gemini" and not disable_support_files:
         gemini_md = root / "GEMINI.md"
-        should_patch_gemini_md = patch or patch_gemini_md
+        should_patch_gemini_md = (
+            (gemini_md.exists() and not force) or patch or patch_gemini_md
+        )
         if str(gemini_md) in skipped_support_files:
             result.declined_support_files.append(str(gemini_md))
-        elif gemini_md.exists() and not force and not should_patch_gemini_md:
-            result.skipped_support_files.append(str(gemini_md))
         else:
             try:
                 content = build_gemini_md(support_agents, support_skills, language)
@@ -1918,8 +1918,6 @@ def install(
         agents_md = root / "AGENTS.md"
         if str(agents_md) in skipped_support_files:
             result.declined_support_files.append(str(agents_md))
-        elif agents_md.exists() and not force and not patch:
-            result.skipped_support_files.append(str(agents_md))
         else:
             try:
                 content = build_codex_agents_md(
@@ -1929,7 +1927,7 @@ def install(
                     patch_codex_agents_md(
                         agents_md.read_text(encoding="utf-8"), content
                     )
-                    if agents_md.exists() and not force and patch
+                    if agents_md.exists() and not force
                     else content
                 )
                 agents_md.write_text(next_content, encoding="utf-8")
@@ -2010,11 +2008,6 @@ def print_install_result(
             "Skipped (already present; use --force to overwrite): "
             + ", ".join(result.skipped)
         )
-    if result.skipped_support_files:
-        print(
-            "Skipped support files (already present; use --force to overwrite): "
-            + ", ".join(result.skipped_support_files)
-        )
     if result.declined_support_files:
         print(
             "Skipped support files (overwrite declined): "
@@ -2054,24 +2047,6 @@ def run_install(args: argparse.Namespace) -> int:
         print(f"Invalid --target. Use: {', '.join(TARGETS)}")
         return 1
 
-    patch_claude_md = False
-    if "claude" in targets and (root / "CLAUDE.md").exists() and not bool(args.force):
-        if bool(args.patch):
-            patch_claude_md = True
-        elif not is_ci_mode() and not bool(args.yes):
-            patch_claude_md = prompt_yes_no(
-                f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?"
-            )
-
-    patch_gemini_md = False
-    if "gemini" in targets and (root / "GEMINI.md").exists() and not bool(args.force):
-        if bool(args.patch):
-            patch_gemini_md = True
-        elif not is_ci_mode() and not bool(args.yes):
-            patch_gemini_md = prompt_yes_no(
-                f"Existing GEMINI.md found at {root / 'GEMINI.md'}. Patch the Installed agent rules section?"
-            )
-
     support_decisions: dict[str, str | None] = {}
     for target in targets:
         skipped_support_file, support_error = confirm_support_file_overwrite(
@@ -2109,8 +2084,8 @@ def run_install(args: argparse.Namespace) -> int:
                     bool(args.force),
                     bool(args.patch),
                     False,
-                    patch_claude_md,
-                    patch_gemini_md,
+                    False,
+                    False,
                     {skipped_support_file} if skipped_support_file else None,
                     deployment_model,
                 ),
