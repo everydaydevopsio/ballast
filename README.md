@@ -309,7 +309,7 @@ Recommended order for one repository that uses all five language profiles:
 4. If the repo also contains Ansible, run `ballast-go install --language ansible --target cursor --all`.
 5. If the repo also contains Terraform, run `ballast-go install --language terraform --target cursor --all`.
 
-Ballast only installs shipped agents and skills and follows the single overwrite policy: existing rule and skill files are preserved unless you explicitly choose `--patch` or `--force`. Existing support files (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) are patched by default when `--force` is not set, updating only Ballast-managed installed-rule and installed-skill sections.
+Ballast only installs shipped agents and skills and follows the single overwrite policy: existing rule and skill files are preserved unless you explicitly choose `--patch` or `--force`. Existing support files (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) are patched by default when `--force` is not set, updating only installed-rule and installed-skill sections that include the Ballast-managed notice. Older or customized support-file sections without that notice are preserved unless you use `--patch` or confirm the interactive patch prompt.
 
 Use `--patch` when you want to merge upstream Ballast updates into an existing rule or skill file while preserving user-edited sections.
 
@@ -330,7 +330,7 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 - `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
 
-When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value, interactive installs prompt for `taskSystem` and app `deploymentModel`; `--yes` uses defaults. For CLI, library, or SDK-only projects, choose `none` for `deploymentModel`.
+When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value, interactive installs prompt for `taskSystem` and app `deploymentModel`; `--yes` and CI mode use defaults. For CLI, library, or SDK-only projects, choose `none` for `deploymentModel`.
 
 ## Wrapper Commands
 
