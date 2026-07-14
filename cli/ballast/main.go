@@ -3453,7 +3453,16 @@ func isInteractiveInstall(args []string) bool {
 			return false
 		}
 	}
-	return true
+	return !isCIMode()
+}
+
+func isCIMode() bool {
+	for _, name := range []string{"CI", "GITHUB_ACTIONS", "GITLAB_CI", "TF_BUILD", "BUILDKITE", "CIRCLECI"} {
+		if strings.TrimSpace(os.Getenv(name)) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func promptSupportFilePatch(path string) (bool, error) {

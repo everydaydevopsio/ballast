@@ -3569,6 +3569,29 @@ func TestUpdateMonorepoSupportFilesPreservesUnmanagedSectionsWithoutPatch(t *tes
 	}
 }
 
+func TestUpdateMonorepoSupportFilesDoesNotPromptInCI(t *testing.T) {
+	t.Setenv("CI", "true")
+	root := resolvedTempDir(t)
+	plan := &monorepoPlan{
+		Targets:  []string{"claude"},
+		Common:   []string{"local-dev"},
+		Language: []string{"linting"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+		},
+	}
+	mustWriteFile(t, filepath.Join(root, "CLAUDE.md"), "# CLAUDE.md\n\n## Installed agent rules\n\nCustom unmanaged rules section.\n")
+
+	output := captureStdout(t, func() {
+		if err := updateMonorepoSupportFiles(root, plan, []string{"install", "--target", "claude", "--all"}); err != nil {
+			t.Fatalf("updateMonorepoSupportFiles returned error: %v", err)
+		}
+	})
+	if strings.Contains(output, "Patch the Installed agent rules section") {
+		t.Fatalf("expected CI mode to avoid support-file prompt, got %q", output)
+	}
+}
+
 func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
 	root := resolvedTempDir(t)
 	rulePath := filepath.Join(root, ".codex", "rules", "common", "docs.md")
@@ -4113,6 +4136,7 @@ func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
 }
 
 func TestResolveMonorepoPlanPromptsForRequiredFirstRunOptions(t *testing.T) {
+	clearCIEnv(t)
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
 	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
@@ -4153,6 +4177,27 @@ func TestResolveMonorepoPlanPromptsForRequiredFirstRunOptions(t *testing.T) {
 	}
 	if !strings.Contains(got, "--deployment-model serverless") {
 		t.Fatalf("expected prompted deployment-model forwarded to backend, got %q", got)
+	}
+}
+
+func TestResolveMonorepoPlanDefaultsRequiredOptionsInCI(t *testing.T) {
+	t.Setenv("CI", "true")
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "codex", "--all"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil || len(plan.Invocations) == 0 {
+		t.Fatalf("expected monorepo plan, got %#v", plan)
+	}
+	if plan.Config.TaskSystem != "github" {
+		t.Fatalf("expected default taskSystem in CI, got %#v", plan.Config)
+	}
+	if plan.Config.DeploymentModel != "none" {
+		t.Fatalf("expected default deploymentModel in CI, got %#v", plan.Config)
 	}
 }
 
@@ -4365,6 +4410,13 @@ func withWorkingDir(t *testing.T, dir string, fn func()) {
 		}
 	})
 	fn()
+}
+
+func clearCIEnv(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{"CI", "GITHUB_ACTIONS", "GITLAB_CI", "TF_BUILD", "BUILDKITE", "CIRCLECI"} {
+		t.Setenv(name, "")
+	}
 }
 
 func captureStdout(t *testing.T, fn func()) string {
