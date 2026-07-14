@@ -211,6 +211,30 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(merged).not.toContain('`.codex/rules/old.md`');
     });
 
+    test('preserves unmanaged installed sections in managed-only mode', () => {
+      const existing = `# AGENTS.md
+
+## Installed agent rules
+
+- \`.codex/rules/old.md\` — Team managed rule
+`;
+
+      const canonical = `# AGENTS.md
+
+## Installed agent rules
+
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
+
+- \`.codex/rules/typescript-linting.md\` — Linting rule
+`;
+
+      const merged = patchCodexAgentsMd(existing, canonical, {
+        replaceUnmanagedSections: false
+      });
+      expect(merged).toContain('`.codex/rules/old.md`');
+      expect(merged).toContain('`.codex/rules/typescript-linting.md`');
+    });
+
     test('ignores installed-rules headings inside fenced code blocks', () => {
       const existing = `# AGENTS.md
 

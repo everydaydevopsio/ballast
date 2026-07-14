@@ -1019,7 +1019,7 @@ func TestRunInstallPromptsToPatchExistingGeminiMD(t *testing.T) {
 		t.Fatal(err)
 	}
 	geminiPath := filepath.Join(tmpDir, "GEMINI.md")
-	if err := os.WriteFile(geminiPath, []byte("# GEMINI.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\n- `.gemini/rules/old.md` - Old rule\n"), 0o644); err != nil {
+	if err := os.WriteFile(geminiPath, []byte("# GEMINI.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\n- `.gemini/rules/old.md` - Old rule\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2016,7 +2016,7 @@ Keep my custom rule text.
 		t.Fatal(err)
 	}
 	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
-	if err := os.WriteFile(agentsMD, []byte("# AGENTS.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nRead and follow these rule files in `.codex/rules/` when they apply:\n\n- `.codex/rules/old.md` - Old rule\n"), 0o644); err != nil {
+	if err := os.WriteFile(agentsMD, []byte("# AGENTS.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\nRead and follow these rule files in `.codex/rules/` when they apply:\n\n- `.codex/rules/old.md` - Old rule\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2052,6 +2052,39 @@ Keep my custom rule text.
 	}
 	if strings.Contains(text, "`.codex/rules/old.md`") {
 		t.Fatalf("expected old installed-rules entry to be replaced: %s", text)
+	}
+}
+
+func TestInstallDefaultPatchPreservesUnmanagedCodexSupportSection(t *testing.T) {
+	tmpDir := t.TempDir()
+	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
+	if err := os.WriteFile(agentsMD, []byte("# AGENTS.md\n\n## Installed agent rules\n\n- `.codex/rules/old.md` - Team managed rule\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex"},
+		agents:      []string{"linting"},
+		language:    "go",
+		force:       false,
+		patch:       false,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	content, err := os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "`.codex/rules/old.md`") {
+		t.Fatalf("expected unmanaged section to be preserved: %s", text)
+	}
+	if !strings.Contains(text, "`.codex/rules/go-linting.md`") {
+		t.Fatalf("expected linting rule to be installed: %s", text)
 	}
 }
 
@@ -2168,5 +2201,18 @@ func TestPatchCodexAgentsMDIgnoresHeadingInsideCodeFence(t *testing.T) {
 	}
 	if !strings.Contains(merged, "```md\n## Installed agent rules\n```") {
 		t.Fatalf("expected fenced code block to be preserved without matching: %s", merged)
+	}
+}
+
+func TestPatchCodexAgentsMDPreservesUnmanagedSectionsInManagedOnlyMode(t *testing.T) {
+	existing := "# AGENTS.md\n\n## Installed agent rules\n\n- `.codex/rules/old.md` - Team managed rule\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\n- `.codex/rules/go-linting.md` - New rule\n"
+
+	merged := patchCodexAgentsMDWithOptions(existing, canonical, false)
+	if !strings.Contains(merged, "`.codex/rules/old.md`") {
+		t.Fatalf("expected unmanaged section to be preserved: %s", merged)
+	}
+	if !strings.Contains(merged, "`.codex/rules/go-linting.md`") {
+		t.Fatalf("expected managed section to be appended: %s", merged)
 	}
 }

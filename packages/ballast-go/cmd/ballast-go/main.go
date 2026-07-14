@@ -1058,7 +1058,7 @@ func install(opts installOptions) installResult {
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "codex", err: readErr.Error()})
 						} else {
-							nextContent = patchCodexAgentsMD(string(existing), content)
+							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch)
 						}
 					}
 					if err := os.WriteFile(agentsPath, []byte(nextContent), 0o644); err != nil {
@@ -1088,7 +1088,7 @@ func install(opts installOptions) installResult {
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "claude", err: readErr.Error()})
 						} else {
-							nextContent = patchCodexAgentsMD(string(existing), content)
+							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch || opts.patchClaude)
 						}
 					}
 					if err := os.WriteFile(claudePath, []byte(nextContent), 0o644); err != nil {
@@ -1118,7 +1118,7 @@ func install(opts installOptions) installResult {
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "gemini", err: readErr.Error()})
 						} else {
-							nextContent = patchCodexAgentsMD(string(existing), content)
+							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch || opts.patchGemini)
 						}
 					}
 					if err := os.WriteFile(geminiPath, []byte(nextContent), 0o644); err != nil {
@@ -1843,36 +1843,65 @@ func patchRuleContent(existing, canonical, target string) string {
 }
 
 func findSectionRange(content, heading string) (int, int, bool) {
+	ranges := findSectionRanges(content, heading)
+	if len(ranges) == 0 {
+		return 0, 0, false
+	}
+	return ranges[0].start, ranges[0].end, true
+}
+
+type sectionRange struct {
+	start int
+	end   int
+}
+
+func findSectionRanges(content, heading string) []sectionRange {
 	normalized := normalizeLineEndings(content)
 	lines := strings.SplitAfter(normalized, "\n")
 	position := 0
-	start := -1
-	end := len(normalized)
 	marker := "## " + heading
 	inCodeFence := false
+	type headingPosition struct {
+		line  string
+		start int
+	}
+	headings := []headingPosition{}
 
-	for index, line := range lines {
+	for _, line := range lines {
 		trimmed := strings.TrimSuffix(line, "\n")
 		if strings.HasPrefix(strings.TrimSpace(trimmed), "```") {
 			inCodeFence = !inCodeFence
 		}
-		if !inCodeFence && start < 0 {
-			if trimmed == marker {
-				start = position
-			}
-		} else if !inCodeFence && strings.HasPrefix(trimmed, "## ") {
-			end = position
-			return start, end, true
+		if !inCodeFence && strings.HasPrefix(trimmed, "## ") {
+			headings = append(headings, headingPosition{line: trimmed, start: position})
 		}
 		position += len(line)
-		if index == len(lines)-1 && start >= 0 {
-			return start, end, true
-		}
 	}
-	return 0, 0, false
+
+	ranges := []sectionRange{}
+	for index, headingPosition := range headings {
+		if headingPosition.line != marker {
+			continue
+		}
+		end := len(normalized)
+		if index+1 < len(headings) {
+			end = headings[index+1].start
+		}
+		ranges = append(ranges, sectionRange{start: headingPosition.start, end: end})
+	}
+	return ranges
 }
 
 func patchCodexAgentsMD(existing, canonical string) string {
+	return patchCodexAgentsMDWithOptions(existing, canonical, true)
+}
+
+func hasBallastManagedNotice(section string) bool {
+	return strings.Contains(section, "Created by [Ballast]") &&
+		strings.Contains(section, "Do not edit this section.")
+}
+
+func patchCodexAgentsMDWithOptions(existing, canonical string, replaceUnmanagedSections bool) string {
 	if strings.TrimSpace(existing) == "" {
 		return normalizeLineEndings(canonical)
 	}
@@ -1885,16 +1914,24 @@ func patchCodexAgentsMD(existing, canonical string) string {
 			continue
 		}
 		canonicalSection := strings.TrimRight(canonical[canonicalStart:canonicalEnd], "\n")
-		existingStart, existingEnd, ok := findSectionRange(current, heading)
-		if !ok {
+		var existingRange sectionRange
+		found := false
+		for _, candidate := range findSectionRanges(current, heading) {
+			if replaceUnmanagedSections || hasBallastManagedNotice(current[candidate.start:candidate.end]) {
+				existingRange = candidate
+				found = true
+				break
+			}
+		}
+		if !found {
 			current = strings.TrimRight(current, "\n") + "\n\n" + canonicalSection + "\n"
 			continue
 		}
-		current = strings.TrimRight(current[:existingStart], "\n") +
+		current = strings.TrimRight(current[:existingRange.start], "\n") +
 			"\n\n" +
 			canonicalSection +
 			"\n\n" +
-			strings.TrimLeft(current[existingEnd:], "\n") + "\n"
+			strings.TrimLeft(current[existingRange.end:], "\n") + "\n"
 	}
 	return current
 }

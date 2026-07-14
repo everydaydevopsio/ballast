@@ -776,7 +776,13 @@ export function install(options: InstallOptions): InstallResult {
         );
         const nextContent =
           fs.existsSync(claudeMdPath) && !force && shouldPatchClaudeMd
-            ? patchCodexAgentsMd(fs.readFileSync(claudeMdPath, 'utf8'), content)
+            ? patchCodexAgentsMd(
+                fs.readFileSync(claudeMdPath, 'utf8'),
+                content,
+                {
+                  replaceUnmanagedSections: patch || patchClaudeMd
+                }
+              )
             : content;
         fs.writeFileSync(claudeMdPath, nextContent, 'utf8');
         installedSupportFiles.push(claudeMdPath);
@@ -804,7 +810,13 @@ export function install(options: InstallOptions): InstallResult {
         );
         const nextContent =
           fs.existsSync(geminiMdPath) && !force && shouldPatchGeminiMd
-            ? patchCodexAgentsMd(fs.readFileSync(geminiMdPath, 'utf8'), content)
+            ? patchCodexAgentsMd(
+                fs.readFileSync(geminiMdPath, 'utf8'),
+                content,
+                {
+                  replaceUnmanagedSections: patch || patchGeminiMd
+                }
+              )
             : content;
         fs.writeFileSync(geminiMdPath, nextContent, 'utf8');
         installedSupportFiles.push(geminiMdPath);
@@ -830,7 +842,13 @@ export function install(options: InstallOptions): InstallResult {
         );
         const nextContent =
           fs.existsSync(agentsMdPath) && !force
-            ? patchCodexAgentsMd(fs.readFileSync(agentsMdPath, 'utf8'), content)
+            ? patchCodexAgentsMd(
+                fs.readFileSync(agentsMdPath, 'utf8'),
+                content,
+                {
+                  replaceUnmanagedSections: patch
+                }
+              )
             : content;
         fs.writeFileSync(agentsMdPath, nextContent, 'utf8');
         installedSupportFiles.push(agentsMdPath);

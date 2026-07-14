@@ -11,6 +11,15 @@ interface MarkdownSection {
   text: string;
 }
 
+interface MarkdownSectionRange {
+  start: number;
+  end: number;
+}
+
+interface PatchCodexAgentsMdOptions {
+  replaceUnmanagedSections?: boolean;
+}
+
 interface ParsedMarkdownBody {
   intro: string;
   sections: MarkdownSection[];
@@ -186,48 +195,61 @@ export function patchRuleContent(
   }
 }
 
-function findMarkdownSectionRange(
+function findMarkdownSectionRanges(
   content: string,
   heading: string
-): { start: number; end: number } | null {
+): MarkdownSectionRange[] {
   const lines = content.split(/\r?\n/);
   const targetHeading = `## ${heading}`;
   let inFence = false;
   let offset = 0;
+  const headings: Array<{ line: string; start: number }> = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (const line of lines) {
     if (line.startsWith('```')) {
       inFence = !inFence;
     }
-    if (!inFence && line === targetHeading) {
-      const start = offset;
-      offset += line.length + 1;
-      for (let j = i + 1; j < lines.length; j++) {
-        const nextLine = lines[j];
-        if (nextLine.startsWith('```')) {
-          inFence = !inFence;
-        }
-        if (!inFence && nextLine.startsWith('## ')) {
-          return { start, end: offset - 1 };
-        }
-        offset += nextLine.length + 1;
-      }
-      return { start, end: content.length };
+    if (!inFence && line.startsWith('## ')) {
+      headings.push({ line, start: offset });
     }
     offset += line.length + 1;
   }
-  return null;
+
+  return headings
+    .map((item, index) => ({
+      heading: item.line,
+      start: item.start,
+      end:
+        index + 1 < headings.length ? headings[index + 1].start : content.length
+    }))
+    .filter((range) => range.heading === targetHeading)
+    .map(({ start, end }) => ({ start, end }));
+}
+
+function findMarkdownSectionRange(
+  content: string,
+  heading: string
+): MarkdownSectionRange | null {
+  return findMarkdownSectionRanges(content, heading)[0] ?? null;
+}
+
+function hasBallastManagedNotice(section: string): boolean {
+  return (
+    section.includes('Created by [Ballast]') &&
+    section.includes('Do not edit this section.')
+  );
 }
 
 export function patchCodexAgentsMd(
   existing: string,
-  canonical: string
+  canonical: string,
+  options: PatchCodexAgentsMdOptions = {}
 ): string {
   if (!existing.trim()) {
     return canonical;
   }
 
+  const replaceUnmanagedSections = options.replaceUnmanagedSections ?? true;
   let next = existing;
   for (const heading of ['Installed agent rules', 'Installed skills']) {
     const canonicalRange = findMarkdownSectionRange(canonical, heading);
@@ -238,7 +260,13 @@ export function patchCodexAgentsMd(
     const canonicalSection = canonical
       .slice(canonicalRange.start, canonicalRange.end)
       .trimEnd();
-    const existingRange = findMarkdownSectionRange(next, heading);
+    const existingRange =
+      findMarkdownSectionRanges(next, heading).find((range) => {
+        if (replaceUnmanagedSections) {
+          return true;
+        }
+        return hasBallastManagedNotice(next.slice(range.start, range.end));
+      }) ?? null;
 
     if (!existingRange) {
       next = `${next.trimEnd()}\n\n${canonicalSection}\n`;

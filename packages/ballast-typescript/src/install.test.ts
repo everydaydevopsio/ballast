@@ -1699,6 +1699,8 @@ Keep this section.
 
 ## Installed agent rules
 
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
+
 Read and follow these rule files in \`.claude/rules/\` when they apply:
 
 - \`.claude/rules/old.md\` — Old rule
@@ -1850,6 +1852,8 @@ Keep this section.
 
 ## Installed agent rules
 
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
+
 Read and follow these rule files in \`.gemini/rules/\` when they apply:
 
 - \`.gemini/rules/old.md\` — Old rule
@@ -1906,6 +1910,8 @@ Read and follow these rule files in \`.gemini/rules/\` when they apply:
 Keep this section.
 
 ## Installed agent rules
+
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
 
 Read and follow these rule files in \`.gemini/rules/\` when they apply:
 
@@ -2011,6 +2017,33 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         expect(agentsMd).toContain('Keep this section.');
         expect(agentsMd).toContain('`.codex/rules/typescript-linting.md`');
         expect(agentsMd).not.toContain('`.codex/rules/old.md`');
+      });
+
+      test('codex default patch preserves unmanaged installed rules section', () => {
+        fs.writeFileSync(
+          path.join(tmpDir, 'AGENTS.md'),
+          `# AGENTS.md
+
+## Installed agent rules
+
+- \`.codex/rules/old.md\` — Team managed rule
+`
+        );
+
+        install({
+          projectRoot: tmpDir,
+          target: 'codex',
+          agents: ['linting'],
+          force: false,
+          saveConfig: false
+        });
+
+        const agentsMd = fs.readFileSync(
+          path.join(tmpDir, 'AGENTS.md'),
+          'utf8'
+        );
+        expect(agentsMd).toContain('`.codex/rules/old.md`');
+        expect(agentsMd).toContain('`.codex/rules/typescript-linting.md`');
       });
 
       test('codex patch keeps rules in AGENTS.md for config-backed skill-only updates', () => {
