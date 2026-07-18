@@ -244,7 +244,7 @@ describe('build', () => {
       expect(content).toContain('web smoke test');
       expect(content).toContain('live route or health endpoint');
       expect(content).toContain(
-        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
       );
       expect(content).toContain(
         'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
@@ -252,15 +252,73 @@ describe('build', () => {
       expect(content).toContain('one critical user workflow');
     });
 
+    test('returns TypeScript testing content with integration framework detection guidance', () => {
+      const content = getContent('testing', undefined, 'typescript');
+      expect(content).toContain(
+        'Detect existing unit, integration, and browser E2E frameworks before adding or replacing test tooling.'
+      );
+      for (const marker of [
+        'Jest',
+        'Vitest',
+        'Cypress',
+        'Playwright',
+        'WebdriverIO',
+        'Selenium',
+        'Puppeteer',
+        'Testing Library'
+      ]) {
+        expect(content).toContain(marker);
+      }
+      expect(content).toContain(
+        'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
+      );
+      expect(content).toContain(
+        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
+      );
+      expect(content).toContain(
+        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
+      );
+    });
+
     test('returns Python testing content with web smoke and E2E placement guidance', () => {
       const content = getContent('testing', undefined, 'python');
       expect(content).toContain('web smoke test');
       expect(content).toContain('live route or health endpoint');
       expect(content).toContain(
-        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
       );
       expect(content).toContain(
         'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
+      );
+    });
+
+    test('returns Python testing content with integration framework detection guidance', () => {
+      const content = getContent('testing', undefined, 'python');
+      expect(content).toContain(
+        'Detect existing unit, integration, API/service, and browser E2E frameworks before adding or replacing test tooling.'
+      );
+      for (const marker of [
+        'pytest',
+        'unittest',
+        'tox',
+        'nox',
+        'Robot Framework',
+        'Selenium',
+        'pytest-playwright',
+        'Playwright',
+        'FastAPI TestClient',
+        'Django test client'
+      ]) {
+        expect(content).toContain(marker);
+      }
+      expect(content).toContain(
+        'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
+      );
+      expect(content).toContain(
+        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
+      );
+      expect(content).toContain(
+        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
       );
     });
 
@@ -341,6 +399,35 @@ describe('build', () => {
       const content = getContent('testing', undefined, 'go');
       expect(content).toContain('Go testing specialist');
       expect(content).toContain('go test ./...');
+    });
+
+    test('returns Go testing content with integration framework detection guidance', () => {
+      const content = getContent('testing', undefined, 'go');
+      expect(content).toContain(
+        'Detect existing unit, integration, API/service, and browser E2E frameworks before adding or replacing test tooling.'
+      );
+      for (const marker of [
+        'go test',
+        'integration build tags',
+        '_integration_test.go',
+        'httptest',
+        'Selenium',
+        'chromedp',
+        'rod',
+        'agouti',
+        'Playwright'
+      ]) {
+        expect(content).toContain(marker);
+      }
+      expect(content).toContain(
+        'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
+      );
+      expect(content).toContain(
+        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
+      );
+      expect(content).toContain(
+        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
+      );
     });
   });
 
@@ -525,7 +612,7 @@ describe('build', () => {
       const testing = buildCodexFormat('testing');
       expect(testing).toContain('web smoke test');
       expect(testing).toContain(
-        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
       );
       expect(testing).toContain(
         'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
@@ -534,7 +621,7 @@ describe('build', () => {
       const pythonTesting = buildCodexFormat('testing', undefined, 'python');
       expect(pythonTesting).toContain('web smoke test');
       expect(pythonTesting).toContain(
-        'Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.'
+        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
       );
       expect(pythonTesting).toContain(
         'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
@@ -547,6 +634,32 @@ describe('build', () => {
       expect(publishingCli).toContain('representative command');
       expect(publishingCli).toContain(
         'Keep local packaged-command smoke checks fast, run them in pre-push when the packaged artifact can be built deterministically, and require them in CI before publish jobs.'
+      );
+    });
+
+    test('includes framework detection guidance in generated Codex testing rules', () => {
+      const testing = buildCodexFormat('testing');
+      expect(testing).toContain('Cypress');
+      expect(testing).toContain('WebdriverIO');
+      expect(testing).toContain(
+        'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
+      );
+      expect(testing).toContain(
+        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
+      );
+
+      const pythonTesting = buildCodexFormat('testing', undefined, 'python');
+      expect(pythonTesting).toContain('Robot Framework');
+      expect(pythonTesting).toContain('pytest-playwright');
+      expect(pythonTesting).toContain(
+        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
+      );
+
+      const goTesting = buildCodexFormat('testing', undefined, 'go');
+      expect(goTesting).toContain('chromedp');
+      expect(goTesting).toContain('integration build tags');
+      expect(goTesting).toContain(
+        'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
       );
     });
   });

@@ -297,6 +297,32 @@ Ballast testing and publishing rules mention smoke tests, but they do not consis
 5. `docs/agents/testing.md` and `docs/agents/publishing.md` include the same operator-facing guidance.
 6. Tests or snapshots fail if the generated guidance drops the required smoke/E2E or CLI packaged-command expectations.
 
+## Integration Framework Detection Guidance
+
+### Problem
+
+Ballast testing rules now define smoke and E2E expectations, but agents still need explicit framework-detection discipline before adding or changing integration tests. Without language-aware detection markers, agents can replace established E2E stacks, add Playwright to library-only repositories, or miss browser app surfaces that should use Playwright when no browser E2E framework exists.
+
+### Requirements
+
+1. Generated TypeScript testing guidance must tell agents to detect existing unit, integration, and browser E2E frameworks before introducing new test tooling.
+2. Generated Python and Go testing guidance must tell agents to detect existing unit, integration, API, service, and browser E2E frameworks before introducing new test tooling.
+3. Browser E2E guidance must preserve an existing browser E2E framework such as Cypress, WebdriverIO, Selenium, Puppeteer, Robot Framework, pytest-playwright, Playwright Test, or Go browser harnesses when one is already present.
+4. Browser E2E guidance must prefer Playwright only when Playwright markers already exist or when the repository has a real browser application surface and no existing browser E2E framework.
+5. Generated guidance must warn agents not to add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.
+6. Documentation must describe the same framework-detection and Playwright-selection expectations.
+7. Automated generated-content tests must cover the framework markers, existing-framework preservation, Playwright preference, and non-browser guardrail.
+
+### Acceptance Criteria
+
+1. TypeScript generated testing rules mention package/config markers for Jest, Vitest, Cypress, Playwright, WebdriverIO, Selenium, Puppeteer, and Testing Library.
+2. Python generated testing rules mention markers for pytest, unittest, tox/nox, Robot Framework, Selenium, Playwright or pytest-playwright, and API/service test clients.
+3. Go generated testing rules mention `go test`, integration build tags or naming, API/service tests, Selenium/chromedp/rod/agouti, and Playwright-driven browser harnesses.
+4. Generated testing rules for TypeScript, Python, and Go preserve existing browser E2E frameworks before adding Playwright.
+5. Generated testing rules for TypeScript, Python, and Go prefer Playwright only for existing Playwright repos or browser apps with no existing browser E2E framework.
+6. `docs/agents/testing.md` includes operator-facing framework-detection guidance aligned with generated rules.
+7. Tests fail if generated guidance loses required detection markers, existing-framework preservation, Playwright preference, or non-browser guardrails.
+
 ## Deployment Model Configuration
 
 ### Problem

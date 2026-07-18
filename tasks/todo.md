@@ -1,5 +1,15 @@
 # Tasks
 
+- [x] Confirm issue #145 scope, operating mode, and governing PRD gap.
+- [x] Add PRD requirements for integration-framework detection and Playwright preference across supported languages.
+- [x] Add failing generated-content coverage for framework detection markers and browser E2E framework selection.
+- [x] Update canonical testing guidance sources and docs.
+- [x] Sync package mirrors; leave checked-in `.codex`/`.claude` rule outputs unchanged per maintainer direction to change templates instead of generated rules.
+- [x] Run focused tests.
+- [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
+
+## Previous Tasks
+
 - [x] Confirm issue #160 scope, operating mode, and Terraform/OpenTofu tooling sources.
 - [x] Add PRD requirements for Terraform linting, testing, CI, security scanner, and OpenTofu guidance.
 - [x] Add failing generated-content coverage for Terraform best-practice guidance.
@@ -7,8 +17,6 @@
 - [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
 - [x] Run focused tests and required sync/generation checks.
 - [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
-
-## Previous Tasks
 
 - [x] Confirm issue #215 broader deployment-model scope, operating mode, and PRD requirements.
 - [x] Add PRD requirements for deployment model prompts, flags, persistence, doctor output, and publishing guidance.
