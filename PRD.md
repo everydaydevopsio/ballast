@@ -1,5 +1,33 @@
 # Product Requirements
 
+## Consolidated CI Workflow
+
+### Problem
+
+Ballast's primary pull-request validation is split across separate lint, test, and language-pack workflows. Contributors need one canonical CI entry point that shows the full merge validation contract while still running independent language lanes in parallel.
+
+### Requirements
+
+1. The repository must use `.github/workflows/ci.yml` as the primary CI workflow for pull requests and pushes to `main`.
+2. The CI workflow must include a workflow-level `concurrency` block that cancels superseded runs for the same workflow and ref.
+3. The CI workflow must preserve TypeScript lint, format, test, and coverage validation, including Node 22 and Node 24 test coverage for supported runtime compatibility.
+4. The CI workflow must preserve Python lint, format, test, coverage, and package import validation.
+5. The CI workflow must preserve Go package and wrapper CLI lint, vet, tidy, test, coverage, and build validation.
+6. Independent language and package lanes must run in parallel wherever practical.
+7. Superseded primary CI workflow files must be removed or reduced to non-overlapping helpers so `ci.yml` is the clear contributor-facing CI contract.
+8. README badges must point at the canonical CI workflow instead of retired lint or test workflows.
+
+### Acceptance Criteria
+
+1. `.github/workflows/ci.yml` exists and triggers on `pull_request` and pushes to `main`.
+2. `ci.yml` includes `concurrency.group: ${{ github.workflow }}-${{ github.ref }}` and `cancel-in-progress: true`.
+3. `ci.yml` contains separate parallel jobs for TypeScript, Python, Go package, and wrapper CLI validation.
+4. TypeScript tests run against Node 22 and Node 24, and TypeScript coverage is uploaded to Codecov.
+5. Python and Go coverage outputs are uploaded to Codecov.
+6. Python package import checks, Go language-pack builds, and wrapper CLI builds remain represented in CI.
+7. `.github/workflows/lint.yaml`, `.github/workflows/test.yml`, and `.github/workflows/language-packs.yml` are removed because their coverage is represented in `ci.yml`.
+8. The README CI badge references `.github/workflows/ci.yml`.
+
 ## Terraform Rule Best-Practices Alignment
 
 ### Problem

@@ -8,6 +8,23 @@ type GoReleaserConfig = {
   };
 };
 
+type WorkflowConfig = {
+  name?: string;
+  on?: {
+    push?: {
+      branches?: string[];
+    };
+    pull_request?: {
+      branches?: string[];
+    };
+  };
+  concurrency?: {
+    group?: string;
+    'cancel-in-progress'?: boolean;
+  };
+  jobs?: Record<string, unknown>;
+};
+
 const repoRoot = path.resolve(__dirname, '../../..');
 
 function readGoReleaserConfig(relativePath: string): GoReleaserConfig {
@@ -18,6 +35,10 @@ function readGoReleaserConfig(relativePath: string): GoReleaserConfig {
 
 function readRepoFile(relativePath: string): string {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+}
+
+function readWorkflowConfig(relativePath: string): WorkflowConfig {
+  return YAML.parse(readRepoFile(relativePath)) as WorkflowConfig;
 }
 
 describe('release config', () => {
@@ -49,5 +70,50 @@ describe('release config', () => {
       expect(workflow).not.toContain("version: '~> v2'");
       expect(pinnedVersions.length).toBe(goreleaserUses.length);
     }
+  });
+
+  test('primary CI is consolidated into one parallel workflow', () => {
+    const workflow = readWorkflowConfig('.github/workflows/ci.yml');
+    const readme = readRepoFile('README.md');
+    const jobs = workflow.jobs ?? {};
+
+    expect(workflow.name).toBe('CI');
+    expect(workflow.on?.push?.branches).toContain('main');
+    expect(workflow.on?.pull_request?.branches).toContain('main');
+    expect(workflow.concurrency?.group).toBe(
+      '${{ github.workflow }}-${{ github.ref }}'
+    );
+    expect(workflow.concurrency?.['cancel-in-progress']).toBe(true);
+
+    for (const jobName of [
+      'typescript-lint',
+      'typescript-tests',
+      'typescript-coverage',
+      'python-lint',
+      'python-tests',
+      'python-package',
+      'go-pack-lint',
+      'go-pack-tests',
+      'go-package',
+      'cli-lint',
+      'cli-tests',
+      'cli-package'
+    ]) {
+      expect(Object.prototype.hasOwnProperty.call(jobs, jobName)).toBe(true);
+    }
+
+    expect(readRepoFile('.github/workflows/ci.yml')).toContain(
+      'node-version: ${{ matrix.node-version }}'
+    );
+    expect(readme).toContain('actions/workflows/ci.yml/badge.svg');
+    expect(
+      fs.existsSync(path.join(repoRoot, '.github/workflows/lint.yaml'))
+    ).toBe(false);
+    expect(
+      fs.existsSync(path.join(repoRoot, '.github/workflows/test.yml'))
+    ).toBe(false);
+    expect(
+      fs.existsSync(path.join(repoRoot, '.github/workflows/language-packs.yml'))
+    ).toBe(false);
   });
 });
