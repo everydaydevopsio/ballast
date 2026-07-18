@@ -10,7 +10,7 @@ Ballast's primary pull-request validation is split across separate lint, test, a
 
 1. The repository must use `.github/workflows/ci.yml` as the primary CI workflow for pull requests and pushes to `main`.
 2. The CI workflow must include a workflow-level `concurrency` block that cancels superseded runs for the same workflow and ref.
-3. The CI workflow must preserve TypeScript lint, format, test, and coverage validation, including Node 22 and Node 24 test coverage for supported runtime compatibility.
+3. The CI workflow must preserve TypeScript lint, format, test, and coverage validation, including Node 22 and Node 24 test runs for supported runtime compatibility.
 4. The CI workflow must preserve Python lint, format, test, coverage, and package import validation.
 5. The CI workflow must preserve Go package and wrapper CLI lint, vet, tidy, test, coverage, and build validation.
 6. Independent language and package lanes must run in parallel wherever practical.
