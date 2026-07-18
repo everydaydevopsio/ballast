@@ -1,0 +1,323 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typescript-lint:
+    name: TypeScript lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm --filter @everydaydevopsio/ballast run lint
+
+      - name: Check Prettier formatting
+        run: pnpm --filter @everydaydevopsio/ballast run prettier
+
+  typescript-tests:
+    name: TypeScript tests (${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22.x, 24.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TypeScript package
+        run: pnpm --filter @everydaydevopsio/ballast run build
+
+      - name: Run TypeScript package unit tests
+        run: pnpm --filter @everydaydevopsio/ballast run test
+
+  typescript-coverage:
+    name: TypeScript coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.27.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TypeScript package
+        run: pnpm --filter @everydaydevopsio/ballast run build
+
+      - name: Run TypeScript package tests with coverage
+        run: pnpm --filter @everydaydevopsio/ballast run test:coverage
+
+      - name: Upload TypeScript coverage
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./packages/ballast-typescript/coverage/lcov.info
+          flags: typescript
+          name: codecov-typescript
+          fail_ci_if_error: false
+
+  python-lint:
+    name: Python lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Ruff check
+        working-directory: packages/ballast-python
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        working-directory: packages/ballast-python
+        run: uv run ruff format --check .
+
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Run Python package unit tests with coverage
+        working-directory: packages/ballast-python
+        run: |
+          uv run --with coverage coverage run --source=ballast -m unittest discover -s tests
+          uv run --with coverage coverage xml -o coverage.xml
+
+      - name: Upload Python coverage
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./packages/ballast-python/coverage.xml
+          flags: python
+          name: codecov-python
+          fail_ci_if_error: false
+
+  python-package:
+    name: Python package validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Validate package imports
+        working-directory: packages/ballast-python
+        run: uv run --python 3.12 python -c "import ballast.cli; import ballast.__main__"
+
+  go-pack-lint:
+    name: Go package lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Check gofmt
+        working-directory: packages/ballast-go
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run go vet
+        working-directory: packages/ballast-go
+        run: go vet ./...
+
+      - name: Check go.mod and go.sum are tidy
+        working-directory: packages/ballast-go
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+  go-pack-tests:
+    name: Go package tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Run ballast-go unit tests with coverage
+        working-directory: packages/ballast-go
+        run: go test ./... -covermode=atomic -coverprofile=coverage.out
+
+      - name: Upload ballast-go coverage
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./packages/ballast-go/coverage.out
+          flags: go-pack
+          name: codecov-go-pack
+          fail_ci_if_error: false
+
+  go-package:
+    name: Go package build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Build ballast-go language pack
+        working-directory: packages/ballast-go
+        run: go build ./cmd/ballast-go
+
+  cli-lint:
+    name: CLI lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Check gofmt
+        working-directory: cli/ballast
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run go vet
+        working-directory: cli/ballast
+        run: go vet ./...
+
+      - name: Check go.mod and go.sum are tidy
+        working-directory: cli/ballast
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+  cli-tests:
+    name: CLI tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Run ballast wrapper unit tests with coverage
+        working-directory: cli/ballast
+        run: go test ./... -covermode=atomic -coverprofile=coverage.out
+
+      - name: Upload ballast wrapper coverage
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./cli/ballast/coverage.out
+          flags: cli
+          name: codecov-cli
+          fail_ci_if_error: false
+
+  cli-package:
+    name: CLI build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+
+      - name: Build ballast wrapper
+        working-directory: cli/ballast
+        run: go build .

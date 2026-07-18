@@ -1,7 +1,6 @@
 # Ballast
 
-[![CI](https://github.com/everydaydevopsio/ballast/actions/workflows/test.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/test.yml)
-[![Lint](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/lint.yaml)
+[![CI](https://github.com/everydaydevopsio/ballast/actions/workflows/ci.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/ci.yml)
 [![Release](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml)
 [![License](https://img.shields.io/github/license/everydaydevopsio/ballast)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/everydaydevopsio/ballast)](https://github.com/everydaydevopsio/ballast/releases)
