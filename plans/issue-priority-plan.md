@@ -1,6 +1,6 @@
 # Plan: Open Issue Review and Next Priorities
 
-**Status:** Updated after #93 / PR #231, #145 / PR #230, #160, #209, #210, #213, #214, #215, and PR #226 completion
+**Status:** Updated after #93 / PR #231, #145 / PR #230, #160 / PR #224, #209 and #210 / PR #220, #213 / PR #221, #214 / PR #222, #215 / PR #223, and PR #226 completion
 **Created:** 2026-07-09
 **Source:** Review of open GitHub issues and requested follow-up list
 
@@ -150,7 +150,7 @@ These make agent work easier to review, preserve implementation context, and kee
 
 ### P3: Expand platform and deployment coverage
 
-- [x] #215: Define Kubernetes deployment guidance with local Helm chart and external ArgoCD config — completed and merged via PR #223
+- [x] #215: Define deployment guidance with local Helm chart and external ArgoCD config — completed and merged via PR #223
 
 1. #188: Re-enable OpenCode as a first-class Ballast target
 2. #133: Create MCP server so AI agents can configure and use Ballast directly
