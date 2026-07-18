@@ -179,9 +179,8 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Validate package imports
-        run: |
-          uv run --python 3.12 python -m py_compile packages/ballast-python/ballast/cli.py
-          uv run --python 3.12 python -m py_compile packages/ballast-python/ballast/__main__.py
+        working-directory: packages/ballast-python
+        run: uv run --python 3.12 python -c "import ballast.cli; import ballast.__main__"
 
   go-pack-lint:
     name: Go package lint
