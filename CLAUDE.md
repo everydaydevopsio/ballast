@@ -23,6 +23,10 @@ Suggested facts to record:
 
 Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.
 
+- Root `.rulesrc.json` targets are repo policy. Keep them aligned with every checked-in Ballast-managed target surface.
+- Do not edit checked-in `.claude/` or `.codex/` generated rule outputs directly. Change the source templates/content under repo-root `agents/` and `skills/`, then regenerate the local Ballast-managed outputs.
+- When repo-root `agents/`, `skills/`, Ballast sync/build scripts, or root target config change, regenerate and commit the corresponding local Ballast-managed `.claude/` and `.codex/` outputs in the same PR.
+
 ## Installed agent rules
 
 Created by Ballast. Do not edit this section.
@@ -69,4 +73,3 @@ Read and use these skill files in `.claude/skills/` when they are relevant:
 - `.claude/skills/aws-live-health-review.skill` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
 - `.claude/skills/aws-weekly-security-review.skill` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `.claude/skills/ballast-audit.skill` — audit AI rule and skill files for context density, duplication, and bloat
-
