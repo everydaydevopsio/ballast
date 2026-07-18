@@ -20,7 +20,9 @@ EOF
 
 OUTPUT="$(
   cd "${PROJECT}"
-  printf 'linear\nserverless\n' | ballast-go install --target codex --language go --all
+  printf 'linear\nserverless\n' |
+    env -u CI -u GITHUB_ACTIONS -u GITLAB_CI -u TF_BUILD -u BUILDKITE -u CIRCLECI \
+      ballast-go install --target codex --language go --all
 )"
 
 assert_contains '"taskSystem": "linear"' "${PROJECT}/.rulesrc.json"

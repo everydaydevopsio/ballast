@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -2085,6 +2086,67 @@ func TestInstallDefaultPatchPreservesUnmanagedCodexSupportSection(t *testing.T) 
 	}
 	if !strings.Contains(text, "`.codex/rules/go-linting.md`") {
 		t.Fatalf("expected linting rule to be installed: %s", text)
+	}
+}
+
+func TestInstallSkipsSupportFileWriteWhenExistingFileCannotBeRead(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("write-only chmod semantics differ on Windows")
+	}
+
+	tests := []struct {
+		name        string
+		target      string
+		path        string
+		expectedErr string
+	}{
+		{name: "codex", target: "codex", path: "AGENTS.md", expectedErr: "codex"},
+		{name: "claude", target: "claude", path: "CLAUDE.md", expectedErr: "claude"},
+		{name: "gemini", target: "gemini", path: "GEMINI.md", expectedErr: "gemini"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			supportPath := filepath.Join(tmpDir, test.path)
+			original := "# " + test.path + "\n\n## Installed agent rules\n\nDo not replace this.\n"
+			if err := os.WriteFile(supportPath, []byte(original), 0o200); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				_ = os.Chmod(supportPath, 0o600)
+			})
+
+			result := install(installOptions{
+				projectRoot: tmpDir,
+				targets:     []string{test.target},
+				agents:      []string{"linting"},
+				language:    "go",
+				force:       false,
+				patch:       false,
+				saveConfig:  false,
+			})
+
+			if len(result.errors) == 0 {
+				t.Fatalf("expected read error for %s", test.path)
+			}
+			if !strings.Contains(result.errors[0].agent, test.expectedErr) {
+				t.Fatalf("expected %s read error, got %+v", test.expectedErr, result.errors)
+			}
+			if contains(result.installedSupport, supportPath) {
+				t.Fatalf("expected unreadable support file not to be reported as installed")
+			}
+			if err := os.Chmod(supportPath, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			content, err := os.ReadFile(supportPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(content) != original {
+				t.Fatalf("expected original support file to be preserved, got %q", string(content))
+			}
+		})
 	}
 }
 

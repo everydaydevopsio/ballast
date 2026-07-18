@@ -235,6 +235,41 @@ Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. D
       expect(merged).toContain('`.codex/rules/typescript-linting.md`');
     });
 
+    test('normalizes CRLF content before patching installed sections', () => {
+      const existing = [
+        '# AGENTS.md',
+        '',
+        '## Team Notes',
+        '',
+        'Keep this note.',
+        '',
+        '## Installed agent rules',
+        '',
+        'Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.',
+        '',
+        '- `.codex/rules/old.md` — Old rule',
+        ''
+      ].join('\r\n');
+      const canonical = [
+        '# AGENTS.md',
+        '',
+        '## Installed agent rules',
+        '',
+        'Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.',
+        '',
+        '- `.codex/rules/typescript-linting.md` — Linting rule',
+        ''
+      ].join('\r\n');
+
+      const merged = patchCodexAgentsMd(existing, canonical, {
+        replaceUnmanagedSections: false
+      });
+      expect(merged).toContain('## Team Notes\n\nKeep this note.');
+      expect(merged).toContain('`.codex/rules/typescript-linting.md`');
+      expect(merged).not.toContain('`.codex/rules/old.md`');
+      expect(merged).not.toContain('\r\n');
+    });
+
     test('ignores installed-rules headings inside fenced code blocks', () => {
       const existing = `# AGENTS.md
 

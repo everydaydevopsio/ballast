@@ -27,6 +27,10 @@ interface ParsedMarkdownBody {
 
 const DANGEROUS_YAML_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
+function normalizeLineEndings(content: string): string {
+  return content.replace(/\r\n/g, '\n');
+}
+
 function splitFrontmatterDocument(content: string): ParsedFrontmatterDocument {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
   if (!match || match.index !== 0) {
@@ -246,9 +250,11 @@ export function patchCodexAgentsMd(
   options: PatchCodexAgentsMdOptions = {}
 ): string {
   if (!existing.trim()) {
-    return canonical;
+    return normalizeLineEndings(canonical);
   }
 
+  existing = normalizeLineEndings(existing);
+  canonical = normalizeLineEndings(canonical);
   const replaceUnmanagedSections = options.replaceUnmanagedSections ?? true;
   let next = existing;
   for (const heading of ['Installed agent rules', 'Installed skills']) {

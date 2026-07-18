@@ -1053,18 +1053,22 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 				} else {
 					nextContent := content
+					shouldWrite := true
 					if exists(agentsPath) && !opts.force {
 						existing, readErr := os.ReadFile(agentsPath)
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "codex", err: readErr.Error()})
+							shouldWrite = false
 						} else {
 							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch)
 						}
 					}
-					if err := os.WriteFile(agentsPath, []byte(nextContent), 0o644); err != nil {
-						result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
-					} else if !contains(result.installedSupport, agentsPath) {
-						result.installedSupport = append(result.installedSupport, agentsPath)
+					if shouldWrite {
+						if err := os.WriteFile(agentsPath, []byte(nextContent), 0o644); err != nil {
+							result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
+						} else if !contains(result.installedSupport, agentsPath) {
+							result.installedSupport = append(result.installedSupport, agentsPath)
+						}
 					}
 				}
 			}
@@ -1083,18 +1087,22 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
 				} else {
 					nextContent := content
+					shouldWrite := true
 					if exists(claudePath) && !opts.force && shouldPatchClaude {
 						existing, readErr := os.ReadFile(claudePath)
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "claude", err: readErr.Error()})
+							shouldWrite = false
 						} else {
 							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch || opts.patchClaude)
 						}
 					}
-					if err := os.WriteFile(claudePath, []byte(nextContent), 0o644); err != nil {
-						result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
-					} else if !contains(result.installedSupport, claudePath) {
-						result.installedSupport = append(result.installedSupport, claudePath)
+					if shouldWrite {
+						if err := os.WriteFile(claudePath, []byte(nextContent), 0o644); err != nil {
+							result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
+						} else if !contains(result.installedSupport, claudePath) {
+							result.installedSupport = append(result.installedSupport, claudePath)
+						}
 					}
 				}
 			}
@@ -1113,18 +1121,22 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
 				} else {
 					nextContent := content
+					shouldWrite := true
 					if exists(geminiPath) && !opts.force && shouldPatchGemini {
 						existing, readErr := os.ReadFile(geminiPath)
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "gemini", err: readErr.Error()})
+							shouldWrite = false
 						} else {
 							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch || opts.patchGemini)
 						}
 					}
-					if err := os.WriteFile(geminiPath, []byte(nextContent), 0o644); err != nil {
-						result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
-					} else if !contains(result.installedSupport, geminiPath) {
-						result.installedSupport = append(result.installedSupport, geminiPath)
+					if shouldWrite {
+						if err := os.WriteFile(geminiPath, []byte(nextContent), 0o644); err != nil {
+							result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
+						} else if !contains(result.installedSupport, geminiPath) {
+							result.installedSupport = append(result.installedSupport, geminiPath)
+						}
 					}
 				}
 			}
