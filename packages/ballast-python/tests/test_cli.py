@@ -1192,7 +1192,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 
             self.assertFalse((root / "AGENTS.md").exists())
 
-    def test_install_skips_existing_gemini_md_without_patch(self) -> None:
+    def test_install_patches_existing_gemini_md_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "GEMINI.md").write_text(
@@ -1201,6 +1201,14 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 ## Team Notes
 
 Keep this section.
+
+## Installed agent rules
+
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
+
+Read and follow these rule files in `.gemini/rules/` when they apply:
+
+- `.gemini/rules/old.md` - Old rule
 """,
                 encoding="utf-8",
             )
@@ -1209,9 +1217,12 @@ Keep this section.
                 root, "gemini", ["linting"], [], "python", False, False, False
             )
 
-            self.assertIn(str(root / "GEMINI.md"), result.skipped_support_files)
+            self.assertIn(str(root / "GEMINI.md"), result.installed_support_files)
+            self.assertNotIn(str(root / "GEMINI.md"), result.skipped_support_files)
             gemini_md = (root / "GEMINI.md").read_text(encoding="utf-8")
             self.assertIn("## Team Notes", gemini_md)
+            self.assertIn("`.gemini/rules/python-linting.md`", gemini_md)
+            self.assertNotIn("`.gemini/rules/old.md`", gemini_md)
             self.assertFalse((root / "AGENTS.md").exists())
 
     def test_patch_updates_gemini_md_section_only(self) -> None:
@@ -1408,6 +1419,25 @@ Read and follow these rule files in `.gemini/rules/` when they apply:
             self.assertIn("`.claude/rules/python-linting.md`", claude_md)
             self.assertNotIn("`.claude/rules/old.md`", claude_md)
 
+    def test_default_patch_preserves_unmanaged_codex_support_section(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "AGENTS.md").write_text(
+                """# AGENTS.md
+
+## Installed agent rules
+
+- `.codex/rules/old.md` - Team managed rule
+""",
+                encoding="utf-8",
+            )
+
+            cli.install(root, "codex", ["linting"], [], "python", False, False, False)
+
+            agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn("`.codex/rules/old.md`", agents_md)
+            self.assertIn("`.codex/rules/python-linting.md`", agents_md)
+
     def test_patch_merges_frontmatter_keys(self) -> None:
         existing = """---
 description: Team customized linting rules
@@ -1468,6 +1498,31 @@ Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. D
         self.assertIn("```md\n## Installed agent rules\n```", merged)
         self.assertIn("`.codex/rules/python-linting.md`", merged)
         self.assertNotIn("`.codex/rules/old.md`", merged)
+
+    def test_patch_codex_agents_md_preserves_unmanaged_sections_in_managed_only_mode(
+        self,
+    ) -> None:
+        existing = """# AGENTS.md
+
+## Installed agent rules
+
+- `.codex/rules/old.md` - Team managed rule
+"""
+        canonical = """# AGENTS.md
+
+## Installed agent rules
+
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
+
+- `.codex/rules/python-linting.md` - New rule
+"""
+
+        merged = cli.patch_codex_agents_md(
+            existing, canonical, replace_unmanaged_sections=False
+        )
+
+        self.assertIn("`.codex/rules/old.md`", merged)
+        self.assertIn("`.codex/rules/python-linting.md`", merged)
 
 
 if __name__ == "__main__":

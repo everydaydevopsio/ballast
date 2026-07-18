@@ -3569,6 +3569,29 @@ func TestUpdateMonorepoSupportFilesPreservesUnmanagedSectionsWithoutPatch(t *tes
 	}
 }
 
+func TestUpdateMonorepoSupportFilesDoesNotPromptInCI(t *testing.T) {
+	t.Setenv("CI", "true")
+	root := resolvedTempDir(t)
+	plan := &monorepoPlan{
+		Targets:  []string{"claude"},
+		Common:   []string{"local-dev"},
+		Language: []string{"linting"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+		},
+	}
+	mustWriteFile(t, filepath.Join(root, "CLAUDE.md"), "# CLAUDE.md\n\n## Installed agent rules\n\nCustom unmanaged rules section.\n")
+
+	output := captureStdout(t, func() {
+		if err := updateMonorepoSupportFiles(root, plan, []string{"install", "--target", "claude", "--all"}); err != nil {
+			t.Fatalf("updateMonorepoSupportFiles returned error: %v", err)
+		}
+	})
+	if strings.Contains(output, "Patch the Installed agent rules section") {
+		t.Fatalf("expected CI mode to avoid support-file prompt, got %q", output)
+	}
+}
+
 func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
 	root := resolvedTempDir(t)
 	rulePath := filepath.Join(root, ".codex", "rules", "common", "docs.md")
@@ -3842,6 +3865,48 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	}
 }
 
+func TestRunMonorepoRemoveLanguageCleansConfigBackedRuleWithoutMarker(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["linting"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname = \"api\"\n")
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md"),
+		"# TypeScript Linting Rules\n\nlegacy generated content without marker\n",
+	)
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--remove-language", "typescript", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected config-backed markerless typescript rule to be removed, got err=%v", err)
+	}
+}
+
 // TestRunMonorepoInstallPreservesTaskSystemWrittenByBackend asserts that a
 // taskSystem value written to .rulesrc.json by a backend invocation (simulating
 // what ballast-typescript does after prompting the user) is not clobbered by
@@ -4070,6 +4135,72 @@ func TestResolveMonorepoPlanNormalizesTaskSystemFlagForBackend(t *testing.T) {
 	}
 }
 
+func TestResolveMonorepoPlanPromptsForRequiredFirstRunOptions(t *testing.T) {
+	clearCIEnv(t)
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	originalStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = reader
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		_ = reader.Close()
+	})
+	if _, err := writer.WriteString("linear\nserverless\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "codex", "--all"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil || len(plan.Invocations) == 0 {
+		t.Fatalf("expected monorepo plan, got %#v", plan)
+	}
+	if plan.Config.TaskSystem != "linear" {
+		t.Fatalf("expected prompted taskSystem in saved config, got %#v", plan.Config)
+	}
+	if plan.Config.DeploymentModel != "serverless" {
+		t.Fatalf("expected prompted deploymentModel in saved config, got %#v", plan.Config)
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if !strings.Contains(got, "--task-system linear") {
+		t.Fatalf("expected prompted task-system forwarded to backend, got %q", got)
+	}
+	if !strings.Contains(got, "--deployment-model serverless") {
+		t.Fatalf("expected prompted deployment-model forwarded to backend, got %q", got)
+	}
+}
+
+func TestResolveMonorepoPlanDefaultsRequiredOptionsInCI(t *testing.T) {
+	t.Setenv("CI", "true")
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--target", "codex", "--all"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil || len(plan.Invocations) == 0 {
+		t.Fatalf("expected monorepo plan, got %#v", plan)
+	}
+	if plan.Config.TaskSystem != "github" {
+		t.Fatalf("expected default taskSystem in CI, got %#v", plan.Config)
+	}
+	if plan.Config.DeploymentModel != "none" {
+		t.Fatalf("expected default deploymentModel in CI, got %#v", plan.Config)
+	}
+}
+
 func TestResolveMonorepoPlanNormalizesDeploymentModelFlagForBackend(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
@@ -4279,6 +4410,13 @@ func withWorkingDir(t *testing.T, dir string, fn func()) {
 		}
 	})
 	fn()
+}
+
+func clearCIEnv(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{"CI", "GITHUB_ACTIONS", "GITLAB_CI", "TF_BUILD", "BUILDKITE", "CIRCLECI"} {
+		t.Setenv(name, "")
+	}
 }
 
 func captureStdout(t *testing.T, fn func()) string {

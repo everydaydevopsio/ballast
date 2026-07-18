@@ -147,7 +147,7 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 4. `--force` must prompt before replacing an existing support file (`AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`) that would lose user customizations.
 5. In non-interactive mode (`--yes` or CI environment variables), an attempted `--force` overwrite of an existing support file must fail with a clear error telling the operator to rerun interactively without `--yes`.
 6. Creating a missing support file with `--force` must continue without prompting.
-7. Support-file patch behavior and existing agent-rule overwrite semantics must remain unchanged.
+7. Existing support files must be patched by default when `--force` is not set, updating only Ballast-managed installed-rule and installed-skill sections while preserving user-managed sections.
 8. README and installation documentation must describe the updated `--patch` and `--force` behavior.
 9. If an existing Claude `.skill` archive is unreadable during `--patch`, install must recover by overwriting it with canonical packaged skill content instead of failing the run.
 
@@ -161,8 +161,29 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 6. Given an existing support file and interactive `--force`, answering yes overwrites the support file with canonical content.
 7. Given an existing support file and non-interactive `--force`, install exits with an error and does not overwrite the file.
 8. Automated tests cover the skill-file decision matrix and support-file confirmation behavior in the TypeScript, Python, and Go backends.
-9. README and `docs/installation.md` describe when to use `--patch` versus `--force`, including the support-file confirmation behavior.
+9. README and `docs/installation.md` describe when support files are patched by default and when to use `--patch` versus `--force`, including the support-file confirmation behavior.
 10. Given an existing unreadable Claude `.skill` archive and `force=false, patch=true`, install replaces it with canonical content and completes without an install error.
+
+## Required Agent Option Resolution
+
+### Problem
+
+Some agents require repo-level option values before rule content is generated. Wrapper-driven installs resolved publishing deployment model differently from the tasks task system, so first-run installs with `--all` could prompt for publishing while silently defaulting tasks when no `.rulesrc.json` existed.
+
+### Requirements
+
+1. Wrapper-driven installs must resolve required options through one shared code path.
+2. When `tasks` is selected and `.rulesrc.json` has no `taskSystem`, interactive installs must prompt for the task system and non-interactive installs must use the default.
+3. When `publishing` is selected and `.rulesrc.json` has no `deploymentModel`, interactive installs must prompt for the deployment model and non-interactive installs must use the default.
+4. Explicit CLI flags must override saved config and prompted/default values.
+5. Resolved values must be saved to `.rulesrc.json` and forwarded to backend invocations.
+
+### Acceptance Criteria
+
+1. Given a first-run multi-language install with `--all`, Ballast prompts for both task system and deployment model.
+2. Given saved values in `.rulesrc.json`, Ballast does not prompt and reuses the saved values.
+3. Given `--yes` or CI, Ballast uses defaults for missing selected-agent options.
+4. Tests cover first-run prompt resolution and backend argument forwarding.
 
 ## Ballast Upgrade Skill Refresh
 

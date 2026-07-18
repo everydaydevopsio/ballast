@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -455,7 +456,7 @@ func printUsage() {
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Install language behavior: `--remove-language` removes languages from `.rulesrc.json`, removes their `paths`, and prunes stale Ballast-managed rule files.")
-	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app deployment guidance as one of none, kubernetes, serverless, server, or hosted.")
+	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app/service deployment guidance as one of none, kubernetes, serverless, server, or hosted. Use `none` for CLI, library, or SDK-only projects.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
 	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/terraform/`).")
 }
@@ -2152,14 +2153,30 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, nil
 	}
 
-	requestedTaskSystem, err := parseTaskSystemFlag(args)
+	taskSystemOption := requiredInstallOption{
+		FieldName:    "taskSystem",
+		FlagName:     "--task-system",
+		PromptLabel:  "Task system for tasks",
+		Allowed:      supportedTaskSystems,
+		DefaultValue: "github",
+	}
+	deploymentModelOption := requiredInstallOption{
+		FieldName:    "deploymentModel",
+		FlagName:     "--deployment-model",
+		PromptLabel:  "App deployment model for publishing (use none for CLI/library/SDK-only projects)",
+		Allowed:      supportedDeploymentModels,
+		DefaultValue: "none",
+	}
+
+	requestedTaskSystem, err := parseRequiredInstallOptionFlag(args, taskSystemOption)
 	if err != nil {
 		return nil, err
 	}
-	requestedDeploymentModel, err := parseDeploymentModelFlag(args)
+	requestedDeploymentModel, err := parseRequiredInstallOptionFlag(args, deploymentModelOption)
 	if err != nil {
 		return nil, err
 	}
+	promptReader := bufio.NewReader(os.Stdin)
 
 	config, err := loadMonorepoConfig(root)
 	if err != nil {
@@ -2278,19 +2295,27 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, err
 	}
 
-	var savedTaskSystem string
-	if config != nil {
-		savedTaskSystem = config.TaskSystem
+	savedTaskSystem, err := resolveRequiredInstallOption(requiredInstallOptionResolution{
+		Option:         taskSystemOption,
+		Requested:      requestedTaskSystem,
+		Saved:          configValue(config, taskSystemOption.FieldName),
+		Selected:       slices.Contains(persistAgents, "tasks"),
+		NonInteractive: !isInteractiveInstall(args),
+		Reader:         promptReader,
+	})
+	if err != nil {
+		return nil, err
 	}
-	if requestedTaskSystem != "" {
-		savedTaskSystem = requestedTaskSystem
-	}
-	var savedDeploymentModel string
-	if config != nil {
-		savedDeploymentModel = config.DeploymentModel
-	}
-	if requestedDeploymentModel != "" {
-		savedDeploymentModel = requestedDeploymentModel
+	savedDeploymentModel, err := resolveRequiredInstallOption(requiredInstallOptionResolution{
+		Option:         deploymentModelOption,
+		Requested:      requestedDeploymentModel,
+		Saved:          configValue(config, deploymentModelOption.FieldName),
+		Selected:       slices.Contains(persistAgents, "publishing"),
+		NonInteractive: !isInteractiveInstall(args),
+		Reader:         promptReader,
+	})
+	if err != nil {
+		return nil, err
 	}
 	configToSave := monorepoConfig{
 		Targets:         savedTargets,
@@ -2326,11 +2351,11 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	baseArgs := withTargetSelection(stripMonorepoFlags(args), requestedTargets)
 	plan := make([]backendInvocation, 0, len(profiles)+1)
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
-	if requestedTaskSystem != "" && slices.Contains(configToSave.Agents, "tasks") {
-		commonArgs = append(commonArgs, "--task-system", requestedTaskSystem)
+	if savedTaskSystem != "" && slices.Contains(configToSave.Agents, "tasks") {
+		commonArgs = append(commonArgs, "--task-system", savedTaskSystem)
 	}
-	if requestedDeploymentModel != "" && slices.Contains(configToSave.Agents, "publishing") {
-		commonArgs = append(commonArgs, "--deployment-model", requestedDeploymentModel)
+	if savedDeploymentModel != "" && slices.Contains(configToSave.Agents, "publishing") {
+		commonArgs = append(commonArgs, "--deployment-model", savedDeploymentModel)
 	}
 	if len(commonSelection) > 0 || len(selectedSkills) > 0 {
 		commonLanguage := profiles[0].Language
@@ -2339,7 +2364,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		}
 		tool := toolsByLanguage[commonLanguage]
 		env := monorepoInvocationEnv("common")
-		if requestedTaskSystem != "" && slices.Contains(commonSelection, "tasks") {
+		if savedTaskSystem != "" && slices.Contains(commonSelection, "tasks") && savedTaskSystem != configValue(config, taskSystemOption.FieldName) {
 			env["BALLAST_REFRESH_TASK_RULES"] = "1"
 		}
 		plan = append(plan, backendInvocation{
@@ -2662,23 +2687,40 @@ func splitAgentValues(raw string) []string {
 	return agents
 }
 
-func parseTaskSystemFlag(args []string) (string, error) {
+type requiredInstallOption struct {
+	FieldName    string
+	FlagName     string
+	PromptLabel  string
+	Allowed      []string
+	DefaultValue string
+}
+
+type requiredInstallOptionResolution struct {
+	Option         requiredInstallOption
+	Requested      string
+	Saved          string
+	Selected       bool
+	NonInteractive bool
+	Reader         *bufio.Reader
+}
+
+func parseRequiredInstallOptionFlag(args []string, option requiredInstallOption) (string, error) {
 	raw := ""
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if strings.HasPrefix(arg, "--task-system=") {
-			raw = strings.TrimSpace(strings.TrimPrefix(arg, "--task-system="))
+		if strings.HasPrefix(arg, option.FlagName+"=") {
+			raw = strings.TrimSpace(strings.TrimPrefix(arg, option.FlagName+"="))
 			continue
 		}
-		if arg != "--task-system" {
+		if arg != option.FlagName {
 			continue
 		}
 		if i+1 >= len(args) {
-			return "", errors.New("missing value for --task-system")
+			return "", fmt.Errorf("missing value for %s", option.FlagName)
 		}
 		candidate := strings.TrimSpace(args[i+1])
 		if candidate == "" || strings.HasPrefix(candidate, "-") {
-			return "", errors.New("missing value for --task-system")
+			return "", fmt.Errorf("missing value for %s", option.FlagName)
 		}
 		raw = candidate
 		i++
@@ -2687,49 +2729,87 @@ func parseTaskSystemFlag(args []string) (string, error) {
 		return "", nil
 	}
 	normalized := strings.ToLower(raw)
-	if slices.Contains(supportedTaskSystems, normalized) {
+	if slices.Contains(option.Allowed, normalized) {
 		return normalized, nil
 	}
 	return "", fmt.Errorf(
-		"invalid --task-system: %s (valid: %s)",
+		"invalid %s: %s (valid: %s)",
+		option.FlagName,
 		raw,
-		strings.Join(supportedTaskSystems, ", "),
+		strings.Join(option.Allowed, ", "),
 	)
 }
 
-func parseDeploymentModelFlag(args []string) (string, error) {
-	raw := ""
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if strings.HasPrefix(arg, "--deployment-model=") {
-			raw = strings.TrimSpace(strings.TrimPrefix(arg, "--deployment-model="))
-			continue
-		}
-		if arg != "--deployment-model" {
-			continue
-		}
-		if i+1 >= len(args) {
-			return "", errors.New("missing value for --deployment-model")
-		}
-		candidate := strings.TrimSpace(args[i+1])
-		if candidate == "" || strings.HasPrefix(candidate, "-") {
-			return "", errors.New("missing value for --deployment-model")
-		}
-		raw = candidate
-		i++
+func resolveRequiredInstallOption(resolution requiredInstallOptionResolution) (string, error) {
+	if resolution.Requested != "" {
+		return resolution.Requested, nil
 	}
-	if raw == "" {
+	saved := strings.ToLower(strings.TrimSpace(resolution.Saved))
+	if saved != "" {
+		if slices.Contains(resolution.Option.Allowed, saved) {
+			return saved, nil
+		}
+		return "", fmt.Errorf(
+			"invalid %s %q; use one of: %s",
+			resolution.Option.FieldName,
+			resolution.Saved,
+			strings.Join(resolution.Option.Allowed, ", "),
+		)
+	}
+	if !resolution.Selected {
 		return "", nil
 	}
-	normalized := strings.ToLower(raw)
-	if slices.Contains(supportedDeploymentModels, normalized) {
-		return normalized, nil
+	if resolution.NonInteractive {
+		return resolution.Option.DefaultValue, nil
 	}
-	return "", fmt.Errorf(
-		"invalid --deployment-model: %s (valid: %s)",
-		raw,
-		strings.Join(supportedDeploymentModels, ", "),
-	)
+	return promptRequiredInstallOption(resolution.Option, resolution.Reader)
+}
+
+func promptRequiredInstallOption(option requiredInstallOption, reader *bufio.Reader) (string, error) {
+	if reader == nil {
+		reader = bufio.NewReader(os.Stdin)
+	}
+	allowed := strings.Join(option.Allowed, ", ")
+	for {
+		fmt.Printf("%s [%s] (default: %s): ", option.PromptLabel, allowed, option.DefaultValue)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+				if strings.TrimSpace(response) != "" {
+					value := strings.ToLower(strings.TrimSpace(response))
+					if slices.Contains(option.Allowed, value) {
+						return value, nil
+					}
+					fmt.Printf("Invalid %s. Choose one of: %s\n", option.FieldName, allowed)
+					continue
+				}
+				return option.DefaultValue, nil
+			}
+			return "", err
+		}
+		value := strings.ToLower(strings.TrimSpace(response))
+		if value == "" {
+			return option.DefaultValue, nil
+		}
+		if slices.Contains(option.Allowed, value) {
+			return value, nil
+		}
+		fmt.Printf("Invalid %s. Choose one of: %s\n", option.FieldName, allowed)
+	}
+}
+
+func configValue(config *monorepoConfig, field string) string {
+	if config == nil {
+		return ""
+	}
+	switch field {
+	case "taskSystem":
+		return config.TaskSystem
+	case "deploymentModel":
+		return config.DeploymentModel
+	default:
+		return ""
+	}
 }
 
 func findFlagValue(args []string, longFlag string, shortFlag string) string {
@@ -3055,8 +3135,9 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		return nil
 	}
 	trackedPaths := ballastManagedPathsFromSupportFile(root, target)
+	configBackedStaleRulePaths := configBackedStaleRulePathSet(root, target, previous)
 	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePaths(root, target, next)) {
-		if !ballastOwnsManagedFile(file) && !trackedPaths[file] {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !configBackedStaleRulePaths[file] {
 			continue
 		}
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -3074,6 +3155,21 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
 	return nil
+}
+
+func configBackedStaleRulePathSet(root string, target string, previous *monorepoConfig) map[string]bool {
+	paths := map[string]bool{}
+	if previous == nil {
+		return paths
+	}
+	previousLanguageRules := &monorepoConfig{
+		Agents:    filterAgents(previous.Agents, languageAgentIDs()),
+		Languages: previous.Languages,
+	}
+	for _, previousPath := range managedRulePaths(root, target, previousLanguageRules) {
+		paths[previousPath] = true
+	}
+	return paths
 }
 
 func allowConfigBackedStaleSkillRemoval(root string, target string, path string, previous *monorepoConfig) bool {
@@ -3357,17 +3453,30 @@ func isInteractiveInstall(args []string) bool {
 			return false
 		}
 	}
-	return true
+	return !isCIMode()
+}
+
+func isCIMode() bool {
+	for _, name := range []string{"CI", "GITHUB_ACTIONS", "GITLAB_CI", "TF_BUILD", "BUILDKITE", "CIRCLECI"} {
+		if strings.TrimSpace(os.Getenv(name)) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func promptSupportFilePatch(path string) (bool, error) {
 	fmt.Printf("Existing %s found. Patch the Installed agent rules section? [y/N]: ", filepath.Base(path))
-	var response string
-	if _, err := fmt.Scanln(&response); err != nil {
-		if errors.Is(err, os.ErrClosed) || strings.Contains(err.Error(), "unexpected newline") || strings.Contains(err.Error(), "expected newline") {
-			return false, nil
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+			if strings.TrimSpace(response) == "" {
+				return false, nil
+			}
+		} else {
+			return false, err
 		}
-		return false, err
 	}
 	value := strings.ToLower(strings.TrimSpace(response))
 	return value == "y" || value == "yes", nil

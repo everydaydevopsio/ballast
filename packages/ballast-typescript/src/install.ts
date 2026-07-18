@@ -182,7 +182,7 @@ async function promptTaskSystem(): Promise<TaskSystem> {
 
 async function promptDeploymentModel(): Promise<DeploymentModel> {
   const line = await prompt(
-    `Deployment model (${DEPLOYMENT_MODELS.join(', ')}) [${DEFAULT_DEPLOYMENT_MODEL}]: `
+    `App deployment model for publishing (use none for CLI/library/SDK-only projects) (${DEPLOYMENT_MODELS.join(', ')}) [${DEFAULT_DEPLOYMENT_MODEL}]: `
   );
   if (!line) return DEFAULT_DEPLOYMENT_MODEL;
   const token = line.trim().toLowerCase();
@@ -763,11 +763,10 @@ export function install(options: InstallOptions): InstallResult {
 
   if (!disableSupportFiles && target === 'claude') {
     const claudeMdPath = getClaudeMdPath(projectRoot);
-    const shouldPatchClaudeMd = patch || patchClaudeMd;
+    const shouldPatchClaudeMd =
+      fs.existsSync(claudeMdPath) && !force ? true : patch || patchClaudeMd;
     if (skippedSupportSet.has(claudeMdPath)) {
       declinedSupportFiles.push(claudeMdPath);
-    } else if (fs.existsSync(claudeMdPath) && !force && !shouldPatchClaudeMd) {
-      skippedSupportFiles.push(claudeMdPath);
     } else {
       try {
         const content = buildClaudeMd(
@@ -777,7 +776,13 @@ export function install(options: InstallOptions): InstallResult {
         );
         const nextContent =
           fs.existsSync(claudeMdPath) && !force && shouldPatchClaudeMd
-            ? patchCodexAgentsMd(fs.readFileSync(claudeMdPath, 'utf8'), content)
+            ? patchCodexAgentsMd(
+                fs.readFileSync(claudeMdPath, 'utf8'),
+                content,
+                {
+                  replaceUnmanagedSections: patch || patchClaudeMd
+                }
+              )
             : content;
         fs.writeFileSync(claudeMdPath, nextContent, 'utf8');
         installedSupportFiles.push(claudeMdPath);
@@ -792,11 +797,10 @@ export function install(options: InstallOptions): InstallResult {
 
   if (!disableSupportFiles && target === 'gemini') {
     const geminiMdPath = getGeminiMdPath(projectRoot);
-    const shouldPatchGeminiMd = patch || patchGeminiMd;
+    const shouldPatchGeminiMd =
+      fs.existsSync(geminiMdPath) && !force ? true : patch || patchGeminiMd;
     if (skippedSupportSet.has(geminiMdPath)) {
       declinedSupportFiles.push(geminiMdPath);
-    } else if (fs.existsSync(geminiMdPath) && !force && !shouldPatchGeminiMd) {
-      skippedSupportFiles.push(geminiMdPath);
     } else {
       try {
         const content = buildGeminiMd(
@@ -806,7 +810,13 @@ export function install(options: InstallOptions): InstallResult {
         );
         const nextContent =
           fs.existsSync(geminiMdPath) && !force && shouldPatchGeminiMd
-            ? patchCodexAgentsMd(fs.readFileSync(geminiMdPath, 'utf8'), content)
+            ? patchCodexAgentsMd(
+                fs.readFileSync(geminiMdPath, 'utf8'),
+                content,
+                {
+                  replaceUnmanagedSections: patch || patchGeminiMd
+                }
+              )
             : content;
         fs.writeFileSync(geminiMdPath, nextContent, 'utf8');
         installedSupportFiles.push(geminiMdPath);
@@ -823,8 +833,6 @@ export function install(options: InstallOptions): InstallResult {
     const agentsMdPath = getCodexAgentsMdPath(projectRoot);
     if (skippedSupportSet.has(agentsMdPath)) {
       declinedSupportFiles.push(agentsMdPath);
-    } else if (fs.existsSync(agentsMdPath) && !force && !patch) {
-      skippedSupportFiles.push(agentsMdPath);
     } else {
       try {
         const content = buildCodexAgentsMd(
@@ -833,8 +841,14 @@ export function install(options: InstallOptions): InstallResult {
           language
         );
         const nextContent =
-          fs.existsSync(agentsMdPath) && !force && patch
-            ? patchCodexAgentsMd(fs.readFileSync(agentsMdPath, 'utf8'), content)
+          fs.existsSync(agentsMdPath) && !force
+            ? patchCodexAgentsMd(
+                fs.readFileSync(agentsMdPath, 'utf8'),
+                content,
+                {
+                  replaceUnmanagedSections: patch
+                }
+              )
             : content;
         fs.writeFileSync(agentsMdPath, nextContent, 'utf8');
         installedSupportFiles.push(agentsMdPath);
@@ -1052,30 +1066,6 @@ export async function runInstall(
       );
     }
 
-    const claudeMdPath = getClaudeMdPath(projectRoot);
-    let patchClaudeMd = false;
-    if (target === 'claude' && fs.existsSync(claudeMdPath) && !options.force) {
-      if (options.patch) {
-        patchClaudeMd = true;
-      } else if (!isCiMode() && !options.yes) {
-        patchClaudeMd = await promptYesNo(
-          `Existing CLAUDE.md found at ${claudeMdPath}. Patch the Installed agent rules section?`
-        );
-      }
-    }
-
-    const geminiMdPath = getGeminiMdPath(projectRoot);
-    let patchGeminiMd = false;
-    if (target === 'gemini' && fs.existsSync(geminiMdPath) && !options.force) {
-      if (options.patch) {
-        patchGeminiMd = true;
-      } else if (!isCiMode() && !options.yes) {
-        patchGeminiMd = await promptYesNo(
-          `Existing GEMINI.md found at ${geminiMdPath}. Patch the Installed agent rules section?`
-        );
-      }
-    }
-
     const result = install({
       projectRoot,
       target,
@@ -1084,8 +1074,8 @@ export async function runInstall(
       language,
       force: options.force ?? false,
       patch: options.patch ?? false,
-      patchClaudeMd,
-      patchGeminiMd,
+      patchClaudeMd: false,
+      patchGeminiMd: false,
       skipSupportFiles: supportDecision.skipSupportFile
         ? [supportDecision.skipSupportFile]
         : [],
@@ -1135,13 +1125,6 @@ export async function runInstall(
     if (result.skipped.length > 0) {
       console.log(
         `Skipped (already present; use --force to overwrite): ${result.skipped.join(', ')}`
-      );
-    }
-    if (result.skippedSupportFiles.length > 0) {
-      console.log(
-        `Skipped support files (already present; use --force to overwrite): ${result.skippedSupportFiles.join(
-          ', '
-        )}`
       );
     }
     if (result.declinedSupportFiles.length > 0) {
