@@ -4,7 +4,7 @@
 - [x] Add PRD requirements for integration-framework detection and Playwright preference across supported languages.
 - [x] Add failing generated-content coverage for framework detection markers and browser E2E framework selection.
 - [x] Update canonical testing guidance sources and docs.
-- [x] Sync package mirrors; leave checked-in `.codex`/`.claude` rule outputs unchanged per maintainer direction to change templates instead of generated rules.
+- [x] Sync package mirrors and corresponding `.codex`/`.claude` testing outputs from the updated source templates.
 - [x] Run focused tests.
 - [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
 
