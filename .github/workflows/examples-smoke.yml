@@ -118,7 +118,7 @@ jobs:
           version: 10.27.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
@@ -146,7 +146,7 @@ jobs:
           version: 10.27.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
@@ -221,7 +221,7 @@ jobs:
           go-version-file: packages/ballast-go/go.mod
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
@@ -319,7 +319,7 @@ jobs:
 
       - name: Setup Node.js
         if: matrix.needs_typescript
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
@@ -383,7 +383,7 @@ jobs:
 
       - name: Setup Node.js
         if: matrix.needs_typescript
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: 'pnpm'
