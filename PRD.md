@@ -140,7 +140,7 @@ Ballast-generated rule files for persistent agent context have accumulated large
 
 ### Problem
 
-Ballast has task-system and branch TODO guidance, but it does not distribute the Plan -> ADR lifecycle for non-trivial features. Agents in Ballast-managed repositories need installable guidance for when to create a plan, how to maintain it during implementation, and how to graduate completed plans into durable ADRs without duplicating `tasks/TODO.md` behavior.
+Ballast has task-system and branch TODO guidance, but it does not distribute the Plan -> ADR lifecycle for non-trivial features. Agents in Ballast-managed repositories need installable guidance for when to create a plan, how to maintain it during implementation, and how to graduate completed plans into durable ADRs without duplicating `tasks/todo.md` behavior.
 
 ### Requirements
 
@@ -148,9 +148,9 @@ Ballast has task-system and branch TODO guidance, but it does not distribute the
 2. The plan-lifecycle rule must define when to create a plan, when to skip one, the expected `plans/`, `tasks/`, and `adr/` directory structure, and the required plan file naming convention.
 3. The rule must include a plan template with status, branch, created date, related ADRs, problem, approach, files affected, phases, verification, rejected alternatives, open questions, and change log.
 4. The rule must describe maintaining the plan during implementation, including checking off phases, updating the approach when it changes, committing plan updates with related code, reading the plan at session start, and routing out-of-scope work to the TODO rule.
-5. The rule must define the graduation trigger and steps for turning a plan into an ADR, including checking `tasks/TODO.md`, creating generic task-system work items for incomplete TODOs, assigning the next ADR number, creating the ADR, updating indexes, removing the plan, and committing the graduation.
+5. The rule must define the graduation trigger and steps for turning a plan into an ADR, including checking `tasks/todo.md`, creating generic task-system work items for incomplete TODOs, assigning the next ADR number, creating the ADR, updating indexes, removing the plan, and committing the graduation.
 6. The rule must include an ADR template and ADR management rules for status values, sequential numbering, one decision per ADR, and never deleting ADR history.
-7. The rule must defer to the existing `tasks-todo` rule for `tasks/TODO.md` behavior instead of restating that rule in detail.
+7. The rule must defer to the existing `tasks-todo` rule for `tasks/todo.md` behavior instead of restating that rule in detail.
 8. The generated rule and installed support-file entries must use generic task-system terminology, not Jira-specific wording.
 
 ### Acceptance Criteria
@@ -159,7 +159,7 @@ Ballast has task-system and branch TODO guidance, but it does not distribute the
 2. Generated `.claude/rules/common/plan-lifecycle.md` and `.codex/rules/common/plan-lifecycle.md` exist in this repository when the checked-in Ballast-managed outputs are refreshed.
 3. `CLAUDE.md` and `AGENTS.md` installed rules lists include the new `plan-lifecycle` rule under common task rules.
 4. Generated plan-lifecycle content includes the create/skip criteria, directory structure, plan template, maintenance rules, graduation steps, ADR template, ADR management rules, and quick reference.
-5. Generated plan-lifecycle content explicitly defers `tasks/TODO.md` behavior to the branch-local TODO tracking rule.
+5. Generated plan-lifecycle content explicitly defers `tasks/todo.md` behavior to the branch-local TODO tracking rule.
 6. Automated tests cover rule suffix discovery, generated content, and support-file listing for the new rule.
 
 ## TypeScript Husky Git Hook Guidance

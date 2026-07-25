@@ -103,11 +103,11 @@ For Linear:
 
 - Create issues/tickets in **github** for any planned work, bugs, or follow-up items that extend beyond the current branch.
 - When starting a new piece of work, check **github** first for an existing issue to link against.
-- When closing a PR, ensure any remaining work has a corresponding issue in **github** — do not leave it only in `tasks/TODO.md`.
+- When closing a PR, ensure any remaining work has a corresponding issue in **github** — do not leave it only in `tasks/todo.md`.
 - Reference issue IDs in commit messages and PR descriptions so work is traceable.
 
 ## Important Notes
 
-- Do not use `tasks/TODO.md` as a substitute for durable issue tracking. It is branch-scoped working memory only (see the `tasks/TODO.md` rule).
+- Do not use `tasks/todo.md` as a substitute for durable issue tracking. It is branch-scoped working memory only (see the `tasks/todo.md` rule).
 - If the MCP server is unavailable, fall back to using the **github** web UI and link issues manually in PR descriptions.
 - Keep credentials out of committed files; use environment variables or platform secret stores.

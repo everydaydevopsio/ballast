@@ -152,7 +152,7 @@ describe('build', () => {
 
     test('returns tasks todo content', () => {
       const content = getContent('tasks', 'todo');
-      expect(content).toContain('tasks/TODO.md');
+      expect(content).toContain('tasks/todo.md');
       expect(content).toContain('triage');
       expect(content).not.toContain('{{taskSystem}}');
     });
@@ -171,7 +171,7 @@ describe('build', () => {
       expect(content).toContain('## ADR Management Rules');
       expect(content).toContain('## Quick Reference');
       expect(content).toContain(
-        'Defer `tasks/TODO.md` behavior to the branch-local TODO tracking rule'
+        'Defer `tasks/todo.md` behavior to the branch-local TODO tracking rule'
       );
       expect(content).toContain('task system work item');
       expect(content).not.toContain('Jira');

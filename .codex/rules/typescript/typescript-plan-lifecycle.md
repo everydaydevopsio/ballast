@@ -34,13 +34,13 @@ Use this project-root structure:
 |   +-- README.md
 |   +-- plan-<feature-name>.md
 +-- tasks/
-|   +-- TODO.md
+|   +-- todo.md
 +-- adr/
     +-- README.md
     +-- NNN-<decision-title>.md
 ```
 
-Defer `tasks/TODO.md` behavior to the branch-local TODO tracking rule. Use it for discovered out-of-scope work instead of expanding the plan beyond the feature boundary.
+Defer `tasks/todo.md` behavior to the branch-local TODO tracking rule. Use it for discovered out-of-scope work instead of expanding the plan beyond the feature boundary.
 
 ## Plan File Naming
 
@@ -107,7 +107,7 @@ Things still to resolve. Remove entries as they are answered.
 - If the approach changes, update **Approach** and record the change in **Change Log**.
 - Commit plan updates alongside related code changes.
 - At the start of each session, read the plan to restore context.
-- When you discover real out-of-scope work, add it to `tasks/TODO.md` under the branch-local TODO tracking rule instead of widening the plan.
+- When you discover real out-of-scope work, add it to `tasks/todo.md` under the branch-local TODO tracking rule instead of widening the plan.
 
 ## Graduation Trigger
 
@@ -117,7 +117,7 @@ When the feature is ready to merge, use this trigger phrase:
 
 ## Graduation Steps
 
-1. Check `tasks/TODO.md` for incomplete items (`- [ ]`) added during this feature.
+1. Check `tasks/todo.md` for incomplete items (`- [ ]`) added during this feature.
 2. For each incomplete item, create a task system work item, then update the line to `- [x] TASK-NNN: <description>`.
 3. Determine the next ADR number from `adr/README.md`.
 4. Create `adr/NNN-<decision-title>.md` from the plan content.
@@ -194,8 +194,8 @@ What would you do differently? What worked better than expected?
 | New session on existing feature | Continue implementing `plans/plan-<name>.md` |
 | Approach changed | Update plan and Change Log, commit with code |
 | Phase complete | Check off in plan, commit |
-| Discovered out-of-scope work | Add to `tasks/TODO.md`, commit alongside current change |
+| Discovered out-of-scope work | Add to `tasks/todo.md`, commit alongside current change |
 | Ready to merge | Graduate `plans/plan-<name>.md` to an ADR |
-| Graduation finds open TODO items | Create task system issues, add references to `tasks/TODO.md`, then proceed |
+| Graduation finds open TODO items | Create task system issues, add references to `tasks/todo.md`, then proceed |
 | Decision reversed later | Mark ADR superseded, create a new ADR |
 | Small single-file fix | Skip the plan entirely |

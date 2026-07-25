@@ -4,7 +4,7 @@ alwaysApply: false
 globs:
   - 'plans/**/*.md'
   - 'adr/**/*.md'
-  - 'tasks/TODO.md'
+  - 'tasks/todo.md'
   - '**/AGENTS.md'
   - '**/CLAUDE.md'
 ---
