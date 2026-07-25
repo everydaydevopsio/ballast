@@ -1,5 +1,15 @@
 # Tasks
 
+- [x] Confirm issue #154 scope, operating mode, and governing PRD requirements.
+- [x] Add PRD requirements for distributing plan-lifecycle guidance through Ballast.
+- [x] Add failing generated-content coverage for the plan-lifecycle rule and installed support-file entries.
+- [x] Add canonical plan-lifecycle task rule content and platform headers.
+- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
+- [x] Run focused tests and required sync/generation checks.
+- [ ] Push branch, open PR for #154, request Copilot review, and resolve actionable review comments.
+
+## Previous Tasks
+
 - [x] Confirm issue #145 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for integration-framework detection and Playwright preference across supported languages.
 - [x] Add failing generated-content coverage for framework detection markers and browser E2E framework selection.
@@ -7,8 +17,6 @@
 - [x] Sync package mirrors and corresponding `.codex`/`.claude` testing outputs from the updated source templates.
 - [x] Run focused tests.
 - [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
-
-## Previous Tasks
 
 - [x] Confirm issue #160 scope, operating mode, and Terraform/OpenTofu tooling sources.
 - [x] Add PRD requirements for Terraform linting, testing, CI, security scanner, and OpenTofu guidance.

@@ -64,6 +64,10 @@ describe('build', () => {
       expect(listRuleSuffixes('publishing').length).toBe(8);
     });
 
+    test('returns only main rule for plan-lifecycle', () => {
+      expect(listRuleSuffixes('plan-lifecycle')).toEqual(['']);
+    });
+
     test('throws for unknown agent', () => {
       expect(() => listRuleSuffixes('nonexistent')).toThrow(/content.md/);
     });
@@ -151,6 +155,26 @@ describe('build', () => {
       expect(content).toContain('tasks/TODO.md');
       expect(content).toContain('triage');
       expect(content).not.toContain('{{taskSystem}}');
+    });
+
+    test('returns plan-lifecycle content', () => {
+      const content = getContent('plan-lifecycle');
+      expect(content).toContain('Plan -> ADR lifecycle');
+      expect(content).toContain('Create a plan when');
+      expect(content).toContain('Skip a plan when');
+      expect(content).toContain('plans/plan-<feature-name>.md');
+      expect(content).toContain('## Maintaining The Plan');
+      expect(content).toContain(
+        'Graduate `plans/plan-<feature-name>.md` to an ADR'
+      );
+      expect(content).toContain('## ADR Template');
+      expect(content).toContain('## ADR Management Rules');
+      expect(content).toContain('## Quick Reference');
+      expect(content).toContain(
+        'Defer `tasks/TODO.md` behavior to the branch-local TODO tracking rule'
+      );
+      expect(content).toContain('task system work item');
+      expect(content).not.toContain('Jira');
     });
 
     test('returns tasks task-system content unsubstituted when no variables', () => {
@@ -732,6 +756,14 @@ alwaysApply: false
       expect(content).toContain('## Installed skills');
       expect(content).toContain('`.codex/rules/owasp-security-scan.md`');
     });
+
+    test('lists plan-lifecycle rule for codex', () => {
+      const content = buildCodexAgentsMd(['plan-lifecycle']);
+      expect(content).toContain('`.codex/rules/plan-lifecycle.md`');
+      expect(content).toContain(
+        'Plan lifecycle - create, maintain, and graduate plans to ADRs'
+      );
+    });
   });
 
   describe('buildClaudeMd', () => {
@@ -747,6 +779,14 @@ alwaysApply: false
       expect(content).toContain('TypeScript linting specialist');
       expect(content).toContain('## Installed skills');
       expect(content).toContain('`.claude/skills/owasp-security-scan.skill`');
+    });
+
+    test('lists plan-lifecycle rule for claude', () => {
+      const content = buildClaudeMd(['plan-lifecycle']);
+      expect(content).toContain('`.claude/rules/plan-lifecycle.md`');
+      expect(content).toContain(
+        'Plan lifecycle - create, maintain, and graduate plans to ADRs'
+      );
     });
   });
 
@@ -905,6 +945,18 @@ alwaysApply: false
       expect(dir).toBe(path.join(projectRoot, '.cursor', 'rules'));
       expect(file).toBe(
         path.join(projectRoot, '.cursor', 'rules', 'local-dev-env.mdc')
+      );
+    });
+
+    test('claude with plan-lifecycle returns common rule path', () => {
+      const { dir, file } = getDestination(
+        'plan-lifecycle',
+        'claude',
+        projectRoot
+      );
+      expect(dir).toBe(path.join(projectRoot, '.claude', 'rules'));
+      expect(file).toBe(
+        path.join(projectRoot, '.claude', 'rules', 'plan-lifecycle.md')
       );
     });
 
