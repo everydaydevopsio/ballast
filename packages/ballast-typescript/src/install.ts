@@ -42,7 +42,8 @@ import {
   DEFAULT_DEPLOYMENT_MODEL,
   type Target,
   type TaskSystem,
-  type DeploymentModel
+  type DeploymentModel,
+  type PublishingProfile
 } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -304,6 +305,7 @@ export interface InstallOptions {
   saveConfig?: boolean;
   taskSystem?: TaskSystem;
   deploymentModel?: DeploymentModel;
+  publishingProfiles?: PublishingProfile[];
 }
 
 export interface InstallResult {
@@ -327,8 +329,13 @@ function resolveSupportFileSelections(
   projectRoot: string,
   language: Language,
   fallbackAgents: string[],
-  fallbackSkills: string[]
-): { agents: string[]; skills: string[] } {
+  fallbackSkills: string[],
+  fallbackPublishingProfiles?: PublishingProfile[]
+): {
+  agents: string[];
+  skills: string[];
+  publishingProfiles?: PublishingProfile[];
+} {
   const config = loadConfig(projectRoot, language);
   const rawAgents = config == null ? fallbackAgents : config.agents;
   const rawSkills =
@@ -339,7 +346,8 @@ function resolveSupportFileSelections(
         : [];
   return {
     agents: [...new Set(withImplicitAgents(rawAgents))],
-    skills: [...new Set(rawSkills)]
+    skills: [...new Set(rawSkills)],
+    publishingProfiles: config?.publishingProfiles ?? fallbackPublishingProfiles
   };
 }
 
@@ -554,7 +562,8 @@ export function install(options: InstallOptions): InstallResult {
     skipSupportFiles = [],
     saveConfig: persist,
     taskSystem,
-    deploymentModel
+    deploymentModel,
+    publishingProfiles
   } = options;
   const effectiveAgents = withImplicitAgents(agents);
   const installed: string[] = [];
@@ -594,6 +603,8 @@ export function install(options: InstallOptions): InstallResult {
     deploymentModel ??
     existingConfig?.deploymentModel ??
     DEFAULT_DEPLOYMENT_MODEL;
+  const resolvedPublishingProfiles =
+    publishingProfiles ?? existingConfig?.publishingProfiles;
 
   if (persist) {
     saveConfig(
@@ -608,7 +619,10 @@ export function install(options: InstallOptions): InstallResult {
           : (taskSystem ?? existingConfig?.taskSystem),
         deploymentModel: effectiveAgents.includes('publishing')
           ? resolvedDeploymentModel
-          : (deploymentModel ?? existingConfig?.deploymentModel)
+          : (deploymentModel ?? existingConfig?.deploymentModel),
+        publishingProfiles: effectiveAgents.includes('publishing')
+          ? resolvedPublishingProfiles
+          : (publishingProfiles ?? existingConfig?.publishingProfiles)
       },
       projectRoot
     );
@@ -618,7 +632,8 @@ export function install(options: InstallOptions): InstallResult {
     projectRoot,
     language,
     effectiveAgents,
-    skills
+    skills,
+    resolvedPublishingProfiles
   );
   const skippedSupportSet = new Set(skipSupportFiles);
 
@@ -631,7 +646,11 @@ export function install(options: InstallOptions): InstallResult {
     let agentSkipped = false;
     let agentProcessed = false;
     try {
-      const suffixes = listRuleSuffixes(agentId, language);
+      const suffixes = listRuleSuffixes(
+        agentId,
+        language,
+        resolvedPublishingProfiles
+      );
       for (const ruleSuffix of suffixes) {
         const { dir, file } = getDestination(
           agentId,
@@ -772,7 +791,8 @@ export function install(options: InstallOptions): InstallResult {
         const content = buildClaudeMd(
           supportSelections.agents,
           supportSelections.skills,
-          language
+          language,
+          supportSelections.publishingProfiles
         );
         const nextContent =
           fs.existsSync(claudeMdPath) && !force && shouldPatchClaudeMd
@@ -806,7 +826,8 @@ export function install(options: InstallOptions): InstallResult {
         const content = buildGeminiMd(
           supportSelections.agents,
           supportSelections.skills,
-          language
+          language,
+          supportSelections.publishingProfiles
         );
         const nextContent =
           fs.existsSync(geminiMdPath) && !force && shouldPatchGeminiMd
@@ -838,7 +859,8 @@ export function install(options: InstallOptions): InstallResult {
         const content = buildCodexAgentsMd(
           supportSelections.agents,
           supportSelections.skills,
-          language
+          language,
+          supportSelections.publishingProfiles
         );
         const nextContent =
           fs.existsSync(agentsMdPath) && !force
@@ -887,6 +909,7 @@ export interface RunInstallOptions {
   yes?: boolean;
   taskSystem?: string;
   deploymentModel?: string;
+  publishingProfiles?: PublishingProfile[];
   repositoryFactsFile?: string;
 }
 
@@ -1022,6 +1045,8 @@ export async function runInstall(
       resolvedDeploymentModel = await promptDeploymentModel();
     }
   }
+  const resolvedPublishingProfiles =
+    options.publishingProfiles ?? priorConfig?.publishingProfiles;
 
   const explicitAgentSelection =
     Boolean(options.all) || options.agents !== undefined;
@@ -1053,7 +1078,8 @@ export async function runInstall(
       ballastVersion: BALLAST_VERSION,
       languages: [language],
       taskSystem: resolvedTaskSystem,
-      deploymentModel: resolvedDeploymentModel
+      deploymentModel: resolvedDeploymentModel,
+      publishingProfiles: resolvedPublishingProfiles
     },
     projectRoot
   );
@@ -1081,7 +1107,8 @@ export async function runInstall(
         : [],
       saveConfig: false,
       taskSystem: resolvedTaskSystem,
-      deploymentModel: resolvedDeploymentModel
+      deploymentModel: resolvedDeploymentModel,
+      publishingProfiles: resolvedPublishingProfiles
     });
 
     if (result.errors.length > 0) {

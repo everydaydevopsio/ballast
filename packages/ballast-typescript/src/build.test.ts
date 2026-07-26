@@ -52,7 +52,7 @@ describe('build', () => {
       expect(listRuleSuffixes('docs')).toEqual(['']);
     });
 
-    test('returns libraries, sdks, and apps for publishing', () => {
+    test('returns libraries, sdks, and apps for publishing by default', () => {
       expect(listRuleSuffixes('publishing')).toContain('libraries');
       expect(listRuleSuffixes('publishing')).toContain('sdks');
       expect(listRuleSuffixes('publishing')).toContain('apps');
@@ -62,6 +62,16 @@ describe('build', () => {
       expect(listRuleSuffixes('publishing')).toContain('web');
       expect(listRuleSuffixes('publishing')).toContain('api');
       expect(listRuleSuffixes('publishing').length).toBe(8);
+    });
+
+    test('returns selected publishing profiles when configured', () => {
+      const suffixes = listRuleSuffixes('publishing', 'typescript', [
+        'cli',
+        'apps'
+      ]);
+
+      expect(suffixes).toHaveLength(2);
+      expect(suffixes).toEqual(expect.arrayContaining(['cli', 'apps']));
     });
 
     test('returns only main rule for plan-lifecycle', () => {
@@ -809,6 +819,21 @@ alwaysApply: false
         'Plan lifecycle - create, maintain, and graduate plans to ADRs'
       );
     });
+
+    test('lists only selected publishing profiles for codex', () => {
+      const content = buildCodexAgentsMd(['publishing'], [], 'typescript', [
+        'cli',
+        'apps'
+      ]);
+      expect(content).toContain('`.codex/rules/publishing-cli.md`');
+      expect(content).toContain('`.codex/rules/publishing-apps.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-web.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-api.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-libraries.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-sdks.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-apt.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-brew.md`');
+    });
   });
 
   describe('buildClaudeMd', () => {
@@ -832,6 +857,15 @@ alwaysApply: false
       expect(content).toContain(
         'Plan lifecycle - create, maintain, and graduate plans to ADRs'
       );
+    });
+
+    test('lists only selected publishing profiles for claude', () => {
+      const content = buildClaudeMd(['publishing'], [], 'typescript', [
+        'libraries'
+      ]);
+      expect(content).toContain('`.claude/rules/publishing-libraries.md`');
+      expect(content).not.toContain('`.claude/rules/publishing-cli.md`');
+      expect(content).not.toContain('`.claude/rules/publishing-apps.md`');
     });
   });
 

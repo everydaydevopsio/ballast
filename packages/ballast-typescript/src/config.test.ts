@@ -12,7 +12,8 @@ import {
   TASK_SYSTEMS,
   DEFAULT_TASK_SYSTEM,
   DEPLOYMENT_MODELS,
-  DEFAULT_DEPLOYMENT_MODEL
+  DEFAULT_DEPLOYMENT_MODEL,
+  PUBLISHING_PROFILES
 } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -414,6 +415,110 @@ describe('config', () => {
       saveConfig({ targets: ['cursor'], agents: ['publishing'] }, tmpDir);
       const loaded = loadConfig(tmpDir);
       expect(loaded?.deploymentModel).toBe('hosted');
+    });
+  });
+
+  describe('publishingProfiles', () => {
+    test('PUBLISHING_PROFILES contains supported canonical profiles', () => {
+      expect(PUBLISHING_PROFILES).toEqual([
+        'cli',
+        'apps',
+        'web',
+        'api',
+        'libraries',
+        'sdks',
+        'apt',
+        'brew'
+      ]);
+    });
+
+    test('saves and loads publishingProfiles', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['publishing'],
+          ballastVersion: BALLAST_VERSION,
+          publishingProfiles: ['cli', 'web']
+        },
+        tmpDir
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.publishingProfiles).toEqual(['cli', 'web']);
+    });
+
+    test('normalizes publishing profile aliases from config', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['publishing'],
+          publishingProfiles: ['APP', 'library', 'sdk', 'cli']
+        })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.publishingProfiles).toEqual([
+        'apps',
+        'libraries',
+        'sdks',
+        'cli'
+      ]);
+    });
+
+    test('preserves explicit empty publishingProfiles from config', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['publishing'],
+          publishingProfiles: []
+        })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.publishingProfiles).toEqual([]);
+    });
+
+    test('loads config without publishingProfiles field', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({ targets: ['claude'], agents: ['publishing'] })
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.publishingProfiles).toBeUndefined();
+    });
+
+    test('preserves existing publishingProfiles when saving without one', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['publishing'],
+          publishingProfiles: ['api']
+        },
+        tmpDir
+      );
+      saveConfig({ targets: ['cursor'], agents: ['publishing'] }, tmpDir);
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.publishingProfiles).toEqual(['api']);
+    });
+
+    test('clears existing publishingProfiles when saving an empty array', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['publishing'],
+          publishingProfiles: ['api']
+        },
+        tmpDir
+      );
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['publishing'],
+          publishingProfiles: []
+        },
+        tmpDir
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.publishingProfiles).toEqual([]);
     });
   });
 

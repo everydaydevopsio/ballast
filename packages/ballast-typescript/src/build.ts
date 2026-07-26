@@ -7,7 +7,7 @@ import {
   getAgentDir,
   getSkillDir
 } from './agents';
-import type { Target } from './config';
+import type { PublishingProfile, Target } from './config';
 import type { Language } from './agents';
 import pkg from '../package.json';
 
@@ -382,7 +382,8 @@ const CONTENT_MAIN = `${CONTENT_PREFIX}.md`;
  */
 export function listRuleSuffixes(
   agentId: string,
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  publishingProfiles?: readonly PublishingProfile[]
 ): string[] {
   const dir = getPreferredAgentDir(agentId, language);
   if (!fs.existsSync(dir)) {
@@ -406,6 +407,10 @@ export function listRuleSuffixes(
   }
   if (suffixes.length === 0) {
     throw new Error(`Agent "${agentId}" has no content.md or content-*.md`);
+  }
+  if (agentId === 'publishing' && publishingProfiles !== undefined) {
+    const available = new Set(suffixes);
+    return publishingProfiles.filter((profile) => available.has(profile));
   }
   return suffixes;
 }
@@ -925,7 +930,8 @@ function loadRepositoryFactsSection(): string[] | null {
 export function buildCodexAgentsMd(
   agents: string[],
   skills: string[] = [],
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  publishingProfiles?: readonly PublishingProfile[]
 ): string {
   const lines: string[] = [];
   lines.push('# AGENTS.md');
@@ -945,7 +951,7 @@ export function buildCodexAgentsMd(
   );
   lines.push('');
   for (const agentId of agents) {
-    const suffixes = listRuleSuffixes(agentId, language);
+    const suffixes = listRuleSuffixes(agentId, language, publishingProfiles);
     for (const ruleSuffix of suffixes) {
       const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =
@@ -977,7 +983,8 @@ export function buildCodexAgentsMd(
 export function buildClaudeMd(
   agents: string[],
   skills: string[] = [],
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  publishingProfiles?: readonly PublishingProfile[]
 ): string {
   const lines: string[] = [];
   lines.push('# CLAUDE.md');
@@ -997,7 +1004,7 @@ export function buildClaudeMd(
   );
   lines.push('');
   for (const agentId of agents) {
-    const suffixes = listRuleSuffixes(agentId, language);
+    const suffixes = listRuleSuffixes(agentId, language, publishingProfiles);
     for (const ruleSuffix of suffixes) {
       const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =
@@ -1043,7 +1050,8 @@ export function buildGeminiFormat(
 export function buildGeminiMd(
   agents: string[],
   skills: string[] = [],
-  language: Language = 'typescript'
+  language: Language = 'typescript',
+  publishingProfiles?: readonly PublishingProfile[]
 ): string {
   const lines: string[] = [];
   lines.push('# GEMINI.md');
@@ -1081,7 +1089,7 @@ export function buildGeminiMd(
   );
   lines.push('');
   for (const agentId of agents) {
-    const suffixes = listRuleSuffixes(agentId, language);
+    const suffixes = listRuleSuffixes(agentId, language, publishingProfiles);
     for (const ruleSuffix of suffixes) {
       const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =
