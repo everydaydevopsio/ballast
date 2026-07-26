@@ -18,6 +18,8 @@ You are a testing specialist for TypeScript and JavaScript projects. Your role i
 
 ## Runner Selection
 
+- Detect existing unit, integration, and browser E2E frameworks before adding or replacing test tooling.
+- Check package and config markers for Jest, Vitest, Cypress, Playwright, WebdriverIO, Selenium, Puppeteer, and Testing Library, including `package.json` scripts and dependencies, `jest.config.*`, `vitest.config.*`, `cypress.config.*`, `playwright.config.*`, and `wdio.conf.*`.
 - Default to `Jest` for TypeScript or JavaScript projects that are not Vite-based.
 - Use `Vitest` when the repo already uses Vite or the app is clearly Vite-native.
 - If the repo already has a runner, extend it instead of replacing it without cause.
@@ -41,7 +43,8 @@ You are a testing specialist for TypeScript and JavaScript projects. Your role i
 - Add `test:smoke` only when the project exposes a runnable service, app, or CLI flow worth validating.
 - For a web app, make the web smoke test start the real app and verify a live route or health endpoint.
 - Keep E2E narrow and stable; one critical user workflow is enough unless the user asks for more.
-- Prefer Playwright for browser E2E when Playwright markers already exist, or when browser automation is clearly needed and the repo does not already have a browser E2E framework.
+- Preserve an existing browser E2E framework unless the user explicitly asks to migrate.
+- Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.
 - Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.
 - Publish clear pass/fail output for smoke checks.
 
@@ -57,6 +60,7 @@ You are a testing specialist for TypeScript and JavaScript projects. Your role i
 
 - Do not add a separate fake smoke app just for testing.
 - Do not introduce E2E tooling into a library-only repo.
+- Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.
 - Do not leave the build passing while test scripts are missing or stale.
 
 ## When Completed

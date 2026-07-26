@@ -1,5 +1,33 @@
 # Product Requirements
 
+## Consolidated CI Workflow
+
+### Problem
+
+Ballast's primary pull-request validation is split across separate lint, test, and language-pack workflows. Contributors need one canonical CI entry point that shows the full merge validation contract while still running independent language lanes in parallel.
+
+### Requirements
+
+1. The repository must use `.github/workflows/ci.yml` as the primary CI workflow for pull requests and pushes to `main`.
+2. The CI workflow must include a workflow-level `concurrency` block that cancels superseded runs for the same workflow and ref.
+3. The CI workflow must preserve TypeScript lint, format, test, and coverage validation, including Node 22 and Node 24 test runs for supported runtime compatibility.
+4. The CI workflow must preserve Python lint, format, test, coverage, and package import validation.
+5. The CI workflow must preserve Go package and wrapper CLI lint, vet, tidy, test, coverage, and build validation.
+6. Independent language and package lanes must run in parallel wherever practical.
+7. Superseded primary CI workflow files must be removed or reduced to non-overlapping helpers so `ci.yml` is the clear contributor-facing CI contract.
+8. README badges must point at the canonical CI workflow instead of retired lint or test workflows.
+
+### Acceptance Criteria
+
+1. `.github/workflows/ci.yml` exists and triggers on `pull_request` and pushes to `main`.
+2. `ci.yml` includes `concurrency.group: ${{ github.workflow }}-${{ github.ref }}` and `cancel-in-progress: true`.
+3. `ci.yml` contains separate parallel jobs for TypeScript, Python, Go package, and wrapper CLI validation.
+4. TypeScript tests run against Node 22 and Node 24, and TypeScript coverage is uploaded to Codecov.
+5. Python and Go coverage outputs are uploaded to Codecov.
+6. Python package import checks, Go language-pack builds, and wrapper CLI builds remain represented in CI.
+7. `.github/workflows/lint.yaml`, `.github/workflows/test.yml`, and `.github/workflows/language-packs.yml` are removed because their coverage is represented in `ci.yml`.
+8. The README CI badge references `.github/workflows/ci.yml`.
+
 ## Terraform Rule Best-Practices Alignment
 
 ### Problem
@@ -108,6 +136,32 @@ Ballast-generated rule files for persistent agent context have accumulated large
 7. Root `.rulesrc.json` includes `claude` and `codex` so tracked generated artifacts for both targets can be refreshed by config-driven installs.
 8. `AGENTS.md` documents that PRs touching Ballast generator inputs or target policy must include regenerated local `.claude` and `.codex` artifacts.
 
+## Plan Lifecycle Rule Distribution
+
+### Problem
+
+Ballast has task-system and branch TODO guidance, but it does not distribute the Plan -> ADR lifecycle for non-trivial features. Agents in Ballast-managed repositories need installable guidance for when to create a plan, how to maintain it during implementation, and how to graduate completed plans into durable ADRs without duplicating `tasks/todo.md` behavior.
+
+### Requirements
+
+1. Ballast must distribute `plan-lifecycle` as a language-agnostic common agent rule alongside the existing task rules.
+2. The plan-lifecycle rule must define when to create a plan, when to skip one, the expected `plans/`, `tasks/`, and `adr/` directory structure, and the required plan file naming convention.
+3. The rule must include a plan template with status, branch, created date, related ADRs, problem, approach, files affected, phases, verification, rejected alternatives, open questions, and change log.
+4. The rule must describe maintaining the plan during implementation, including checking off phases, updating the approach when it changes, committing plan updates with related code, reading the plan at session start, and routing out-of-scope work to the TODO rule.
+5. The rule must define the graduation trigger and steps for turning a plan into an ADR, including checking `tasks/todo.md`, creating generic task-system work items for incomplete TODOs, assigning the next ADR number, creating the ADR, updating indexes, removing the plan, and committing the graduation.
+6. The rule must include an ADR template and ADR management rules for status values, sequential numbering, one decision per ADR, and never deleting ADR history.
+7. The rule must defer to the existing `tasks-todo` rule for `tasks/todo.md` behavior instead of restating that rule in detail.
+8. The generated rule and installed support-file entries must use generic task-system terminology, not Jira-specific wording.
+
+### Acceptance Criteria
+
+1. Installing the `plan-lifecycle` agent produces plan-lifecycle rule files for supported targets.
+2. Generated `.claude/rules/common/plan-lifecycle.md` and `.codex/rules/common/plan-lifecycle.md` exist in this repository when the checked-in Ballast-managed outputs are refreshed.
+3. `CLAUDE.md` and `AGENTS.md` installed rules lists include the new `plan-lifecycle` rule under common task rules.
+4. Generated plan-lifecycle content includes the create/skip criteria, directory structure, plan template, maintenance rules, graduation steps, ADR template, ADR management rules, and quick reference.
+5. Generated plan-lifecycle content explicitly defers `tasks/todo.md` behavior to the branch-local TODO tracking rule.
+6. Automated tests cover rule suffix discovery, generated content, and support-file listing for the new rule.
+
 ## TypeScript Husky Git Hook Guidance
 
 ### Problem
@@ -147,7 +201,7 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 4. `--force` must prompt before replacing an existing support file (`AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`) that would lose user customizations.
 5. In non-interactive mode (`--yes` or CI environment variables), an attempted `--force` overwrite of an existing support file must fail with a clear error telling the operator to rerun interactively without `--yes`.
 6. Creating a missing support file with `--force` must continue without prompting.
-7. Support-file patch behavior and existing agent-rule overwrite semantics must remain unchanged.
+7. Existing support files must be patched by default when `--force` is not set, updating only Ballast-managed installed-rule and installed-skill sections while preserving user-managed sections.
 8. README and installation documentation must describe the updated `--patch` and `--force` behavior.
 9. If an existing Claude `.skill` archive is unreadable during `--patch`, install must recover by overwriting it with canonical packaged skill content instead of failing the run.
 
@@ -161,8 +215,29 @@ Ballast does not apply the same overwrite decision matrix to installed skill fil
 6. Given an existing support file and interactive `--force`, answering yes overwrites the support file with canonical content.
 7. Given an existing support file and non-interactive `--force`, install exits with an error and does not overwrite the file.
 8. Automated tests cover the skill-file decision matrix and support-file confirmation behavior in the TypeScript, Python, and Go backends.
-9. README and `docs/installation.md` describe when to use `--patch` versus `--force`, including the support-file confirmation behavior.
+9. README and `docs/installation.md` describe when support files are patched by default and when to use `--patch` versus `--force`, including the support-file confirmation behavior.
 10. Given an existing unreadable Claude `.skill` archive and `force=false, patch=true`, install replaces it with canonical content and completes without an install error.
+
+## Required Agent Option Resolution
+
+### Problem
+
+Some agents require repo-level option values before rule content is generated. Wrapper-driven installs resolved publishing deployment model differently from the tasks task system, so first-run installs with `--all` could prompt for publishing while silently defaulting tasks when no `.rulesrc.json` existed.
+
+### Requirements
+
+1. Wrapper-driven installs must resolve required options through one shared code path.
+2. When `tasks` is selected and `.rulesrc.json` has no `taskSystem`, interactive installs must prompt for the task system and non-interactive installs must use the default.
+3. When `publishing` is selected and `.rulesrc.json` has no `deploymentModel`, interactive installs must prompt for the deployment model and non-interactive installs must use the default.
+4. Explicit CLI flags must override saved config and prompted/default values.
+5. Resolved values must be saved to `.rulesrc.json` and forwarded to backend invocations.
+
+### Acceptance Criteria
+
+1. Given a first-run multi-language install with `--all`, Ballast prompts for both task system and deployment model.
+2. Given saved values in `.rulesrc.json`, Ballast does not prompt and reuses the saved values.
+3. Given `--yes` or CI, Ballast uses defaults for missing selected-agent options.
+4. Tests cover first-run prompt resolution and backend argument forwarding.
 
 ## Ballast Upgrade Skill Refresh
 
@@ -275,6 +350,32 @@ Ballast testing and publishing rules mention smoke tests, but they do not consis
 4. Generated CLI publishing/testing rules require packaged-command smoke tests for install/startup, help output, version output, and a representative command.
 5. `docs/agents/testing.md` and `docs/agents/publishing.md` include the same operator-facing guidance.
 6. Tests or snapshots fail if the generated guidance drops the required smoke/E2E or CLI packaged-command expectations.
+
+## Integration Framework Detection Guidance
+
+### Problem
+
+Ballast testing rules now define smoke and E2E expectations, but agents still need explicit framework-detection discipline before adding or changing integration tests. Without language-aware detection markers, agents can replace established E2E stacks, add Playwright to library-only repositories, or miss browser app surfaces that should use Playwright when no browser E2E framework exists.
+
+### Requirements
+
+1. Generated TypeScript testing guidance must tell agents to detect existing unit, integration, and browser E2E frameworks before introducing new test tooling.
+2. Generated Python and Go testing guidance must tell agents to detect existing unit, integration, API, service, and browser E2E frameworks before introducing new test tooling.
+3. Browser E2E guidance must preserve an existing browser E2E framework such as Cypress, WebdriverIO, Selenium, Puppeteer, Robot Framework, pytest-playwright, Playwright Test, or Go browser harnesses when one is already present.
+4. Browser E2E guidance must prefer Playwright only when Playwright markers already exist or when the repository has a real browser application surface and no existing browser E2E framework.
+5. Generated guidance must warn agents not to add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.
+6. Documentation must describe the same framework-detection and Playwright-selection expectations.
+7. Automated generated-content tests must cover the framework markers, existing-framework preservation, Playwright preference, and non-browser guardrail.
+
+### Acceptance Criteria
+
+1. TypeScript generated testing rules mention package/config markers for Jest, Vitest, Cypress, Playwright, WebdriverIO, Selenium, Puppeteer, and Testing Library.
+2. Python generated testing rules mention markers for pytest, unittest, tox/nox, Robot Framework, Selenium, Playwright or pytest-playwright, and API/service test clients.
+3. Go generated testing rules mention `go test`, integration build tags or naming, API/service tests, Selenium/chromedp/rod/agouti, and Playwright-driven browser harnesses.
+4. Generated testing rules for TypeScript, Python, and Go preserve existing browser E2E frameworks before adding Playwright.
+5. Generated testing rules for TypeScript, Python, and Go prefer Playwright only for existing Playwright repos or browser apps with no existing browser E2E framework.
+6. `docs/agents/testing.md` includes operator-facing framework-detection guidance aligned with generated rules.
+7. Tests fail if generated guidance loses required detection markers, existing-framework preservation, Playwright preference, or non-browser guardrails.
 
 ## Deployment Model Configuration
 

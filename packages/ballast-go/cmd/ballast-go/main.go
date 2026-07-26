@@ -44,6 +44,8 @@ var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
 var gitHooksGuidanceToken = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
 var gitHooksPreCommitGlobToken = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
 var deploymentModelGuidanceToken = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
+var taskSystemToken = "{{taskSystem}}"
+var taskSystems = []string{"github", "jira", "linear"}
 var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
 
 func withImplicitAgents(agents []string) []string {
@@ -126,6 +128,7 @@ type resolveOptions struct {
 	allSkills       bool
 	yes             bool
 	language        string
+	taskSystem      string
 	deploymentModel string
 }
 
@@ -141,6 +144,7 @@ type installOptions struct {
 	patchGemini     bool
 	skipSupport     map[string]struct{}
 	saveConfig      bool
+	taskSystem      string
 	deploymentModel string
 }
 
@@ -211,7 +215,8 @@ func runInstall(args []string) int {
 	force := fs.Bool("force", false, "overwrite existing rule and skill files; prompts before replacing support files")
 	patch := fs.Bool("patch", false, "merge upstream rule and skill updates into existing files")
 	fs.BoolVar(patch, "p", false, "merge upstream rule and skill updates into existing files")
-	deploymentModelFlag := fs.String("deployment-model", "", "deployment model for publishing apps: none|kubernetes|serverless|server|hosted")
+	taskSystemFlag := fs.String("task-system", "", "task system for tasks: github|jira|linear")
+	deploymentModelFlag := fs.String("deployment-model", "", "app/service deployment model for publishing; use none for CLI/library/SDK-only projects: none|kubernetes|serverless|server|hosted")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	repositoryFactsFile := fs.String("repository-facts-file", "", "optional path to wrapper-generated repository facts JSON")
@@ -235,6 +240,11 @@ func runInstall(args []string) int {
 		fmt.Printf("Invalid --language. Use: %s\n", strings.Join(languages, ", "))
 		return 1
 	}
+	taskSystem := normalizeRequiredInstallOptionValue(*taskSystemFlag)
+	if taskSystem != "" && !contains(taskSystems, taskSystem) {
+		fmt.Printf("Invalid --task-system. Use: %s\n", strings.Join(taskSystems, ", "))
+		return 1
+	}
 	deploymentModel := normalizeDeploymentModel(*deploymentModelFlag)
 	if deploymentModel != "" && !contains(deploymentModels, deploymentModel) {
 		fmt.Printf("Invalid --deployment-model. Use: %s\n", strings.Join(deploymentModels, ", "))
@@ -256,6 +266,7 @@ func runInstall(args []string) int {
 		allSkills:       *allSkills,
 		yes:             *yes,
 		language:        lang,
+		taskSystem:      taskSystem,
 		deploymentModel: deploymentModel,
 	})
 	if err != nil {
@@ -268,46 +279,6 @@ func runInstall(args []string) int {
 		return 1
 	}
 
-	patchClaude := false
-	patchGemini := false
-	for _, target := range resolved.Targets {
-		if target == "claude" && exists(claudeMDPath(root)) && !*force {
-			if *patch {
-				patchClaude = true
-			} else if !*yes && !isCIMode() {
-				approved, promptErr := promptYesNo(
-					fmt.Sprintf(
-						"Existing CLAUDE.md found at %s. Patch the Installed agent rules section?",
-						claudeMDPath(root),
-					),
-					false,
-				)
-				if promptErr != nil {
-					fmt.Println(promptErr)
-					return 1
-				}
-				patchClaude = approved
-			}
-		}
-		if target == "gemini" && exists(geminiMDPath(root)) && !*force {
-			if *patch {
-				patchGemini = true
-			} else if !*yes && !isCIMode() {
-				approved, promptErr := promptYesNo(
-					fmt.Sprintf(
-						"Existing GEMINI.md found at %s. Patch the Installed agent rules section?",
-						geminiMDPath(root),
-					),
-					false,
-				)
-				if promptErr != nil {
-					fmt.Println(promptErr)
-					return 1
-				}
-				patchGemini = approved
-			}
-		}
-	}
 	skippedSupport := map[string]struct{}{}
 	for _, target := range resolved.Targets {
 		supportPath := supportFilePath(root, target)
@@ -345,10 +316,11 @@ func runInstall(args []string) int {
 		language:        lang,
 		force:           *force,
 		patch:           *patch,
-		patchClaude:     patchClaude,
-		patchGemini:     patchGemini,
+		patchClaude:     false,
+		patchGemini:     false,
 		skipSupport:     skippedSupport,
 		saveConfig:      true,
+		taskSystem:      resolved.TaskSystem,
 		deploymentModel: resolved.DeploymentModel,
 	})
 
@@ -389,12 +361,6 @@ func runInstall(args []string) int {
 	}
 	if len(result.skipped) > 0 {
 		fmt.Printf("Skipped (already present; use --force to overwrite): %s\n", strings.Join(result.skipped, ", "))
-	}
-	if len(result.skippedSupportFiles) > 0 {
-		fmt.Printf(
-			"Skipped support files (already present; use --force to overwrite): %s\n",
-			strings.Join(result.skippedSupportFiles, ", "),
-		)
 	}
 	if len(result.declinedSupportFiles) > 0 {
 		fmt.Printf(
@@ -437,7 +403,8 @@ Options:
   --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, ballast-audit, ballast-project-maintenance (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
-  --deployment-model <mode> Deployment model for publishing apps: %s
+  --task-system <system>    Task system for tasks: %s
+  --deployment-model <mode> App/service deployment model for publishing; use none for CLI/library/SDK-only projects: %s
   --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -456,7 +423,7 @@ Examples:
   ballast-go install --target claude --all --force
   ballast-go install --target cursor --agent linting --patch
   ballast-go install --yes --target cursor --target codex --all
-`, resolveVersion(), strings.Join(targets, ", "), strings.Join(languages, ", "), strings.Join(deploymentModels, ", "))
+`, resolveVersion(), strings.Join(targets, ", "), strings.Join(languages, ", "), strings.Join(taskSystems, ", "), strings.Join(deploymentModels, ", "))
 }
 
 func hasHelpFlag(args []string) bool {
@@ -726,6 +693,7 @@ func runDoctor() int {
 func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	config := loadConfig(opts.projectRoot, opts.language)
 	ci := isCIMode() || opts.yes
+	promptReader := bufio.NewReader(os.Stdin)
 
 	flagAgents := opts.agents
 	if opts.all {
@@ -739,11 +707,29 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	if config != nil && len(opts.targets) == 0 && len(flagAgents) == 0 && len(flagSkills) == 0 {
 		next := *config
 		next.Agents = withImplicitAgents(config.Agents)
+		if contains(next.Agents, "tasks") {
+			taskSystem, err := resolveRequiredInstallOption(requiredInstallOptionResolution{
+				Option:         taskSystemRequiredOption(),
+				Requested:      opts.taskSystem,
+				Saved:          next.TaskSystem,
+				Selected:       true,
+				NonInteractive: ci,
+				Reader:         promptReader,
+			})
+			if err != nil {
+				return nil, err
+			}
+			next.TaskSystem = taskSystem
+		}
 		if contains(next.Agents, "publishing") {
-			deploymentModel, err := resolveDeploymentModelForPublishing(
-				strings.TrimSpace(next.DeploymentModel),
-				ci,
-			)
+			deploymentModel, err := resolveRequiredInstallOption(requiredInstallOptionResolution{
+				Option:         deploymentModelRequiredOption(),
+				Requested:      opts.deploymentModel,
+				Saved:          next.DeploymentModel,
+				Selected:       true,
+				NonInteractive: ci,
+				Reader:         promptReader,
+			})
 			if err != nil {
 				return nil, err
 			}
@@ -772,20 +758,39 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	} else if config != nil {
 		resolvedSkills = slices.Clone(config.Skills)
 	}
+	taskSystem := opts.taskSystem
 	deploymentModel := opts.deploymentModel
-	if deploymentModel == "" && config != nil {
-		deploymentModel = normalizeDeploymentModel(config.DeploymentModel)
-	}
 
 	if len(resolvedTargets) > 0 && (len(resolvedAgents) > 0 || len(resolvedSkills) > 0) {
-		if contains(resolvedAgents, "publishing") {
+		if contains(resolvedAgents, "tasks") {
 			var err error
-			deploymentModel, err = resolveDeploymentModelForPublishing(deploymentModel, ci)
+			taskSystem, err = resolveRequiredInstallOption(requiredInstallOptionResolution{
+				Option:         taskSystemRequiredOption(),
+				Requested:      opts.taskSystem,
+				Saved:          configValue(config, "taskSystem"),
+				Selected:       true,
+				NonInteractive: ci,
+				Reader:         promptReader,
+			})
 			if err != nil {
 				return nil, err
 			}
 		}
-		return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, DeploymentModel: deploymentModel}, nil
+		if contains(resolvedAgents, "publishing") {
+			var err error
+			deploymentModel, err = resolveRequiredInstallOption(requiredInstallOptionResolution{
+				Option:         deploymentModelRequiredOption(),
+				Requested:      opts.deploymentModel,
+				Saved:          configValue(config, "deploymentModel"),
+				Selected:       true,
+				NonInteractive: ci,
+				Reader:         promptReader,
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+		return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, TaskSystem: taskSystem, DeploymentModel: deploymentModel}, nil
 	}
 
 	if ci {
@@ -813,15 +818,36 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 			return nil, err
 		}
 	}
+	if contains(resolvedAgents, "tasks") {
+		var err error
+		taskSystem, err = resolveRequiredInstallOption(requiredInstallOptionResolution{
+			Option:         taskSystemRequiredOption(),
+			Requested:      opts.taskSystem,
+			Saved:          configValue(config, "taskSystem"),
+			Selected:       true,
+			NonInteractive: ci,
+			Reader:         promptReader,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 	if contains(resolvedAgents, "publishing") {
 		var err error
-		deploymentModel, err = resolveDeploymentModelForPublishing(deploymentModel, ci)
+		deploymentModel, err = resolveRequiredInstallOption(requiredInstallOptionResolution{
+			Option:         deploymentModelRequiredOption(),
+			Requested:      opts.deploymentModel,
+			Saved:          configValue(config, "deploymentModel"),
+			Selected:       true,
+			NonInteractive: ci,
+			Reader:         promptReader,
+		})
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, DeploymentModel: deploymentModel}, nil
+	return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, TaskSystem: taskSystem, DeploymentModel: deploymentModel}, nil
 }
 
 func install(opts installOptions) installResult {
@@ -846,6 +872,7 @@ func install(opts installOptions) installResult {
 			Agents:          opts.agents,
 			Skills:          opts.skills,
 			Languages:       []string{opts.language},
+			TaskSystem:      opts.taskSystem,
 			DeploymentModel: opts.deploymentModel,
 		}); err != nil {
 			result.errors = append(result.errors, agentError{agent: "config", err: err.Error()})
@@ -888,7 +915,7 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
 				}
-				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, opts.deploymentModel)
+				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, opts.taskSystem, opts.deploymentModel)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
@@ -1020,28 +1047,28 @@ func install(opts installOptions) installResult {
 				if !contains(result.declinedSupportFiles, agentsPath) {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, agentsPath)
 				}
-			} else if exists(agentsPath) && !opts.force && !opts.patch {
-				if !contains(result.skippedSupportFiles, agentsPath) {
-					result.skippedSupportFiles = append(result.skippedSupportFiles, agentsPath)
-				}
 			} else {
 				content, err := buildCodexAgentsMD(supportAgents, supportSkills, opts.language)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 				} else {
 					nextContent := content
-					if exists(agentsPath) && !opts.force && opts.patch {
+					shouldWrite := true
+					if exists(agentsPath) && !opts.force {
 						existing, readErr := os.ReadFile(agentsPath)
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "codex", err: readErr.Error()})
+							shouldWrite = false
 						} else {
-							nextContent = patchCodexAgentsMD(string(existing), content)
+							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch)
 						}
 					}
-					if err := os.WriteFile(agentsPath, []byte(nextContent), 0o644); err != nil {
-						result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
-					} else if !contains(result.installedSupport, agentsPath) {
-						result.installedSupport = append(result.installedSupport, agentsPath)
+					if shouldWrite {
+						if err := os.WriteFile(agentsPath, []byte(nextContent), 0o644); err != nil {
+							result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
+						} else if !contains(result.installedSupport, agentsPath) {
+							result.installedSupport = append(result.installedSupport, agentsPath)
+						}
 					}
 				}
 			}
@@ -1049,14 +1076,10 @@ func install(opts installOptions) installResult {
 
 		if target == "claude" && !disableSupportFiles {
 			claudePath := claudeMDPath(opts.projectRoot)
-			shouldPatchClaude := opts.patch || opts.patchClaude
+			shouldPatchClaude := (exists(claudePath) && !opts.force) || opts.patch || opts.patchClaude
 			if _, skipped := opts.skipSupport[claudePath]; skipped {
 				if !contains(result.declinedSupportFiles, claudePath) {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, claudePath)
-				}
-			} else if exists(claudePath) && !opts.force && !shouldPatchClaude {
-				if !contains(result.skippedSupportFiles, claudePath) {
-					result.skippedSupportFiles = append(result.skippedSupportFiles, claudePath)
 				}
 			} else {
 				content, err := buildClaudeMD(supportAgents, supportSkills, opts.language)
@@ -1064,18 +1087,22 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
 				} else {
 					nextContent := content
+					shouldWrite := true
 					if exists(claudePath) && !opts.force && shouldPatchClaude {
 						existing, readErr := os.ReadFile(claudePath)
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "claude", err: readErr.Error()})
+							shouldWrite = false
 						} else {
-							nextContent = patchCodexAgentsMD(string(existing), content)
+							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch || opts.patchClaude)
 						}
 					}
-					if err := os.WriteFile(claudePath, []byte(nextContent), 0o644); err != nil {
-						result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
-					} else if !contains(result.installedSupport, claudePath) {
-						result.installedSupport = append(result.installedSupport, claudePath)
+					if shouldWrite {
+						if err := os.WriteFile(claudePath, []byte(nextContent), 0o644); err != nil {
+							result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
+						} else if !contains(result.installedSupport, claudePath) {
+							result.installedSupport = append(result.installedSupport, claudePath)
+						}
 					}
 				}
 			}
@@ -1083,14 +1110,10 @@ func install(opts installOptions) installResult {
 
 		if target == "gemini" && !disableSupportFiles {
 			geminiPath := geminiMDPath(opts.projectRoot)
-			shouldPatchGemini := opts.patch || opts.patchGemini
+			shouldPatchGemini := (exists(geminiPath) && !opts.force) || opts.patch || opts.patchGemini
 			if _, skipped := opts.skipSupport[geminiPath]; skipped {
 				if !contains(result.declinedSupportFiles, geminiPath) {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, geminiPath)
-				}
-			} else if exists(geminiPath) && !opts.force && !shouldPatchGemini {
-				if !contains(result.skippedSupportFiles, geminiPath) {
-					result.skippedSupportFiles = append(result.skippedSupportFiles, geminiPath)
 				}
 			} else {
 				content, err := buildGeminiMD(supportAgents, supportSkills, opts.language)
@@ -1098,18 +1121,22 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
 				} else {
 					nextContent := content
+					shouldWrite := true
 					if exists(geminiPath) && !opts.force && shouldPatchGemini {
 						existing, readErr := os.ReadFile(geminiPath)
 						if readErr != nil {
 							result.errors = append(result.errors, agentError{agent: "gemini", err: readErr.Error()})
+							shouldWrite = false
 						} else {
-							nextContent = patchCodexAgentsMD(string(existing), content)
+							nextContent = patchCodexAgentsMDWithOptions(string(existing), content, opts.patch || opts.patchGemini)
 						}
 					}
-					if err := os.WriteFile(geminiPath, []byte(nextContent), 0o644); err != nil {
-						result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
-					} else if !contains(result.installedSupport, geminiPath) {
-						result.installedSupport = append(result.installedSupport, geminiPath)
+					if shouldWrite {
+						if err := os.WriteFile(geminiPath, []byte(nextContent), 0o644); err != nil {
+							result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
+						} else if !contains(result.installedSupport, geminiPath) {
+							result.installedSupport = append(result.installedSupport, geminiPath)
+						}
 					}
 				}
 			}
@@ -1828,36 +1855,65 @@ func patchRuleContent(existing, canonical, target string) string {
 }
 
 func findSectionRange(content, heading string) (int, int, bool) {
+	ranges := findSectionRanges(content, heading)
+	if len(ranges) == 0 {
+		return 0, 0, false
+	}
+	return ranges[0].start, ranges[0].end, true
+}
+
+type sectionRange struct {
+	start int
+	end   int
+}
+
+func findSectionRanges(content, heading string) []sectionRange {
 	normalized := normalizeLineEndings(content)
 	lines := strings.SplitAfter(normalized, "\n")
 	position := 0
-	start := -1
-	end := len(normalized)
 	marker := "## " + heading
 	inCodeFence := false
+	type headingPosition struct {
+		line  string
+		start int
+	}
+	headings := []headingPosition{}
 
-	for index, line := range lines {
+	for _, line := range lines {
 		trimmed := strings.TrimSuffix(line, "\n")
 		if strings.HasPrefix(strings.TrimSpace(trimmed), "```") {
 			inCodeFence = !inCodeFence
 		}
-		if !inCodeFence && start < 0 {
-			if trimmed == marker {
-				start = position
-			}
-		} else if !inCodeFence && strings.HasPrefix(trimmed, "## ") {
-			end = position
-			return start, end, true
+		if !inCodeFence && strings.HasPrefix(trimmed, "## ") {
+			headings = append(headings, headingPosition{line: trimmed, start: position})
 		}
 		position += len(line)
-		if index == len(lines)-1 && start >= 0 {
-			return start, end, true
-		}
 	}
-	return 0, 0, false
+
+	ranges := []sectionRange{}
+	for index, headingPosition := range headings {
+		if headingPosition.line != marker {
+			continue
+		}
+		end := len(normalized)
+		if index+1 < len(headings) {
+			end = headings[index+1].start
+		}
+		ranges = append(ranges, sectionRange{start: headingPosition.start, end: end})
+	}
+	return ranges
 }
 
 func patchCodexAgentsMD(existing, canonical string) string {
+	return patchCodexAgentsMDWithOptions(existing, canonical, true)
+}
+
+func hasBallastManagedNotice(section string) bool {
+	return strings.Contains(section, "Created by [Ballast]") &&
+		strings.Contains(section, "Do not edit this section.")
+}
+
+func patchCodexAgentsMDWithOptions(existing, canonical string, replaceUnmanagedSections bool) string {
 	if strings.TrimSpace(existing) == "" {
 		return normalizeLineEndings(canonical)
 	}
@@ -1870,22 +1926,30 @@ func patchCodexAgentsMD(existing, canonical string) string {
 			continue
 		}
 		canonicalSection := strings.TrimRight(canonical[canonicalStart:canonicalEnd], "\n")
-		existingStart, existingEnd, ok := findSectionRange(current, heading)
-		if !ok {
+		var existingRange sectionRange
+		found := false
+		for _, candidate := range findSectionRanges(current, heading) {
+			if replaceUnmanagedSections || hasBallastManagedNotice(current[candidate.start:candidate.end]) {
+				existingRange = candidate
+				found = true
+				break
+			}
+		}
+		if !found {
 			current = strings.TrimRight(current, "\n") + "\n\n" + canonicalSection + "\n"
 			continue
 		}
-		current = strings.TrimRight(current[:existingStart], "\n") +
+		current = strings.TrimRight(current[:existingRange.start], "\n") +
 			"\n\n" +
 			canonicalSection +
 			"\n\n" +
-			strings.TrimLeft(current[existingEnd:], "\n") + "\n"
+			strings.TrimLeft(current[existingRange.end:], "\n") + "\n"
 	}
 	return current
 }
 
-func buildContent(agentID, target, language, suffix, hookMode, deploymentModel string) (string, error) {
-	content, err := readContent(agentID, language, suffix, hookMode, deploymentModel)
+func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deploymentModel string) (string, error) {
+	content, err := readContent(agentID, language, suffix, hookMode, taskSystem, deploymentModel)
 	if err != nil {
 		return "", err
 	}
@@ -1896,12 +1960,14 @@ func buildContent(agentID, target, language, suffix, hookMode, deploymentModel s
 			return "", err
 		}
 		front = applyHookTemplateVariables(front, agentID, language, hookMode)
+		front = applyTaskSystemVariables(front, agentID, taskSystem)
 		return front + "\n" + content, nil
 	case "claude":
 		header, err := readTemplate(agentID, language, "claude-header.md", suffix)
 		if err != nil {
 			return "", err
 		}
+		header = applyTaskSystemVariables(header, agentID, taskSystem)
 		return header + content, nil
 	case "gemini":
 		header, err := readTemplate(agentID, language, "gemini-header.md", suffix)
@@ -1914,12 +1980,14 @@ func buildContent(agentID, target, language, suffix, hookMode, deploymentModel s
 				}
 			}
 		}
+		header = applyTaskSystemVariables(header, agentID, taskSystem)
 		return header + "\n---\n\n" + renderGeminiMandates() + content, nil
 	case "opencode":
 		front, err := readTemplate(agentID, language, "opencode-frontmatter.yaml", suffix)
 		if err != nil {
 			return "", err
 		}
+		front = applyTaskSystemVariables(front, agentID, taskSystem)
 		return front + "\n" + content, nil
 	case "codex":
 		header, err := readTemplate(agentID, language, "codex-header.md", suffix)
@@ -1929,6 +1997,7 @@ func buildContent(agentID, target, language, suffix, hookMode, deploymentModel s
 				return "", err
 			}
 		}
+		header = applyTaskSystemVariables(header, agentID, taskSystem)
 		return header + content, nil
 	default:
 		return "", fmt.Errorf("unknown target: %s", target)
@@ -1946,6 +2015,10 @@ func renderGitHooksPreCommitGlob(agentID, language, hookMode string) string {
 }
 
 func normalizeDeploymentModel(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func normalizeRequiredInstallOptionValue(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
@@ -1992,6 +2065,13 @@ func applyDeploymentModelGuidance(content, agentID, deploymentModel string) stri
 	return strings.ReplaceAll(content, deploymentModelGuidanceToken, renderDeploymentModelGuidance(deploymentModel))
 }
 
+func applyTaskSystemVariables(content, agentID, taskSystem string) string {
+	if agentID != "tasks" || !strings.Contains(content, taskSystemToken) {
+		return content
+	}
+	return strings.ReplaceAll(content, taskSystemToken, normalizeRequiredInstallOptionValue(taskSystem))
+}
+
 func applyHookTemplateVariables(content, agentID, language, hookMode string) string {
 	if !strings.Contains(content, gitHooksPreCommitGlobToken) {
 		return content
@@ -2026,7 +2106,7 @@ func listRuleSuffixes(agentID, language string) ([]string, error) {
 	return suffixes, nil
 }
 
-func readContent(agentID, language, suffix, hookMode, deploymentModel string) (string, error) {
+func readContent(agentID, language, suffix, hookMode, taskSystem, deploymentModel string) (string, error) {
 	name := "content.md"
 	if suffix != "" {
 		name = "content-" + suffix + ".md"
@@ -2036,6 +2116,7 @@ func readContent(agentID, language, suffix, hookMode, deploymentModel string) (s
 		return "", fmt.Errorf("agent %q has no %s", agentID, name)
 	}
 	content := applyDeploymentModelGuidance(string(bytes), agentID, deploymentModel)
+	content = applyTaskSystemVariables(content, agentID, taskSystem)
 	if agentID == "git-hooks" && strings.Contains(content, gitHooksGuidanceToken) {
 		content = strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode))
 	}
@@ -2246,7 +2327,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		BallastVersion:  raw.BallastVersion,
 		Languages:       raw.Languages,
 		Paths:           raw.Paths,
-		TaskSystem:      raw.TaskSystem,
+		TaskSystem:      normalizeRequiredInstallOptionValue(raw.TaskSystem),
 		DeploymentModel: normalizeDeploymentModel(raw.DeploymentModel),
 	}
 }
@@ -2275,6 +2356,10 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		cfg.Paths = mergeLanguagePaths(nil, cfg.Languages)
 	}
 	cfg.DeploymentModel = normalizeDeploymentModel(cfg.DeploymentModel)
+	cfg.TaskSystem = normalizeRequiredInstallOptionValue(cfg.TaskSystem)
+	if cfg.TaskSystem != "" && !contains(taskSystems, cfg.TaskSystem) {
+		return fmt.Errorf("invalid taskSystem %q; use one of: %s", cfg.TaskSystem, strings.Join(taskSystems, ", "))
+	}
 	if cfg.DeploymentModel != "" && !contains(deploymentModels, cfg.DeploymentModel) {
 		return fmt.Errorf("invalid deploymentModel %q; use one of: %s", cfg.DeploymentModel, strings.Join(deploymentModels, ", "))
 	}
@@ -2388,7 +2473,7 @@ func promptTarget() (string, error) {
 	for {
 		fmt.Printf("AI platform (%s): ", strings.Join(targets, ", "))
 		line, err := reader.ReadString('\n')
-		if err != nil && !errors.Is(err, os.ErrClosed) {
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, os.ErrClosed) {
 			if len(strings.TrimSpace(line)) == 0 {
 				return "", err
 			}
@@ -2473,39 +2558,104 @@ func promptSkills(language string) ([]string, error) {
 	}
 }
 
-func resolveDeploymentModelForPublishing(current string, nonInteractive bool) (string, error) {
-	model := normalizeDeploymentModel(current)
-	if model != "" {
-		if !contains(deploymentModels, model) {
-			return "", fmt.Errorf("invalid deploymentModel %q; use one of: %s", model, strings.Join(deploymentModels, ", "))
-		}
-		return model, nil
-	}
-	if nonInteractive {
-		return "none", nil
-	}
-	return promptDeploymentModel()
+type requiredInstallOption struct {
+	FieldName    string
+	PromptLabel  string
+	Allowed      []string
+	DefaultValue string
 }
 
-func promptDeploymentModel() (string, error) {
-	allowed := strings.Join(deploymentModels, ", ")
-	reader := bufio.NewReader(os.Stdin)
+type requiredInstallOptionResolution struct {
+	Option         requiredInstallOption
+	Requested      string
+	Saved          string
+	Selected       bool
+	NonInteractive bool
+	Reader         *bufio.Reader
+}
+
+func taskSystemRequiredOption() requiredInstallOption {
+	return requiredInstallOption{
+		FieldName:    "taskSystem",
+		PromptLabel:  "Task system for tasks",
+		Allowed:      taskSystems,
+		DefaultValue: "github",
+	}
+}
+
+func deploymentModelRequiredOption() requiredInstallOption {
+	return requiredInstallOption{
+		FieldName:    "deploymentModel",
+		PromptLabel:  "App deployment model for publishing (use none for CLI/library/SDK-only projects)",
+		Allowed:      deploymentModels,
+		DefaultValue: "none",
+	}
+}
+
+func resolveRequiredInstallOption(resolution requiredInstallOptionResolution) (string, error) {
+	if resolution.Requested != "" {
+		return resolution.Requested, nil
+	}
+	saved := normalizeRequiredInstallOptionValue(resolution.Saved)
+	if saved != "" {
+		if contains(resolution.Option.Allowed, saved) {
+			return saved, nil
+		}
+		return "", fmt.Errorf("invalid %s %q; use one of: %s", resolution.Option.FieldName, resolution.Saved, strings.Join(resolution.Option.Allowed, ", "))
+	}
+	if !resolution.Selected {
+		return "", nil
+	}
+	if resolution.NonInteractive {
+		return resolution.Option.DefaultValue, nil
+	}
+	return promptRequiredInstallOption(resolution.Option, resolution.Reader)
+}
+
+func promptRequiredInstallOption(option requiredInstallOption, reader *bufio.Reader) (string, error) {
+	if reader == nil {
+		reader = bufio.NewReader(os.Stdin)
+	}
+	allowed := strings.Join(option.Allowed, ", ")
 	for {
-		fmt.Printf("Deployment model for publishing apps [%s] (default: none): ", allowed)
-		line, err := reader.ReadString('\n')
-		if err != nil && !errors.Is(err, os.ErrClosed) {
-			if len(strings.TrimSpace(line)) == 0 {
-				return "", err
+		fmt.Printf("%s [%s] (default: %s): ", option.PromptLabel, allowed, option.DefaultValue)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+				if strings.TrimSpace(response) != "" {
+					value := normalizeRequiredInstallOptionValue(response)
+					if contains(option.Allowed, value) {
+						return value, nil
+					}
+					fmt.Printf("Invalid %s. Choose one of: %s\n", option.FieldName, allowed)
+					continue
+				}
+				return option.DefaultValue, nil
 			}
+			return "", err
 		}
-		value := normalizeDeploymentModel(line)
+		value := normalizeRequiredInstallOptionValue(response)
 		if value == "" {
-			return "none", nil
+			return option.DefaultValue, nil
 		}
-		if contains(deploymentModels, value) {
+		if contains(option.Allowed, value) {
 			return value, nil
 		}
-		fmt.Printf("Invalid deployment model. Choose one of: %s\n", allowed)
+		fmt.Printf("Invalid %s. Choose one of: %s\n", option.FieldName, allowed)
+	}
+}
+
+func configValue(config *rulesConfig, field string) string {
+	if config == nil {
+		return ""
+	}
+	switch field {
+	case "taskSystem":
+		return config.TaskSystem
+	case "deploymentModel":
+		return config.DeploymentModel
+	default:
+		return ""
 	}
 }
 

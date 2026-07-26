@@ -35,7 +35,16 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
 - Web smoke tests that use the repo Dockerfile and `docker-compose.yaml` for runnable apps and verify a live route or health endpoint
 - Explicit smoke-test pass/fail output
 - A smoke-test GitHub Action and matching README badge
-- Narrow end-to-end coverage for one critical workflow when the app has a real user flow, keeping an existing browser E2E framework when present and preferring Playwright only when Playwright markers already exist or browser automation is needed without an existing browser E2E framework
+- Narrow end-to-end coverage for one critical workflow when the app has a real user flow, keeping an existing browser E2E framework when present and preferring Playwright only when Playwright markers already exist or the repo has a real browser application surface with no existing browser E2E framework
+
+## Framework Detection
+
+- TypeScript/JavaScript: check package and config markers for Jest, Vitest, Cypress, Playwright, WebdriverIO, Selenium, Puppeteer, and Testing Library before adding or replacing test tooling.
+- Python: check markers for pytest, unittest, tox, nox, Robot Framework, Selenium, Playwright or pytest-playwright, FastAPI TestClient, Django test client, Flask test client, and existing API/service test clients.
+- Go: check markers for `go test`, integration build tags, `_integration_test.go`, `httptest`, API/service tests, Selenium, chromedp, rod, agouti, Playwright, and existing browser harnesses.
+- Preserve an existing browser E2E framework unless the user explicitly asks to migrate.
+- Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.
+- Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.
 
 ## Smoke and E2E Placement
 

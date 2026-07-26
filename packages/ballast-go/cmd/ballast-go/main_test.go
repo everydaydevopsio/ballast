@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -538,7 +539,7 @@ func TestInstallSupportsTerraformTestingBestPractices(t *testing.T) {
 }
 
 func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
-	got, err := readContent("git-hooks", "terraform", "", "standalone", "none")
+	got, err := readContent("git-hooks", "terraform", "", "standalone", "github", "none")
 	if err != nil {
 		t.Fatalf("read terraform git-hooks content: %v", err)
 	}
@@ -846,7 +847,7 @@ func TestBuildGeminiMDIncludesRepositoryFactsAndSkills(t *testing.T) {
 }
 
 func TestBuildContentGeminiIncludesMandates(t *testing.T) {
-	content, err := buildContent("linting", "gemini", "go", "", "standalone", "none")
+	content, err := buildContent("linting", "gemini", "go", "", "standalone", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent(gemini): %v", err)
 	}
@@ -863,7 +864,7 @@ func TestBuildContentGeminiIncludesMandates(t *testing.T) {
 }
 
 func TestBuildContentRendersPublishingDeploymentModelToken(t *testing.T) {
-	content, err := buildContent("publishing", "codex", "go", "apps", "standalone", "kubernetes")
+	content, err := buildContent("publishing", "codex", "go", "apps", "standalone", "github", "kubernetes")
 	if err != nil {
 		t.Fatalf("buildContent(publishing): %v", err)
 	}
@@ -1019,7 +1020,7 @@ func TestRunInstallPromptsToPatchExistingGeminiMD(t *testing.T) {
 		t.Fatal(err)
 	}
 	geminiPath := filepath.Join(tmpDir, "GEMINI.md")
-	if err := os.WriteFile(geminiPath, []byte("# GEMINI.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\n- `.gemini/rules/old.md` - Old rule\n"), 0o644); err != nil {
+	if err := os.WriteFile(geminiPath, []byte("# GEMINI.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\n- `.gemini/rules/old.md` - Old rule\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1601,6 +1602,100 @@ func TestRunInstallWritesDeploymentModelForPublishing(t *testing.T) {
 	}
 }
 
+func TestRunInstallPromptsForTaskSystemAndDeploymentModelOnFirstRun(t *testing.T) {
+	t.Setenv("CI", "")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("TF_BUILD", "")
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalStdin := os.Stdin
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = reader
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+		_ = reader.Close()
+	})
+	if _, err := writer.WriteString("linear\nserverless\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	exitCode := runInstall([]string{"install", "--target", "codex", "--language", "go", "--all"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, `"taskSystem": "linear"`) {
+		t.Fatalf("expected prompted taskSystem in config: %s", text)
+	}
+	if !strings.Contains(text, `"deploymentModel": "serverless"`) {
+		t.Fatalf("expected prompted deploymentModel in config: %s", text)
+	}
+	taskRule, err := os.ReadFile(filepath.Join(tmpDir, ".codex", "rules", "tasks-task-system.md"))
+	if err != nil {
+		t.Fatalf("read tasks-task-system.md: %v", err)
+	}
+	if !strings.Contains(string(taskRule), "linear") || strings.Contains(string(taskRule), "{{taskSystem}}") {
+		t.Fatalf("expected task rule to render prompted task system: %s", string(taskRule))
+	}
+}
+
+func TestRunInstallDefaultsRequiredOptionsInNonInteractiveMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	exitCode := runInstall([]string{"install", "--target", "codex", "--language", "go", "--all", "--yes"})
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, `"taskSystem": "github"`) {
+		t.Fatalf("expected default taskSystem in config: %s", text)
+	}
+	if !strings.Contains(text, `"deploymentModel": "none"`) {
+		t.Fatalf("expected default deploymentModel in config: %s", text)
+	}
+}
+
 func TestRunInstallRejectsInvalidDeploymentModel(t *testing.T) {
 	output := captureStdout(t, func() {
 		exitCode := runInstall([]string{"install", "--target", "codex", "--agent", "publishing", "--deployment-model", "bogus", "--yes"})
@@ -1610,6 +1705,18 @@ func TestRunInstallRejectsInvalidDeploymentModel(t *testing.T) {
 	})
 	if !strings.Contains(output, "Invalid --deployment-model") {
 		t.Fatalf("expected invalid deployment model message, got %q", output)
+	}
+}
+
+func TestRunInstallRejectsInvalidTaskSystem(t *testing.T) {
+	output := captureStdout(t, func() {
+		exitCode := runInstall([]string{"install", "--target", "codex", "--agent", "tasks", "--task-system", "notion", "--yes"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+	if !strings.Contains(output, "Invalid --task-system") {
+		t.Fatalf("expected invalid task system message, got %q", output)
 	}
 }
 
@@ -1893,7 +2000,7 @@ func TestPatchFlagUpdatesClaudeMDSection(t *testing.T) {
 	}
 }
 
-func TestInstallPatchUpdatesCodexAgentsMDSectionOnly(t *testing.T) {
+func TestInstallUpdatesCodexAgentsMDSectionByDefault(t *testing.T) {
 	tmpDir := t.TempDir()
 	rulePath := filepath.Join(tmpDir, ".codex", "rules", "go-linting.md")
 	if err := os.MkdirAll(filepath.Dir(rulePath), 0o755); err != nil {
@@ -1910,7 +2017,7 @@ Keep my custom rule text.
 		t.Fatal(err)
 	}
 	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
-	if err := os.WriteFile(agentsMD, []byte("# AGENTS.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nRead and follow these rule files in `.codex/rules/` when they apply:\n\n- `.codex/rules/old.md` - Old rule\n"), 0o644); err != nil {
+	if err := os.WriteFile(agentsMD, []byte("# AGENTS.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\nRead and follow these rule files in `.codex/rules/` when they apply:\n\n- `.codex/rules/old.md` - Old rule\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1920,11 +2027,14 @@ Keep my custom rule text.
 		agents:      []string{"linting"},
 		language:    "go",
 		force:       false,
-		patch:       true,
+		patch:       false,
 		saveConfig:  false,
 	})
 	if len(result.errors) > 0 {
 		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	if contains(result.skippedSupportFiles, agentsMD) {
+		t.Fatalf("expected AGENTS.md to be patched by default, got skipped support files: %#v", result.skippedSupportFiles)
 	}
 
 	content, err := os.ReadFile(agentsMD)
@@ -1943,6 +2053,100 @@ Keep my custom rule text.
 	}
 	if strings.Contains(text, "`.codex/rules/old.md`") {
 		t.Fatalf("expected old installed-rules entry to be replaced: %s", text)
+	}
+}
+
+func TestInstallDefaultPatchPreservesUnmanagedCodexSupportSection(t *testing.T) {
+	tmpDir := t.TempDir()
+	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
+	if err := os.WriteFile(agentsMD, []byte("# AGENTS.md\n\n## Installed agent rules\n\n- `.codex/rules/old.md` - Team managed rule\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex"},
+		agents:      []string{"linting"},
+		language:    "go",
+		force:       false,
+		patch:       false,
+		saveConfig:  false,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	content, err := os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "`.codex/rules/old.md`") {
+		t.Fatalf("expected unmanaged section to be preserved: %s", text)
+	}
+	if !strings.Contains(text, "`.codex/rules/go-linting.md`") {
+		t.Fatalf("expected linting rule to be installed: %s", text)
+	}
+}
+
+func TestInstallSkipsSupportFileWriteWhenExistingFileCannotBeRead(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("write-only chmod semantics differ on Windows")
+	}
+
+	tests := []struct {
+		name        string
+		target      string
+		path        string
+		expectedErr string
+	}{
+		{name: "codex", target: "codex", path: "AGENTS.md", expectedErr: "codex"},
+		{name: "claude", target: "claude", path: "CLAUDE.md", expectedErr: "claude"},
+		{name: "gemini", target: "gemini", path: "GEMINI.md", expectedErr: "gemini"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			supportPath := filepath.Join(tmpDir, test.path)
+			original := "# " + test.path + "\n\n## Installed agent rules\n\nDo not replace this.\n"
+			if err := os.WriteFile(supportPath, []byte(original), 0o200); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				_ = os.Chmod(supportPath, 0o600)
+			})
+
+			result := install(installOptions{
+				projectRoot: tmpDir,
+				targets:     []string{test.target},
+				agents:      []string{"linting"},
+				language:    "go",
+				force:       false,
+				patch:       false,
+				saveConfig:  false,
+			})
+
+			if len(result.errors) == 0 {
+				t.Fatalf("expected read error for %s", test.path)
+			}
+			if !strings.Contains(result.errors[0].agent, test.expectedErr) {
+				t.Fatalf("expected %s read error, got %+v", test.expectedErr, result.errors)
+			}
+			if contains(result.installedSupport, supportPath) {
+				t.Fatalf("expected unreadable support file not to be reported as installed")
+			}
+			if err := os.Chmod(supportPath, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			content, err := os.ReadFile(supportPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(content) != original {
+				t.Fatalf("expected original support file to be preserved, got %q", string(content))
+			}
+		})
 	}
 }
 
@@ -2059,5 +2263,18 @@ func TestPatchCodexAgentsMDIgnoresHeadingInsideCodeFence(t *testing.T) {
 	}
 	if !strings.Contains(merged, "```md\n## Installed agent rules\n```") {
 		t.Fatalf("expected fenced code block to be preserved without matching: %s", merged)
+	}
+}
+
+func TestPatchCodexAgentsMDPreservesUnmanagedSectionsInManagedOnlyMode(t *testing.T) {
+	existing := "# AGENTS.md\n\n## Installed agent rules\n\n- `.codex/rules/old.md` - Team managed rule\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\n- `.codex/rules/go-linting.md` - New rule\n"
+
+	merged := patchCodexAgentsMDWithOptions(existing, canonical, false)
+	if !strings.Contains(merged, "`.codex/rules/old.md`") {
+		t.Fatalf("expected unmanaged section to be preserved: %s", merged)
+	}
+	if !strings.Contains(merged, "`.codex/rules/go-linting.md`") {
+		t.Fatalf("expected managed section to be appended: %s", merged)
 	}
 }

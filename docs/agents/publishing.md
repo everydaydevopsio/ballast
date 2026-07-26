@@ -31,7 +31,7 @@ When the publishing agent is installed, Ballast records `deploymentModel` in `.r
 - `server` — self-managed VM, VPS, or bare-metal deployment with a repeatable artifact transfer, service restart, health check, and rollback path.
 - `hosted` — app platforms such as Vercel, Netlify, Render, Railway, or Fly.io.
 
-Use `ballast install --agent publishing --deployment-model kubernetes` for non-interactive setup. Interactive installs prompt for the deployment model only when the publishing agent is selected.
+Use `ballast install --agent publishing --deployment-model kubernetes` for non-interactive app/service setup. Interactive installs prompt for the app deployment model only when the publishing agent is selected; choose `none` for CLI, library, or SDK-only projects.
 
 ## CLI Smoke Placement
 

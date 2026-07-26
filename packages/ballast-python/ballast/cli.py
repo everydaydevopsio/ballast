@@ -1493,30 +1493,41 @@ def patch_rule_content(existing: str, canonical: str, target: str) -> str:
 
 
 def find_markdown_section_range(content: str, heading: str) -> tuple[int, int] | None:
+    ranges = find_markdown_section_ranges(content, heading)
+    return ranges[0] if ranges else None
+
+
+def find_markdown_section_ranges(content: str, heading: str) -> list[tuple[int, int]]:
     normalized = normalize_line_endings(content)
     lines = normalized.split("\n")
     target = f"## {heading}"
     in_fence = False
     offset = 0
+    headings: list[tuple[str, int]] = []
 
-    for i, line in enumerate(lines):
+    for line in lines:
         if line.startswith("```"):
             in_fence = not in_fence
-        if not in_fence and line == target:
-            start = offset
-            offset += len(line) + 1
-            for next_line in lines[i + 1 :]:
-                if next_line.startswith("```"):
-                    in_fence = not in_fence
-                if not in_fence and next_line.startswith("## "):
-                    return start, offset - 1
-                offset += len(next_line) + 1
-            return start, len(normalized)
+        if not in_fence and line.startswith("## "):
+            headings.append((line, offset))
         offset += len(line) + 1
-    return None
+
+    ranges: list[tuple[int, int]] = []
+    for index, (line, start) in enumerate(headings):
+        if line != target:
+            continue
+        end = headings[index + 1][1] if index + 1 < len(headings) else len(normalized)
+        ranges.append((start, end))
+    return ranges
 
 
-def patch_codex_agents_md(existing: str, canonical: str) -> str:
+def has_ballast_managed_notice(section: str) -> bool:
+    return "Created by [Ballast]" in section and "Do not edit this section." in section
+
+
+def patch_codex_agents_md(
+    existing: str, canonical: str, replace_unmanaged_sections: bool = True
+) -> str:
     if not existing.strip():
         return canonical
 
@@ -1527,7 +1538,15 @@ def patch_codex_agents_md(existing: str, canonical: str) -> str:
             continue
         canonical_section = canonical[canonical_range[0] : canonical_range[1]].rstrip()
 
-        existing_range = find_markdown_section_range(next_content, heading)
+        existing_range = next(
+            (
+                range_
+                for range_ in find_markdown_section_ranges(next_content, heading)
+                if replace_unmanaged_sections
+                or has_ballast_managed_notice(next_content[range_[0] : range_[1]])
+            ),
+            None,
+        )
         if not existing_range:
             next_content = next_content.rstrip() + "\n\n" + canonical_section + "\n"
             continue
@@ -1633,7 +1652,7 @@ def prompt_skills(language: str) -> list[str]:
 
 def prompt_deployment_model() -> str:
     value = prompt(
-        "Deployment model for publishing apps "
+        "App deployment model for publishing (use none for CLI/library/SDK-only projects) "
         f"[{', '.join(DEPLOYMENT_MODELS)}] (default: none): "
     )
     normalized = normalize_deployment_model(value)
@@ -1872,17 +1891,19 @@ def install(
 
     if target == "claude" and not disable_support_files:
         claude_md = root / "CLAUDE.md"
-        should_patch_claude_md = patch or patch_claude_md
+        should_patch_claude_md = (
+            (claude_md.exists() and not force) or patch or patch_claude_md
+        )
         if str(claude_md) in skipped_support_files:
             result.declined_support_files.append(str(claude_md))
-        elif claude_md.exists() and not force and not should_patch_claude_md:
-            result.skipped_support_files.append(str(claude_md))
         else:
             try:
                 content = build_claude_md(support_agents, support_skills, language)
                 next_content = (
                     patch_codex_agents_md(
-                        claude_md.read_text(encoding="utf-8"), content
+                        claude_md.read_text(encoding="utf-8"),
+                        content,
+                        replace_unmanaged_sections=patch or patch_claude_md,
                     )
                     if claude_md.exists() and not force and should_patch_claude_md
                     else content
@@ -1894,17 +1915,19 @@ def install(
 
     if target == "gemini" and not disable_support_files:
         gemini_md = root / "GEMINI.md"
-        should_patch_gemini_md = patch or patch_gemini_md
+        should_patch_gemini_md = (
+            (gemini_md.exists() and not force) or patch or patch_gemini_md
+        )
         if str(gemini_md) in skipped_support_files:
             result.declined_support_files.append(str(gemini_md))
-        elif gemini_md.exists() and not force and not should_patch_gemini_md:
-            result.skipped_support_files.append(str(gemini_md))
         else:
             try:
                 content = build_gemini_md(support_agents, support_skills, language)
                 next_content = (
                     patch_codex_agents_md(
-                        gemini_md.read_text(encoding="utf-8"), content
+                        gemini_md.read_text(encoding="utf-8"),
+                        content,
+                        replace_unmanaged_sections=patch or patch_gemini_md,
                     )
                     if gemini_md.exists() and not force and should_patch_gemini_md
                     else content
@@ -1918,8 +1941,6 @@ def install(
         agents_md = root / "AGENTS.md"
         if str(agents_md) in skipped_support_files:
             result.declined_support_files.append(str(agents_md))
-        elif agents_md.exists() and not force and not patch:
-            result.skipped_support_files.append(str(agents_md))
         else:
             try:
                 content = build_codex_agents_md(
@@ -1927,9 +1948,11 @@ def install(
                 )
                 next_content = (
                     patch_codex_agents_md(
-                        agents_md.read_text(encoding="utf-8"), content
+                        agents_md.read_text(encoding="utf-8"),
+                        content,
+                        replace_unmanaged_sections=patch,
                     )
-                    if agents_md.exists() and not force and patch
+                    if agents_md.exists() and not force
                     else content
                 )
                 agents_md.write_text(next_content, encoding="utf-8")
@@ -2010,11 +2033,6 @@ def print_install_result(
             "Skipped (already present; use --force to overwrite): "
             + ", ".join(result.skipped)
         )
-    if result.skipped_support_files:
-        print(
-            "Skipped support files (already present; use --force to overwrite): "
-            + ", ".join(result.skipped_support_files)
-        )
     if result.declined_support_files:
         print(
             "Skipped support files (overwrite declined): "
@@ -2054,24 +2072,6 @@ def run_install(args: argparse.Namespace) -> int:
         print(f"Invalid --target. Use: {', '.join(TARGETS)}")
         return 1
 
-    patch_claude_md = False
-    if "claude" in targets and (root / "CLAUDE.md").exists() and not bool(args.force):
-        if bool(args.patch):
-            patch_claude_md = True
-        elif not is_ci_mode() and not bool(args.yes):
-            patch_claude_md = prompt_yes_no(
-                f"Existing CLAUDE.md found at {root / 'CLAUDE.md'}. Patch the Installed agent rules section?"
-            )
-
-    patch_gemini_md = False
-    if "gemini" in targets and (root / "GEMINI.md").exists() and not bool(args.force):
-        if bool(args.patch):
-            patch_gemini_md = True
-        elif not is_ci_mode() and not bool(args.yes):
-            patch_gemini_md = prompt_yes_no(
-                f"Existing GEMINI.md found at {root / 'GEMINI.md'}. Patch the Installed agent rules section?"
-            )
-
     support_decisions: dict[str, str | None] = {}
     for target in targets:
         skipped_support_file, support_error = confirm_support_file_overwrite(
@@ -2109,8 +2109,8 @@ def run_install(args: argparse.Namespace) -> int:
                     bool(args.force),
                     bool(args.patch),
                     False,
-                    patch_claude_md,
-                    patch_gemini_md,
+                    False,
+                    False,
                     {skipped_support_file} if skipped_support_file else None,
                     deployment_model,
                 ),
@@ -2171,7 +2171,7 @@ def parser() -> argparse.ArgumentParser:
     install_cmd.add_argument(
         "--deployment-model",
         choices=DEPLOYMENT_MODELS,
-        help="Deployment model for publishing apps",
+        help="App/service deployment model for publishing; use none for CLI/library/SDK-only projects",
     )
     install_cmd.add_argument(
         "--force",

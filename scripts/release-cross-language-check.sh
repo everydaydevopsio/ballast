@@ -45,6 +45,8 @@ main() {
   run_language_smoke "terraform-sample" "terraform" "ballast-go" "terraform-linting.mdc"
 
   "${REPO_ROOT}/scripts/smoke-wrapper-monorepo.sh"
+  "${REPO_ROOT}/scripts/e2e-go-first-run-required-options.sh"
+  "${REPO_ROOT}/scripts/e2e-support-file-default-patch.sh"
 
   echo "Cross-language release validation passed."
 }
