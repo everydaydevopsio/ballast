@@ -139,6 +139,23 @@ class PatchInstallTests(unittest.TestCase):
         self.assertNotIn("{{taskSystem}}", content)
         self.assertNotIn("All durable work items must be created there", content)
 
+    def test_apply_task_system_guidance_defaults_missing_task_system(self) -> None:
+        content = cli.apply_task_system_guidance(
+            "\n".join(
+                [
+                    "{{BALLAST_TASK_SYSTEM_GUIDANCE}}",
+                    'When asked, "configure MCP for {{taskSystem}}"',
+                ]
+            ),
+            "tasks",
+            None,
+        )
+
+        self.assertIn("**github** as the system of record", content)
+        self.assertIn('"configure MCP for github"', content)
+        self.assertNotIn("{{BALLAST_TASK_SYSTEM_GUIDANCE}}", content)
+        self.assertNotIn("{{taskSystem}}", content)
+
     def test_destination_rejects_invalid_rule_subdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

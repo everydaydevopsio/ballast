@@ -52,6 +52,7 @@ GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
 DEPLOYMENT_MODEL_GUIDANCE_TOKEN = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
 TASK_SYSTEM_GUIDANCE_TOKEN = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
 TASK_SYSTEM_TOKEN = "{{taskSystem}}"
+DEFAULT_TASK_SYSTEM = "github"
 DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "hosted"]
 
 
@@ -836,7 +837,7 @@ def normalize_task_system(value: object) -> str:
 
 
 def render_task_system_guidance(task_system: str | None) -> str:
-    normalized = normalize_task_system(task_system) or "{{taskSystem}}"
+    normalized = normalize_task_system(task_system) or DEFAULT_TASK_SYSTEM
     if normalized == "none":
         return "\n".join(
             [
@@ -871,7 +872,7 @@ def apply_task_system_guidance(
 ) -> str:
     if agent != "tasks":
         return content
-    normalized = normalize_task_system(task_system)
+    normalized = normalize_task_system(task_system) or DEFAULT_TASK_SYSTEM
     if TASK_SYSTEM_GUIDANCE_TOKEN in content:
         if normalized == "none":
             return content[
