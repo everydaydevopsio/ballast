@@ -266,10 +266,11 @@ describe('config', () => {
   });
 
   describe('taskSystem', () => {
-    test('TASK_SYSTEMS contains github, jira, linear', () => {
+    test('TASK_SYSTEMS contains github, jira, linear, none', () => {
       expect(TASK_SYSTEMS).toContain('github');
       expect(TASK_SYSTEMS).toContain('jira');
       expect(TASK_SYSTEMS).toContain('linear');
+      expect(TASK_SYSTEMS).toContain('none');
     });
 
     test('DEFAULT_TASK_SYSTEM is github', () => {
@@ -288,6 +289,20 @@ describe('config', () => {
       );
       const loaded = loadConfig(tmpDir);
       expect(loaded?.taskSystem).toBe('linear');
+    });
+
+    test('saves and loads none taskSystem', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['tasks'],
+          ballastVersion: BALLAST_VERSION,
+          taskSystem: 'none'
+        },
+        tmpDir
+      );
+      const loaded = loadConfig(tmpDir);
+      expect(loaded?.taskSystem).toBe('none');
     });
 
     test('loads config without taskSystem field', () => {

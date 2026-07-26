@@ -50,6 +50,8 @@ SKILLS_BY_LANGUAGE = {
 GIT_HOOKS_GUIDANCE_TOKEN = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
 GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
 DEPLOYMENT_MODEL_GUIDANCE_TOKEN = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
+TASK_SYSTEM_GUIDANCE_TOKEN = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
+TASK_SYSTEM_TOKEN = "{{taskSystem}}"
 DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "hosted"]
 
 
@@ -813,7 +815,7 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
             ]
         case _:
             lines = [
-                "No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.",
+                "No app deployment model is configured (`deploymentModel: none`). Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.",
             ]
     return "\n".join(lines)
 
@@ -827,6 +829,61 @@ def apply_deployment_model_guidance(
         DEPLOYMENT_MODEL_GUIDANCE_TOKEN,
         render_deployment_model_guidance(deployment_model),
     )
+
+
+def normalize_task_system(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def render_task_system_guidance(task_system: str | None) -> str:
+    normalized = normalize_task_system(task_system) or "{{taskSystem}}"
+    if normalized == "none":
+        return "\n".join(
+            [
+                "## Configured Task System",
+                "",
+                "This repository has no external task system configured (`taskSystem: none`). Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.",
+                "",
+                "Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.",
+                "",
+                "## MCP Server Setup",
+                "",
+                "No task-system MCP server is required while `taskSystem` is `none`. Configure GitHub Issues, Jira, or Linear MCP only after the repository changes its saved `taskSystem` value or the user explicitly asks for that integration.",
+                "",
+                "## Using Work Items",
+                "",
+                "- Do not create external issues or tickets by default.",
+                "- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them in branch-local notes, or ask the user where durable follow-up belongs.",
+                "- Keep credentials out of committed files; use environment variables or platform secret stores if a task-system integration is added later.",
+            ]
+        )
+    return "\n".join(
+        [
+            "## Configured Task System",
+            "",
+            f"This repository uses **{normalized}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.",
+        ]
+    )
+
+
+def apply_task_system_guidance(
+    content: str, agent: str, task_system: str | None
+) -> str:
+    if agent != "tasks":
+        return content
+    normalized = normalize_task_system(task_system)
+    if TASK_SYSTEM_GUIDANCE_TOKEN in content:
+        if normalized == "none":
+            return content[
+                : content.index(TASK_SYSTEM_GUIDANCE_TOKEN)
+            ] + render_task_system_guidance(task_system)
+        content = content.replace(
+            TASK_SYSTEM_GUIDANCE_TOKEN,
+            render_task_system_guidance(task_system),
+        )
+    if TASK_SYSTEM_TOKEN in content:
+        content = content.replace(TASK_SYSTEM_TOKEN, normalized)
+    return content
 
 
 def read_template(agent: str, language: str, filename: str, suffix: str = "") -> str:
@@ -868,13 +925,18 @@ def build_content(
     suffix: str = "",
     root: Path | None = None,
     deployment_model: str | None = None,
+    task_system: str | None = None,
 ) -> str:
-    body = apply_deployment_model_guidance(
-        apply_hook_guidance(
-            read_content(agent, language, suffix), agent, language, root
+    body = apply_task_system_guidance(
+        apply_deployment_model_guidance(
+            apply_hook_guidance(
+                read_content(agent, language, suffix), agent, language, root
+            ),
+            agent,
+            deployment_model,
         ),
         agent,
-        deployment_model,
+        task_system,
     )
     if target == "cursor":
         return (
@@ -1809,6 +1871,9 @@ def install(
         if config_for_support_files
         else skills
     )
+    task_system = (
+        config_for_support_files.get("taskSystem") if config_for_support_files else None
+    )
     skipped_support_files = skip_support_files or set()
 
     for agent in agents:
@@ -1825,7 +1890,13 @@ def install(
                 basename = rule_basename(agent, language, suffix)
                 dst = destination(root, target, basename)
                 content = build_content(
-                    agent, target, language, suffix, root, deployment_model
+                    agent,
+                    target,
+                    language,
+                    suffix,
+                    root,
+                    deployment_model,
+                    task_system if isinstance(task_system, str) else None,
                 )
                 if dst.exists() and not force and not patch:
                     agent_skipped = True

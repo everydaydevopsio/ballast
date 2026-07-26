@@ -1,5 +1,5 @@
 # Task System Integration
 
-Use {{taskSystem}} as the system of record for work items. Check and configure the task system MCP server when asked.
+Use the configured task system for durable work items. Check and configure the task system MCP server when asked and when a non-`none` task system is configured.
 
 ---

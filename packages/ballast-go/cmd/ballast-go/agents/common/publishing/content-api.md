@@ -11,13 +11,13 @@ You are a publishing specialist for REST API services deployed as Docker contain
 
 ## Release Model
 
-REST API apps use **continuous deployment** — every merge to `main` deploys. See the web app publishing rule for the full `deploy-web.yml` workflow template; the same workflow applies here. The only differences are API health endpoint requirements and any deployment-model-specific runtime configuration.
+When an API deployment model is configured, REST API apps usually use **continuous deployment**: every merge to `main` deploys. See the web app publishing rule for the full `deploy-web.yml` workflow template; the same workflow applies here. The only differences are API health endpoint requirements and any deployment-model-specific runtime configuration.
 
 {{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}
 
 ## CI Workflow
 
-Use the same `deploy-web.yml` workflow template as the web app publishing rule:
+Use the same `deploy-web.yml` workflow template as the web app publishing rule only when this repository owns an active API deployment:
 
 - Trigger on `push` to `main`.
 - `concurrency: cancel-in-progress: true`.
@@ -25,6 +25,8 @@ Use the same `deploy-web.yml` workflow template as the web app publishing rule:
 - Update deployment state according to the configured deployment model.
 
 Name the workflow file `deploy-api.yml` (or keep `deploy-web.yml` if there is only one service).
+
+If `deploymentModel` is `none`, do not add `deploy-api.yml` unless the user explicitly asks to introduce API deployment ownership. Container publishing may still be valid for installable or local runtime images, but deployment-state updates are inactive.
 
 ## Health Endpoint Requirements
 
@@ -150,5 +152,5 @@ Grant `packages: write` to the build job for GHCR. Remove it for Docker Hub.
 ## When to Apply
 
 - When a REST API service is deployed from a container image or platform-native service artifact.
-- When every merge to `main` should trigger a new deployment.
+- When a configured deployment model or existing workflow says every merge to `main` should trigger a new deployment.
 - When the API needs health and readiness checks for safe runtime lifecycle management.

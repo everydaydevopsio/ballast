@@ -133,6 +133,29 @@ describe('build', () => {
       expect(content).toContain('ballast install');
     });
 
+    test('returns language-neutral common rule content', () => {
+      const cicd = buildCodexFormat('cicd', undefined, 'go');
+      const localDev = buildCodexFormat('local-dev', 'env', 'go');
+      const observability = buildCodexFormat('observability', undefined, 'go');
+
+      expect(cicd).toContain("repository's configured languages and runtimes");
+      expect(localDev).toContain(
+        "repository's configured languages and runtimes"
+      );
+      expect(observability).toContain(
+        "repository's configured languages and runtimes"
+      );
+      expect(cicd).not.toContain(
+        'CI/CD specialist for TypeScript/JavaScript projects'
+      );
+      expect(localDev).not.toContain(
+        'local development environment specialist for TypeScript/JavaScript projects'
+      );
+      expect(observability).not.toContain(
+        'observability specialist for TypeScript/JavaScript applications'
+      );
+    });
+
     test('returns tasks task-system content with default variable substitution', () => {
       const content = getContent('tasks', 'task-system', 'typescript', {
         variables: { taskSystem: 'github' }
@@ -148,6 +171,23 @@ describe('build', () => {
       });
       expect(content).toContain('linear');
       expect(content).not.toContain('{{taskSystem}}');
+    });
+
+    test('returns tasks task-system content for none without mandatory tracker guidance', () => {
+      const content = getContent('tasks', 'task-system', 'typescript', {
+        variables: { taskSystem: 'none' }
+      });
+
+      expect(content).toContain('taskSystem: none');
+      expect(content).toContain('No task-system MCP server is required');
+      expect(content).toContain(
+        'Do not create external issues or tickets by default.'
+      );
+      expect(content).not.toContain('{{taskSystem}}');
+      expect(content).not.toContain(
+        'All durable work items must be created there'
+      );
+      expect(content).not.toContain('configure MCP for none');
     });
 
     test('returns tasks todo content', () => {
@@ -238,6 +278,9 @@ describe('build', () => {
 
     test('returns platform-neutral web deployment state placeholders', () => {
       const content = getContent('publishing', 'web', 'typescript');
+      expect(content).toContain('deploymentModel: none');
+      expect(content).toContain('Deployment is inactive');
+      expect(content).toContain('do not create deploy-on-main workflows');
       expect(content).toContain('repository: OWNER/deployment-state');
       expect(content).toContain(
         'Hosted, serverless, server, or none models may replace'
@@ -249,6 +292,8 @@ describe('build', () => {
 
     test('keeps REST API baseline goals platform neutral', () => {
       const content = getContent('publishing', 'api', 'typescript');
+      expect(content).toContain('Deployment is inactive');
+      expect(content).toContain('do not create deploy-on-main workflows');
       expect(content).toContain(
         'health and readiness endpoints that the configured runtime can use'
       );

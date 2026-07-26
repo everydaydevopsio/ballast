@@ -1,5 +1,29 @@
 # Product Requirements
 
+## Generated Rule Activation Clarity
+
+### Problem
+
+Ballast common rules can be installed in Go, Python, Terraform, Ansible, or mixed-language repositories, but some generated common guidance still frames CI/CD, local development, and observability as TypeScript/JavaScript-only. Publishing rules can also be generated as a broad pack even when `.rulesrc.json` sets `deploymentModel: "none"`, which makes deploy-on-main web/API templates look mandatory. The tasks install flow asks operators for a task system including `none`, but the config model and generated task-system rule must make that no-tracker mode explicit.
+
+### Requirements
+
+1. Common CI/CD, local-dev, and observability rule sources must use language-neutral framing.
+2. Language-specific examples in common rules must be labeled as examples or ecosystem-specific guidance.
+3. Generated web/API publishing rules must distinguish active deployment models from `deploymentModel: none`.
+4. With `deploymentModel: none`, generated web/API publishing content must not require deploy-on-main workflows or deployment-state updates.
+5. Ballast must support `taskSystem: none` as a valid configured value for repositories that do not use a durable issue tracker.
+6. With `taskSystem: none`, generated task-system rules must clearly state that no external task system is configured and that issue/ticket creation guidance is conditional.
+
+### Acceptance Criteria
+
+1. Generated common CI/CD, local-dev, and observability rules no longer describe themselves as TypeScript/JavaScript-only.
+2. Generated publishing web/API rules with `deploymentModel: none` contain explicit inactive-deployment guidance.
+3. Generated publishing web/API rules with `deploymentModel: none` do not say every merge to `main` deploys as a mandatory rule.
+4. `TASK_SYSTEMS` accepts `none`, config load/save preserves it, and invalid values remain ignored or rejected.
+5. Generated task-system content with `taskSystem: none` contains no `{{taskSystem}}` placeholder and does not require MCP setup or issue creation.
+6. Tests cover the language-neutral common wording, inactive deployment guidance, and `taskSystem: none` rendering.
+
 ## Consolidated CI Workflow
 
 ### Problem

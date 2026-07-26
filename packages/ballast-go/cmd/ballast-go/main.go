@@ -44,8 +44,9 @@ var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
 var gitHooksGuidanceToken = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
 var gitHooksPreCommitGlobToken = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
 var deploymentModelGuidanceToken = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
+var taskSystemGuidanceToken = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
 var taskSystemToken = "{{taskSystem}}"
-var taskSystems = []string{"github", "jira", "linear"}
+var taskSystems = []string{"github", "jira", "linear", "none"}
 var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
 
 func withImplicitAgents(agents []string) []string {
@@ -215,7 +216,7 @@ func runInstall(args []string) int {
 	force := fs.Bool("force", false, "overwrite existing rule and skill files; prompts before replacing support files")
 	patch := fs.Bool("patch", false, "merge upstream rule and skill updates into existing files")
 	fs.BoolVar(patch, "p", false, "merge upstream rule and skill updates into existing files")
-	taskSystemFlag := fs.String("task-system", "", "task system for tasks: github|jira|linear")
+	taskSystemFlag := fs.String("task-system", "", "task system for tasks: github|jira|linear|none")
 	deploymentModelFlag := fs.String("deployment-model", "", "app/service deployment model for publishing; use none for CLI/library/SDK-only projects: none|kubernetes|serverless|server|hosted")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
@@ -2054,7 +2055,7 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 			"- CI should validate builds and let the hosted platform own rollout mechanics unless the repo defines a separate release gate.",
 		}, "\n")
 	default:
-		return "No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`."
+		return "No app deployment model is configured (`deploymentModel: none`). Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`."
 	}
 }
 
@@ -2066,10 +2067,40 @@ func applyDeploymentModelGuidance(content, agentID, deploymentModel string) stri
 }
 
 func applyTaskSystemVariables(content, agentID, taskSystem string) string {
-	if agentID != "tasks" || !strings.Contains(content, taskSystemToken) {
+	if agentID != "tasks" {
 		return content
 	}
-	return strings.ReplaceAll(content, taskSystemToken, normalizeRequiredInstallOptionValue(taskSystem))
+	normalized := normalizeRequiredInstallOptionValue(taskSystem)
+	if strings.Contains(content, taskSystemGuidanceToken) {
+		if normalized == "none" {
+			return content[:strings.Index(content, taskSystemGuidanceToken)] + strings.Join([]string{
+				"## Configured Task System",
+				"",
+				"This repository has no external task system configured (`taskSystem: none`). Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.",
+				"",
+				"Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.",
+				"",
+				"## MCP Server Setup",
+				"",
+				"No task-system MCP server is required while `taskSystem` is `none`. Configure GitHub Issues, Jira, or Linear MCP only after the repository changes its saved `taskSystem` value or the user explicitly asks for that integration.",
+				"",
+				"## Using Work Items",
+				"",
+				"- Do not create external issues or tickets by default.",
+				"- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them in branch-local notes, or ask the user where durable follow-up belongs.",
+				"- Keep credentials out of committed files; use environment variables or platform secret stores if a task-system integration is added later.",
+			}, "\n")
+		}
+		content = strings.ReplaceAll(content, taskSystemGuidanceToken, strings.Join([]string{
+			"## Configured Task System",
+			"",
+			fmt.Sprintf("This repository uses **%s** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.", normalized),
+		}, "\n"))
+	}
+	if strings.Contains(content, taskSystemToken) {
+		return strings.ReplaceAll(content, taskSystemToken, normalized)
+	}
+	return content
 }
 
 func applyHookTemplateVariables(content, agentID, language, hookMode string) string {

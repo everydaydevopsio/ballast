@@ -1,6 +1,6 @@
 # Local Development Environment Agent
 
-You are a local development environment specialist for TypeScript/JavaScript projects.
+You are a local development environment specialist for the repository's configured languages and runtimes.
 
 Keep this rule concise. Use it to set direction, then read implementation files or docs for details instead of dumping large boilerplate into the conversation.
 

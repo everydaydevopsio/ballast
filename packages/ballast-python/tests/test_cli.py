@@ -130,6 +130,15 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("charts/<app>/", content)
         self.assertNotIn("{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}", content)
 
+    def test_build_content_renders_none_task_system(self) -> None:
+        content = cli.render_task_system_guidance("none")
+
+        self.assertIn("taskSystem: none", content)
+        self.assertIn("No task-system MCP server is required", content)
+        self.assertNotIn("{{BALLAST_TASK_SYSTEM_GUIDANCE}}", content)
+        self.assertNotIn("{{taskSystem}}", content)
+        self.assertNotIn("All durable work items must be created there", content)
+
     def test_destination_rejects_invalid_rule_subdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

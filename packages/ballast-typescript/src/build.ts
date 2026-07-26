@@ -17,6 +17,7 @@ const SOURCE_AGENTS_ROOT = path.join(REPO_ROOT, 'agents');
 const GIT_HOOKS_GUIDANCE_TOKEN = '{{BALLAST_GIT_HOOKS_GUIDANCE}}';
 const GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = '{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}';
 const DEPLOYMENT_MODEL_GUIDANCE_TOKEN = '{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}';
+const TASK_SYSTEM_GUIDANCE_TOKEN = '{{BALLAST_TASK_SYSTEM_GUIDANCE}}';
 const BALLAST_REPO_URL = 'https://github.com/everydaydevopsio/ballast';
 const BALLAST_MANAGED_COMMENT = `<!-- Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section. -->`;
 
@@ -301,7 +302,7 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'none':
     default:
-      return 'No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.';
+      return 'No app deployment model is configured (`deploymentModel: none`). Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.';
   }
 }
 
@@ -319,6 +320,55 @@ function applyDeploymentModelGuidance(
   return content.replaceAll(
     DEPLOYMENT_MODEL_GUIDANCE_TOKEN,
     renderDeploymentModelGuidance(options)
+  );
+}
+
+function renderTaskSystemGuidance(options?: BuildOptions): string {
+  const taskSystem = options?.variables?.taskSystem ?? '{{taskSystem}}';
+  if (taskSystem === 'none') {
+    return [
+      '## Configured Task System',
+      '',
+      'This repository has no external task system configured (`taskSystem: none`). Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.',
+      '',
+      'Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.',
+      '',
+      '## MCP Server Setup',
+      '',
+      'No task-system MCP server is required while `taskSystem` is `none`. Configure GitHub Issues, Jira, or Linear MCP only after the repository changes its saved `taskSystem` value or the user explicitly asks for that integration.',
+      '',
+      '## Using Work Items',
+      '',
+      '- Do not create external issues or tickets by default.',
+      '- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them in branch-local notes, or ask the user where durable follow-up belongs.',
+      '- Keep credentials out of committed files; use environment variables or platform secret stores if a task-system integration is added later.'
+    ].join('\n');
+  }
+
+  return [
+    '## Configured Task System',
+    '',
+    `This repository uses **${taskSystem}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.`
+  ].join('\n');
+}
+
+function applyTaskSystemGuidance(
+  content: string,
+  agentId: string,
+  options?: BuildOptions
+): string {
+  if (agentId !== 'tasks' || !content.includes(TASK_SYSTEM_GUIDANCE_TOKEN)) {
+    return content;
+  }
+  if (options?.variables?.taskSystem === 'none') {
+    return (
+      content.slice(0, content.indexOf(TASK_SYSTEM_GUIDANCE_TOKEN)) +
+      renderTaskSystemGuidance(options)
+    );
+  }
+  return content.replaceAll(
+    TASK_SYSTEM_GUIDANCE_TOKEN,
+    renderTaskSystemGuidance(options)
   );
 }
 
@@ -383,8 +433,12 @@ export function getContent(
       raw = raw.replaceAll(`{{${key}}}`, value);
     }
   }
-  return applyDeploymentModelGuidance(
-    applyHookGuidance(raw, agentId, language, options),
+  return applyTaskSystemGuidance(
+    applyDeploymentModelGuidance(
+      applyHookGuidance(raw, agentId, language, options),
+      agentId,
+      options
+    ),
     agentId,
     options
   );
