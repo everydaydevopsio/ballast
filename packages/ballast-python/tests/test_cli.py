@@ -433,6 +433,54 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("**github** as the system of record", content)
             self.assertNotIn("{{taskSystem}}", content)
 
+    def test_run_install_changing_task_system_refreshes_existing_task_rules(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_git_boundary(root)
+            old_cwd = Path.cwd()
+            os.chdir(root)
+            try:
+                first_args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--agent",
+                        "tasks",
+                        "--task-system",
+                        "jira",
+                        "--yes",
+                    ]
+                )
+                second_args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--agent",
+                        "tasks",
+                        "--task-system",
+                        "linear",
+                        "--yes",
+                    ]
+                )
+                self.assertEqual(cli.run_install(first_args), 0)
+                self.assertEqual(cli.run_install(second_args), 0)
+            finally:
+                os.chdir(old_cwd)
+
+            config = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"taskSystem": "linear"', config)
+            content = (root / ".codex" / "rules" / "tasks-task-system.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("taskSystem: linear", content)
+            self.assertIn("**linear** as the system of record", content)
+            self.assertNotIn("taskSystem: jira", content)
+            self.assertNotIn("**jira** as the system of record", content)
+
     def test_run_install_writes_multi_target_shared_rulesrc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

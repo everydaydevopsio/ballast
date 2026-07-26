@@ -1912,6 +1912,7 @@ def install(
     skip_support_files: set[str] | None = None,
     deployment_model: str | None = None,
     task_system: str | None = None,
+    refresh_task_rules: bool = False,
 ) -> InstallResult:
     result = InstallResult()
     agents = with_implicit_agents(agents)
@@ -1971,7 +1972,12 @@ def install(
                     deployment_model,
                     task_system if isinstance(task_system, str) else None,
                 )
-                if dst.exists() and not force and not patch:
+                if (
+                    dst.exists()
+                    and not force
+                    and not patch
+                    and not (refresh_task_rules and agent == "tasks")
+                ):
                     agent_skipped = True
                     agent_processed = True
                     continue
@@ -2120,6 +2126,7 @@ def install_for_targets(
     patch_gemini_md: bool = False,
     deployment_model: str | None = None,
     task_system: str | None = None,
+    refresh_task_rules: bool = False,
 ) -> list[tuple[str, InstallResult]]:
     results: list[tuple[str, InstallResult]] = []
     agents = with_implicit_agents(agents)
@@ -2145,6 +2152,7 @@ def install_for_targets(
                     patch_gemini_md,
                     deployment_model=deployment_model,
                     task_system=task_system,
+                    refresh_task_rules=refresh_task_rules,
                 ),
             )
         )
@@ -2235,6 +2243,17 @@ def run_install(args: argparse.Namespace) -> int:
         support_decisions[target] = skipped_support_file
 
     per_target_results: list[tuple[str, InstallResult]] = []
+    prior_config = load_config(root, language)
+    prior_task_system = (
+        normalize_task_system(prior_config.get("taskSystem")) if prior_config else ""
+    )
+    refresh_task_rules = (
+        "tasks" in with_implicit_agents(agents)
+        and task_system is not None
+        and normalize_task_system(task_system)
+        != (prior_task_system or DEFAULT_TASK_SYSTEM)
+    )
+
     save_config(
         root,
         language,
@@ -2267,6 +2286,7 @@ def run_install(args: argparse.Namespace) -> int:
                     {skipped_support_file} if skipped_support_file else None,
                     deployment_model,
                     task_system,
+                    refresh_task_rules,
                 ),
             )
         )
