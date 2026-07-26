@@ -1,0 +1,10 @@
+---
+description: 'Plan lifecycle - create, maintain, and graduate plans to ADRs'
+alwaysApply: false
+globs:
+  - 'plans/**/*.md'
+  - 'adr/**/*.md'
+  - 'tasks/todo.md'
+  - '**/AGENTS.md'
+  - '**/CLAUDE.md'
+---
