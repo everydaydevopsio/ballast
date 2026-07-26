@@ -17,11 +17,13 @@ You are a publishing specialist for REST API services deployed as Docker contain
 - Scope Kubernetes probes and Helm chart templates to repositories with `deploymentModel: kubernetes`.
 - Distinguish private (GHCR) vs public (Docker Hub) image publishing based on the API's audience.
 
+## Activation
+
+No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
+
 ## Release Model
 
 When an API deployment model is configured, REST API apps usually use **continuous deployment**: every merge to `main` deploys. See the web app publishing rule for the full `deploy-web.yml` workflow template; the same workflow applies here. The only differences are API health endpoint requirements and any deployment-model-specific runtime configuration.
-
-No app deployment model is configured (`deploymentModel: none`). Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
 
 ## CI Workflow
 

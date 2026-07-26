@@ -52,7 +52,7 @@ describe('build', () => {
       expect(listRuleSuffixes('docs')).toEqual(['']);
     });
 
-    test('returns libraries, sdks, and apps for publishing', () => {
+    test('returns libraries, sdks, and apps for publishing by default', () => {
       expect(listRuleSuffixes('publishing')).toContain('libraries');
       expect(listRuleSuffixes('publishing')).toContain('sdks');
       expect(listRuleSuffixes('publishing')).toContain('apps');
@@ -62,6 +62,34 @@ describe('build', () => {
       expect(listRuleSuffixes('publishing')).toContain('web');
       expect(listRuleSuffixes('publishing')).toContain('api');
       expect(listRuleSuffixes('publishing').length).toBe(8);
+    });
+
+    test('returns selected publishing profiles when configured', () => {
+      const suffixes = listRuleSuffixes('publishing', 'typescript', [
+        'cli',
+        'apps'
+      ]);
+
+      expect(suffixes).toHaveLength(2);
+      expect(suffixes).toEqual(expect.arrayContaining(['cli', 'apps']));
+    });
+
+    test('treats empty publishingProfiles as unfiltered', () => {
+      const suffixes = listRuleSuffixes('publishing', 'typescript', []);
+
+      expect(suffixes).toHaveLength(8);
+      expect(suffixes).toEqual(
+        expect.arrayContaining([
+          'libraries',
+          'sdks',
+          'apps',
+          'cli',
+          'brew',
+          'apt',
+          'web',
+          'api'
+        ])
+      );
     });
 
     test('returns only main rule for plan-lifecycle', () => {
@@ -161,6 +189,9 @@ describe('build', () => {
         variables: { taskSystem: 'github' }
       });
       expect(content).toContain('github');
+      expect(content).toContain(
+        'External issue tracking is active (`taskSystem: github`).'
+      );
       expect(content).toContain('MCP Server Setup');
       expect(content).not.toContain('{{taskSystem}}');
     });
@@ -179,6 +210,9 @@ describe('build', () => {
       });
 
       expect(content).toContain('taskSystem: none');
+      expect(content).toContain(
+        'External issue tracking is disabled (`taskSystem: none`).'
+      );
       expect(content).toContain('No task-system MCP server is required');
       expect(content).toContain(
         'Do not create external issues or tickets by default.'
@@ -264,6 +298,9 @@ describe('build', () => {
       expect(content).toContain('GitOps repository');
       expect(content).toContain('image digest');
       expect(content).toContain('## App Deployment Model');
+      expect(content).toContain(
+        'Deployment guidance is active (`deploymentModel: kubernetes`).'
+      );
       expect(content).not.toContain('## Kubernetes');
     });
 
@@ -280,6 +317,7 @@ describe('build', () => {
       const content = getContent('publishing', 'web', 'typescript');
       expect(content).toContain('deploymentModel: none');
       expect(content).toContain('Deployment is inactive');
+      expect(content).toContain('Deployment guidance is reference-only');
       expect(content).toContain('do not create deploy-on-main workflows');
       expect(content).toContain('repository: OWNER/deployment-state');
       expect(content).toContain(
@@ -293,6 +331,7 @@ describe('build', () => {
     test('keeps REST API baseline goals platform neutral', () => {
       const content = getContent('publishing', 'api', 'typescript');
       expect(content).toContain('Deployment is inactive');
+      expect(content).toContain('Deployment guidance is reference-only');
       expect(content).toContain('do not create deploy-on-main workflows');
       expect(content).toContain(
         'health and readiness endpoints that the configured runtime can use'
@@ -306,6 +345,21 @@ describe('build', () => {
       expect(content).not.toContain(
         'Ensure the API exposes a health endpoint that Kubernetes probes can use.'
       );
+    });
+
+    test('marks optional publishing variants as reference-only until configured', () => {
+      const brew = getContent('publishing', 'brew');
+      const apt = getContent('publishing', 'apt');
+
+      for (const content of [brew, apt]) {
+        expect(content).toContain('## Activation');
+        expect(content).toContain(
+          'This optional publishing variant is inactive by default.'
+        );
+        expect(content).toContain(
+          'Treat this rule as reference-only unless it is explicitly configured'
+        );
+      }
     });
 
     test('returns TypeScript testing content with web smoke and E2E placement guidance', () => {
@@ -809,6 +863,21 @@ alwaysApply: false
         'Plan lifecycle - create, maintain, and graduate plans to ADRs'
       );
     });
+
+    test('lists only selected publishing profiles for codex', () => {
+      const content = buildCodexAgentsMd(['publishing'], [], 'typescript', [
+        'cli',
+        'apps'
+      ]);
+      expect(content).toContain('`.codex/rules/publishing-cli.md`');
+      expect(content).toContain('`.codex/rules/publishing-apps.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-web.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-api.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-libraries.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-sdks.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-apt.md`');
+      expect(content).not.toContain('`.codex/rules/publishing-brew.md`');
+    });
   });
 
   describe('buildClaudeMd', () => {
@@ -832,6 +901,15 @@ alwaysApply: false
       expect(content).toContain(
         'Plan lifecycle - create, maintain, and graduate plans to ADRs'
       );
+    });
+
+    test('lists only selected publishing profiles for claude', () => {
+      const content = buildClaudeMd(['publishing'], [], 'typescript', [
+        'libraries'
+      ]);
+      expect(content).toContain('`.claude/rules/publishing-libraries.md`');
+      expect(content).not.toContain('`.claude/rules/publishing-cli.md`');
+      expect(content).not.toContain('`.claude/rules/publishing-apps.md`');
     });
   });
 

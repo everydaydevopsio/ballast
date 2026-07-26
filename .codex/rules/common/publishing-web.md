@@ -12,18 +12,22 @@ You are a publishing specialist for web applications deployed as Docker containe
 
 ## Goals
 
-- Build and publish a Docker image to GHCR or Docker Hub on every merge to `main`.
+- When this repository owns an active web deployment, build and publish a Docker image to GHCR or Docker Hub on every merge to `main`.
 - Tag images with the git SHA and `latest`; capture the digest for immutable deploys.
 - Update deployment state according to the configured deployment model after the image is pushed.
 - Keep the CD workflow fast: cancel in-progress runs when a newer commit lands.
 
+## Activation
+
+No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
+
 ## Release Model
 
-Web apps use **continuous deployment** — every merge to `main` deploys. There is no manual version bump or `workflow_dispatch` trigger. If a named semver release is also needed (e.g. for a public API), create a separate `release.yml` workflow that responds to `v*` tags.
-
-No app deployment model is configured. Keep library, SDK, and CLI publishing guidance active, but do not assume Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets `deploymentModel`.
+When a web app deployment model is configured, web apps usually use **continuous deployment**: every merge to `main` deploys. There is no manual version bump or `workflow_dispatch` trigger. If a named semver release is also needed (e.g. for a public API), create a separate `release.yml` workflow that responds to `v*` tags.
 
 ## Workflow Trigger and Concurrency
+
+Use this workflow trigger only when this repository owns an active web deployment. If `deploymentModel` is `none`, do not add this workflow unless the user explicitly asks to introduce web deployment ownership.
 
 ```yaml
 on:
@@ -38,6 +42,8 @@ concurrency:
 `cancel-in-progress: true` ensures the newest commit's deploy always wins.
 
 ## CI Workflow Template (`deploy-web.yml`)
+
+This template is conditional. Apply it only when a web deployment model is configured or an existing web deployment workflow is being maintained.
 
 ```yaml
 name: Deploy Web
@@ -155,6 +161,8 @@ Choose one registry per deployment. Use GHCR for private or org-internal images;
 
 ## Deployment State Update Rules
 
+These rules apply only when the configured deployment model has deployment state to update. With `deploymentModel: none`, omit deployment-state update jobs.
+
 - Prefer digest pinning (`image.digest`) over tag pinning for production deploys.
 - Keep the `image.tag` field for human readability alongside the digest.
 - Do not overwrite unrelated environment values in the automation step.
@@ -190,5 +198,5 @@ Add a badge for the deploy workflow:
 ## When to Apply
 
 - When a web application is deployed from a container image or platform-native app artifact.
-- When every merge to `main` should trigger a new deployment.
+- When a configured deployment model or existing workflow says every merge to `main` should trigger a new deployment.
 - When the team wants immutable image references or artifact identifiers in deployment state.

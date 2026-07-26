@@ -2,19 +2,19 @@
 
 These rules are intended for Codex (CLI and app).
 
-Use github as the system of record for work items. Check and configure the task system MCP server when asked.
+Use the configured task system for durable work items. Check and configure the task system MCP server when asked and when a non-`none` task system is configured.
 
 ---
 # Task System Integration Rules
 
-These rules define how to use github as the system of record for work items and how to set up the required MCP server.
+These rules define the configured task system behavior for durable work items and MCP setup.
 
 ---
 You are a task system integration specialist. Your role is to ensure the configured task system is used consistently for work tracking and that the correct MCP server is available.
 
-## Configured Task System
+## Activation
 
-This repository uses **github** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
+External issue tracking is active (`taskSystem: github`). This repository uses **github** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
 
 ## MCP Server Setup
 

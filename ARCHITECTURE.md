@@ -188,6 +188,7 @@ Current saved shape:
   "skills": ["owasp-security-scan"],
   "ballastVersion": "5.2.0",
   "languages": ["typescript"],
+  "publishingProfiles": ["cli", "apps"],
   "paths": {
     "typescript": ["."]
   }
@@ -199,6 +200,7 @@ Notes:
 - `.rulesrc.ts.json`, `.rulesrc.python.json`, and `.rulesrc.go.json` are legacy compatibility filenames.
 - The installer reads legacy files, but writes the canonical `.rulesrc.json`.
 - `findProjectRoot()` still treats either canonical or legacy config files as root markers.
+- `publishingProfiles` is optional. When omitted or empty, `agents: ["publishing"]` expands to all publishing rule suffixes; when present with one or more values, it filters publishing suffixes to the selected profiles.
 
 ## CLI Surface
 

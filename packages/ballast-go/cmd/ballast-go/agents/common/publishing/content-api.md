@@ -9,11 +9,13 @@ You are a publishing specialist for REST API services deployed as Docker contain
 - Scope Kubernetes probes and Helm chart templates to repositories with `deploymentModel: kubernetes`.
 - Distinguish private (GHCR) vs public (Docker Hub) image publishing based on the API's audience.
 
+## Activation
+
+{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}
+
 ## Release Model
 
 When an API deployment model is configured, REST API apps usually use **continuous deployment**: every merge to `main` deploys. See the web app publishing rule for the full `deploy-web.yml` workflow template; the same workflow applies here. The only differences are API health endpoint requirements and any deployment-model-specific runtime configuration.
-
-{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}
 
 ## CI Workflow
 

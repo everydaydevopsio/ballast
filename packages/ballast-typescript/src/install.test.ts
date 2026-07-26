@@ -1634,6 +1634,104 @@ Keep my custom responsibilities.
       );
     });
 
+    test('installs only configured publishing profiles', () => {
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['publishing'],
+          publishingProfiles: ['cli', 'apps']
+        },
+        tmpDir
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['publishing'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installed).toEqual(['publishing']);
+      expect(result.installedRules).toHaveLength(2);
+      expect(result.installedRules).toEqual(
+        expect.arrayContaining([
+          { agentId: 'publishing', ruleSuffix: 'apps' },
+          { agentId: 'publishing', ruleSuffix: 'cli' }
+        ])
+      );
+      expect(
+        fs.existsSync(path.join(tmpDir, '.codex', 'rules', 'publishing-cli.md'))
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.codex', 'rules', 'publishing-apps.md')
+        )
+      ).toBe(true);
+      expect(
+        fs.existsSync(path.join(tmpDir, '.codex', 'rules', 'publishing-web.md'))
+      ).toBe(false);
+      expect(
+        fs.existsSync(path.join(tmpDir, '.codex', 'rules', 'publishing-api.md'))
+      ).toBe(false);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.codex', 'rules', 'publishing-libraries.md')
+        )
+      ).toBe(false);
+
+      const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
+      expect(agentsMd).toContain('`.codex/rules/publishing-cli.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-apps.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-api.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-libraries.md`');
+    });
+
+    test('treats empty publishingProfiles as unfiltered during install', () => {
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['publishing'],
+          publishingProfiles: []
+        },
+        tmpDir
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['publishing'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installed).toEqual(['publishing']);
+      expect(result.installedRules).toHaveLength(8);
+      for (const suffix of [
+        'api',
+        'apps',
+        'apt',
+        'brew',
+        'cli',
+        'libraries',
+        'sdks',
+        'web'
+      ]) {
+        expect(
+          fs.existsSync(
+            path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
+          )
+        ).toBe(true);
+      }
+
+      const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
+      expect(agentsMd).toContain('`.codex/rules/publishing-cli.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-api.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-libraries.md`');
+    });
+
     test('adds to errors for unknown agent and continues with valid ones', () => {
       const result = install({
         projectRoot: tmpDir,
@@ -2192,6 +2290,78 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(errorSpy).toHaveBeenCalledWith(
         'Invalid --deployment-model value: "kuberntes". Valid values: none, kubernetes, serverless, server, hosted'
       );
+    });
+
+    test('installs all publishing profiles when no publishingProfiles are configured', async () => {
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['publishing'],
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      for (const suffix of [
+        'cli',
+        'apps',
+        'web',
+        'api',
+        'libraries',
+        'sdks',
+        'apt',
+        'brew'
+      ]) {
+        expect(
+          fs.existsSync(
+            path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
+          )
+        ).toBe(true);
+      }
+      const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
+      expect(agentsMd).toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-brew.md`');
+    });
+
+    test('installs and lists only configured publishing profiles', async () => {
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['publishing'],
+          publishingProfiles: ['cli', 'apps']
+        },
+        tmpDir
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      expect(
+        fs.existsSync(path.join(tmpDir, '.codex', 'rules', 'publishing-cli.md'))
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.codex', 'rules', 'publishing-apps.md')
+        )
+      ).toBe(true);
+      for (const suffix of ['web', 'api', 'libraries', 'sdks', 'apt', 'brew']) {
+        expect(
+          fs.existsSync(
+            path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
+          )
+        ).toBe(false);
+      }
+      const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
+      expect(agentsMd).toContain('`.codex/rules/publishing-cli.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-apps.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-api.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-libraries.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-sdks.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-apt.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-brew.md`');
     });
 
     test('prompts for deploymentModel when publishing is selected interactively', async () => {

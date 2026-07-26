@@ -2027,6 +2027,8 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 	switch normalizeDeploymentModel(deploymentModel) {
 	case "kubernetes":
 		return strings.Join([]string{
+			"Deployment guidance is active (`deploymentModel: kubernetes`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
+			"",
 			"Kubernetes deployment model:",
 			"- Treat app deployment ownership as Kubernetes-native unless repo docs say otherwise.",
 			"- Keep application Helm charts in the app repository under `charts/<app>/` with chart tests and schema validation.",
@@ -2035,6 +2037,8 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 		}, "\n")
 	case "serverless":
 		return strings.Join([]string{
+			"Deployment guidance is active (`deploymentModel: serverless`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
+			"",
 			"Serverless deployment model:",
 			"- Treat deployable apps as functions, jobs, queues, event rules, and managed cloud resources.",
 			"- Keep infrastructure definitions close to the owning service unless the repo documents a shared infrastructure boundary.",
@@ -2042,6 +2046,8 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 		}, "\n")
 	case "server":
 		return strings.Join([]string{
+			"Deployment guidance is active (`deploymentModel: server`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
+			"",
 			"Self-managed server deployment model:",
 			"- Treat deployable apps as services on provisioned hosts, VMs, or bare-metal servers.",
 			"- Keep systemd, process manager, reverse proxy, secrets, and rollback instructions aligned with the runtime environment.",
@@ -2049,13 +2055,15 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 		}, "\n")
 	case "hosted":
 		return strings.Join([]string{
+			"Deployment guidance is active (`deploymentModel: hosted`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
+			"",
 			"Hosted platform deployment model:",
 			"- Treat deployable apps as hosted-platform workloads such as Vercel, Netlify, Railway, Render, Fly.io, or similar services.",
 			"- Keep provider configuration, environment variables, preview environments, and production promotion rules documented with the app.",
 			"- CI should validate builds and let the hosted platform own rollout mechanics unless the repo defines a separate release gate.",
 		}, "\n")
 	default:
-		return "No app deployment model is configured (`deploymentModel: none`). Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`."
+		return "No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`."
 	}
 }
 
@@ -2074,9 +2082,9 @@ func applyTaskSystemVariables(content, agentID, taskSystem string) string {
 	if strings.Contains(content, taskSystemGuidanceToken) {
 		if normalized == "none" {
 			return content[:strings.Index(content, taskSystemGuidanceToken)] + strings.Join([]string{
-				"## Configured Task System",
+				"## Activation",
 				"",
-				"This repository has no external task system configured (`taskSystem: none`). Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.",
+				"External issue tracking is disabled (`taskSystem: none`). This repository has no external task system configured. Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.",
 				"",
 				"Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.",
 				"",
@@ -2092,9 +2100,9 @@ func applyTaskSystemVariables(content, agentID, taskSystem string) string {
 			}, "\n")
 		}
 		content = strings.ReplaceAll(content, taskSystemGuidanceToken, strings.Join([]string{
-			"## Configured Task System",
+			"## Activation",
 			"",
-			fmt.Sprintf("This repository uses **%s** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.", normalized),
+			fmt.Sprintf("External issue tracking is active (`taskSystem: %s`). This repository uses **%s** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.", normalized, normalized),
 		}, "\n"))
 	}
 	if strings.Contains(content, taskSystemToken) {

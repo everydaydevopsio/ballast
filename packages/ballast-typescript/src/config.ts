@@ -15,10 +15,21 @@ export const DEPLOYMENT_MODELS = [
   'hosted'
 ] as const;
 export const DEFAULT_DEPLOYMENT_MODEL = 'none' as const;
+export const PUBLISHING_PROFILES = [
+  'cli',
+  'apps',
+  'web',
+  'api',
+  'libraries',
+  'sdks',
+  'apt',
+  'brew'
+] as const;
 
 export type Target = (typeof TARGETS)[number];
 export type TaskSystem = (typeof TASK_SYSTEMS)[number];
 export type DeploymentModel = (typeof DEPLOYMENT_MODELS)[number];
+export type PublishingProfile = (typeof PUBLISHING_PROFILES)[number];
 
 export interface RulesConfig {
   targets: Target[];
@@ -29,6 +40,7 @@ export interface RulesConfig {
   paths?: Record<string, string[]>;
   taskSystem?: TaskSystem;
   deploymentModel?: DeploymentModel;
+  publishingProfiles?: PublishingProfile[];
 }
 
 export function getRulesrcFilename(): string {
@@ -191,6 +203,12 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     nextConfig = { ...nextConfig, deploymentModel };
   }
 
+  const publishingProfiles =
+    config.publishingProfiles ?? existing?.publishingProfiles;
+  if (publishingProfiles !== undefined) {
+    nextConfig = { ...nextConfig, publishingProfiles };
+  }
+
   fs.writeFileSync(filePath, JSON.stringify(nextConfig, null, 2), 'utf8');
 }
 
@@ -217,6 +235,7 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     paths?: unknown;
     taskSystem?: unknown;
     deploymentModel?: unknown;
+    publishingProfiles?: unknown;
   };
   const targets = normalizeTargets(record.targets ?? record.target);
   if (targets.length === 0 || !Array.isArray(record.agents)) {
@@ -265,7 +284,32 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
       config.deploymentModel = deploymentModel as DeploymentModel;
     }
   }
+  if (Array.isArray(record.publishingProfiles)) {
+    config.publishingProfiles = normalizePublishingProfiles(
+      record.publishingProfiles
+    );
+  }
   return config;
+}
+
+export function normalizePublishingProfiles(
+  values: unknown[]
+): PublishingProfile[] {
+  const aliases: Record<string, PublishingProfile> = {
+    app: 'apps',
+    library: 'libraries',
+    sdk: 'sdks'
+  };
+  const profiles = new Set<PublishingProfile>();
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const token = value.trim().toLowerCase();
+    const profile = aliases[token] ?? token;
+    if ((PUBLISHING_PROFILES as readonly string[]).includes(profile)) {
+      profiles.add(profile as PublishingProfile);
+    }
+  }
+  return Array.from(profiles);
 }
 
 function mergeLanguages(
