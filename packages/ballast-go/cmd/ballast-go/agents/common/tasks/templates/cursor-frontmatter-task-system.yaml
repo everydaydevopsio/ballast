@@ -1,5 +1,5 @@
 ---
-description: 'Task system integration - use {{taskSystem}} for work items and configure the MCP server'
+description: 'Task system integration - use the configured work item system and configure MCP when active'
 alwaysApply: false
 globs:
   - '**/AGENTS.md'

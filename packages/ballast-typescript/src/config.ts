@@ -5,7 +5,7 @@ import { LANGUAGES } from './agents';
 const RULESRC_FILENAME = '.rulesrc.json';
 const LEGACY_TYPESCRIPT_RULESRC_FILENAME = '.rulesrc.ts.json';
 const TARGETS = ['cursor', 'claude', 'opencode', 'codex', 'gemini'] as const;
-export const TASK_SYSTEMS = ['github', 'jira', 'linear'] as const;
+export const TASK_SYSTEMS = ['github', 'jira', 'linear', 'none'] as const;
 export const DEFAULT_TASK_SYSTEM = 'github' as const;
 export const DEPLOYMENT_MODELS = [
   'none',

@@ -880,6 +880,40 @@ func TestBuildContentRendersPublishingDeploymentModelToken(t *testing.T) {
 	}
 }
 
+func TestBuildContentRendersInactiveDeploymentModel(t *testing.T) {
+	content, err := buildContent("publishing", "codex", "go", "web", "standalone", "github", "none")
+	if err != nil {
+		t.Fatalf("buildContent(publishing): %v", err)
+	}
+
+	if strings.Contains(content, deploymentModelGuidanceToken) {
+		t.Fatalf("expected deployment model token to be replaced, got %q", content)
+	}
+	if !strings.Contains(content, "Deployment is inactive") {
+		t.Fatalf("expected inactive deployment guidance, got %q", content)
+	}
+	if !strings.Contains(content, "do not create deploy-on-main workflows") {
+		t.Fatalf("expected deploy-on-main guardrail, got %q", content)
+	}
+}
+
+func TestBuildContentRendersNoneTaskSystem(t *testing.T) {
+	content, err := buildContent("tasks", "codex", "go", "task-system", "standalone", "none", "none")
+	if err != nil {
+		t.Fatalf("buildContent(tasks): %v", err)
+	}
+
+	if strings.Contains(content, taskSystemGuidanceToken) || strings.Contains(content, taskSystemToken) {
+		t.Fatalf("expected task system tokens to be replaced, got %q", content)
+	}
+	if !strings.Contains(content, "taskSystem: none") {
+		t.Fatalf("expected none task system guidance, got %q", content)
+	}
+	if strings.Contains(content, "All durable work items must be created there") {
+		t.Fatalf("expected no mandatory tracker guidance, got %q", content)
+	}
+}
+
 func TestInstallCreatesGeminiSupportFileOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 
