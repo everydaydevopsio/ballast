@@ -38,7 +38,7 @@ jobs:
           python-version: '3.12'
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: packages/ballast-go/go.mod
 
