@@ -115,6 +115,36 @@ class PatchInstallTests(unittest.TestCase):
 
         self.assertEqual(args.deployment_model, "kubernetes")
 
+    def test_parser_accepts_task_system(self) -> None:
+        args = cli.parser().parse_args(
+            [
+                "install",
+                "--target",
+                "codex",
+                "--agent",
+                "tasks",
+                "--task-system",
+                "linear",
+            ]
+        )
+
+        self.assertEqual(args.task_system, "linear")
+
+    def test_parser_rejects_invalid_task_system(self) -> None:
+        with io.StringIO() as buf, mock.patch("sys.stderr", buf):
+            with self.assertRaises(SystemExit) as exc:
+                cli.parser().parse_args(
+                    ["install", "--agent", "tasks", "--task-system", "asana"]
+                )
+            output = buf.getvalue()
+
+        self.assertEqual(exc.exception.code, 2)
+        self.assertIn("invalid choice: 'asana'", output)
+        self.assertIn("github", output)
+        self.assertIn("jira", output)
+        self.assertIn("linear", output)
+        self.assertIn("none", output)
+
     def test_build_content_for_gemini_prefers_non_codex_header(self) -> None:
         content = cli.build_content("linting", "gemini", "python")
 
@@ -302,6 +332,69 @@ class PatchInstallTests(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn("Hosted platform deployment model", content)
+
+    def test_run_install_writes_task_system_for_tasks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_git_boundary(root)
+            old_cwd = Path.cwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--agent",
+                        "tasks",
+                        "--task-system",
+                        "none",
+                        "--yes",
+                    ]
+                )
+                exit_code = cli.run_install(args)
+            finally:
+                os.chdir(old_cwd)
+
+            self.assertEqual(exit_code, 0)
+            config = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"taskSystem": "none"', config)
+            task_rule = root / ".codex" / "rules" / "tasks-task-system.md"
+            self.assertTrue(task_rule.exists())
+            content = task_rule.read_text(encoding="utf-8")
+            self.assertIn("taskSystem: none", content)
+            self.assertIn("No task-system MCP server is required", content)
+            self.assertNotIn("{{taskSystem}}", content)
+
+    def test_run_install_defaults_tasks_to_github(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_git_boundary(root)
+            old_cwd = Path.cwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--agent",
+                        "tasks",
+                        "--yes",
+                    ]
+                )
+                exit_code = cli.run_install(args)
+            finally:
+                os.chdir(old_cwd)
+
+            self.assertEqual(exit_code, 0)
+            config = (root / ".rulesrc.json").read_text(encoding="utf-8")
+            self.assertIn('"taskSystem": "github"', config)
+            content = (root / ".codex" / "rules" / "tasks-task-system.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("**github** as the system of record", content)
+            self.assertNotIn("{{taskSystem}}", content)
 
     def test_run_install_writes_multi_target_shared_rulesrc(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -706,7 +799,9 @@ class PatchInstallTests(unittest.TestCase):
             args = cli.parser().parse_args(["install", "--yes"])
             resolved = cli.resolve_target_and_agents(args, root, "python")
 
-            self.assertEqual(resolved, (["claude"], [], ["owasp-security-scan"], ""))
+            self.assertEqual(
+                resolved, (["claude"], [], ["owasp-security-scan"], "", "")
+            )
 
     def test_resolve_target_and_agents_supports_multi_target_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -729,8 +824,25 @@ class PatchInstallTests(unittest.TestCase):
                     ["linting", "git-hooks"],
                     ["owasp-security-scan"],
                     "",
+                    "",
                 ),
             )
+
+    def test_resolve_target_and_agents_prompts_for_task_system(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            args = cli.parser().parse_args(["install"])
+
+            with (
+                mock.patch.object(cli, "is_ci_mode", return_value=False),
+                mock.patch.object(cli, "prompt_targets", return_value=["codex"]),
+                mock.patch.object(cli, "prompt_agents", return_value=["tasks"]),
+                mock.patch.object(cli, "prompt_skills", return_value=[]),
+                mock.patch.object(cli, "prompt_task_system", return_value="jira"),
+            ):
+                resolved = cli.resolve_target_and_agents(args, root, "python")
+
+            self.assertEqual(resolved, (["codex"], ["tasks"], [], "", "jira"))
 
     def test_resolve_target_and_agents_prompts_for_multiple_targets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -755,6 +867,7 @@ class PatchInstallTests(unittest.TestCase):
                     ["cursor", "claude"],
                     ["linting"],
                     ["owasp-security-scan"],
+                    "",
                     "",
                 ),
             )

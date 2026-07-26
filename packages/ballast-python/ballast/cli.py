@@ -22,6 +22,7 @@ COMMON_AGENTS = [
     "observability",
     "publishing",
     "git-hooks",
+    "tasks",
 ]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
@@ -53,6 +54,7 @@ DEPLOYMENT_MODEL_GUIDANCE_TOKEN = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
 TASK_SYSTEM_GUIDANCE_TOKEN = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
 TASK_SYSTEM_TOKEN = "{{taskSystem}}"
 DEFAULT_TASK_SYSTEM = "github"
+TASK_SYSTEMS = ["github", "jira", "linear", "none"]
 DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "hosted"]
 
 
@@ -307,11 +309,12 @@ def save_config(
     agents: list[str],
     skills: list[str] | None = None,
     deployment_model: str | None = None,
+    task_system: str | None = None,
 ) -> None:
     file_path = root / rulesrc_filename(language)
     languages: list[str] = []
     paths: dict[str, list[str]] = {}
-    task_system: str | None = None
+    existing_task_system: str | None = None
     existing_deployment_model: str | None = None
     if file_path.exists():
         try:
@@ -332,7 +335,7 @@ def save_config(
                         ):
                             paths[key] = list(value)
                 if isinstance(raw.get("taskSystem"), str):
-                    task_system = raw["taskSystem"]
+                    existing_task_system = raw["taskSystem"].strip().lower()
                 if isinstance(raw.get("deploymentModel"), str):
                     existing_deployment_model = raw["deploymentModel"].strip().lower()
         except (OSError, json.JSONDecodeError):
@@ -350,6 +353,9 @@ def save_config(
     normalized_deployment_model = (
         (deployment_model or existing_deployment_model or "").strip().lower()
     )
+    normalized_task_system = normalize_task_system(
+        task_system or existing_task_system or ""
+    )
     if (
         normalized_deployment_model
         and normalized_deployment_model not in DEPLOYMENT_MODELS
@@ -357,6 +363,11 @@ def save_config(
         raise ValueError(
             "invalid deploymentModel "
             f"{normalized_deployment_model!r}; use one of: {', '.join(DEPLOYMENT_MODELS)}"
+        )
+    if normalized_task_system and normalized_task_system not in TASK_SYSTEMS:
+        raise ValueError(
+            "invalid taskSystem "
+            f"{normalized_task_system!r}; use one of: {', '.join(TASK_SYSTEMS)}"
         )
     payload: dict[str, object] = {
         "targets": targets,
@@ -366,8 +377,8 @@ def save_config(
         "languages": languages,
         "paths": paths,
     }
-    if task_system:
-        payload["taskSystem"] = task_system
+    if normalized_task_system:
+        payload["taskSystem"] = normalized_task_system
     if normalized_deployment_model:
         payload["deploymentModel"] = normalized_deployment_model
 
@@ -1727,6 +1738,33 @@ def prompt_deployment_model() -> str:
     return prompt_deployment_model()
 
 
+def prompt_task_system() -> str:
+    value = prompt(
+        "Task system for tasks "
+        f"[{', '.join(TASK_SYSTEMS)}] (default: {DEFAULT_TASK_SYSTEM}): "
+    )
+    normalized = normalize_task_system(value)
+    if not normalized:
+        return DEFAULT_TASK_SYSTEM
+    if normalized in TASK_SYSTEMS:
+        return normalized
+    print(f"Invalid task system. Choose one of: {', '.join(TASK_SYSTEMS)}")
+    return prompt_task_system()
+
+
+def resolve_task_system_for_tasks(current: str | None, non_interactive: bool) -> str:
+    normalized = normalize_task_system(current)
+    if normalized:
+        if normalized not in TASK_SYSTEMS:
+            raise ValueError(
+                f"invalid taskSystem {normalized!r}; use one of: {', '.join(TASK_SYSTEMS)}"
+            )
+        return normalized
+    if non_interactive:
+        return DEFAULT_TASK_SYSTEM
+    return prompt_task_system()
+
+
 def resolve_deployment_model_for_publishing(
     current: str | None, non_interactive: bool
 ) -> str:
@@ -1754,7 +1792,7 @@ def resolve_requested_targets(raw: object) -> list[str]:
 
 def resolve_target_and_agents(
     args: argparse.Namespace, root: Path, language: str
-) -> tuple[list[str], list[str], list[str], str | None] | None:
+) -> tuple[list[str], list[str], list[str], str | None, str | None] | None:
     cfg = load_config(root, language)
     ci = is_ci_mode() or bool(args.yes)
 
@@ -1772,6 +1810,7 @@ def resolve_target_and_agents(
     deployment_model_from_flag = normalize_deployment_model(
         getattr(args, "deployment_model", "")
     )
+    task_system_from_flag = normalize_task_system(getattr(args, "task_system", ""))
     if (
         deployment_model_from_flag
         and deployment_model_from_flag not in DEPLOYMENT_MODELS
@@ -1779,6 +1818,8 @@ def resolve_target_and_agents(
         raise ValueError(
             f"Invalid --deployment-model. Use: {', '.join(DEPLOYMENT_MODELS)}"
         )
+    if task_system_from_flag and task_system_from_flag not in TASK_SYSTEMS:
+        raise ValueError(f"Invalid --task-system. Use: {', '.join(TASK_SYSTEMS)}")
 
     if (
         cfg
@@ -1788,15 +1829,19 @@ def resolve_target_and_agents(
     ):
         agents = with_implicit_agents(list(cfg["agents"]))
         deployment_model = normalize_deployment_model(cfg.get("deploymentModel"))
+        task_system = normalize_task_system(cfg.get("taskSystem"))
         if "publishing" in agents:
             deployment_model = resolve_deployment_model_for_publishing(
                 deployment_model, ci
             )
+        if "tasks" in agents:
+            task_system = resolve_task_system_for_tasks(task_system, ci)
         return (
             list(cfg["targets"]),
             agents,
             list(cfg.get("skills") or []),
             deployment_model,
+            task_system,
         )
 
     targets = target_from_flag or (list(cfg["targets"]) if cfg else None)
@@ -1813,13 +1858,18 @@ def resolve_target_and_agents(
     deployment_model = deployment_model_from_flag or (
         normalize_deployment_model(cfg.get("deploymentModel")) if cfg else ""
     )
+    task_system = task_system_from_flag or (
+        normalize_task_system(cfg.get("taskSystem")) if cfg else ""
+    )
 
     if targets and ((agents and len(agents) > 0) or len(skills) > 0):
         if agents and "publishing" in agents:
             deployment_model = resolve_deployment_model_for_publishing(
                 deployment_model, ci
             )
-        return targets, agents or [], skills, deployment_model
+        if agents and "tasks" in agents:
+            task_system = resolve_task_system_for_tasks(task_system, ci)
+        return targets, agents or [], skills, deployment_model, task_system
 
     if ci:
         return None
@@ -1829,7 +1879,15 @@ def resolve_target_and_agents(
     resolved_skills = skills if skills else prompt_skills(language)
     if "publishing" in resolved_agents:
         deployment_model = resolve_deployment_model_for_publishing(deployment_model, ci)
-    return resolved_targets, resolved_agents, resolved_skills, deployment_model
+    if "tasks" in resolved_agents:
+        task_system = resolve_task_system_for_tasks(task_system, ci)
+    return (
+        resolved_targets,
+        resolved_agents,
+        resolved_skills,
+        deployment_model,
+        task_system,
+    )
 
 
 def install(
@@ -1845,6 +1903,7 @@ def install(
     patch_gemini_md: bool = False,
     skip_support_files: set[str] | None = None,
     deployment_model: str | None = None,
+    task_system: str | None = None,
 ) -> InstallResult:
     result = InstallResult()
     agents = with_implicit_agents(agents)
@@ -1859,7 +1918,9 @@ def install(
         result.errors.append(("gitignore", str(err)))
 
     if persist:
-        save_config(root, language, target, agents, skills, deployment_model)
+        save_config(
+            root, language, target, agents, skills, deployment_model, task_system
+        )
 
     config_for_support_files = load_config(root, language)
     support_agents = with_implicit_agents(
@@ -1872,8 +1933,11 @@ def install(
         if config_for_support_files
         else skills
     )
-    task_system = (
+    config_task_system = (
         config_for_support_files.get("taskSystem") if config_for_support_files else None
+    )
+    task_system = task_system or (
+        config_task_system if isinstance(config_task_system, str) else None
     )
     skipped_support_files = skip_support_files or set()
 
@@ -2047,11 +2111,14 @@ def install_for_targets(
     patch_claude_md: bool = False,
     patch_gemini_md: bool = False,
     deployment_model: str | None = None,
+    task_system: str | None = None,
 ) -> list[tuple[str, InstallResult]]:
     results: list[tuple[str, InstallResult]] = []
     agents = with_implicit_agents(agents)
     if persist:
-        save_config(root, language, targets, agents, skills, deployment_model)
+        save_config(
+            root, language, targets, agents, skills, deployment_model, task_system
+        )
 
     for target in targets:
         results.append(
@@ -2069,6 +2136,7 @@ def install_for_targets(
                     patch_claude_md,
                     patch_gemini_md,
                     deployment_model=deployment_model,
+                    task_system=task_system,
                 ),
             )
         )
@@ -2138,8 +2206,12 @@ def run_install(args: argparse.Namespace) -> int:
     if len(resolved) == 3:
         targets, agents, skills = resolved
         deployment_model = None
-    else:
+        task_system = None
+    elif len(resolved) == 4:
         targets, agents, skills, deployment_model = resolved
+        task_system = None
+    else:
+        targets, agents, skills, deployment_model, task_system = resolved
     if any(target not in TARGETS for target in targets):
         print(f"Invalid --target. Use: {', '.join(TARGETS)}")
         return 1
@@ -2162,6 +2234,7 @@ def run_install(args: argparse.Namespace) -> int:
         with_implicit_agents(agents),
         skills,
         deployment_model,
+        task_system,
     )
     for target in targets:
         skipped_support_file = support_decisions.get(target)
@@ -2185,6 +2258,7 @@ def run_install(args: argparse.Namespace) -> int:
                     False,
                     {skipped_support_file} if skipped_support_file else None,
                     deployment_model,
+                    task_system,
                 ),
             )
         )
@@ -2244,6 +2318,11 @@ def parser() -> argparse.ArgumentParser:
         "--deployment-model",
         choices=DEPLOYMENT_MODELS,
         help="App/service deployment model for publishing; use none for CLI/library/SDK-only projects",
+    )
+    install_cmd.add_argument(
+        "--task-system",
+        choices=TASK_SYSTEMS,
+        help=f"Task system for the tasks agent; default: {DEFAULT_TASK_SYSTEM}",
     )
     install_cmd.add_argument(
         "--force",
