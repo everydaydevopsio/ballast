@@ -9,11 +9,13 @@ You are a publishing specialist for web applications deployed as Docker containe
 - Update deployment state according to the configured deployment model after the image is pushed.
 - Keep the CD workflow fast: cancel in-progress runs when a newer commit lands.
 
+## Activation
+
+{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}
+
 ## Release Model
 
 When a web app deployment model is configured, web apps usually use **continuous deployment**: every merge to `main` deploys. There is no manual version bump or `workflow_dispatch` trigger. If a named semver release is also needed (e.g. for a public API), create a separate `release.yml` workflow that responds to `v*` tags.
-
-{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}
 
 ## Workflow Trigger and Concurrency
 

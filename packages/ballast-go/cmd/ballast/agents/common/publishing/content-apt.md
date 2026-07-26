@@ -2,6 +2,10 @@
 
 You are a publishing specialist for Debian package (`.deb`) distribution of CLI tools.
 
+## Activation
+
+This optional publishing variant is inactive by default. Treat this rule as reference-only unless it is explicitly configured in the repository, requested by the maintainer, or already represented by existing `.deb` packaging or APT repository workflows.
+
 ## Goals
 
 - Produce `.deb` packages alongside binary archives using GoReleaser `nfpms`.
@@ -135,6 +139,7 @@ Sign the Release file with a GPG key so `apt-get` can verify authenticity:
 
 ## When to Apply
 
+- Optional: apply only when Debian/APT distribution is explicitly configured, requested, or already present.
 - When the project ships a Go CLI and users on Debian/Ubuntu are a primary audience.
 - When GoReleaser is already configured for binary releases.
 - When the project wants to make installation easier for Linux users who prefer system package managers.

@@ -171,6 +171,9 @@ describe('build', () => {
         variables: { taskSystem: 'github' }
       });
       expect(content).toContain('github');
+      expect(content).toContain(
+        'External issue tracking is active (`taskSystem: github`).'
+      );
       expect(content).toContain('MCP Server Setup');
       expect(content).not.toContain('{{taskSystem}}');
     });
@@ -189,6 +192,9 @@ describe('build', () => {
       });
 
       expect(content).toContain('taskSystem: none');
+      expect(content).toContain(
+        'External issue tracking is disabled (`taskSystem: none`).'
+      );
       expect(content).toContain('No task-system MCP server is required');
       expect(content).toContain(
         'Do not create external issues or tickets by default.'
@@ -274,6 +280,9 @@ describe('build', () => {
       expect(content).toContain('GitOps repository');
       expect(content).toContain('image digest');
       expect(content).toContain('## App Deployment Model');
+      expect(content).toContain(
+        'Deployment guidance is active (`deploymentModel: kubernetes`).'
+      );
       expect(content).not.toContain('## Kubernetes');
     });
 
@@ -290,6 +299,7 @@ describe('build', () => {
       const content = getContent('publishing', 'web', 'typescript');
       expect(content).toContain('deploymentModel: none');
       expect(content).toContain('Deployment is inactive');
+      expect(content).toContain('Deployment guidance is reference-only');
       expect(content).toContain('do not create deploy-on-main workflows');
       expect(content).toContain('repository: OWNER/deployment-state');
       expect(content).toContain(
@@ -303,6 +313,7 @@ describe('build', () => {
     test('keeps REST API baseline goals platform neutral', () => {
       const content = getContent('publishing', 'api', 'typescript');
       expect(content).toContain('Deployment is inactive');
+      expect(content).toContain('Deployment guidance is reference-only');
       expect(content).toContain('do not create deploy-on-main workflows');
       expect(content).toContain(
         'health and readiness endpoints that the configured runtime can use'
@@ -316,6 +327,21 @@ describe('build', () => {
       expect(content).not.toContain(
         'Ensure the API exposes a health endpoint that Kubernetes probes can use.'
       );
+    });
+
+    test('marks optional publishing variants as reference-only until configured', () => {
+      const brew = getContent('publishing', 'brew');
+      const apt = getContent('publishing', 'apt');
+
+      for (const content of [brew, apt]) {
+        expect(content).toContain('## Activation');
+        expect(content).toContain(
+          'This optional publishing variant is inactive by default.'
+        );
+        expect(content).toContain(
+          'Treat this rule as reference-only unless it is explicitly configured'
+        );
+      }
     });
 
     test('returns TypeScript testing content with web smoke and E2E placement guidance', () => {

@@ -798,6 +798,8 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
     match normalize_deployment_model(deployment_model):
         case "kubernetes":
             lines = [
+                "Deployment guidance is active (`deploymentModel: kubernetes`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
+                "",
                 "Kubernetes deployment model:",
                 "- Treat app deployment ownership as Kubernetes-native unless repo docs say otherwise.",
                 "- Keep application Helm charts in the app repository under `charts/<app>/` with chart tests and schema validation.",
@@ -806,6 +808,8 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
             ]
         case "serverless":
             lines = [
+                "Deployment guidance is active (`deploymentModel: serverless`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
+                "",
                 "Serverless deployment model:",
                 "- Treat deployable apps as functions, jobs, queues, event rules, and managed cloud resources.",
                 "- Keep infrastructure definitions close to the owning service unless the repo documents a shared infrastructure boundary.",
@@ -813,6 +817,8 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
             ]
         case "server":
             lines = [
+                "Deployment guidance is active (`deploymentModel: server`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
+                "",
                 "Self-managed server deployment model:",
                 "- Treat deployable apps as services on provisioned hosts, VMs, or bare-metal servers.",
                 "- Keep systemd, process manager, reverse proxy, secrets, and rollback instructions aligned with the runtime environment.",
@@ -820,6 +826,8 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
             ]
         case "hosted":
             lines = [
+                "Deployment guidance is active (`deploymentModel: hosted`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
+                "",
                 "Hosted platform deployment model:",
                 "- Treat deployable apps as hosted-platform workloads such as Vercel, Netlify, Railway, Render, Fly.io, or similar services.",
                 "- Keep provider configuration, environment variables, preview environments, and production promotion rules documented with the app.",
@@ -827,7 +835,7 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
             ]
         case _:
             lines = [
-                "No app deployment model is configured (`deploymentModel: none`). Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.",
+                "No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.",
             ]
     return "\n".join(lines)
 
@@ -852,9 +860,9 @@ def render_task_system_guidance(task_system: str | None) -> str:
     if normalized == "none":
         return "\n".join(
             [
-                "## Configured Task System",
+                "## Activation",
                 "",
-                "This repository has no external task system configured (`taskSystem: none`). Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.",
+                "External issue tracking is disabled (`taskSystem: none`). This repository has no external task system configured. Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.",
                 "",
                 "Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.",
                 "",
@@ -871,9 +879,9 @@ def render_task_system_guidance(task_system: str | None) -> str:
         )
     return "\n".join(
         [
-            "## Configured Task System",
+            "## Activation",
             "",
-            f"This repository uses **{normalized}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.",
+            f"External issue tracking is active (`taskSystem: {normalized}`). This repository uses **{normalized}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.",
         ]
     )
 

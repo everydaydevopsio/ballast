@@ -248,6 +248,8 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
   switch (deploymentModel) {
     case 'kubernetes':
       return [
+        'Deployment guidance is active (`deploymentModel: kubernetes`). Apply web/API deployment workflow guidance for repositories that own this deployment model.',
+        '',
         'Kubernetes: local Helm chart + external ArgoCD GitOps.',
         '',
         '- Application repository ownership:',
@@ -269,6 +271,8 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'serverless':
       return [
+        'Deployment guidance is active (`deploymentModel: serverless`). Apply web/API deployment workflow guidance for repositories that own this deployment model.',
+        '',
         'Serverless deployment model for managed function or container platforms such as AWS Lambda, Cloud Run, Azure Functions, or equivalent services.',
         '',
         '- Keep infrastructure definitions or platform manifests close to the service unless the team has a dedicated infra repository.',
@@ -280,6 +284,8 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'server':
       return [
+        'Deployment guidance is active (`deploymentModel: server`). Apply web/API deployment workflow guidance for repositories that own this deployment model.',
+        '',
         'Server deployment model for self-managed VM, VPS, or bare-metal deployments.',
         '',
         '- Build a versioned artifact or container image in CI; do not build production artifacts manually on the server.',
@@ -291,6 +297,8 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'hosted':
       return [
+        'Deployment guidance is active (`deploymentModel: hosted`). Apply web/API deployment workflow guidance for repositories that own this deployment model.',
+        '',
         'Hosted app platform deployment model for services such as Vercel, Netlify, Render, Railway, Fly.io, or similar app platforms.',
         '',
         '- Keep platform configuration in the app repo when the platform supports checked-in config files.',
@@ -302,7 +310,7 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'none':
     default:
-      return 'No app deployment model is configured (`deploymentModel: none`). Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.';
+      return 'No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.';
   }
 }
 
@@ -327,9 +335,9 @@ function renderTaskSystemGuidance(options?: BuildOptions): string {
   const taskSystem = options?.variables?.taskSystem ?? '{{taskSystem}}';
   if (taskSystem === 'none') {
     return [
-      '## Configured Task System',
+      '## Activation',
       '',
-      'This repository has no external task system configured (`taskSystem: none`). Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.',
+      'External issue tracking is disabled (`taskSystem: none`). This repository has no external task system configured. Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.',
       '',
       'Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.',
       '',
@@ -346,9 +354,9 @@ function renderTaskSystemGuidance(options?: BuildOptions): string {
   }
 
   return [
-    '## Configured Task System',
+    '## Activation',
     '',
-    `This repository uses **${taskSystem}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.`
+    `External issue tracking is active (\`taskSystem: ${taskSystem}\`). This repository uses **${taskSystem}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.`
   ].join('\n');
 }
 

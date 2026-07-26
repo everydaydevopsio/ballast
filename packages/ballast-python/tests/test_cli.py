@@ -157,17 +157,54 @@ class PatchInstallTests(unittest.TestCase):
         )
 
         self.assertIn("Kubernetes deployment model", content)
+        self.assertIn(
+            "Deployment guidance is active (`deploymentModel: kubernetes`).",
+            content,
+        )
         self.assertIn("charts/<app>/", content)
         self.assertNotIn("{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}", content)
+
+    def test_build_content_renders_inactive_deployment_model(self) -> None:
+        content = cli.build_content(
+            "publishing", "codex", "python", "web", deployment_model="none"
+        )
+
+        self.assertIn("Deployment guidance is reference-only", content)
+        self.assertIn("Deployment is inactive", content)
+        self.assertIn("do not create deploy-on-main workflows", content)
+
+    def test_build_content_marks_optional_publishing_variants(self) -> None:
+        for suffix in ["apt", "brew"]:
+            content = cli.build_content("publishing", "codex", "python", suffix)
+            self.assertIn(
+                "This optional publishing variant is inactive by default.",
+                content,
+            )
+            self.assertIn(
+                "Treat this rule as reference-only unless it is explicitly configured",
+                content,
+            )
 
     def test_build_content_renders_none_task_system(self) -> None:
         content = cli.render_task_system_guidance("none")
 
         self.assertIn("taskSystem: none", content)
+        self.assertIn(
+            "External issue tracking is disabled (`taskSystem: none`).",
+            content,
+        )
         self.assertIn("No task-system MCP server is required", content)
         self.assertNotIn("{{BALLAST_TASK_SYSTEM_GUIDANCE}}", content)
         self.assertNotIn("{{taskSystem}}", content)
         self.assertNotIn("All durable work items must be created there", content)
+
+    def test_build_content_renders_active_task_system(self) -> None:
+        content = cli.render_task_system_guidance("github")
+
+        self.assertIn(
+            "External issue tracking is active (`taskSystem: github`).",
+            content,
+        )
 
     def test_apply_task_system_guidance_defaults_missing_task_system(self) -> None:
         content = cli.apply_task_system_guidance(

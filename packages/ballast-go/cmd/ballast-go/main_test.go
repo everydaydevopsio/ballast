@@ -875,6 +875,9 @@ func TestBuildContentRendersPublishingDeploymentModelToken(t *testing.T) {
 	if !strings.Contains(content, "Kubernetes deployment model") {
 		t.Fatalf("expected kubernetes guidance, got %q", content)
 	}
+	if !strings.Contains(content, "Deployment guidance is active (`deploymentModel: kubernetes`).") {
+		t.Fatalf("expected active deployment activation guidance, got %q", content)
+	}
 	if !strings.Contains(content, "charts/<app>/") {
 		t.Fatalf("expected app chart guidance, got %q", content)
 	}
@@ -892,8 +895,37 @@ func TestBuildContentRendersInactiveDeploymentModel(t *testing.T) {
 	if !strings.Contains(content, "Deployment is inactive") {
 		t.Fatalf("expected inactive deployment guidance, got %q", content)
 	}
+	if !strings.Contains(content, "Deployment guidance is reference-only") {
+		t.Fatalf("expected reference-only deployment guidance, got %q", content)
+	}
 	if !strings.Contains(content, "do not create deploy-on-main workflows") {
 		t.Fatalf("expected deploy-on-main guardrail, got %q", content)
+	}
+}
+
+func TestBuildContentMarksOptionalPublishingVariants(t *testing.T) {
+	for _, suffix := range []string{"apt", "brew"} {
+		content, err := buildContent("publishing", "codex", "go", suffix, "standalone", "github", "none")
+		if err != nil {
+			t.Fatalf("buildContent(publishing %s): %v", suffix, err)
+		}
+		if !strings.Contains(content, "This optional publishing variant is inactive by default.") {
+			t.Fatalf("expected optional activation guidance in %s, got %q", suffix, content)
+		}
+		if !strings.Contains(content, "Treat this rule as reference-only unless it is explicitly configured") {
+			t.Fatalf("expected reference-only optional guidance in %s, got %q", suffix, content)
+		}
+	}
+}
+
+func TestBuildContentRendersActiveTaskSystem(t *testing.T) {
+	content, err := buildContent("tasks", "codex", "go", "task-system", "standalone", "github", "none")
+	if err != nil {
+		t.Fatalf("buildContent(tasks): %v", err)
+	}
+
+	if !strings.Contains(content, "External issue tracking is active (`taskSystem: github`).") {
+		t.Fatalf("expected active task-system guidance, got %q", content)
 	}
 }
 
@@ -908,6 +940,9 @@ func TestBuildContentRendersNoneTaskSystem(t *testing.T) {
 	}
 	if !strings.Contains(content, "taskSystem: none") {
 		t.Fatalf("expected none task system guidance, got %q", content)
+	}
+	if !strings.Contains(content, "External issue tracking is disabled (`taskSystem: none`).") {
+		t.Fatalf("expected disabled task-system guidance, got %q", content)
 	}
 	if strings.Contains(content, "All durable work items must be created there") {
 		t.Fatalf("expected no mandatory tracker guidance, got %q", content)
