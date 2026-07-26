@@ -348,7 +348,7 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
   - Python CLI: `.rulesrc.python.json`
   - Go CLI: `.rulesrc.go.json`
 - Saved settings include `target`, `agents`, `skills`, and repo-level options such as `taskSystem`, `deploymentModel`, and `publishingProfiles`
-- `publishingProfiles` narrows `agents: ["publishing"]` to selected publishing rule files. Supported canonical values are `cli`, `apps`, `web`, `api`, `libraries`, `sdks`, `apt`, and `brew`; singular aliases `app`, `library`, and `sdk` are accepted when loading config. If `publishingProfiles` is omitted, Ballast keeps the backward-compatible behavior and installs all publishing rule files.
+- `publishingProfiles` narrows `agents: ["publishing"]` to selected publishing rule files. Supported canonical values are `cli`, `apps`, `web`, `api`, `libraries`, `sdks`, `apt`, and `brew`; singular aliases `app`, `library`, and `sdk` are accepted when loading config. If `publishingProfiles` is omitted or empty, Ballast keeps the backward-compatible behavior and installs all publishing rule files.
 
 ## Install Locations
 

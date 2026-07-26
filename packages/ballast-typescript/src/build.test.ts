@@ -74,6 +74,24 @@ describe('build', () => {
       expect(suffixes).toEqual(expect.arrayContaining(['cli', 'apps']));
     });
 
+    test('treats empty publishingProfiles as unfiltered', () => {
+      const suffixes = listRuleSuffixes('publishing', 'typescript', []);
+
+      expect(suffixes).toHaveLength(8);
+      expect(suffixes).toEqual(
+        expect.arrayContaining([
+          'libraries',
+          'sdks',
+          'apps',
+          'cli',
+          'brew',
+          'apt',
+          'web',
+          'api'
+        ])
+      );
+    });
+
     test('returns only main rule for plan-lifecycle', () => {
       expect(listRuleSuffixes('plan-lifecycle')).toEqual(['']);
     });

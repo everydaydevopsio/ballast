@@ -416,7 +416,11 @@ export function listRuleSuffixes(
   if (suffixes.length === 0) {
     throw new Error(`Agent "${agentId}" has no content.md or content-*.md`);
   }
-  if (agentId === 'publishing' && publishingProfiles !== undefined) {
+  if (
+    agentId === 'publishing' &&
+    publishingProfiles !== undefined &&
+    publishingProfiles.length > 0
+  ) {
     const available = new Set(suffixes);
     return publishingProfiles.filter((profile) => available.has(profile));
   }

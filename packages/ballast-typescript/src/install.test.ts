@@ -1688,6 +1688,50 @@ Keep my custom responsibilities.
       expect(agentsMd).not.toContain('`.codex/rules/publishing-libraries.md`');
     });
 
+    test('treats empty publishingProfiles as unfiltered during install', () => {
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['publishing'],
+          publishingProfiles: []
+        },
+        tmpDir
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: ['publishing'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installed).toEqual(['publishing']);
+      expect(result.installedRules).toHaveLength(8);
+      for (const suffix of [
+        'api',
+        'apps',
+        'apt',
+        'brew',
+        'cli',
+        'libraries',
+        'sdks',
+        'web'
+      ]) {
+        expect(
+          fs.existsSync(
+            path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
+          )
+        ).toBe(true);
+      }
+
+      const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
+      expect(agentsMd).toContain('`.codex/rules/publishing-cli.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-api.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-libraries.md`');
+    });
+
     test('adds to errors for unknown agent and continues with valid ones', () => {
       const result = install({
         projectRoot: tmpDir,
