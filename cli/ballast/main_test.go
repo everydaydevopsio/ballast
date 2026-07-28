@@ -332,6 +332,53 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 }
 
+func TestRunDoctorReportsConfigProfileDrift(t *testing.T) {
+	originalCollect := collectDoctorBackendsFunc
+	t.Cleanup(func() {
+		collectDoctorBackendsFunc = originalCollect
+	})
+
+	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
+		return []doctorBackendStatus{
+			{Name: "ballast-typescript", Version: "5.0.2", Location: "/tmp/ts", Found: true},
+			{Name: "ballast-python", Version: "5.0.2", Location: "/tmp/py", Found: true},
+			{Name: "ballast-go", Version: "5.0.2", Location: "/tmp/go", Found: true},
+		}
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "ui", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript"],
+  "paths":{"typescript":["examples/chat-ts"]}
+}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"doctor"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	for _, expected := range []string{
+		"Config drift:",
+		"- missing configured path: typescript=examples/chat-ts",
+		"- untracked detected profile: typescript=examples/web/ui",
+		"- untracked detected language: python=services/api",
+		"Run `ballast doctor --fix` to refresh saved languages and paths from current repository detection.",
+	} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("expected %q in doctor output, got %q", expected, output)
+		}
+	}
+}
+
 func TestRunDoctorReportsMissingBallastState(t *testing.T) {
 	originalCollect := collectDoctorBackendsFunc
 	t.Cleanup(func() {
@@ -529,6 +576,64 @@ func TestRunDoctorFixInstallsBackendsAndRefreshesConfig(t *testing.T) {
 	}
 	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --yes") {
 		t.Fatalf("expected refresh-config install invocation, got %q", got)
+	}
+}
+
+func TestRunDoctorFixRefreshesConfigProfilesBeforeInstall(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.2"
+
+	runCommandFunc = func(name string, args []string) error { return nil }
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/project\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "ui", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript","go"],
+  "paths":{
+    "typescript":["examples/chat-ts","examples/chat-web"],
+    "go":["."]
+  }
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"doctor", "--fix"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		t.Fatalf("loadDoctorConfig returned error: %v", err)
+	}
+	if config == nil {
+		t.Fatal("expected .rulesrc.json to remain present")
+	}
+	if !sameStringSet(config.Languages, []string{"typescript", "go"}) {
+		t.Fatalf("expected languages to match detected profiles, got %#v", config.Languages)
+	}
+	if got := config.Paths["typescript"]; !sameStringSet(got, []string{"examples/web/ui"}) {
+		t.Fatalf("expected doctor --fix to replace stale TypeScript paths, got %#v", got)
+	}
+	if got := config.Paths["go"]; !sameStringSet(got, []string{"."}) {
+		t.Fatalf("expected doctor --fix to preserve detected Go path, got %#v", got)
 	}
 }
 

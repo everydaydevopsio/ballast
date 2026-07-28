@@ -175,6 +175,14 @@ type ballastLocalState struct {
 	ToolsStatus string
 }
 
+type doctorConfigDrift struct {
+	MissingConfiguredPaths  []string
+	StaleConfiguredProfiles []string
+	UntrackedProfiles       []string
+	UntrackedLanguages      []string
+	ScanError               error
+}
+
 const (
 	localStatePresent    = "present"
 	localStateMissing    = "missing"
@@ -873,6 +881,10 @@ func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool,
 	if !fileExists(filepath.Join(root, ".rulesrc.json")) {
 		return 0
 	}
+	if err := refreshDoctorConfigProfiles(root, selectedLanguage); err != nil {
+		fmt.Println(err)
+		return 1
+	}
 
 	refreshArgs := []string{"install", "--refresh-config"}
 	if patch {
@@ -986,7 +998,205 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	if strings.TrimSpace(config.DeploymentModel) != "" {
 		fmt.Printf("- deploymentModel: %s\n", config.DeploymentModel)
 	}
+	printDoctorConfigDrift(root, config)
 	fmt.Println()
+}
+
+func printDoctorConfigDrift(root string, config *monorepoConfig) {
+	drift := analyzeDoctorConfigDrift(root, config)
+	if !drift.hasDrift() && drift.ScanError == nil {
+		return
+	}
+	fmt.Println()
+	fmt.Println("Config drift:")
+	if drift.ScanError != nil {
+		fmt.Printf("- scan error: %v\n", drift.ScanError)
+		return
+	}
+	for _, item := range drift.MissingConfiguredPaths {
+		fmt.Printf("- missing configured path: %s\n", item)
+	}
+	for _, item := range drift.StaleConfiguredProfiles {
+		fmt.Printf("- stale configured profile: %s\n", item)
+	}
+	for _, item := range drift.UntrackedProfiles {
+		fmt.Printf("- untracked detected profile: %s\n", item)
+	}
+	for _, item := range drift.UntrackedLanguages {
+		fmt.Printf("- untracked detected language: %s\n", item)
+	}
+	fmt.Println("- remediation: Run `ballast doctor --fix` to refresh saved languages and paths from current repository detection.")
+}
+
+func (drift doctorConfigDrift) hasDrift() bool {
+	return len(drift.MissingConfiguredPaths) > 0 ||
+		len(drift.StaleConfiguredProfiles) > 0 ||
+		len(drift.UntrackedProfiles) > 0 ||
+		len(drift.UntrackedLanguages) > 0
+}
+
+func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigDrift {
+	if config == nil {
+		return doctorConfigDrift{}
+	}
+	detected, err := detectRepoProfiles(root)
+	if err != nil {
+		return doctorConfigDrift{ScanError: err}
+	}
+	detectedPaths := profileRelativePathMap(root, detected)
+	configuredPaths := normalizedConfigPathMap(config)
+	configuredLanguages := configuredLanguageSet(config)
+	drift := doctorConfigDrift{}
+
+	for _, lang := range orderedConfigPathLanguages(config) {
+		for _, configuredPath := range configuredPaths[lang] {
+			if !fileExists(filepath.Join(root, configuredPath)) {
+				drift.MissingConfiguredPaths = append(drift.MissingConfiguredPaths, string(lang)+"="+configuredPath)
+				continue
+			}
+			if !stringSliceContains(detectedPaths[lang], configuredPath) {
+				drift.StaleConfiguredProfiles = append(drift.StaleConfiguredProfiles, string(lang)+"="+configuredPath)
+			}
+		}
+	}
+
+	for _, profile := range detected {
+		paths := detectedPaths[profile.Language]
+		if !configuredLanguages[profile.Language] {
+			drift.UntrackedLanguages = append(drift.UntrackedLanguages, string(profile.Language)+"="+strings.Join(paths, ","))
+			continue
+		}
+		for _, detectedPath := range paths {
+			if !stringSliceContains(configuredPaths[profile.Language], detectedPath) {
+				drift.UntrackedProfiles = append(drift.UntrackedProfiles, string(profile.Language)+"="+detectedPath)
+			}
+		}
+	}
+	return drift
+}
+
+func refreshDoctorConfigProfiles(root string, selectedLanguage language) error {
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		return nil
+	}
+	detected, err := detectRepoProfiles(root)
+	if err != nil {
+		return err
+	}
+	if len(detected) == 0 {
+		return nil
+	}
+	if selectedLanguage == "" {
+		config.Languages = make([]string, 0, len(detected))
+		config.Paths = map[string][]string{}
+	}
+	for _, profile := range detected {
+		if selectedLanguage != "" && profile.Language != selectedLanguage {
+			continue
+		}
+		if selectedLanguage != "" && !slices.Contains(config.Languages, string(profile.Language)) {
+			config.Languages = append(config.Languages, string(profile.Language))
+		}
+		if config.Paths == nil {
+			config.Paths = map[string][]string{}
+		}
+		if selectedLanguage == "" {
+			config.Languages = append(config.Languages, string(profile.Language))
+		}
+		config.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
+	}
+	return saveMonorepoConfig(root, *config)
+}
+
+func profileRelativePathMap(root string, profiles []repoProfile) map[language][]string {
+	paths := map[language][]string{}
+	for _, profile := range profiles {
+		paths[profile.Language] = relativePaths(root, profile.Paths)
+	}
+	return paths
+}
+
+func normalizedConfigPathMap(config *monorepoConfig) map[language][]string {
+	paths := map[language][]string{}
+	if config == nil {
+		return paths
+	}
+	for rawLanguage, rawPaths := range config.Paths {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if !isSupportedLanguage(lang) {
+			continue
+		}
+		for _, rawPath := range rawPaths {
+			if strings.TrimSpace(rawPath) == "" {
+				continue
+			}
+			paths[lang] = append(paths[lang], filepath.Clean(rawPath))
+		}
+		paths[lang] = uniqueStrings(paths[lang])
+	}
+	return paths
+}
+
+func configuredLanguageSet(config *monorepoConfig) map[language]bool {
+	languages := map[language]bool{}
+	if config == nil {
+		return languages
+	}
+	for _, rawLanguage := range config.Languages {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if isSupportedLanguage(lang) {
+			languages[lang] = true
+		}
+	}
+	for rawLanguage := range config.Paths {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if isSupportedLanguage(lang) {
+			languages[lang] = true
+		}
+	}
+	return languages
+}
+
+func orderedConfigPathLanguages(config *monorepoConfig) []language {
+	if config == nil {
+		return nil
+	}
+	paths := normalizedConfigPathMap(config)
+	ordered := []language{}
+	seen := map[language]bool{}
+	for _, rawLanguage := range config.Languages {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if !isSupportedLanguage(lang) || len(paths[lang]) == 0 || seen[lang] {
+			continue
+		}
+		ordered = append(ordered, lang)
+		seen[lang] = true
+	}
+	remaining := []string{}
+	for lang, values := range paths {
+		if seen[lang] || len(values) == 0 {
+			continue
+		}
+		remaining = append(remaining, string(lang))
+	}
+	sort.Strings(remaining)
+	for _, rawLanguage := range remaining {
+		ordered = append(ordered, language(rawLanguage))
+	}
+	return ordered
+}
+
+func stringSliceContains(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func printDoctorLocalState(root string) {

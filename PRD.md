@@ -313,6 +313,7 @@ Ballast refreshes saved installs from `.rulesrc.json`, but removing managed agen
 ### Problem
 
 Operators use `ballast doctor` to inspect the effective Ballast state for a repository, but the current report omits the saved `languages` and `paths` from `.rulesrc.json`. This makes it hard to confirm which language profiles Ballast considers installed in monorepos or mixed-language repos.
+Operators also need to know when saved language paths have drifted from the repository, such as when a configured target directory was deleted, renamed, or when a new language profile was added after Ballast was installed.
 
 ### Requirements
 
@@ -321,6 +322,9 @@ Operators use `ballast doctor` to inspect the effective Ballast state for a repo
 3. `ballast doctor` must display configured `taskSystem` when `.rulesrc.json` contains it.
 4. The change must apply consistently across the TypeScript, Python, Go, and wrapper CLIs.
 5. Existing `doctor` output for targets, agents, skills, installed CLIs, and recommendations must remain intact.
+6. The wrapper `ballast doctor` report must identify configured language paths that are missing from disk or no longer match detected language profiles.
+7. The wrapper `ballast doctor` report must identify detected language profiles that are not saved in `.rulesrc.json`, including newly added directories and newly added languages.
+8. `ballast doctor --fix` must refresh saved `languages` and `paths` from current repository detection before reapplying the saved install configuration when current detection can produce a supported profile set.
 
 ### Acceptance Criteria
 
@@ -329,6 +333,10 @@ Operators use `ballast doctor` to inspect the effective Ballast state for a repo
 3. Given a `.rulesrc.json` with `taskSystem`, `ballast doctor` prints a `- taskSystem: ...` line in the `Config:` section.
 4. Given a `.rulesrc.json` without `languages`, `paths`, or `taskSystem`, `ballast doctor` does not print empty placeholder lines for those fields.
 5. Automated tests cover the new output in each CLI implementation that renders `doctor` output.
+6. Given a configured path that no longer exists, wrapper `ballast doctor` prints a config drift line that names the missing language path and recommends `ballast doctor --fix`.
+7. Given a repo where current detection finds a profile path not saved in `.rulesrc.json`, wrapper `ballast doctor` prints a config drift line that names the untracked detected profile.
+8. Given a repo where current detection finds a language not saved in `.rulesrc.json`, wrapper `ballast doctor` prints a config drift line that names the untracked detected language.
+9. Given stale saved TypeScript paths and a current detected TypeScript path, wrapper `ballast doctor --fix` rewrites `.rulesrc.json` to the detected path before refreshing generated outputs.
 
 ## JavaScript Detection Warning
 
