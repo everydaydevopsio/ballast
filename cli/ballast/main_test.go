@@ -757,8 +757,8 @@ func TestRefreshDoctorConfigProfilesSelectedLanguageOnly(t *testing.T) {
   "ballastVersion":"5.0.2",
   "targets":["codex"],
   "agents":["linting"],
-  "languages":["typescript"],
-  "paths":{"typescript":["examples/chat-ts"]}
+  "languages":[" TypeScript ","Go"],
+  "paths":{" TypeScript ":[" examples/chat-ts ","../outside"],"Go":["old-go"]}
 }`)
 
 	if err := refreshDoctorConfigProfiles(root, langGo); err != nil {
@@ -780,6 +780,9 @@ func TestRefreshDoctorConfigProfilesSelectedLanguageOnly(t *testing.T) {
 	}
 	if got := config.Paths["go"]; !sameStringSet(got, []string{"."}) {
 		t.Fatalf("expected Go path to be refreshed, got %#v", got)
+	}
+	if _, ok := config.Paths["Go"]; ok {
+		t.Fatalf("expected selected language refresh to normalize mixed-case path keys, got %#v", config.Paths)
 	}
 }
 

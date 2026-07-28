@@ -1107,6 +1107,8 @@ func refreshDoctorConfigProfiles(root string, selectedLanguage language) error {
 	if selectedLanguage == "" {
 		config.Languages = make([]string, 0, len(detected))
 		config.Paths = map[string][]string{}
+	} else {
+		normalizeDoctorConfigProfiles(config)
 	}
 	for _, profile := range detected {
 		if selectedLanguage != "" && profile.Language != selectedLanguage {
@@ -1124,6 +1126,43 @@ func refreshDoctorConfigProfiles(root string, selectedLanguage language) error {
 		config.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
 	}
 	return saveMonorepoConfig(root, *config)
+}
+
+func normalizeDoctorConfigProfiles(config *monorepoConfig) {
+	if config == nil {
+		return
+	}
+	languages := make([]string, 0, len(config.Languages))
+	seenLanguages := map[string]bool{}
+	for _, rawLanguage := range config.Languages {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if !isSupportedLanguage(lang) || seenLanguages[string(lang)] {
+			continue
+		}
+		languages = append(languages, string(lang))
+		seenLanguages[string(lang)] = true
+	}
+	paths := map[string][]string{}
+	for rawLanguage, rawPaths := range config.Paths {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if !isSupportedLanguage(lang) {
+			continue
+		}
+		for _, rawPath := range rawPaths {
+			normalizedPath, ok := normalizeConfigRelativePath(rawPath)
+			if !ok {
+				continue
+			}
+			paths[string(lang)] = append(paths[string(lang)], normalizedPath)
+		}
+		paths[string(lang)] = uniqueStrings(paths[string(lang)])
+		if !seenLanguages[string(lang)] {
+			languages = append(languages, string(lang))
+			seenLanguages[string(lang)] = true
+		}
+	}
+	config.Languages = languages
+	config.Paths = paths
 }
 
 func profileRelativePathMap(root string, profiles []repoProfile) map[language][]string {
