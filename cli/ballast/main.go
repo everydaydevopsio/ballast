@@ -881,6 +881,17 @@ func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool,
 	if !fileExists(filepath.Join(root, ".rulesrc.json")) {
 		return 0
 	}
+	configPath := filepath.Join(root, ".rulesrc.json")
+	originalConfig, err := os.ReadFile(configPath)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	configInfo, err := os.Stat(configPath)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
 	if err := refreshDoctorConfigProfiles(root, selectedLanguage); err != nil {
 		fmt.Println(err)
 		return 1
@@ -898,6 +909,9 @@ func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool,
 	}
 	exitCode := run(refreshArgs)
 	if exitCode != 0 {
+		if err := os.WriteFile(configPath, originalConfig, configInfo.Mode().Perm()); err != nil {
+			fmt.Println(err)
+		}
 		return exitCode
 	}
 	if desiredVersion != "" {

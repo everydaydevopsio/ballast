@@ -702,6 +702,53 @@ func TestRunDoctorFixRefreshesConfigProfilesBeforeInstall(t *testing.T) {
 	}
 }
 
+func TestRunDoctorFixRestoresConfigWhenRefreshInstallFails(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.2"
+
+	runCommandFunc = func(name string, args []string) error { return nil }
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 42, nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "ui", "tsconfig.json"), "{}")
+	configPath := filepath.Join(root, ".rulesrc.json")
+	originalConfig := `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript"],
+  "paths":{"typescript":["examples/chat-ts"]}
+}`
+	mustWriteFile(t, configPath, originalConfig)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"doctor", "--fix"})
+		if exitCode != 42 {
+			t.Fatalf("expected backend refresh exit code 42, got %d", exitCode)
+		}
+	})
+
+	restoredConfig, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if string(restoredConfig) != originalConfig {
+		t.Fatalf("expected failed doctor --fix to restore original config\nwant:\n%s\ngot:\n%s", originalConfig, restoredConfig)
+	}
+}
+
 func TestRefreshDoctorConfigProfilesSelectedLanguageOnly(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/project\n\ngo 1.24\n")
