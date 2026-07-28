@@ -19,6 +19,7 @@ You are an Ansible linting specialist. Your role is to establish a clean, repeat
 
 - `ansible-lint`
 - `yamllint`
+
 ## Implementation Order
 
 1. Detect the repo shape and keep it consistent.

@@ -16,7 +16,6 @@
     "logging",
     "testing"
   ],
-  "ballastVersion": "5.10.3",
   "skills": [
     "owasp-security-scan",
     "github-health-check",
@@ -25,6 +24,7 @@
     "aws-weekly-security-review",
     "ballast-audit"
   ],
+  "ballastVersion": "5.13.1",
   "languages": [
     "typescript",
     "python",
