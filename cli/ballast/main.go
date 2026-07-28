@@ -1131,14 +1131,27 @@ func normalizedConfigPathMap(config *monorepoConfig) map[language][]string {
 			continue
 		}
 		for _, rawPath := range rawPaths {
-			if strings.TrimSpace(rawPath) == "" {
+			normalizedPath, ok := normalizeConfigRelativePath(rawPath)
+			if !ok {
 				continue
 			}
-			paths[lang] = append(paths[lang], filepath.Clean(rawPath))
+			paths[lang] = append(paths[lang], normalizedPath)
 		}
 		paths[lang] = uniqueStrings(paths[lang])
 	}
 	return paths
+}
+
+func normalizeConfigRelativePath(rawPath string) (string, bool) {
+	trimmed := strings.TrimSpace(rawPath)
+	if trimmed == "" || filepath.IsAbs(trimmed) {
+		return "", false
+	}
+	cleaned := filepath.Clean(trimmed)
+	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return cleaned, true
 }
 
 func configuredLanguageSet(config *monorepoConfig) map[language]bool {

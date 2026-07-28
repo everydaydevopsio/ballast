@@ -788,7 +788,7 @@ func TestDoctorConfigDriftHelpersNormalizeAndOrderPaths(t *testing.T) {
 		Paths: map[string][]string{
 			"go":         {"."},
 			"ruby":       {"ignored"},
-			"typescript": {"", "apps//web", "apps/web"},
+			"typescript": {"", "/tmp/outside", "../outside", "apps//web", "apps/web"},
 		},
 	}
 
