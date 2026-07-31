@@ -2246,6 +2246,7 @@ func TestCompareVersions(t *testing.T) {
 		{name: "numeric not lexical", left: "5.10.0", right: "5.9.9", want: 1},
 		{name: "parseable beats unparseable", left: "5.0.0", right: "dev", want: 1},
 		{name: "unparseable loses to parseable", left: "dev", right: "5.0.0", want: -1},
+		{name: "partial numeric part is unparseable", left: "5-rc1.0.0", right: "5.0.0", want: -1},
 		{name: "lexical fallback older", left: "alpha", right: "beta", want: -1},
 		{name: "lexical fallback newer", left: "beta", right: "alpha", want: 1},
 	}

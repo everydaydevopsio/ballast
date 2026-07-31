@@ -17,6 +17,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -716,8 +717,8 @@ func parseVersionParts(value string) ([]int, bool) {
 	parts := strings.Split(value, ".")
 	parsed := make([]int, 0, len(parts))
 	for _, part := range parts {
-		number := 0
-		if _, err := fmt.Sscanf(part, "%d", &number); err != nil {
+		number, err := strconv.Atoi(part)
+		if err != nil {
 			return nil, false
 		}
 		parsed = append(parsed, number)
