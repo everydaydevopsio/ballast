@@ -1719,13 +1719,47 @@ func resolveCommandVersionWithArgs(binary string, args []string, env map[string]
 }
 
 func collectDoctorBackends(root string) []doctorBackendStatus {
-	statuses := make([]doctorBackendStatus, 0, len(installableBackendLanguages))
-	for _, lang := range installableBackendLanguages {
+	languages := configuredDoctorBackendLanguages(root)
+	statuses := make([]doctorBackendStatus, 0, len(languages))
+	for _, lang := range languages {
 		tool := toolsByLanguage[lang]
 		resolved := resolveBackendCommand(lang, tool, nil, nil)
 		statuses = append(statuses, detectDoctorBackendStatus(resolved, tool))
 	}
 	return statuses
+}
+
+func configuredDoctorBackendLanguages(root string) []language {
+	config, err := loadDoctorConfig(root)
+	if err != nil || config == nil || len(config.Languages) == 0 {
+		return slices.Clone(installableBackendLanguages)
+	}
+
+	languages := make([]language, 0, len(config.Languages))
+	seen := map[language]bool{}
+	for _, configured := range config.Languages {
+		lang := backendLanguageForConfiguredLanguage(language(strings.ToLower(strings.TrimSpace(configured))))
+		if lang == "" || seen[lang] {
+			continue
+		}
+		languages = append(languages, lang)
+		seen[lang] = true
+	}
+	if len(languages) == 0 {
+		return slices.Clone(installableBackendLanguages)
+	}
+	return languages
+}
+
+func backendLanguageForConfiguredLanguage(lang language) language {
+	switch lang {
+	case langTypeScript, langPython, langGo:
+		return lang
+	case langAnsible, langTerraform:
+		return langGo
+	default:
+		return ""
+	}
 }
 
 func detectDoctorBackendStatus(resolved resolvedBackendCommand, tool toolConfig) doctorBackendStatus {

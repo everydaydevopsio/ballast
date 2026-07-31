@@ -270,7 +270,7 @@ func TestRunHelpAndVersionCommands(t *testing.T) {
 	})
 }
 
-func TestRunDoctorReportsAllBackends(t *testing.T) {
+func TestRunDoctorReportsConfiguredBackends(t *testing.T) {
 	originalCollect := collectDoctorBackendsFunc
 	t.Cleanup(func() {
 		collectDoctorBackendsFunc = originalCollect
@@ -279,7 +279,6 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
 		return []doctorBackendStatus{
 			{Name: "ballast-typescript", Version: "5.0.2", Location: "/tmp/ts", Found: true},
-			{Name: "ballast-python", Version: "5.0.2", Location: "/tmp/py", Found: true},
 			{Name: "ballast-go", Version: "5.0.2", Location: "/tmp/go", Found: true},
 		}
 	}
@@ -310,10 +309,13 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	if !strings.Contains(output, "Ballast doctor") {
 		t.Fatalf("expected wrapper doctor output, got %q", output)
 	}
-	for _, name := range []string{"ballast-typescript", "ballast-python", "ballast-go"} {
+	for _, name := range []string{"ballast-typescript", "ballast-go"} {
 		if !strings.Contains(output, name) {
 			t.Fatalf("expected %s in doctor output, got %q", name, output)
 		}
+	}
+	if strings.Contains(output, "ballast-python") {
+		t.Fatalf("did not expect unconfigured python backend in doctor output, got %q", output)
 	}
 	if !strings.Contains(output, "ballastVersion: 5.0.2") {
 		t.Fatalf("expected config version in doctor output, got %q", output)
@@ -329,6 +331,40 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 	if !strings.Contains(output, "deploymentModel: kubernetes") {
 		t.Fatalf("expected config deployment model in doctor output, got %q", output)
+	}
+}
+
+func TestConfiguredDoctorBackendLanguagesUsesConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "languages":["go","typescript","ansible","terraform","python","go"]
+}`)
+
+	got := configuredDoctorBackendLanguages(root)
+	want := []language{langGo, langTypeScript, langPython}
+	if !slices.Equal(got, want) {
+		t.Fatalf("expected configured backend languages %#v, got %#v", want, got)
+	}
+}
+
+func TestConfiguredDoctorBackendLanguagesFallsBackWithoutConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+
+	got := configuredDoctorBackendLanguages(root)
+	if !slices.Equal(got, installableBackendLanguages) {
+		t.Fatalf("expected fallback backend languages %#v, got %#v", installableBackendLanguages, got)
+	}
+}
+
+func TestConfiguredDoctorBackendLanguagesFallsBackForMalformedConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "languages":["","javascript","ruby"]
+}`)
+
+	got := configuredDoctorBackendLanguages(root)
+	if !slices.Equal(got, installableBackendLanguages) {
+		t.Fatalf("expected fallback backend languages %#v, got %#v", installableBackendLanguages, got)
 	}
 }
 

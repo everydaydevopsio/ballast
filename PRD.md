@@ -325,6 +325,7 @@ Operators also need to know when saved language paths have drifted from the repo
 6. The wrapper `ballast doctor` report must identify configured language paths that are missing from disk or no longer match detected language profiles.
 7. The wrapper `ballast doctor` report must identify detected language profiles that are not saved in `.rulesrc.json`, including newly added directories and newly added languages.
 8. `ballast doctor --fix` must refresh saved `languages` and `paths` from current repository detection before reapplying the saved install configuration when current detection can produce a supported profile set.
+9. When `.rulesrc.json` contains configured `languages`, wrapper `ballast doctor` must check only the backend CLIs required by those languages; Ansible and Terraform configurations use the Go backend.
 
 ### Acceptance Criteria
 
@@ -337,6 +338,7 @@ Operators also need to know when saved language paths have drifted from the repo
 7. Given a repo where current detection finds a profile path not saved in `.rulesrc.json`, wrapper `ballast doctor` prints a config drift line that names the untracked detected profile.
 8. Given a repo where current detection finds a language not saved in `.rulesrc.json`, wrapper `ballast doctor` prints a config drift line that names the untracked detected language.
 9. Given stale saved TypeScript paths and a current detected TypeScript path, wrapper `ballast doctor --fix` rewrites `.rulesrc.json` to the detected path before refreshing generated outputs.
+10. Given a `.rulesrc.json` with only `go` configured and a globally installed `ballast-typescript` on `PATH`, wrapper `ballast doctor` does not report the TypeScript backend.
 
 ## JavaScript Detection Warning
 
