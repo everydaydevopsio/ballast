@@ -599,7 +599,14 @@ func ensureInstalled(tool toolConfig) error {
 }
 
 func runInstallCLI(selectedLanguage language, args []string) int {
-	version, err := parseInstallCLIVersion(args)
+	requestedVersion, err := parseInstallCLIVersion(args)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	root := findProjectRoot("")
+	version, err := resolveInstallCLIVersion(root, requestedVersion)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -643,6 +650,79 @@ func installCLIs(selectedLanguage language, version string) int {
 	}
 
 	return 0
+}
+
+func resolveInstallCLIVersion(root string, requestedVersion string) (string, error) {
+	if strings.TrimSpace(requestedVersion) != "" {
+		return requestedVersion, nil
+	}
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		return "", err
+	}
+	if config == nil {
+		return "", nil
+	}
+	requiredVersion := releaseVersion(config.BallastVersion)
+	if requiredVersion == "" {
+		return "", nil
+	}
+	currentVersion := releaseVersion(resolveVersion())
+	if currentVersion != "" && compareVersions(currentVersion, requiredVersion) < 0 {
+		return "", fmt.Errorf(".rulesrc.json requires Ballast %s but this ballast is %s. Update Ballast before running install-cli", requiredVersion, currentVersion)
+	}
+	return requiredVersion, nil
+}
+
+func compareVersions(left string, right string) int {
+	if left == right {
+		return 0
+	}
+	leftParts, leftOK := parseVersionParts(left)
+	rightParts, rightOK := parseVersionParts(right)
+	if leftOK && !rightOK {
+		return 1
+	}
+	if !leftOK && rightOK {
+		return -1
+	}
+	if !leftOK || !rightOK {
+		if left < right {
+			return -1
+		}
+		return 1
+	}
+	length := max(len(leftParts), len(rightParts))
+	for index := 0; index < length; index++ {
+		leftPart := 0
+		rightPart := 0
+		if index < len(leftParts) {
+			leftPart = leftParts[index]
+		}
+		if index < len(rightParts) {
+			rightPart = rightParts[index]
+		}
+		if leftPart < rightPart {
+			return -1
+		}
+		if leftPart > rightPart {
+			return 1
+		}
+	}
+	return 0
+}
+
+func parseVersionParts(value string) ([]int, bool) {
+	parts := strings.Split(value, ".")
+	parsed := make([]int, 0, len(parts))
+	for _, part := range parts {
+		number := 0
+		if _, err := fmt.Sscanf(part, "%d", &number); err != nil {
+			return nil, false
+		}
+		parsed = append(parsed, number)
+	}
+	return parsed, true
 }
 
 type setupDevCommand struct {
