@@ -2105,6 +2105,162 @@ func TestRunInstallCLICommandInstallsAllLanguagesByDefault(t *testing.T) {
 	}
 }
 
+func TestRunInstallCLIUsesRulesrcVersionByDefault(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "5.0.6"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"ballastVersion":"5.0.5","languages":["python"]}`)
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install-cli", "--language", "python"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected 1 install command, got %#v", commands)
+	}
+	got := strings.Join(commands[0], " ")
+	if !strings.Contains(got, "releases/download/v5.0.5/ballast_python-5.0.5-py3-none-any.whl") {
+		t.Fatalf("expected install-cli to use .rulesrc.json version 5.0.5, got %q", got)
+	}
+	if strings.Contains(got, "5.0.6") {
+		t.Fatalf("expected install-cli not to use running wrapper version, got %q", got)
+	}
+}
+
+func TestRunInstallCLIRequiresWrapperAtLeastRulesrcVersion(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "5.0.4"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"ballastVersion":"5.0.5","languages":["python"]}`)
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"install-cli", "--language", "python"})
+			if exitCode != 1 {
+				t.Fatalf("expected exit code 1, got %d", exitCode)
+			}
+		})
+	})
+
+	if len(commands) != 0 {
+		t.Fatalf("expected no install commands, got %#v", commands)
+	}
+	if !strings.Contains(output, ".rulesrc.json requires Ballast 5.0.5 but this ballast is 5.0.4") {
+		t.Fatalf("expected update guidance, got %q", output)
+	}
+}
+
+func TestResolveInstallCLIVersion(t *testing.T) {
+	originalVersion := version
+	t.Cleanup(func() {
+		version = originalVersion
+	})
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"ballastVersion":"v5.0.5"}`)
+
+	version = "5.0.6"
+	got, err := resolveInstallCLIVersion(root, "5.0.4")
+	if err != nil {
+		t.Fatalf("explicit version returned error: %v", err)
+	}
+	if got != "5.0.4" {
+		t.Fatalf("expected explicit version to win, got %q", got)
+	}
+
+	got, err = resolveInstallCLIVersion(root, "")
+	if err != nil {
+		t.Fatalf("rulesrc version returned error: %v", err)
+	}
+	if got != "5.0.5" {
+		t.Fatalf("expected rulesrc version, got %q", got)
+	}
+
+	version = "dev"
+	got, err = resolveInstallCLIVersion(root, "")
+	if err != nil {
+		t.Fatalf("dev wrapper should allow rulesrc release target: %v", err)
+	}
+	if got != "5.0.5" {
+		t.Fatalf("expected rulesrc version for dev wrapper, got %q", got)
+	}
+
+	emptyRoot := resolvedTempDir(t)
+	got, err = resolveInstallCLIVersion(emptyRoot, "")
+	if err != nil {
+		t.Fatalf("missing config returned error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected no default version without config, got %q", got)
+	}
+
+	missingVersionRoot := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(missingVersionRoot, ".rulesrc.json"), `{"languages":["python"]}`)
+	got, err = resolveInstallCLIVersion(missingVersionRoot, "")
+	if err != nil {
+		t.Fatalf("missing rulesrc version returned error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected no default version without ballastVersion, got %q", got)
+	}
+}
+
+func TestCompareVersions(t *testing.T) {
+	tests := []struct {
+		name  string
+		left  string
+		right string
+		want  int
+	}{
+		{name: "equal", left: "5.0.5", right: "5.0.5", want: 0},
+		{name: "left older", left: "5.0.4", right: "5.0.5", want: -1},
+		{name: "left newer", left: "5.0.6", right: "5.0.5", want: 1},
+		{name: "missing patch equals zero", left: "5.0", right: "5.0.0", want: 0},
+		{name: "numeric not lexical", left: "5.10.0", right: "5.9.9", want: 1},
+		{name: "parseable beats unparseable", left: "5.0.0", right: "dev", want: 1},
+		{name: "unparseable loses to parseable", left: "dev", right: "5.0.0", want: -1},
+		{name: "partial numeric part is unparseable", left: "5-rc1.0.0", right: "5.0.0", want: -1},
+		{name: "lexical fallback older", left: "alpha", right: "beta", want: -1},
+		{name: "lexical fallback newer", left: "beta", right: "alpha", want: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareVersions(tt.left, tt.right)
+			if got != tt.want {
+				t.Fatalf("compareVersions(%q, %q) = %d, want %d", tt.left, tt.right, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRunInstallCLICommandInstallsGoBackendForAnsibleLanguage(t *testing.T) {
 	originalRun := runCommandFunc
 	originalVersion := version
