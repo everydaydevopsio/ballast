@@ -356,6 +356,18 @@ func TestConfiguredDoctorBackendLanguagesFallsBackWithoutConfig(t *testing.T) {
 	}
 }
 
+func TestConfiguredDoctorBackendLanguagesFallsBackForMalformedConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "languages":["","javascript","ruby"]
+}`)
+
+	got := configuredDoctorBackendLanguages(root)
+	if !slices.Equal(got, installableBackendLanguages) {
+		t.Fatalf("expected fallback backend languages %#v, got %#v", installableBackendLanguages, got)
+	}
+}
+
 func TestRunDoctorReportsConfigProfileDrift(t *testing.T) {
 	originalCollect := collectDoctorBackendsFunc
 	t.Cleanup(func() {

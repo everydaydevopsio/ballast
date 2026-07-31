@@ -1745,6 +1745,9 @@ func configuredDoctorBackendLanguages(root string) []language {
 		languages = append(languages, lang)
 		seen[lang] = true
 	}
+	if len(languages) == 0 {
+		return slices.Clone(installableBackendLanguages)
+	}
 	return languages
 }
 
