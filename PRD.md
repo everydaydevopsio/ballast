@@ -93,9 +93,11 @@ Ballast stores project-local backend CLIs under `.ballast/`, but the product con
 5. `ballast doctor` must report whether `.ballast/`, `.ballast/bin`, and `.ballast/tools` exist.
 6. `ballast doctor` must provide actionable remediation when `.ballast/` state is missing or incomplete.
 7. `ballast doctor --fix` must recreate missing `.ballast/` directories through the same local CLI install path.
-8. Agent guidance must explain how to check and repair Ballast local state.
-9. Ballast must ship a dedicated common skill for AI agents that covers Ballast-managed repository status, bootstrap, and repair workflows.
-10. Documentation must describe the dedicated Ballast skill and how to install it.
+8. When `ballast install-cli` runs without an explicit `--version`, it must install backend CLIs matching the saved `.rulesrc.json` `ballastVersion` when present, instead of defaulting to the running wrapper version.
+9. When the saved `.rulesrc.json` `ballastVersion` is newer than the running wrapper version, `ballast install-cli` must exit without installing backend CLIs and tell the operator to update Ballast.
+10. Agent guidance must explain how to check and repair Ballast local state.
+11. Ballast must ship a dedicated common skill for AI agents that covers Ballast-managed repository status, bootstrap, and repair workflows.
+12. Documentation must describe the dedicated Ballast skill and how to install it.
 
 ### Acceptance Criteria
 
@@ -103,9 +105,11 @@ Ballast stores project-local backend CLIs under `.ballast/`, but the product con
 2. Given a repository with `.ballast/` but missing `.ballast/bin` or `.ballast/tools`, `ballast doctor` reports the incomplete state and recommends repair.
 3. Given a repository without `.ballast/`, `ballast install-cli --language go --version <version>` creates `.ballast/bin` and `.ballast/tools` before running the install command.
 4. Given a repository without `.ballast/`, `ballast doctor --fix` creates `.ballast/bin` and `.ballast/tools` before running backend install commands.
-5. Generated local-dev guidance tells agents to use `ballast doctor` to inspect Ballast local state and `ballast doctor --fix` or `ballast install-cli` to repair it.
-6. The new Ballast skill is available through `--skill ballast-project-maintenance` and `--all-skills`.
-7. README and installation docs document `.ballast/` as generated local state and list the Ballast project maintenance skill.
+5. Given `.rulesrc.json` contains `ballastVersion: 5.12.0` and the running wrapper is newer, `ballast install-cli` installs backend CLIs at `5.12.0`.
+6. Given `.rulesrc.json` contains a `ballastVersion` newer than the running wrapper, `ballast install-cli` exits non-zero, runs no backend installer, and tells the operator to update Ballast.
+7. Generated local-dev guidance tells agents to use `ballast doctor` to inspect Ballast local state and `ballast doctor --fix` or `ballast install-cli` to repair it.
+8. The new Ballast skill is available through `--skill ballast-project-maintenance` and `--all-skills`.
+9. README and installation docs document `.ballast/` as generated local state and list the Ballast project maintenance skill.
 
 ## Agent Development Environment Bootstrap
 
@@ -313,6 +317,7 @@ Ballast refreshes saved installs from `.rulesrc.json`, but removing managed agen
 ### Problem
 
 Operators use `ballast doctor` to inspect the effective Ballast state for a repository, but the current report omits the saved `languages` and `paths` from `.rulesrc.json`. This makes it hard to confirm which language profiles Ballast considers installed in monorepos or mixed-language repos.
+Operators also need to know when saved language paths have drifted from the repository, such as when a configured target directory was deleted, renamed, or when a new language profile was added after Ballast was installed.
 
 ### Requirements
 
@@ -321,6 +326,10 @@ Operators use `ballast doctor` to inspect the effective Ballast state for a repo
 3. `ballast doctor` must display configured `taskSystem` when `.rulesrc.json` contains it.
 4. The change must apply consistently across the TypeScript, Python, Go, and wrapper CLIs.
 5. Existing `doctor` output for targets, agents, skills, installed CLIs, and recommendations must remain intact.
+6. The wrapper `ballast doctor` report must identify configured language paths that are missing from disk or no longer match detected language profiles.
+7. The wrapper `ballast doctor` report must identify detected language profiles that are not saved in `.rulesrc.json`, including newly added directories and newly added languages.
+8. `ballast doctor --fix` must refresh saved `languages` and `paths` from current repository detection before reapplying the saved install configuration when current detection can produce a supported profile set.
+9. When `.rulesrc.json` contains configured `languages`, wrapper `ballast doctor` must check only the backend CLIs required by those languages; Ansible and Terraform configurations use the Go backend.
 
 ### Acceptance Criteria
 
@@ -329,6 +338,11 @@ Operators use `ballast doctor` to inspect the effective Ballast state for a repo
 3. Given a `.rulesrc.json` with `taskSystem`, `ballast doctor` prints a `- taskSystem: ...` line in the `Config:` section.
 4. Given a `.rulesrc.json` without `languages`, `paths`, or `taskSystem`, `ballast doctor` does not print empty placeholder lines for those fields.
 5. Automated tests cover the new output in each CLI implementation that renders `doctor` output.
+6. Given a configured path that no longer exists, wrapper `ballast doctor` prints a config drift line that names the missing language path and recommends `ballast doctor --fix`.
+7. Given a repo where current detection finds a profile path not saved in `.rulesrc.json`, wrapper `ballast doctor` prints a config drift line that names the untracked detected profile.
+8. Given a repo where current detection finds a language not saved in `.rulesrc.json`, wrapper `ballast doctor` prints a config drift line that names the untracked detected language.
+9. Given stale saved TypeScript paths and a current detected TypeScript path, wrapper `ballast doctor --fix` rewrites `.rulesrc.json` to the detected path before refreshing generated outputs.
+10. Given a `.rulesrc.json` with only `go` configured and a globally installed `ballast-typescript` on `PATH`, wrapper `ballast doctor` does not report the TypeScript backend.
 
 ## JavaScript Detection Warning
 

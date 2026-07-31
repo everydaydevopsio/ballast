@@ -17,6 +17,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -173,6 +174,14 @@ type ballastLocalState struct {
 	RootStatus  string
 	BinStatus   string
 	ToolsStatus string
+}
+
+type doctorConfigDrift struct {
+	MissingConfiguredPaths  []string
+	StaleConfiguredProfiles []string
+	UntrackedProfiles       []string
+	UntrackedLanguages      []string
+	ScanError               error
 }
 
 const (
@@ -591,7 +600,14 @@ func ensureInstalled(tool toolConfig) error {
 }
 
 func runInstallCLI(selectedLanguage language, args []string) int {
-	version, err := parseInstallCLIVersion(args)
+	requestedVersion, err := parseInstallCLIVersion(args)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+
+	root := findProjectRoot("")
+	version, err := resolveInstallCLIVersion(root, requestedVersion)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -635,6 +651,79 @@ func installCLIs(selectedLanguage language, version string) int {
 	}
 
 	return 0
+}
+
+func resolveInstallCLIVersion(root string, requestedVersion string) (string, error) {
+	if strings.TrimSpace(requestedVersion) != "" {
+		return requestedVersion, nil
+	}
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		return "", err
+	}
+	if config == nil {
+		return "", nil
+	}
+	requiredVersion := releaseVersion(config.BallastVersion)
+	if requiredVersion == "" {
+		return "", nil
+	}
+	currentVersion := releaseVersion(resolveVersion())
+	if currentVersion != "" && compareVersions(currentVersion, requiredVersion) < 0 {
+		return "", fmt.Errorf(".rulesrc.json requires Ballast %s but this ballast is %s. Update Ballast before running install-cli", requiredVersion, currentVersion)
+	}
+	return requiredVersion, nil
+}
+
+func compareVersions(left string, right string) int {
+	if left == right {
+		return 0
+	}
+	leftParts, leftOK := parseVersionParts(left)
+	rightParts, rightOK := parseVersionParts(right)
+	if leftOK && !rightOK {
+		return 1
+	}
+	if !leftOK && rightOK {
+		return -1
+	}
+	if !leftOK || !rightOK {
+		if left < right {
+			return -1
+		}
+		return 1
+	}
+	length := max(len(leftParts), len(rightParts))
+	for index := 0; index < length; index++ {
+		leftPart := 0
+		rightPart := 0
+		if index < len(leftParts) {
+			leftPart = leftParts[index]
+		}
+		if index < len(rightParts) {
+			rightPart = rightParts[index]
+		}
+		if leftPart < rightPart {
+			return -1
+		}
+		if leftPart > rightPart {
+			return 1
+		}
+	}
+	return 0
+}
+
+func parseVersionParts(value string) ([]int, bool) {
+	parts := strings.Split(value, ".")
+	parsed := make([]int, 0, len(parts))
+	for _, part := range parts {
+		number, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, false
+		}
+		parsed = append(parsed, number)
+	}
+	return parsed, true
 }
 
 type setupDevCommand struct {
@@ -873,6 +962,21 @@ func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool,
 	if !fileExists(filepath.Join(root, ".rulesrc.json")) {
 		return 0
 	}
+	configPath := filepath.Join(root, ".rulesrc.json")
+	originalConfig, err := os.ReadFile(configPath)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	configInfo, err := os.Stat(configPath)
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
+	if err := refreshDoctorConfigProfiles(root, selectedLanguage); err != nil {
+		fmt.Println(err)
+		return 1
+	}
 
 	refreshArgs := []string{"install", "--refresh-config"}
 	if patch {
@@ -886,6 +990,9 @@ func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool,
 	}
 	exitCode := run(refreshArgs)
 	if exitCode != 0 {
+		if err := os.WriteFile(configPath, originalConfig, configInfo.Mode().Perm()); err != nil {
+			fmt.Println(err)
+		}
 		return exitCode
 	}
 	if desiredVersion != "" {
@@ -986,7 +1093,257 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	if strings.TrimSpace(config.DeploymentModel) != "" {
 		fmt.Printf("- deploymentModel: %s\n", config.DeploymentModel)
 	}
+	printDoctorConfigDrift(root, config)
 	fmt.Println()
+}
+
+func printDoctorConfigDrift(root string, config *monorepoConfig) {
+	drift := analyzeDoctorConfigDrift(root, config)
+	if !drift.hasDrift() && drift.ScanError == nil {
+		return
+	}
+	fmt.Println()
+	fmt.Println("Config drift:")
+	if drift.ScanError != nil {
+		fmt.Printf("- scan error: %v\n", drift.ScanError)
+		return
+	}
+	for _, item := range drift.MissingConfiguredPaths {
+		fmt.Printf("- missing configured path: %s\n", item)
+	}
+	for _, item := range drift.StaleConfiguredProfiles {
+		fmt.Printf("- stale configured profile: %s\n", item)
+	}
+	for _, item := range drift.UntrackedProfiles {
+		fmt.Printf("- untracked detected profile: %s\n", item)
+	}
+	for _, item := range drift.UntrackedLanguages {
+		fmt.Printf("- untracked detected language: %s\n", item)
+	}
+	fmt.Println("- remediation: Run `ballast doctor --fix` to refresh saved languages and paths from current repository detection.")
+}
+
+func (drift doctorConfigDrift) hasDrift() bool {
+	return len(drift.MissingConfiguredPaths) > 0 ||
+		len(drift.StaleConfiguredProfiles) > 0 ||
+		len(drift.UntrackedProfiles) > 0 ||
+		len(drift.UntrackedLanguages) > 0
+}
+
+func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigDrift {
+	if config == nil {
+		return doctorConfigDrift{}
+	}
+	detected, err := detectRepoProfiles(root)
+	if err != nil {
+		return doctorConfigDrift{ScanError: err}
+	}
+	detectedPaths := profileRelativePathMap(root, detected)
+	configuredPaths := normalizedConfigPathMap(config)
+	configuredLanguages := configuredLanguageSet(config)
+	drift := doctorConfigDrift{}
+
+	for _, lang := range orderedConfigPathLanguages(config) {
+		for _, configuredPath := range configuredPaths[lang] {
+			if !fileExists(filepath.Join(root, configuredPath)) {
+				drift.MissingConfiguredPaths = append(drift.MissingConfiguredPaths, string(lang)+"="+configuredPath)
+				continue
+			}
+			if !stringSliceContains(detectedPaths[lang], configuredPath) {
+				drift.StaleConfiguredProfiles = append(drift.StaleConfiguredProfiles, string(lang)+"="+configuredPath)
+			}
+		}
+	}
+
+	for _, profile := range detected {
+		paths := detectedPaths[profile.Language]
+		if !configuredLanguages[profile.Language] {
+			drift.UntrackedLanguages = append(drift.UntrackedLanguages, string(profile.Language)+"="+strings.Join(paths, ","))
+			continue
+		}
+		for _, detectedPath := range paths {
+			if !stringSliceContains(configuredPaths[profile.Language], detectedPath) {
+				drift.UntrackedProfiles = append(drift.UntrackedProfiles, string(profile.Language)+"="+detectedPath)
+			}
+		}
+	}
+	return drift
+}
+
+func refreshDoctorConfigProfiles(root string, selectedLanguage language) error {
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		return err
+	}
+	if config == nil {
+		return nil
+	}
+	detected, err := detectRepoProfiles(root)
+	if err != nil {
+		return err
+	}
+	if len(detected) == 0 {
+		return nil
+	}
+	if selectedLanguage == "" {
+		config.Languages = make([]string, 0, len(detected))
+		config.Paths = map[string][]string{}
+	} else {
+		normalizeDoctorConfigProfiles(config)
+	}
+	for _, profile := range detected {
+		if selectedLanguage != "" && profile.Language != selectedLanguage {
+			continue
+		}
+		if selectedLanguage != "" && !slices.Contains(config.Languages, string(profile.Language)) {
+			config.Languages = append(config.Languages, string(profile.Language))
+		}
+		if config.Paths == nil {
+			config.Paths = map[string][]string{}
+		}
+		if selectedLanguage == "" {
+			config.Languages = append(config.Languages, string(profile.Language))
+		}
+		config.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
+	}
+	return saveMonorepoConfig(root, *config)
+}
+
+func normalizeDoctorConfigProfiles(config *monorepoConfig) {
+	if config == nil {
+		return
+	}
+	languages := make([]string, 0, len(config.Languages))
+	seenLanguages := map[string]bool{}
+	for _, rawLanguage := range config.Languages {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if !isSupportedLanguage(lang) || seenLanguages[string(lang)] {
+			continue
+		}
+		languages = append(languages, string(lang))
+		seenLanguages[string(lang)] = true
+	}
+	paths := map[string][]string{}
+	for rawLanguage, rawPaths := range config.Paths {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if !isSupportedLanguage(lang) {
+			continue
+		}
+		for _, rawPath := range rawPaths {
+			normalizedPath, ok := normalizeConfigRelativePath(rawPath)
+			if !ok {
+				continue
+			}
+			paths[string(lang)] = append(paths[string(lang)], normalizedPath)
+		}
+		paths[string(lang)] = uniqueStrings(paths[string(lang)])
+		if !seenLanguages[string(lang)] {
+			languages = append(languages, string(lang))
+			seenLanguages[string(lang)] = true
+		}
+	}
+	config.Languages = languages
+	config.Paths = paths
+}
+
+func profileRelativePathMap(root string, profiles []repoProfile) map[language][]string {
+	paths := map[language][]string{}
+	for _, profile := range profiles {
+		paths[profile.Language] = relativePaths(root, profile.Paths)
+	}
+	return paths
+}
+
+func normalizedConfigPathMap(config *monorepoConfig) map[language][]string {
+	paths := map[language][]string{}
+	if config == nil {
+		return paths
+	}
+	for rawLanguage, rawPaths := range config.Paths {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if !isSupportedLanguage(lang) {
+			continue
+		}
+		for _, rawPath := range rawPaths {
+			normalizedPath, ok := normalizeConfigRelativePath(rawPath)
+			if !ok {
+				continue
+			}
+			paths[lang] = append(paths[lang], normalizedPath)
+		}
+		paths[lang] = uniqueStrings(paths[lang])
+	}
+	return paths
+}
+
+func normalizeConfigRelativePath(rawPath string) (string, bool) {
+	trimmed := strings.TrimSpace(rawPath)
+	if trimmed == "" || filepath.IsAbs(trimmed) {
+		return "", false
+	}
+	cleaned := filepath.Clean(trimmed)
+	if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return cleaned, true
+}
+
+func configuredLanguageSet(config *monorepoConfig) map[language]bool {
+	languages := map[language]bool{}
+	if config == nil {
+		return languages
+	}
+	for _, rawLanguage := range config.Languages {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if isSupportedLanguage(lang) {
+			languages[lang] = true
+		}
+	}
+	for rawLanguage := range config.Paths {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if isSupportedLanguage(lang) {
+			languages[lang] = true
+		}
+	}
+	return languages
+}
+
+func orderedConfigPathLanguages(config *monorepoConfig) []language {
+	if config == nil {
+		return nil
+	}
+	paths := normalizedConfigPathMap(config)
+	ordered := []language{}
+	seen := map[language]bool{}
+	for _, rawLanguage := range config.Languages {
+		lang := language(strings.ToLower(strings.TrimSpace(rawLanguage)))
+		if !isSupportedLanguage(lang) || len(paths[lang]) == 0 || seen[lang] {
+			continue
+		}
+		ordered = append(ordered, lang)
+		seen[lang] = true
+	}
+	remaining := []string{}
+	for lang, values := range paths {
+		if seen[lang] || len(values) == 0 {
+			continue
+		}
+		remaining = append(remaining, string(lang))
+	}
+	sort.Strings(remaining)
+	for _, rawLanguage := range remaining {
+		ordered = append(ordered, language(rawLanguage))
+	}
+	return ordered
+}
+
+func stringSliceContains(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func printDoctorLocalState(root string) {
@@ -1443,13 +1800,47 @@ func resolveCommandVersionWithArgs(binary string, args []string, env map[string]
 }
 
 func collectDoctorBackends(root string) []doctorBackendStatus {
-	statuses := make([]doctorBackendStatus, 0, len(installableBackendLanguages))
-	for _, lang := range installableBackendLanguages {
+	languages := configuredDoctorBackendLanguages(root)
+	statuses := make([]doctorBackendStatus, 0, len(languages))
+	for _, lang := range languages {
 		tool := toolsByLanguage[lang]
 		resolved := resolveBackendCommand(lang, tool, nil, nil)
 		statuses = append(statuses, detectDoctorBackendStatus(resolved, tool))
 	}
 	return statuses
+}
+
+func configuredDoctorBackendLanguages(root string) []language {
+	config, err := loadDoctorConfig(root)
+	if err != nil || config == nil || len(config.Languages) == 0 {
+		return slices.Clone(installableBackendLanguages)
+	}
+
+	languages := make([]language, 0, len(config.Languages))
+	seen := map[language]bool{}
+	for _, configured := range config.Languages {
+		lang := backendLanguageForConfiguredLanguage(language(strings.ToLower(strings.TrimSpace(configured))))
+		if lang == "" || seen[lang] {
+			continue
+		}
+		languages = append(languages, lang)
+		seen[lang] = true
+	}
+	if len(languages) == 0 {
+		return slices.Clone(installableBackendLanguages)
+	}
+	return languages
+}
+
+func backendLanguageForConfiguredLanguage(lang language) language {
+	switch lang {
+	case langTypeScript, langPython, langGo:
+		return lang
+	case langAnsible, langTerraform:
+		return langGo
+	default:
+		return ""
+	}
 }
 
 func detectDoctorBackendStatus(resolved resolvedBackendCommand, tool toolConfig) doctorBackendStatus {

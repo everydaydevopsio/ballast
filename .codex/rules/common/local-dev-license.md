@@ -60,10 +60,13 @@ Replace `<YEAR>` with the current year and `<COPYRIGHT HOLDER>` with the author/
 ## Example README Addition
 
 ```markdown
+
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+Default license for this project: Apache-2.0 (or ISC, BSD-3-Clause, etc.)
 ```
+
+When such a section exists, use the specified license instead of MIT. If both files define a license, prefer `AGENTS.md` (it is agent-facing and typically more authoritative for automation).
 
 ## Example package.json Addition
 
@@ -78,6 +81,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 Projects may specify a non-MIT license in `AGENTS.md` or `CLAUDE.md`:
 
 ```markdown
+
 ## License
 
 Default license for this project: Apache-2.0 (or ISC, BSD-3-Clause, etc.)

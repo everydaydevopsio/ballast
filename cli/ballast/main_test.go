@@ -270,7 +270,7 @@ func TestRunHelpAndVersionCommands(t *testing.T) {
 	})
 }
 
-func TestRunDoctorReportsAllBackends(t *testing.T) {
+func TestRunDoctorReportsConfiguredBackends(t *testing.T) {
 	originalCollect := collectDoctorBackendsFunc
 	t.Cleanup(func() {
 		collectDoctorBackendsFunc = originalCollect
@@ -279,7 +279,6 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
 		return []doctorBackendStatus{
 			{Name: "ballast-typescript", Version: "5.0.2", Location: "/tmp/ts", Found: true},
-			{Name: "ballast-python", Version: "5.0.2", Location: "/tmp/py", Found: true},
 			{Name: "ballast-go", Version: "5.0.2", Location: "/tmp/go", Found: true},
 		}
 	}
@@ -310,10 +309,13 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	if !strings.Contains(output, "Ballast doctor") {
 		t.Fatalf("expected wrapper doctor output, got %q", output)
 	}
-	for _, name := range []string{"ballast-typescript", "ballast-python", "ballast-go"} {
+	for _, name := range []string{"ballast-typescript", "ballast-go"} {
 		if !strings.Contains(output, name) {
 			t.Fatalf("expected %s in doctor output, got %q", name, output)
 		}
+	}
+	if strings.Contains(output, "ballast-python") {
+		t.Fatalf("did not expect unconfigured python backend in doctor output, got %q", output)
 	}
 	if !strings.Contains(output, "ballastVersion: 5.0.2") {
 		t.Fatalf("expected config version in doctor output, got %q", output)
@@ -329,6 +331,152 @@ func TestRunDoctorReportsAllBackends(t *testing.T) {
 	}
 	if !strings.Contains(output, "deploymentModel: kubernetes") {
 		t.Fatalf("expected config deployment model in doctor output, got %q", output)
+	}
+}
+
+func TestConfiguredDoctorBackendLanguagesUsesConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "languages":["go","typescript","ansible","terraform","python","go"]
+}`)
+
+	got := configuredDoctorBackendLanguages(root)
+	want := []language{langGo, langTypeScript, langPython}
+	if !slices.Equal(got, want) {
+		t.Fatalf("expected configured backend languages %#v, got %#v", want, got)
+	}
+}
+
+func TestConfiguredDoctorBackendLanguagesFallsBackWithoutConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+
+	got := configuredDoctorBackendLanguages(root)
+	if !slices.Equal(got, installableBackendLanguages) {
+		t.Fatalf("expected fallback backend languages %#v, got %#v", installableBackendLanguages, got)
+	}
+}
+
+func TestConfiguredDoctorBackendLanguagesFallsBackForMalformedConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "languages":["","javascript","ruby"]
+}`)
+
+	got := configuredDoctorBackendLanguages(root)
+	if !slices.Equal(got, installableBackendLanguages) {
+		t.Fatalf("expected fallback backend languages %#v, got %#v", installableBackendLanguages, got)
+	}
+}
+
+func TestRunDoctorReportsConfigProfileDrift(t *testing.T) {
+	originalCollect := collectDoctorBackendsFunc
+	t.Cleanup(func() {
+		collectDoctorBackendsFunc = originalCollect
+	})
+
+	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
+		return []doctorBackendStatus{
+			{Name: "ballast-typescript", Version: "5.0.2", Location: "/tmp/ts", Found: true},
+			{Name: "ballast-python", Version: "5.0.2", Location: "/tmp/py", Found: true},
+			{Name: "ballast-go", Version: "5.0.2", Location: "/tmp/go", Found: true},
+		}
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "ui", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript"],
+  "paths":{"typescript":["examples/chat-ts"]}
+}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"doctor"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	for _, expected := range []string{
+		"Config drift:",
+		"- missing configured path: typescript=examples/chat-ts",
+		"- untracked detected profile: typescript=examples/web/ui",
+		"- untracked detected language: python=services/api",
+		"Run `ballast doctor --fix` to refresh saved languages and paths from current repository detection.",
+	} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("expected %q in doctor output, got %q", expected, output)
+		}
+	}
+}
+
+func TestRunDoctorReportsStaleConfiguredProfile(t *testing.T) {
+	originalCollect := collectDoctorBackendsFunc
+	t.Cleanup(func() {
+		collectDoctorBackendsFunc = originalCollect
+	})
+
+	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
+		return []doctorBackendStatus{{Name: "ballast-typescript", Version: "5.0.2", Location: "/tmp/ts", Found: true}}
+	}
+
+	root := resolvedTempDir(t)
+	if err := os.MkdirAll(filepath.Join(root, "legacy", "web"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(root, "apps", "web", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript"],
+  "paths":{"typescript":["legacy/web"]}
+}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"doctor"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	if !strings.Contains(output, "- stale configured profile: typescript=legacy/web") {
+		t.Fatalf("expected stale configured profile in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "- untracked detected profile: typescript=apps/web") {
+		t.Fatalf("expected untracked detected profile in doctor output, got %q", output)
+	}
+}
+
+func TestPrintDoctorConfigDriftReportsScanError(t *testing.T) {
+	originalWalk := walkDirFunc
+	t.Cleanup(func() {
+		walkDirFunc = originalWalk
+	})
+	walkDirFunc = func(root string, fn fs.WalkDirFunc) error {
+		return errors.New("scan failed")
+	}
+
+	root := resolvedTempDir(t)
+	output := captureStdout(t, func() {
+		printDoctorConfigDrift(root, &monorepoConfig{
+			Languages: []string{"typescript"},
+			Paths:     map[string][]string{"typescript": {"apps/web"}},
+		})
+	})
+
+	if !strings.Contains(output, "Config drift:") {
+		t.Fatalf("expected config drift heading, got %q", output)
+	}
+	if !strings.Contains(output, "- scan error: scan repo for language profiles: scan failed") {
+		t.Fatalf("expected scan error in config drift output, got %q", output)
 	}
 }
 
@@ -529,6 +677,223 @@ func TestRunDoctorFixInstallsBackendsAndRefreshesConfig(t *testing.T) {
 	}
 	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --yes") {
 		t.Fatalf("expected refresh-config install invocation, got %q", got)
+	}
+}
+
+func TestRunDoctorFixRefreshesConfigProfilesBeforeInstall(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.2"
+
+	runCommandFunc = func(name string, args []string) error { return nil }
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/project\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "ui", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript","go"],
+  "paths":{
+    "typescript":["examples/chat-ts","examples/chat-web"],
+    "go":["."]
+  }
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"doctor", "--fix"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		t.Fatalf("loadDoctorConfig returned error: %v", err)
+	}
+	if config == nil {
+		t.Fatal("expected .rulesrc.json to remain present")
+	}
+	if !sameStringSet(config.Languages, []string{"typescript", "go"}) {
+		t.Fatalf("expected languages to match detected profiles, got %#v", config.Languages)
+	}
+	if got := config.Paths["typescript"]; !sameStringSet(got, []string{"examples/web/ui"}) {
+		t.Fatalf("expected doctor --fix to replace stale TypeScript paths, got %#v", got)
+	}
+	if got := config.Paths["go"]; !sameStringSet(got, []string{"."}) {
+		t.Fatalf("expected doctor --fix to preserve detected Go path, got %#v", got)
+	}
+}
+
+func TestRunDoctorFixRestoresConfigWhenRefreshInstallFails(t *testing.T) {
+	originalRun := runCommandFunc
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+		version = originalVersion
+	})
+	version = "5.0.2"
+
+	runCommandFunc = func(name string, args []string) error { return nil }
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 42, nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "ui", "tsconfig.json"), "{}")
+	configPath := filepath.Join(root, ".rulesrc.json")
+	originalConfig := `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript"],
+  "paths":{"typescript":["examples/chat-ts"]}
+}`
+	mustWriteFile(t, configPath, originalConfig)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"doctor", "--fix"})
+		if exitCode != 42 {
+			t.Fatalf("expected backend refresh exit code 42, got %d", exitCode)
+		}
+	})
+
+	restoredConfig, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if string(restoredConfig) != originalConfig {
+		t.Fatalf("expected failed doctor --fix to restore original config\nwant:\n%s\ngot:\n%s", originalConfig, restoredConfig)
+	}
+}
+
+func TestRefreshDoctorConfigProfilesSelectedLanguageOnly(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/project\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "ui", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":[" TypeScript ","Go"],
+  "paths":{" TypeScript ":[" examples/chat-ts ","../outside"],"Go":["old-go"]}
+}`)
+
+	if err := refreshDoctorConfigProfiles(root, langGo); err != nil {
+		t.Fatalf("refreshDoctorConfigProfiles returned error: %v", err)
+	}
+
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		t.Fatalf("loadDoctorConfig returned error: %v", err)
+	}
+	if config == nil {
+		t.Fatal("expected .rulesrc.json to remain present")
+	}
+	if !sameStringSet(config.Languages, []string{"typescript", "go"}) {
+		t.Fatalf("expected selected language to be added without dropping existing languages, got %#v", config.Languages)
+	}
+	if got := config.Paths["typescript"]; !sameStringSet(got, []string{"examples/chat-ts"}) {
+		t.Fatalf("expected TypeScript paths to be left unchanged, got %#v", got)
+	}
+	if got := config.Paths["go"]; !sameStringSet(got, []string{"."}) {
+		t.Fatalf("expected Go path to be refreshed, got %#v", got)
+	}
+	if _, ok := config.Paths["Go"]; ok {
+		t.Fatalf("expected selected language refresh to normalize mixed-case path keys, got %#v", config.Paths)
+	}
+}
+
+func TestRefreshDoctorConfigProfilesHandlesNoConfigNoProfilesAndScanErrors(t *testing.T) {
+	root := resolvedTempDir(t)
+	if err := refreshDoctorConfigProfiles(root, ""); err != nil {
+		t.Fatalf("expected missing config to be ignored, got %v", err)
+	}
+
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript"],
+  "paths":{"typescript":["apps/web"]}
+}`)
+	if err := refreshDoctorConfigProfiles(root, ""); err != nil {
+		t.Fatalf("expected no detected profiles to be ignored, got %v", err)
+	}
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		t.Fatalf("loadDoctorConfig returned error: %v", err)
+	}
+	if config == nil || !sameStringSet(config.Paths["typescript"], []string{"apps/web"}) {
+		t.Fatalf("expected config to remain unchanged when no profiles are detected, got %#v", config)
+	}
+
+	originalWalk := walkDirFunc
+	t.Cleanup(func() {
+		walkDirFunc = originalWalk
+	})
+	walkDirFunc = func(root string, fn fs.WalkDirFunc) error {
+		return errors.New("scan failed")
+	}
+	if err := refreshDoctorConfigProfiles(root, ""); err == nil || !strings.Contains(err.Error(), "scan failed") {
+		t.Fatalf("expected scan error from refreshDoctorConfigProfiles, got %v", err)
+	}
+}
+
+func TestDoctorConfigDriftHelpersNormalizeAndOrderPaths(t *testing.T) {
+	if got := normalizedConfigPathMap(nil); len(got) != 0 {
+		t.Fatalf("expected nil config to produce no normalized paths, got %#v", got)
+	}
+	if got := configuredLanguageSet(nil); len(got) != 0 {
+		t.Fatalf("expected nil config to produce no configured languages, got %#v", got)
+	}
+	if got := orderedConfigPathLanguages(nil); len(got) != 0 {
+		t.Fatalf("expected nil config to produce no ordered path languages, got %#v", got)
+	}
+
+	config := &monorepoConfig{
+		Languages: []string{"ruby", "typescript", "typescript"},
+		Paths: map[string][]string{
+			"go":         {"."},
+			"ruby":       {"ignored"},
+			"typescript": {"", "/tmp/outside", "../outside", "apps//web", "apps/web"},
+		},
+	}
+
+	paths := normalizedConfigPathMap(config)
+	if got := paths[langTypeScript]; !sameStringSet(got, []string{"apps/web"}) {
+		t.Fatalf("expected TypeScript paths to be cleaned and deduplicated, got %#v", got)
+	}
+	if _, ok := paths[language("ruby")]; ok {
+		t.Fatalf("expected unsupported language paths to be ignored, got %#v", paths)
+	}
+
+	languages := configuredLanguageSet(config)
+	if !languages[langTypeScript] || !languages[langGo] || languages[language("ruby")] {
+		t.Fatalf("expected supported languages from both language list and paths, got %#v", languages)
+	}
+
+	ordered := orderedConfigPathLanguages(config)
+	if !reflect.DeepEqual(ordered, []language{langTypeScript, langGo}) {
+		t.Fatalf("expected configured languages first with remaining sorted, got %#v", ordered)
 	}
 }
 
@@ -1737,6 +2102,162 @@ func TestRunInstallCLICommandInstallsAllLanguagesByDefault(t *testing.T) {
 	}
 	if got := strings.Join(commands[1], " "); got != `env UV_TOOL_DIR=`+filepath.Join(root, ".ballast", "tools", "python")+` UV_TOOL_BIN_DIR=`+filepath.Join(root, ".ballast", "bin")+` uv tool install --reinstall --from https://github.com/everydaydevopsio/ballast/releases/download/v5.0.2/ballast_python-5.0.2-py3-none-any.whl ballast-python` {
 		t.Fatalf("unexpected default python install command: %q", got)
+	}
+}
+
+func TestRunInstallCLIUsesRulesrcVersionByDefault(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "5.0.6"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"ballastVersion":"5.0.5","languages":["python"]}`)
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install-cli", "--language", "python"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected 1 install command, got %#v", commands)
+	}
+	got := strings.Join(commands[0], " ")
+	if !strings.Contains(got, "releases/download/v5.0.5/ballast_python-5.0.5-py3-none-any.whl") {
+		t.Fatalf("expected install-cli to use .rulesrc.json version 5.0.5, got %q", got)
+	}
+	if strings.Contains(got, "5.0.6") {
+		t.Fatalf("expected install-cli not to use running wrapper version, got %q", got)
+	}
+}
+
+func TestRunInstallCLIRequiresWrapperAtLeastRulesrcVersion(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "5.0.4"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"ballastVersion":"5.0.5","languages":["python"]}`)
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"install-cli", "--language", "python"})
+			if exitCode != 1 {
+				t.Fatalf("expected exit code 1, got %d", exitCode)
+			}
+		})
+	})
+
+	if len(commands) != 0 {
+		t.Fatalf("expected no install commands, got %#v", commands)
+	}
+	if !strings.Contains(output, ".rulesrc.json requires Ballast 5.0.5 but this ballast is 5.0.4") {
+		t.Fatalf("expected update guidance, got %q", output)
+	}
+}
+
+func TestResolveInstallCLIVersion(t *testing.T) {
+	originalVersion := version
+	t.Cleanup(func() {
+		version = originalVersion
+	})
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"ballastVersion":"v5.0.5"}`)
+
+	version = "5.0.6"
+	got, err := resolveInstallCLIVersion(root, "5.0.4")
+	if err != nil {
+		t.Fatalf("explicit version returned error: %v", err)
+	}
+	if got != "5.0.4" {
+		t.Fatalf("expected explicit version to win, got %q", got)
+	}
+
+	got, err = resolveInstallCLIVersion(root, "")
+	if err != nil {
+		t.Fatalf("rulesrc version returned error: %v", err)
+	}
+	if got != "5.0.5" {
+		t.Fatalf("expected rulesrc version, got %q", got)
+	}
+
+	version = "dev"
+	got, err = resolveInstallCLIVersion(root, "")
+	if err != nil {
+		t.Fatalf("dev wrapper should allow rulesrc release target: %v", err)
+	}
+	if got != "5.0.5" {
+		t.Fatalf("expected rulesrc version for dev wrapper, got %q", got)
+	}
+
+	emptyRoot := resolvedTempDir(t)
+	got, err = resolveInstallCLIVersion(emptyRoot, "")
+	if err != nil {
+		t.Fatalf("missing config returned error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected no default version without config, got %q", got)
+	}
+
+	missingVersionRoot := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(missingVersionRoot, ".rulesrc.json"), `{"languages":["python"]}`)
+	got, err = resolveInstallCLIVersion(missingVersionRoot, "")
+	if err != nil {
+		t.Fatalf("missing rulesrc version returned error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected no default version without ballastVersion, got %q", got)
+	}
+}
+
+func TestCompareVersions(t *testing.T) {
+	tests := []struct {
+		name  string
+		left  string
+		right string
+		want  int
+	}{
+		{name: "equal", left: "5.0.5", right: "5.0.5", want: 0},
+		{name: "left older", left: "5.0.4", right: "5.0.5", want: -1},
+		{name: "left newer", left: "5.0.6", right: "5.0.5", want: 1},
+		{name: "missing patch equals zero", left: "5.0", right: "5.0.0", want: 0},
+		{name: "numeric not lexical", left: "5.10.0", right: "5.9.9", want: 1},
+		{name: "parseable beats unparseable", left: "5.0.0", right: "dev", want: 1},
+		{name: "unparseable loses to parseable", left: "dev", right: "5.0.0", want: -1},
+		{name: "partial numeric part is unparseable", left: "5-rc1.0.0", right: "5.0.0", want: -1},
+		{name: "lexical fallback older", left: "alpha", right: "beta", want: -1},
+		{name: "lexical fallback newer", left: "beta", right: "alpha", want: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareVersions(tt.left, tt.right)
+			if got != tt.want {
+				t.Fatalf("compareVersions(%q, %q) = %d, want %d", tt.left, tt.right, got, tt.want)
+			}
+		})
 	}
 }
 
