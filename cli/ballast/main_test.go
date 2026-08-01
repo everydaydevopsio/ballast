@@ -2327,6 +2327,39 @@ func TestRunInstallCLICommandInstallsGoBackendForTerraformLanguage(t *testing.T)
 	}
 }
 
+func TestRunInstallCLICommandInstallsGoBackendForDartLanguage(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "5.0.2"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "pubspec.yaml"), "name: mobile\ndependencies:\n  flutter:\n    sdk: flutter\n")
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install-cli", "--language", "dart", "--version", "5.0.2"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected 1 install command, got %#v", commands)
+	}
+	got := strings.Join(commands[0], " ")
+	if !strings.Contains(got, "ballast-go_5.0.2_") {
+		t.Fatalf("expected dart install-cli to reuse ballast-go backend, got %q", got)
+	}
+}
+
 func TestRunInstallCLICreatesLocalBallastDirectories(t *testing.T) {
 	originalRun := runCommandFunc
 	t.Cleanup(func() {
@@ -2685,6 +2718,27 @@ func TestDetectRepoProfilesFindsTerraformProfile(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesFindsDartFlutterProfile(t *testing.T) {
+	root := resolvedTempDir(t)
+	app := filepath.Join(root, "apps", "mobile")
+	mustWriteFile(t, filepath.Join(app, "pubspec.yaml"), "name: mobile\ndependencies:\n  flutter:\n    sdk: flutter\n")
+	mustWriteFile(t, filepath.Join(app, "analysis_options.yaml"), "include: package:flutter_lints/flutter.yaml\n")
+	mustWriteFile(t, filepath.Join(app, ".metadata"), "project_type: app\n")
+	mustWriteFile(t, filepath.Join(app, "lib", "main.dart"), "void main() {}\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langDart, Paths: []string{app}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected dart profile %#v, got %#v", want, profiles)
+	}
+}
+
 func TestDetectRepoProfilesSkipsTerraformCaches(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform-version"), "1.8.5\n")
@@ -2762,6 +2816,18 @@ func TestDetectLanguageSupportsTerraformRulesConfig(t *testing.T) {
 	got := detectLanguage(root)
 	if got != langTerraform {
 		t.Fatalf("expected terraform detection from legacy config, got %q", got)
+	}
+}
+
+func TestDetectLanguageSupportsDartFlutterMarkers(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "pubspec.yaml"), "name: mobile\ndependencies:\n  flutter:\n    sdk: flutter\n")
+	mustWriteFile(t, filepath.Join(root, "analysis_options.yaml"), "include: package:flutter_lints/flutter.yaml\n")
+	mustWriteFile(t, filepath.Join(root, ".metadata"), "project_type: app\n")
+
+	got := detectLanguage(root)
+	if got != langDart {
+		t.Fatalf("expected dart detection, got %q", got)
 	}
 }
 

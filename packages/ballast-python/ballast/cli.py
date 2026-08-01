@@ -14,7 +14,7 @@ from importlib import metadata
 from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex", "gemini"]
-LANGUAGES = ["typescript", "python", "go", "ansible", "terraform"]
+LANGUAGES = ["typescript", "python", "go", "ansible", "terraform", "dart"]
 COMMON_AGENTS = [
     "local-dev",
     "docs",
@@ -31,6 +31,7 @@ AGENTS_BY_LANGUAGE = {
     "go": COMMON_AGENTS + LANGUAGE_AGENTS,
     "ansible": COMMON_AGENTS + LANGUAGE_AGENTS,
     "terraform": COMMON_AGENTS + LANGUAGE_AGENTS,
+    "dart": COMMON_AGENTS + LANGUAGE_AGENTS,
 }
 COMMON_SKILLS = [
     "owasp-security-scan",
@@ -47,6 +48,7 @@ SKILLS_BY_LANGUAGE = {
     "go": COMMON_SKILLS,
     "ansible": COMMON_SKILLS,
     "terraform": COMMON_SKILLS,
+    "dart": COMMON_SKILLS,
 }
 GIT_HOOKS_GUIDANCE_TOKEN = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
 GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
@@ -214,6 +216,10 @@ def resolve_project_root(cwd: Path) -> Path:
                 "terraform.tf",
             )
         )
+        has_dart = any(
+            (directory / marker).exists()
+            for marker in ("pubspec.yaml", "analysis_options.yaml", ".metadata")
+        )
         has_any_cfg = (
             (directory / ".rulesrc.json").exists()
             or (directory / ".rulesrc.ts.json").exists()
@@ -228,6 +234,7 @@ def resolve_project_root(cwd: Path) -> Path:
             or has_pyproject
             or has_ansible
             or has_terraform
+            or has_dart
             or has_any_cfg
         ):
             return directory
@@ -724,6 +731,19 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
                 "- Run `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .` from the hook configuration; keep `tfsec` only for legacy-compatible pipelines.",
                 "- Keep `.terraform/`, state files, and plan files out of Git.",
+                "- Keep the configuration current with `pre-commit autoupdate`.",
+            ]
+        )
+    if language == "dart":
+        return "\n".join(
+            [
+                "- Use `pre-commit` for Dart and Flutter repositories.",
+                "- Create or update `.pre-commit-config.yaml` at the Flutter app root or monorepo root.",
+                "- Install hooks with `pre-commit install`.",
+                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                "- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.",
+                "- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.",
+                "- Keep `.dart_tool/`, `build/`, and platform build output out of Git.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
             ]
         )

@@ -613,6 +613,35 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("OpenTofu", content)
             self.assertIn("tofu test", content)
 
+    def test_install_supports_dart_flutter_language_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "codex",
+                ["linting", "logging", "testing"],
+                [],
+                "dart",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("linting", result.installed)
+            linting = root / ".codex" / "rules" / "dart-linting.md"
+            logging = root / ".codex" / "rules" / "dart-logging.md"
+            testing = root / ".codex" / "rules" / "dart-testing.md"
+            self.assertTrue(linting.exists())
+            self.assertTrue(logging.exists())
+            self.assertTrue(testing.exists())
+            self.assertIn("flutter_lints", linting.read_text(encoding="utf-8"))
+            self.assertIn("flutter analyze", linting.read_text(encoding="utf-8"))
+            self.assertIn("dart:developer", logging.read_text(encoding="utf-8"))
+            self.assertIn("package:logging", logging.read_text(encoding="utf-8"))
+            self.assertIn("flutter_test", testing.read_text(encoding="utf-8"))
+            self.assertIn("integration_test", testing.read_text(encoding="utf-8"))
+
     def test_install_creates_skill_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

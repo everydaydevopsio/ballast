@@ -111,7 +111,10 @@ function hasProjectMarker(dir: string): boolean {
     fs.existsSync(path.join(dir, 'main.tf')) ||
     fs.existsSync(path.join(dir, 'providers.tf')) ||
     fs.existsSync(path.join(dir, 'versions.tf')) ||
-    fs.existsSync(path.join(dir, 'terraform.tf'))
+    fs.existsSync(path.join(dir, 'terraform.tf')) ||
+    fs.existsSync(path.join(dir, 'pubspec.yaml')) ||
+    fs.existsSync(path.join(dir, 'analysis_options.yaml')) ||
+    fs.existsSync(path.join(dir, '.metadata'))
   );
 }
 

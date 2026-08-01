@@ -193,6 +193,20 @@ function renderGitHooksGuidance(
     ].join('\n');
   }
 
+  if (language === 'dart') {
+    return [
+      'Use `pre-commit` for Dart and Flutter repositories.',
+      '',
+      '- Create or update `.pre-commit-config.yaml` at the Flutter app root or monorepo root.',
+      '- Install hooks with `pre-commit install`.',
+      '- Install the pre-push hook with `pre-commit install --hook-type pre-push`.',
+      '- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.',
+      '- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.',
+      '- Keep `.dart_tool/`, `build/`, and platform build output out of Git.',
+      '- Keep the configuration current with `pre-commit autoupdate`.'
+    ].join('\n');
+  }
+
   return '';
 }
 

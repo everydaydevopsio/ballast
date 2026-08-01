@@ -1,0 +1,17 @@
+---
+description: Dart and Flutter linting specialist - configures analysis_options, flutter_lints, dart format, and flutter analyze
+mode: subagent
+tools:
+  bash:
+    'dart *': allow
+    'flutter *': allow
+    'git *': allow
+    'cat *': allow
+    'grep *': allow
+    '*': ask
+  edit: true
+  write: true
+  read: true
+  glob: true
+  grep: true
+---
