@@ -503,6 +503,15 @@ describe('build', () => {
       expect(content).toContain('tfsec');
     });
 
+    test('returns flutter dart git-hooks command guidance', () => {
+      const content = getContent('git-hooks', undefined, 'dart');
+      expect(content).toContain('dart format --set-exit-if-changed .');
+      expect(content).toContain('flutter analyze');
+      expect(content).toContain('flutter test');
+      expect(content).toContain('flutter test integration_test');
+      expect(content).toContain('.dart_tool/');
+    });
+
     test('returns husky git-hooks content for typescript', () => {
       const content = getContent('git-hooks', undefined, 'typescript', {
         hookMode: 'husky'

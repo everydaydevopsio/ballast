@@ -2739,6 +2739,21 @@ func TestDetectRepoProfilesFindsDartFlutterProfile(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesIgnoresNonFlutterDartPackage(t *testing.T) {
+	root := resolvedTempDir(t)
+	pkg := filepath.Join(root, "packages", "cli")
+	mustWriteFile(t, filepath.Join(pkg, "pubspec.yaml"), "name: cli\n")
+	mustWriteFile(t, filepath.Join(pkg, "lib", "main.dart"), "void main() {}\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+	if len(profiles) != 0 {
+		t.Fatalf("expected non-flutter dart package to be ignored, got %#v", profiles)
+	}
+}
+
 func TestDetectRepoProfilesSkipsTerraformCaches(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "terraform", ".terraform-version"), "1.8.5\n")
@@ -2828,6 +2843,16 @@ func TestDetectLanguageSupportsDartFlutterMarkers(t *testing.T) {
 	got := detectLanguage(root)
 	if got != langDart {
 		t.Fatalf("expected dart detection, got %q", got)
+	}
+}
+
+func TestDetectLanguageSupportsDartRulesConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.dart.json"), `{"target":"codex","agents":["linting"]}`)
+
+	got := detectLanguage(root)
+	if got != langDart {
+		t.Fatalf("expected dart detection from legacy config, got %q", got)
 	}
 }
 
