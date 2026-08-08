@@ -1783,6 +1783,33 @@ Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. D
         self.assertIn("`.codex/rules/old.md`", merged)
         self.assertIn("`.codex/rules/python-linting.md`", merged)
 
+    def test_patch_codex_agents_md_replaces_legacy_managed_notice_in_managed_only_mode(
+        self,
+    ) -> None:
+        existing = """# AGENTS.md
+
+## Installed agent rules
+
+Created by Ballast. Do not edit this section.
+
+- `.codex/rules/old.md` - Old rule
+"""
+        canonical = """# AGENTS.md
+
+## Installed agent rules
+
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
+
+- `.codex/rules/python-linting.md` - New rule
+"""
+
+        merged = cli.patch_codex_agents_md(
+            existing, canonical, replace_unmanaged_sections=False
+        )
+
+        self.assertNotIn("`.codex/rules/old.md`", merged)
+        self.assertIn("`.codex/rules/python-linting.md`", merged)
+
 
 if __name__ == "__main__":
     unittest.main()

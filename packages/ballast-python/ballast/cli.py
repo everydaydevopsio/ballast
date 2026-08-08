@@ -1624,7 +1624,9 @@ def find_markdown_section_ranges(content: str, heading: str) -> list[tuple[int, 
 
 
 def has_ballast_managed_notice(section: str) -> bool:
-    return "Created by [Ballast]" in section and "Do not edit this section." in section
+    return (
+        "Created by [Ballast]" in section or "Created by Ballast." in section
+    ) and "Do not edit this section." in section
 
 
 def patch_codex_agents_md(

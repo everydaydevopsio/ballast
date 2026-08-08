@@ -235,6 +235,32 @@ Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. D
       expect(merged).toContain('`.codex/rules/typescript-linting.md`');
     });
 
+    test('replaces legacy managed notice in managed-only mode', () => {
+      const existing = `# AGENTS.md
+
+## Installed agent rules
+
+Created by Ballast. Do not edit this section.
+
+- \`.codex/rules/old.md\` — Old rule
+`;
+
+      const canonical = `# AGENTS.md
+
+## Installed agent rules
+
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
+
+- \`.codex/rules/typescript-linting.md\` — Linting rule
+`;
+
+      const merged = patchCodexAgentsMd(existing, canonical, {
+        replaceUnmanagedSections: false
+      });
+      expect(merged).not.toContain('`.codex/rules/old.md`');
+      expect(merged).toContain('`.codex/rules/typescript-linting.md`');
+    });
+
     test('normalizes CRLF content before patching installed sections', () => {
       const existing = [
         '# AGENTS.md',

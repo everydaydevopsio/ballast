@@ -2446,3 +2446,16 @@ func TestPatchCodexAgentsMDPreservesUnmanagedSectionsInManagedOnlyMode(t *testin
 		t.Fatalf("expected managed section to be appended: %s", merged)
 	}
 }
+
+func TestPatchCodexAgentsMDReplacesLegacyManagedNoticeInManagedOnlyMode(t *testing.T) {
+	existing := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/old.md` - Old rule\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\n- `.codex/rules/go-linting.md` - New rule\n"
+
+	merged := patchCodexAgentsMDWithOptions(existing, canonical, false)
+	if strings.Contains(merged, "`.codex/rules/old.md`") {
+		t.Fatalf("expected legacy managed section to be replaced: %s", merged)
+	}
+	if !strings.Contains(merged, "`.codex/rules/go-linting.md`") {
+		t.Fatalf("expected managed section to contain canonical rule: %s", merged)
+	}
+}

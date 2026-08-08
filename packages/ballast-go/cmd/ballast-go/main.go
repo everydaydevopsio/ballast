@@ -1910,7 +1910,7 @@ func patchCodexAgentsMD(existing, canonical string) string {
 }
 
 func hasBallastManagedNotice(section string) bool {
-	return strings.Contains(section, "Created by [Ballast]") &&
+	return (strings.Contains(section, "Created by [Ballast]") || strings.Contains(section, "Created by Ballast.")) &&
 		strings.Contains(section, "Do not edit this section.")
 }
 

@@ -239,7 +239,8 @@ function findMarkdownSectionRange(
 
 function hasBallastManagedNotice(section: string): boolean {
   return (
-    section.includes('Created by [Ballast]') &&
+    (section.includes('Created by [Ballast]') ||
+      section.includes('Created by Ballast.')) &&
     section.includes('Do not edit this section.')
   );
 }
