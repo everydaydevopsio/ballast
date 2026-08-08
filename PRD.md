@@ -1,5 +1,30 @@
 # Product Requirements
 
+## Dart Flutter Mobile App Language Support
+
+### Problem
+
+Ballast supports TypeScript, Python, Go, Ansible, and Terraform language profiles, but Flutter mobile applications use Dart and are not detected or given Dart/Flutter-specific linting, logging, testing, and hook guidance. Flutter app repositories such as `sujiko` expose stable markers through `pubspec.yaml`, `.metadata`, `analysis_options.yaml`, `lib/`, `test/`, and `integration_test/`, and agents need generated rules that reflect current Flutter mobile practices instead of generic TypeScript or Go guidance.
+
+### Requirements
+
+1. Ballast must support `dart` as a configured language profile for Flutter mobile app repositories.
+2. Project-root detection must recognize Flutter/Dart projects using stable Flutter markers such as `pubspec.yaml`, `.metadata`, and `analysis_options.yaml`.
+3. Monorepo profile detection must identify Flutter/Dart app directories and persist `languages` and `paths` for `dart`.
+4. Wrapper installs for Dart profiles must dispatch to an existing backend capable of rendering Dart rule content.
+5. Generated Dart linting guidance must prefer `analysis_options.yaml`, `flutter_lints`, `flutter analyze`, and `dart format --set-exit-if-changed`.
+6. Generated Dart logging guidance must cover Flutter-appropriate logging through `dart:developer`, `package:logging`, and production-safe forwarding to crash or observability tooling without leaking secrets.
+7. Generated Dart testing guidance must cover unit, widget, and integration tests with `flutter_test`, `test`, and `integration_test`, including mobile emulator/device placement for slower checks.
+8. Generated Dart git-hook guidance must use `pre-commit` and run fast format/analyze checks before commit, with Flutter tests on pre-push or CI.
+
+### Acceptance Criteria
+
+1. Given a Flutter app containing `pubspec.yaml`, `analysis_options.yaml`, and `.metadata`, Ballast resolves the project root to that app directory.
+2. Given a monorepo with a Flutter app under a subdirectory, wrapper profile detection returns a `dart` profile with the app path.
+3. Given `ballast --language dart install --target codex --agent linting --yes`, generated Dart linting rules are written under Dart-prefixed rule names.
+4. Generated Dart rules mention `flutter_lints`, `flutter analyze`, `dart format --set-exit-if-changed`, `dart:developer`, `package:logging`, `flutter_test`, and `integration_test`.
+5. Wrapper install-cli/backend routing supports Dart without requiring a separate Dart backend package.
+
 ## Generated Rule Activation Clarity
 
 ### Problem

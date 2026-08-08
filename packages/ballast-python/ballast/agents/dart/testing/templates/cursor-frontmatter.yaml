@@ -1,0 +1,12 @@
+---
+description: 'Dart and Flutter testing specialist - sets up unit, widget, coverage, and integration_test guidance for Flutter apps'
+alwaysApply: false
+globs:
+  - '*.dart'
+  - 'pubspec.yaml'
+  - 'pubspec.lock'
+  - 'test/**/*.dart'
+  - 'integration_test/**/*.dart'
+  - '.github/workflows/*.yml'
+  - '.github/workflows/*.yaml'
+---

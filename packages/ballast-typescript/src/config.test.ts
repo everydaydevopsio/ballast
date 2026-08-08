@@ -76,6 +76,21 @@ describe('config', () => {
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
     });
 
+    test('returns dir containing flutter project markers', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, 'pubspec.yaml'),
+        'name: sample_app\ndependencies:\n  flutter:\n    sdk: flutter\n'
+      );
+      fs.writeFileSync(
+        path.join(tmpDir, 'analysis_options.yaml'),
+        'include: package:flutter_lints/flutter.yaml\n'
+      );
+      fs.writeFileSync(path.join(tmpDir, '.metadata'), 'project_type: app\n');
+      const sub = path.join(tmpDir, 'lib', 'src');
+      fs.mkdirSync(sub, { recursive: true });
+      expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
+    });
+
     test('returns dir containing .rulesrc.json', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),

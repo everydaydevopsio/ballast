@@ -1,0 +1,12 @@
+---
+description: 'Dart and Flutter linting specialist - configures analysis_options, flutter_lints, dart format, and flutter analyze'
+alwaysApply: false
+globs:
+  - '*.dart'
+  - 'pubspec.yaml'
+  - 'pubspec.lock'
+  - 'analysis_options.yaml'
+  - '.metadata'
+  - '.github/workflows/*.yml'
+  - '.github/workflows/*.yaml'
+---

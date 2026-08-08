@@ -1,0 +1,10 @@
+---
+description: 'Dart and Flutter logging specialist - configures dart:developer, package:logging, and production-safe crash or observability forwarding'
+alwaysApply: false
+globs:
+  - '*.dart'
+  - 'pubspec.yaml'
+  - 'lib/**/*.dart'
+  - 'test/**/*.dart'
+  - 'integration_test/**/*.dart'
+---

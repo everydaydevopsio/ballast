@@ -320,6 +320,31 @@ func TestFindProjectRootSupportsTerraformMarkers(t *testing.T) {
 	}
 }
 
+func TestFindProjectRootSupportsDartFlutterMarkers(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "pubspec.yaml"), []byte("name: mobile\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "analysis_options.yaml"), []byte("include: package:flutter_lints/flutter.yaml\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, ".metadata"), []byte("project_type: app\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(tmpDir, "lib", "src")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(nested)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != tmpDir {
+		t.Fatalf("expected dart flutter project root %q, got %q", tmpDir, root)
+	}
+}
+
 func TestFindProjectRootDoesNotCrossGitBoundary(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmpDir, "playbook.yml"), []byte("---\n"), 0o644); err != nil {
@@ -538,6 +563,62 @@ func TestInstallSupportsTerraformTestingBestPractices(t *testing.T) {
 	}
 }
 
+func TestInstallSupportsDartFlutterLanguageProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex"},
+		agents:      []string{"linting", "logging", "testing"},
+		language:    "dart",
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+	for _, want := range []string{"linting", "logging", "testing", "git-hooks"} {
+		if !slices.Contains(result.installed, want) {
+			t.Fatalf("expected dart %s install, got %+v", want, result.installed)
+		}
+	}
+
+	checks := map[string][]string{
+		"dart-linting.md": {
+			"Dart and Flutter linting specialist",
+			"flutter_lints",
+			"dart format --set-exit-if-changed",
+			"flutter analyze",
+		},
+		"dart-logging.md": {
+			"Dart and Flutter logging specialist",
+			"dart:developer",
+			"Crashlytics",
+		},
+		"dart-testing.md": {
+			"Dart and Flutter testing specialist",
+			"flutter test",
+			"integration_test",
+		},
+		"git-hooks.md": {
+			"dart format --set-exit-if-changed",
+			"flutter analyze",
+			"flutter test",
+			".dart_tool/",
+		},
+	}
+	for file, wants := range checks {
+		content, err := os.ReadFile(filepath.Join(tmpDir, ".codex", "rules", file))
+		if err != nil {
+			t.Fatalf("expected %s to exist: %v", file, err)
+		}
+		text := string(content)
+		for _, want := range wants {
+			if !strings.Contains(text, want) {
+				t.Fatalf("expected %s content to mention %q, got %q", file, want, text)
+			}
+		}
+	}
+}
+
 func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
 	got, err := readContent("git-hooks", "terraform", "", "standalone", "github", "none")
 	if err != nil {
@@ -557,6 +638,24 @@ func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
 		!strings.Contains(got, "trivy config .") ||
 		!strings.Contains(got, "tfsec") {
 		t.Fatalf("expected terraform git-hooks content to mention terraform checks, got %q", got)
+	}
+}
+
+func TestRenderGitHooksContentSupportsDartFlutter(t *testing.T) {
+	got, err := readContent("git-hooks", "dart", "", "standalone", "github", "none")
+	if err != nil {
+		t.Fatalf("read dart git-hooks content: %v", err)
+	}
+	for _, want := range []string{
+		"dart format --set-exit-if-changed .",
+		"flutter analyze",
+		"flutter test",
+		"flutter test integration_test",
+		".dart_tool/",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected dart git-hooks content to mention %q, got %q", want, got)
+		}
 	}
 }
 
@@ -2345,5 +2444,18 @@ func TestPatchCodexAgentsMDPreservesUnmanagedSectionsInManagedOnlyMode(t *testin
 	}
 	if !strings.Contains(merged, "`.codex/rules/go-linting.md`") {
 		t.Fatalf("expected managed section to be appended: %s", merged)
+	}
+}
+
+func TestPatchCodexAgentsMDReplacesLegacyManagedNoticeInManagedOnlyMode(t *testing.T) {
+	existing := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/old.md` - Old rule\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.\n\n- `.codex/rules/go-linting.md` - New rule\n"
+
+	merged := patchCodexAgentsMDWithOptions(existing, canonical, false)
+	if strings.Contains(merged, "`.codex/rules/old.md`") {
+		t.Fatalf("expected legacy managed section to be replaced: %s", merged)
+	}
+	if !strings.Contains(merged, "`.codex/rules/go-linting.md`") {
+		t.Fatalf("expected managed section to contain canonical rule: %s", merged)
 	}
 }

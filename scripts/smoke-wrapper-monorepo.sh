@@ -35,12 +35,58 @@ make_fixture() {
   local monorepo="$1"
 
   mkdir -p "${monorepo}/apps/frontend"
+  mkdir -p "${monorepo}/apps/mobile/lib"
   mkdir -p "${monorepo}/services/api"
   mkdir -p "${monorepo}/tools/worker"
 
   cp -R "${EXAMPLES_ROOT}/typescript-sample/." "${monorepo}/apps/frontend/"
   cp -R "${EXAMPLES_ROOT}/python-sample/." "${monorepo}/services/api/"
   cp -R "${EXAMPLES_ROOT}/go-sample/." "${monorepo}/tools/worker/"
+
+  cat > "${monorepo}/apps/mobile/pubspec.yaml" <<'EOF'
+name: ballast_wrapper_mobile
+description: Lightweight Flutter marker project for Ballast wrapper smoke tests.
+publish_to: none
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+EOF
+
+  cat > "${monorepo}/apps/mobile/analysis_options.yaml" <<'EOF'
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    prefer_const_constructors: true
+EOF
+
+  cat > "${monorepo}/apps/mobile/.metadata" <<'EOF'
+version:
+  revision: "0000000000000000000000000000000000000000"
+  channel: stable
+
+project_type: app
+EOF
+
+  cat > "${monorepo}/apps/mobile/lib/main.dart" <<'EOF'
+import 'package:flutter/widgets.dart';
+
+void main() {
+  runApp(const Directionality(
+    textDirection: TextDirection.ltr,
+    child: Text('Ballast Dart Flutter wrapper smoke sample'),
+  ));
+}
+EOF
 
   cat > "${monorepo}/package.json" <<'EOF'
 {
@@ -78,17 +124,24 @@ verify_language_rules() {
   test -f "${monorepo}/.cursor/rules/go/go-logging.mdc"
   test -f "${monorepo}/.cursor/rules/go/go-testing.mdc"
 
+  test -f "${monorepo}/.cursor/rules/dart/dart-linting.mdc"
+  test -f "${monorepo}/.cursor/rules/dart/dart-logging.mdc"
+  test -f "${monorepo}/.cursor/rules/dart/dart-testing.mdc"
+
   test -f "${monorepo}/.claude/rules/typescript/typescript-linting.md"
   test -f "${monorepo}/.claude/rules/python/python-linting.md"
   test -f "${monorepo}/.claude/rules/go/go-linting.md"
+  test -f "${monorepo}/.claude/rules/dart/dart-linting.md"
 
   test -f "${monorepo}/.opencode/typescript/typescript-linting.md"
   test -f "${monorepo}/.opencode/python/python-linting.md"
   test -f "${monorepo}/.opencode/go/go-linting.md"
+  test -f "${monorepo}/.opencode/dart/dart-linting.md"
 
   test -f "${monorepo}/.codex/rules/typescript/typescript-linting.md"
   test -f "${monorepo}/.codex/rules/python/python-linting.md"
   test -f "${monorepo}/.codex/rules/go/go-linting.md"
+  test -f "${monorepo}/.codex/rules/dart/dart-linting.md"
 }
 
 verify_rulesrc() {
@@ -103,7 +156,9 @@ verify_rulesrc() {
   grep -q '"typescript"' "${monorepo}/.rulesrc.json"
   grep -q '"python"' "${monorepo}/.rulesrc.json"
   grep -q '"go"' "${monorepo}/.rulesrc.json"
+  grep -q '"dart"' "${monorepo}/.rulesrc.json"
   grep -q '"apps/frontend"' "${monorepo}/.rulesrc.json"
+  grep -q '"apps/mobile"' "${monorepo}/.rulesrc.json"
   grep -q '"services/api"' "${monorepo}/.rulesrc.json"
   grep -q '"tools/worker"' "${monorepo}/.rulesrc.json"
 }
@@ -114,7 +169,9 @@ verify_support_files() {
   test -f "${monorepo}/CLAUDE.md"
   test -f "${monorepo}/AGENTS.md"
   grep -q '`.claude/rules/typescript/typescript-linting.md`' "${monorepo}/CLAUDE.md"
+  grep -q '`.claude/rules/dart/dart-linting.md`' "${monorepo}/CLAUDE.md"
   grep -q '`.codex/rules/typescript/typescript-linting.md`' "${monorepo}/AGENTS.md"
+  grep -q '`.codex/rules/dart/dart-linting.md`' "${monorepo}/AGENTS.md"
 }
 
 verify_skills() {
@@ -140,6 +197,7 @@ verify_codex_removed() {
 
   test ! -e "${monorepo}/.codex/rules/common/local-dev-env.md"
   test ! -e "${monorepo}/.codex/rules/typescript/typescript-linting.md"
+  test ! -e "${monorepo}/.codex/rules/dart/dart-linting.md"
   test ! -e "${monorepo}/.codex/rules/owasp-security-scan.md"
   ! grep -q '"codex"' "${monorepo}/.rulesrc.json"
   ! grep -q '`.codex/rules/' "${monorepo}/AGENTS.md"

@@ -37,6 +37,9 @@ jobs:
           - sample: terraform-sample
             language: terraform
             expected_rule: terraform-linting.mdc
+          - sample: dart-flutter-sample
+            language: dart
+            expected_rule: dart-linting.mdc
 
     steps:
       - name: Checkout ballast repo

@@ -23,7 +23,7 @@ import (
 )
 
 var targets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
-var languages = []string{"typescript", "python", "go", "ansible", "terraform"}
+var languages = []string{"typescript", "python", "go", "ansible", "terraform", "dart"}
 
 var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks"}
 var languageAgents = []string{"linting", "logging", "testing"}
@@ -205,8 +205,8 @@ func runInstall(args []string) int {
 	var targetFlags targetListFlag
 	fs.Var(&targetFlags, "target", "cursor|claude|opencode|codex|gemini")
 	fs.Var(&targetFlags, "t", "cursor|claude|opencode|codex|gemini")
-	language := fs.String("language", "go", "typescript|python|go|ansible|terraform")
-	fs.StringVar(language, "l", "go", "typescript|python|go|ansible|terraform")
+	language := fs.String("language", "go", "typescript|python|go|ansible|terraform|dart")
+	fs.StringVar(language, "l", "go", "typescript|python|go|ansible|terraform|dart")
 	agent := fs.String("agent", "", "comma-separated list")
 	fs.StringVar(agent, "a", "", "comma-separated list")
 	skill := fs.String("skill", "", "comma-separated list")
@@ -1910,7 +1910,7 @@ func patchCodexAgentsMD(existing, canonical string) string {
 }
 
 func hasBallastManagedNotice(section string) bool {
-	return strings.Contains(section, "Created by [Ballast]") &&
+	return (strings.Contains(section, "Created by [Ballast]") || strings.Contains(section, "Created by Ballast.")) &&
 		strings.Contains(section, "Do not edit this section.")
 }
 
@@ -2248,6 +2248,17 @@ func renderGitHooksGuidance(language, hookMode string) string {
 			"- Keep `.terraform/`, state files, and plan files out of Git.",
 			"- Keep the configuration current with `pre-commit autoupdate`.",
 		}, "\n")
+	case "dart":
+		return strings.Join([]string{
+			"- Use `pre-commit` for Dart and Flutter repositories.",
+			"- Create or update `.pre-commit-config.yaml` at the Flutter app root or monorepo root.",
+			"- Install hooks with `pre-commit install`.",
+			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			"- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.",
+			"- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.",
+			"- Keep `.dart_tool/`, `build/`, and platform build output out of Git.",
+			"- Keep the configuration current with `pre-commit autoupdate`.",
+		}, "\n")
 	default:
 		return ""
 	}
@@ -2300,6 +2311,9 @@ func findProjectRoot(cwd string) (string, error) {
 			exists(filepath.Join(dir, "providers.tf")) ||
 			exists(filepath.Join(dir, "versions.tf")) ||
 			exists(filepath.Join(dir, "terraform.tf")) ||
+			exists(filepath.Join(dir, "pubspec.yaml")) ||
+			exists(filepath.Join(dir, "analysis_options.yaml")) ||
+			exists(filepath.Join(dir, ".metadata")) ||
 			hasAnyRulesConfig(dir) {
 			return dir, nil
 		}

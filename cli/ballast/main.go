@@ -29,9 +29,10 @@ const (
 	langGo         language = "go"
 	langAnsible    language = "ansible"
 	langTerraform  language = "terraform"
+	langDart       language = "dart"
 )
 
-var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible, langTerraform}
+var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible, langTerraform, langDart}
 var installableBackendLanguages = []language{langTypeScript, langPython, langGo}
 var supportedTargets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
 
@@ -121,6 +122,7 @@ var toolsByLanguage = map[language]toolConfig{
 	langGo:         goTool,
 	langAnsible:    goTool,
 	langTerraform:  goTool,
+	langDart:       goTool,
 }
 
 var version = "dev"
@@ -456,7 +458,7 @@ func printUsage() {
 	fmt.Println("  ballast upgrade --patch")
 	fmt.Println("  ballast upgrade --force")
 	fmt.Println("  ballast install-cli --language go --version 5.0.2")
-	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go/Ansible/Terraform repo")
+	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go/Ansible/Terraform/Dart repo")
 	fmt.Println("  ballast --language python install --target codex --agent linting")
 	fmt.Println("  ballast --language ansible install --target cursor --all")
 	fmt.Println("  ballast --language terraform install --target cursor --all")
@@ -467,7 +469,7 @@ func printUsage() {
 	fmt.Println("Install language behavior: `--remove-language` removes languages from `.rulesrc.json`, removes their `paths`, and prunes stale Ballast-managed rule files.")
 	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app/service deployment guidance as one of none, kubernetes, serverless, server, or hosted. Use `none` for CLI, library, or SDK-only projects.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
-	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/terraform/`).")
+	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform/Dart repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/dart/`).")
 }
 
 func printVersion() {
@@ -1836,7 +1838,7 @@ func backendLanguageForConfiguredLanguage(lang language) language {
 	switch lang {
 	case langTypeScript, langPython, langGo:
 		return lang
-	case langAnsible, langTerraform:
+	case langAnsible, langTerraform, langDart:
 		return langGo
 	default:
 		return ""
@@ -1983,7 +1985,7 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 
 func backendArgs(lang language, args []string) []string {
 	dispatched := append([]string(nil), args...)
-	if lang != langAnsible && lang != langTerraform {
+	if lang != langAnsible && lang != langTerraform && lang != langDart {
 		return dispatched
 	}
 	languageName := string(lang)
@@ -2056,7 +2058,7 @@ func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendC
 				Binary: binaryPath,
 			}
 		}
-	case langTerraform:
+	case langTerraform, langDart:
 		binaryPath := filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go")
 		if fileExists(binaryPath) {
 			return resolvedBackendCommand{
@@ -2089,7 +2091,7 @@ func projectLocalBackendCommand(projectRoot string, lang language) resolvedBacke
 		if fileExists(binary) {
 			return resolvedBackendCommand{Binary: binary}
 		}
-	case langTerraform:
+	case langTerraform, langDart:
 		binary := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
 		if fileExists(binary) {
 			return resolvedBackendCommand{Binary: binary}
@@ -2127,7 +2129,7 @@ func siblingBackendBinary(lang language) (string, bool) {
 		name = "ballast-go"
 	case langAnsible:
 		name = "ballast-go"
-	case langTerraform:
+	case langTerraform, langDart:
 		name = "ballast-go"
 	default:
 		return "", false
@@ -2977,6 +2979,7 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 		langGo:         {},
 		langAnsible:    {},
 		langTerraform:  {},
+		langDart:       {},
 	}
 
 	if err := walkDirFunc(root, func(path string, d fs.DirEntry, err error) error {
@@ -3006,6 +3009,10 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 			pathsByLanguage[langAnsible] = append(pathsByLanguage[langAnsible], dir)
 		case ".terraform-version", "main.tf", "providers.tf", "versions.tf", "terraform.tf":
 			pathsByLanguage[langTerraform] = append(pathsByLanguage[langTerraform], dir)
+		case "pubspec.yaml", "analysis_options.yaml", ".metadata":
+			if isFlutterDartProfileDir(dir) {
+				pathsByLanguage[langDart] = append(pathsByLanguage[langDart], dir)
+			}
 		}
 		return nil
 	}); err != nil {
@@ -3021,6 +3028,22 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 		profiles = append(profiles, repoProfile{Language: lang, Paths: paths})
 	}
 	return profiles, nil
+}
+
+func isFlutterDartProfileDir(dir string) bool {
+	pubspec := filepath.Join(dir, "pubspec.yaml")
+	if !fileExists(pubspec) {
+		return false
+	}
+	content, err := os.ReadFile(pubspec)
+	if err != nil {
+		return false
+	}
+	text := string(content)
+	return strings.Contains(text, "flutter:") ||
+		strings.Contains(text, "sdk: flutter") ||
+		fileExists(filepath.Join(dir, ".metadata")) ||
+		fileExists(filepath.Join(dir, "analysis_options.yaml"))
 }
 
 func parseInstallSelection(args []string) ([]string, bool, []string, bool) {
@@ -4184,9 +4207,12 @@ func hasRootMarker(dir string) bool {
 		".rulesrc.go.json",
 		".rulesrc.ansible.json",
 		".rulesrc.terraform.json",
+		".rulesrc.dart.json",
 		"go.mod",
 		"pyproject.toml",
 		"package.json",
+		"pubspec.yaml",
+		"analysis_options.yaml",
 		"pnpm-lock.yaml",
 		"uv.lock",
 		"ansible.cfg",
@@ -4199,6 +4225,7 @@ func hasRootMarker(dir string) bool {
 		"providers.tf",
 		"versions.tf",
 		"terraform.tf",
+		".metadata",
 	}
 	for _, marker := range markers {
 		if fileExists(filepath.Join(dir, marker)) {
@@ -4219,6 +4246,7 @@ func detectLanguage(root string) language {
 		langGo:         0,
 		langAnsible:    0,
 		langTerraform:  0,
+		langDart:       0,
 	}
 
 	applyMarkerScores(root, scores)
@@ -4280,6 +4308,15 @@ func applyMarkerScores(root string, scores map[language]int) {
 	if fileExists(filepath.Join(root, "main.tf")) || fileExists(filepath.Join(root, "terraform.tf")) {
 		scores[langTerraform] += 6
 	}
+	if isFlutterDartProfileDir(root) {
+		scores[langDart] += 10
+	}
+	if fileExists(filepath.Join(root, "analysis_options.yaml")) {
+		scores[langDart] += 4
+	}
+	if fileExists(filepath.Join(root, ".metadata")) {
+		scores[langDart] += 4
+	}
 }
 
 func applyConfigScores(root string, scores map[language]int) {
@@ -4291,6 +4328,9 @@ func applyConfigScores(root string, scores map[language]int) {
 	}
 	if fileExists(filepath.Join(root, ".rulesrc.terraform.json")) {
 		scores[langTerraform] += 20
+	}
+	if fileExists(filepath.Join(root, ".rulesrc.dart.json")) {
+		scores[langDart] += 20
 	}
 	if fileExists(filepath.Join(root, ".rulesrc.python.json")) {
 		scores[langPython] += 20

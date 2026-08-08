@@ -99,3 +99,10 @@
 - [x] Implement JavaScript package warning logic in single-language and monorepo detection.
 - [x] Add smoke coverage for JavaScript package warnings.
 - [ ] File a GitHub issue for integration-test framework detection and Playwright guidance. Blocked here by GitHub token permissions and network access.
+
+- [x] Confirm governing PRD requirements for Dart/Flutter language support.
+- [x] Add failing tests for Flutter/Dart project-root detection, monorepo profile detection, backend dispatch, and generated Dart rules.
+- [x] Add canonical Dart linting, logging, testing, and git-hook guidance based on current Dart/Flutter docs.
+- [x] Sync package mirrors and regenerate checked-in Ballast-managed outputs.
+- [x] Create a Flutter example app in `../ballast-examples` using `../flutter-setup`.
+- [x] Run focused tests and record evidence.

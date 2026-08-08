@@ -43,7 +43,8 @@ export const LANGUAGES = [
   'python',
   'go',
   'ansible',
-  'terraform'
+  'terraform',
+  'dart'
 ] as const;
 export type Language = (typeof LANGUAGES)[number];
 

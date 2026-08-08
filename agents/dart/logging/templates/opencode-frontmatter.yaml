@@ -1,0 +1,17 @@
+---
+description: Dart and Flutter logging specialist - configures dart:developer, package:logging, and production-safe crash or observability forwarding
+mode: subagent
+tools:
+  bash:
+    'dart *': allow
+    'flutter *': allow
+    'git *': allow
+    'cat *': allow
+    'grep *': allow
+    '*': ask
+  edit: true
+  write: true
+  read: true
+  glob: true
+  grep: true
+---

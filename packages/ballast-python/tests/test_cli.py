@@ -613,6 +613,41 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("OpenTofu", content)
             self.assertIn("tofu test", content)
 
+    def test_install_supports_dart_flutter_language_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "codex",
+                ["linting", "logging", "testing"],
+                [],
+                "dart",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("linting", result.installed)
+            linting = root / ".codex" / "rules" / "dart-linting.md"
+            logging = root / ".codex" / "rules" / "dart-logging.md"
+            testing = root / ".codex" / "rules" / "dart-testing.md"
+            git_hooks = root / ".codex" / "rules" / "git-hooks.md"
+            self.assertTrue(linting.exists())
+            self.assertTrue(logging.exists())
+            self.assertTrue(testing.exists())
+            self.assertTrue(git_hooks.exists())
+            self.assertIn("flutter_lints", linting.read_text(encoding="utf-8"))
+            self.assertIn("flutter analyze", linting.read_text(encoding="utf-8"))
+            self.assertIn("dart:developer", logging.read_text(encoding="utf-8"))
+            self.assertIn("package:logging", logging.read_text(encoding="utf-8"))
+            self.assertIn("flutter_test", testing.read_text(encoding="utf-8"))
+            self.assertIn("integration_test", testing.read_text(encoding="utf-8"))
+            git_hooks_content = git_hooks.read_text(encoding="utf-8")
+            self.assertIn("dart format --set-exit-if-changed", git_hooks_content)
+            self.assertIn("flutter analyze", git_hooks_content)
+            self.assertIn("flutter test", git_hooks_content)
+
     def test_install_creates_skill_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1746,6 +1781,33 @@ Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. D
         )
 
         self.assertIn("`.codex/rules/old.md`", merged)
+        self.assertIn("`.codex/rules/python-linting.md`", merged)
+
+    def test_patch_codex_agents_md_replaces_legacy_managed_notice_in_managed_only_mode(
+        self,
+    ) -> None:
+        existing = """# AGENTS.md
+
+## Installed agent rules
+
+Created by Ballast. Do not edit this section.
+
+- `.codex/rules/old.md` - Old rule
+"""
+        canonical = """# AGENTS.md
+
+## Installed agent rules
+
+Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. Do not edit this section.
+
+- `.codex/rules/python-linting.md` - New rule
+"""
+
+        merged = cli.patch_codex_agents_md(
+            existing, canonical, replace_unmanaged_sections=False
+        )
+
+        self.assertNotIn("`.codex/rules/old.md`", merged)
         self.assertIn("`.codex/rules/python-linting.md`", merged)
 
 
