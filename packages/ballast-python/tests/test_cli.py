@@ -632,15 +632,21 @@ class PatchInstallTests(unittest.TestCase):
             linting = root / ".codex" / "rules" / "dart-linting.md"
             logging = root / ".codex" / "rules" / "dart-logging.md"
             testing = root / ".codex" / "rules" / "dart-testing.md"
+            git_hooks = root / ".codex" / "rules" / "git-hooks.md"
             self.assertTrue(linting.exists())
             self.assertTrue(logging.exists())
             self.assertTrue(testing.exists())
+            self.assertTrue(git_hooks.exists())
             self.assertIn("flutter_lints", linting.read_text(encoding="utf-8"))
             self.assertIn("flutter analyze", linting.read_text(encoding="utf-8"))
             self.assertIn("dart:developer", logging.read_text(encoding="utf-8"))
             self.assertIn("package:logging", logging.read_text(encoding="utf-8"))
             self.assertIn("flutter_test", testing.read_text(encoding="utf-8"))
             self.assertIn("integration_test", testing.read_text(encoding="utf-8"))
+            git_hooks_content = git_hooks.read_text(encoding="utf-8")
+            self.assertIn("dart format --set-exit-if-changed", git_hooks_content)
+            self.assertIn("flutter analyze", git_hooks_content)
+            self.assertIn("flutter test", git_hooks_content)
 
     def test_install_creates_skill_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
