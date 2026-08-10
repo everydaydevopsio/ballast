@@ -2665,6 +2665,28 @@ func TestDetectRepoProfilesFindsMultiLanguageMonorepo(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesHonorsConfigExcludePaths(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "packages", "web", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "examples", "ansible", "playbook.yml"), "---\n")
+	mustWriteFile(t, filepath.Join(root, "examples", "terraform", "main.tf"), "terraform {}\n")
+
+	profiles, err := detectRepoProfilesWithConfig(root, &monorepoConfig{
+		Discovery: &discoveryConfig{ExcludePaths: []string{"examples/"}},
+	})
+	if err != nil {
+		t.Fatalf("detectRepoProfilesWithConfig returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langTypeScript, Paths: []string{filepath.Join(root, "packages", "web")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected excluded examples to be skipped; want %#v, got %#v", want, profiles)
+	}
+}
+
 func TestDetectRepoProfilesFindsAnsibleProfile(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "ansible.cfg"), "[defaults]\n")

@@ -148,8 +148,13 @@ type monorepoConfig struct {
 	BallastVersion  string              `json:"ballastVersion,omitempty"`
 	Languages       []string            `json:"languages,omitempty"`
 	Paths           map[string][]string `json:"paths,omitempty"`
+	Discovery       *discoveryConfig    `json:"discovery,omitempty"`
 	TaskSystem      string              `json:"taskSystem,omitempty"`
 	DeploymentModel string              `json:"deploymentModel,omitempty"`
+}
+
+type discoveryConfig struct {
+	ExcludePaths []string `json:"excludePaths,omitempty"`
 }
 
 type repoProfile struct {
@@ -1136,7 +1141,7 @@ func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigD
 	if config == nil {
 		return doctorConfigDrift{}
 	}
-	detected, err := detectRepoProfiles(root)
+	detected, err := detectRepoProfilesWithConfig(root, config)
 	if err != nil {
 		return doctorConfigDrift{ScanError: err}
 	}
@@ -1180,7 +1185,7 @@ func refreshDoctorConfigProfiles(root string, selectedLanguage language) error {
 	if config == nil {
 		return nil
 	}
-	detected, err := detectRepoProfiles(root)
+	detected, err := detectRepoProfilesWithConfig(root, config)
 	if err != nil {
 		return err
 	}
@@ -1288,6 +1293,46 @@ func normalizeConfigRelativePath(rawPath string) (string, bool) {
 		return "", false
 	}
 	return cleaned, true
+}
+
+func discoveryConfigFromConfig(config *monorepoConfig) *discoveryConfig {
+	if config == nil {
+		return nil
+	}
+	if config.Discovery == nil {
+		return nil
+	}
+	excludePaths := make([]string, 0, len(config.Discovery.ExcludePaths))
+	for _, rawPath := range config.Discovery.ExcludePaths {
+		normalizedPath, ok := normalizeConfigRelativePath(rawPath)
+		if !ok || normalizedPath == "." {
+			continue
+		}
+		excludePaths = append(excludePaths, normalizedPath)
+	}
+	excludePaths = uniqueStrings(excludePaths)
+	if len(excludePaths) == 0 {
+		return nil
+	}
+	return &discoveryConfig{ExcludePaths: excludePaths}
+}
+
+func isDiscoveryExcluded(root string, currentPath string, config *monorepoConfig) bool {
+	discovery := discoveryConfigFromConfig(config)
+	if discovery == nil || len(discovery.ExcludePaths) == 0 {
+		return false
+	}
+	relativePath, err := filepath.Rel(root, currentPath)
+	if err != nil {
+		return false
+	}
+	relativePath = filepath.Clean(relativePath)
+	for _, excludedPath := range discovery.ExcludePaths {
+		if relativePath == excludedPath || strings.HasPrefix(relativePath, excludedPath+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 func configuredLanguageSet(config *monorepoConfig) map[language]bool {
@@ -2576,7 +2621,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, err
 	}
 
-	detectedProfiles, err := detectRepoProfiles(root)
+	detectedProfiles, err := detectRepoProfilesWithConfig(root, config)
 	if err != nil {
 		return nil, err
 	}
@@ -2717,6 +2762,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		BallastVersion:  normalizeVersion(resolveVersion()),
 		Languages:       make([]string, 0, len(profiles)),
 		Paths:           map[string][]string{},
+		Discovery:       discoveryConfigFromConfig(config),
 		TaskSystem:      savedTaskSystem,
 		DeploymentModel: savedDeploymentModel,
 	}
@@ -2973,6 +3019,10 @@ func sameStringSet(left []string, right []string) bool {
 }
 
 func detectRepoProfiles(root string) ([]repoProfile, error) {
+	return detectRepoProfilesWithConfig(root, nil)
+}
+
+func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoProfile, error) {
 	pathsByLanguage := map[language][]string{
 		langTypeScript: {},
 		langPython:     {},
@@ -2989,6 +3039,9 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 		if d.IsDir() {
 			name := d.Name()
 			if path != root && strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			if path != root && isDiscoveryExcluded(root, path, config) {
 				return filepath.SkipDir
 			}
 			if name == ".git" || name == "node_modules" || name == ".venv" || name == "dist" || name == "build" || name == "vendor" || name == ".terraform" || name == ".terragrunt-cache" {
