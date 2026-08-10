@@ -24,7 +24,7 @@
     "aws-weekly-security-review",
     "ballast-audit"
   ],
-  "ballastVersion": "5.13.1",
+  "ballastVersion": "5.15.3",
   "languages": [
     "typescript",
     "python",

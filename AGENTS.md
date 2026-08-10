@@ -69,7 +69,6 @@ Read and use these skill files in `.codex/rules/` when they are relevant:
 - `.codex/rules/aws-weekly-security-review.md` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `.codex/rules/ballast-audit.md` — audit AI rule and skill files for context density, duplication, and bloat
 
-<!-- BEGIN CODEX REVIEWER INSTALLER: agents-review-expectations -->
 ## Codex code review expectations
 
 - Follow `docs/code_review.md` for code reviews.
