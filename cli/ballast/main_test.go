@@ -2687,6 +2687,36 @@ func TestDetectRepoProfilesHonorsConfigExcludePaths(t *testing.T) {
 	}
 }
 
+func TestDiscoveryConfigFromConfigNormalizesExcludePaths(t *testing.T) {
+	config := &monorepoConfig{
+		Discovery: &discoveryConfig{ExcludePaths: []string{
+			" examples/ ",
+			"examples",
+			".",
+			"/tmp/outside",
+			"../outside",
+		}},
+	}
+
+	discovery := discoveryConfigFromConfig(config)
+	if discovery == nil {
+		t.Fatal("expected normalized discovery config")
+	}
+	want := []string{"examples"}
+	if !reflect.DeepEqual(discovery.ExcludePaths, want) {
+		t.Fatalf("expected normalized exclude paths %#v, got %#v", want, discovery.ExcludePaths)
+	}
+	if got := discoveryConfigFromConfig(nil); got != nil {
+		t.Fatalf("expected nil config to produce nil discovery config, got %#v", got)
+	}
+	if got := discoveryConfigFromConfig(&monorepoConfig{}); got != nil {
+		t.Fatalf("expected missing discovery config to produce nil, got %#v", got)
+	}
+	if got := discoveryConfigFromConfig(&monorepoConfig{Discovery: &discoveryConfig{ExcludePaths: []string{"."}}}); got != nil {
+		t.Fatalf("expected empty normalized discovery config to produce nil, got %#v", got)
+	}
+}
+
 func TestDetectRepoProfilesFindsAnsibleProfile(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "ansible.cfg"), "[defaults]\n")
