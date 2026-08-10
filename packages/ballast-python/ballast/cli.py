@@ -1284,6 +1284,25 @@ def repository_facts_section() -> list[str]:
     ]
 
 
+def support_rule_reference(target: str, basename: str) -> str:
+    rule_subdir = os.environ.get("BALLAST_RULE_SUBDIR", "").strip()
+    if rule_subdir and not re.fullmatch(r"[A-Za-z0-9_-]+", rule_subdir):
+        raise ValueError(
+            f"Invalid BALLAST_RULE_SUBDIR value {rule_subdir!r}. Only letters, digits, '-' and '_' are allowed."
+        )
+    scoped_basename = (
+        basename
+        if not rule_subdir
+        or rule_subdir == "common"
+        or basename.startswith(f"{rule_subdir}-")
+        else f"{rule_subdir}-{basename}"
+    )
+    root = f".{target}/rules"
+    if rule_subdir:
+        return f"{root}/{rule_subdir}/{scoped_basename}.md"
+    return f"{root}/{scoped_basename}.md"
+
+
 def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -> str:
     lines = [
         "# AGENTS.md",
@@ -1306,7 +1325,9 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
                 get_codex_rule_description(agent, language, suffix)
                 or f"Rules for {basename}"
             )
-            lines.append(f"- `.codex/rules/{basename}.md` — {description}")
+            lines.append(
+                f"- `{support_rule_reference('codex', basename)}` — {description}"
+            )
     if skills:
         lines.extend(
             [
@@ -1349,7 +1370,9 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
                 get_codex_rule_description(agent, language, suffix)
                 or f"Rules for {basename}"
             )
-            lines.append(f"- `.claude/rules/{basename}.md` — {description}")
+            lines.append(
+                f"- `{support_rule_reference('claude', basename)}` — {description}"
+            )
     if skills:
         lines.extend(
             [
@@ -1406,7 +1429,9 @@ def build_gemini_md(agents: list[str], skills: list[str], language: str) -> str:
                 get_codex_rule_description(agent, language, suffix)
                 or f"Rules for {basename}"
             )
-            lines.append(f"- `.gemini/rules/{basename}.md` — {description}")
+            lines.append(
+                f"- `{support_rule_reference('gemini', basename)}` — {description}"
+            )
     if skills:
         lines.extend(
             [

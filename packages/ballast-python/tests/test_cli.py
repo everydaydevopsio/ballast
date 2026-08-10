@@ -230,6 +230,20 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("`.claude/rules/tasks-todo.md`", content)
         self.assertNotIn("`.claude/rules/tasks.md`", content)
 
+        old = os.environ.get("BALLAST_RULE_SUBDIR")
+        os.environ["BALLAST_RULE_SUBDIR"] = "common"
+        try:
+            content = cli.build_claude_md(["tasks"], [], "python")
+        finally:
+            if old is None:
+                os.environ.pop("BALLAST_RULE_SUBDIR", None)
+            else:
+                os.environ["BALLAST_RULE_SUBDIR"] = old
+
+        self.assertIn("`.claude/rules/common/tasks-task-system.md`", content)
+        self.assertIn("`.claude/rules/common/tasks-todo.md`", content)
+        self.assertNotIn("`.claude/rules/common/tasks.md`", content)
+
     def test_destination_rejects_invalid_rule_subdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
