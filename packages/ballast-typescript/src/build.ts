@@ -5,7 +5,8 @@ import {
   COMMON_AGENT_IDS,
   COMMON_SKILL_IDS,
   getAgentDir,
-  getSkillDir
+  getSkillDir,
+  SKILL_IDS
 } from './agents';
 import type { PublishingProfile, Target } from './config';
 import type { Language } from './agents';
@@ -680,6 +681,36 @@ export function buildSkillMarkdown(skillId: string): string {
   );
 }
 
+export function buildCodexSkillMarkdown(skillId: string): string {
+  const content = getSkillContent(skillId).trimEnd();
+  const frontmatterMatch = content.match(/^---\n[\s\S]*?\n---\n?/);
+  if (!frontmatterMatch) {
+    return [BALLAST_MANAGED_COMMENT, '', content, ''].join('\n');
+  }
+  const frontmatter = frontmatterMatch[0].trimEnd();
+  const body = content.slice(frontmatterMatch[0].length).trimStart();
+  return [frontmatter, '', BALLAST_MANAGED_COMMENT, '', body, ''].join('\n');
+}
+
+export function copyCodexSkillResources(
+  skillId: string,
+  destinationDir: string
+): void {
+  const sourceDir = getPreferredSkillDir(skillId);
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    if (entry.name === 'SKILL.md' || entry.name === 'claude-settings.json') {
+      continue;
+    }
+    const source = path.join(sourceDir, entry.name);
+    const destination = path.join(destinationDir, entry.name);
+    fs.cpSync(source, destination, {
+      recursive: true,
+      force: true,
+      errorOnExist: false
+    });
+  }
+}
+
 export function buildClaudeSkill(
   skillId: string,
   skillContent?: string
@@ -993,12 +1024,12 @@ export function buildCodexAgentsMd(
     lines.push(getCreatedByBallastLine());
     lines.push('');
     lines.push(
-      'Read and use these skill files in `.codex/rules/` when they are relevant:'
+      'Read and use these skill files in `.codex/skills/` when they are relevant:'
     );
     lines.push('');
     for (const skillId of skills) {
       lines.push(
-        `- \`.codex/rules/${skillId}.md\` — ${getSkillDescription(skillId)}`
+        `- \`.codex/skills/${skillId}/SKILL.md\` — ${getSkillDescription(skillId)}`
       );
     }
   }
@@ -1261,12 +1292,25 @@ export function getSkillDestination(
       return { dir, file: path.join(dir, `${skillId}.md`) };
     }
     case 'codex': {
-      const dir = path.join(root, '.codex', 'rules');
-      return { dir, file: path.join(dir, `${skillId}.md`) };
+      const dir = path.join(root, '.codex', 'skills', skillId);
+      return { dir, file: path.join(dir, 'SKILL.md') };
     }
     default:
       throw new Error(`Unknown target: ${target}`);
   }
+}
+
+export function getLegacyCodexSkillDestination(
+  skillId: string,
+  projectRoot: string
+): { dir: string; file: string } {
+  const root = path.resolve(projectRoot);
+  const dir = path.join(root, '.codex', 'rules');
+  return { dir, file: path.join(dir, `${skillId}.md`) };
+}
+
+export function getAllSkillIds(): string[] {
+  return SKILL_IDS.slice();
 }
 
 /**

@@ -337,6 +337,32 @@ Ballast refreshes saved installs from `.rulesrc.json`, but removing managed agen
 3. After either reconciliation flow, support files no longer list removed agent or skill references.
 4. Refresh does not delete unmanaged user-authored files outside the Ballast-managed paths for the retained targets.
 
+## Codex Native Skill Migration
+
+### Problem
+
+Ballast currently installs Codex skills as managed rule files under `.codex/rules/<skill>.md` and lists them in `AGENTS.md`. Modern Codex exposes installed skills through the native skills registry, which expects each skill to be a directory containing `SKILL.md` under `.codex/skills/<skill>/`. As a result, Ballast-configured Codex skills appear in `ballast doctor` but do not show up in Codex `/skills`.
+
+### Requirements
+
+1. Codex skill installs must write native skill directories at `.codex/skills/<skill>/SKILL.md`.
+2. Codex native skill content must preserve the source `SKILL.md` frontmatter and copy referenced resource files, such as `references/` and `scripts/`, into the skill directory.
+3. `AGENTS.md` must list Codex skills using `.codex/skills/<skill>/SKILL.md` paths.
+4. `install --refresh-config`, `upgrade`, and `doctor --fix` must remove legacy Ballast-managed `.codex/rules/<skill>.md` files for configured or stale skills when migrating to native Codex skills.
+5. Stale skill reconciliation must remove both legacy Codex rule-format skill files and native Codex skill directories for skills no longer present in saved config.
+6. Target removal must remove native Codex skill directories along with the existing managed Codex target surface.
+7. Migration cleanup must remove only Ballast-managed files or directories and must preserve unrelated user-authored `.codex/rules/` and `.codex/skills/` content.
+8. The behavior must stay consistent across the TypeScript, Python, Go, and wrapper CLIs.
+
+### Acceptance Criteria
+
+1. Given a Codex skill install for `owasp-security-scan`, Ballast creates `.codex/skills/owasp-security-scan/SKILL.md` and does not create `.codex/rules/owasp-security-scan.md`.
+2. Given a repository with a legacy managed `.codex/rules/owasp-security-scan.md`, running `ballast upgrade` removes the legacy rule-format skill file and writes the native skill directory.
+3. Given a repository where `github-health-check` was removed from `.rulesrc.json`, refresh reconciliation deletes both `.codex/rules/github-health-check.md` and `.codex/skills/github-health-check/` when they are Ballast-managed.
+4. Given unmanaged user content under `.codex/skills/custom-skill/`, refresh and target removal preserve it unless the whole Codex target is explicitly removed and the file is Ballast-managed.
+5. Generated `AGENTS.md` references `.codex/skills/<skill>/SKILL.md` for Codex skills.
+6. Automated unit coverage demonstrates the migration in TypeScript, Python, Go, and wrapper paths.
+
 ## Ballast Doctor Config Visibility
 
 ### Problem

@@ -102,7 +102,7 @@ Rule installation paths:
 | Cursor | `.cursor/rules/` | `.mdc` |
 | Claude | `.claude/rules/` | `.md` |
 | OpenCode | `.opencode/` | `.md` |
-| Codex | `.codex/rules/` | `.md` |
+| Codex | `.codex/skills/<skill>/` | `SKILL.md` |
 | Gemini | `.gemini/rules/` | `.md` |
 
 Skill installation paths:
@@ -148,7 +148,7 @@ The TypeScript build layer assembles output by combining agent content with targ
 - Cursor: frontmatter + skill body from `SKILL.md`
 - Claude: stored zip archive containing `SKILL.md` and any `references/*`
 - OpenCode: Markdown body from `SKILL.md`
-- Codex: Markdown body from `SKILL.md`
+- Codex: native skill directories containing `SKILL.md` and copied skill resources
 
 ### Support file assembly
 

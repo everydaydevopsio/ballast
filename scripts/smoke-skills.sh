@@ -77,12 +77,12 @@ run_target() {
       grep -q "# OWASP Security Scan Skill" "$dir/.opencode/skills/owasp-security-scan.md"
       ;;
     codex)
-      assert_file "$dir/.codex/rules/owasp-security-scan.md"
-      grep -q "# OWASP Security Scan Skill" "$dir/.codex/rules/owasp-security-scan.md"
+      assert_file "$dir/.codex/skills/owasp-security-scan/SKILL.md"
+      grep -q "# OWASP Security Scan Skill" "$dir/.codex/skills/owasp-security-scan/SKILL.md"
       if [[ "$mode" == "all-skills" ]]; then
-        assert_file "$dir/.codex/rules/github-health-check.md"
-        assert_file "$dir/.codex/rules/ballast-audit.md"
-        grep -q "# Ballast Audit Skill" "$dir/.codex/rules/ballast-audit.md"
+        assert_file "$dir/.codex/skills/github-health-check/SKILL.md"
+        assert_file "$dir/.codex/skills/ballast-audit/SKILL.md"
+        grep -q "# Ballast Audit Skill" "$dir/.codex/skills/ballast-audit/SKILL.md"
       fi
       grep -q "## Installed skills" "$dir/AGENTS.md"
       ;;

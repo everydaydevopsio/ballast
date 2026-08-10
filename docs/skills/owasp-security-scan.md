@@ -41,7 +41,7 @@ ballast install --target opencode --skill owasp-security-scan --yes
 - Cursor: `.cursor/rules/owasp-security-scan.mdc`
 - Claude: `.claude/skills/owasp-security-scan.skill`
 - OpenCode: `.opencode/skills/owasp-security-scan.md`
-- Codex: `.codex/rules/owasp-security-scan.md`
+- Codex: `.codex/skills/owasp-security-scan/SKILL.md`
 
 ## Output Expectations
 

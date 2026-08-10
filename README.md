@@ -147,7 +147,7 @@ Use aws-live-health-review with PROFILE=prod-readonly to summarize AWS health ri
 - Cursor: `.cursor/rules/<skill>.mdc`
 - Claude: `.claude/skills/<skill>.skill`
 - OpenCode: `.opencode/skills/<skill>.md`
-- Codex: `.codex/rules/<skill>.md`, with root `AGENTS.md` listing installed skills
+- Codex: `.codex/skills/<skill>/SKILL.md`, with root `AGENTS.md` listing installed skills
 
 ## Install and Use (Single Language)
 
@@ -358,7 +358,7 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
 - Codex: `.codex/rules/<agent>.md` and root `AGENTS.md`
 - Gemini: `.gemini/rules/<agent>.md` and root `GEMINI.md`
 - Cursor skills: `.cursor/rules/<skill>.mdc`
-- Codex skills: `.codex/rules/<skill>.md`, with root `AGENTS.md` listing installed skills
+- Codex skills: `.codex/skills/<skill>/SKILL.md`, with root `AGENTS.md` listing installed skills
 - Gemini skills: `.gemini/rules/<skill>.md`, with root `GEMINI.md` listing installed skills
 
 ## Development

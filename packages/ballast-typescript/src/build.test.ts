@@ -10,6 +10,7 @@ import {
   buildCodexFormat,
   buildContent,
   buildClaudeSkill,
+  buildCodexSkillMarkdown,
   buildCursorSkillFormat,
   buildSkillMarkdown,
   buildClaudeMd,
@@ -616,6 +617,13 @@ describe('build', () => {
       expect(content).not.toContain('name: owasp-security-scan');
     });
 
+    test('builds native codex skill markdown with frontmatter preserved', () => {
+      const content = buildCodexSkillMarkdown('owasp-security-scan');
+      expect(content).toMatch(/^---\nname: owasp-security-scan/m);
+      expect(content).toContain('Created by [Ballast]');
+      expect(content).toContain('# OWASP Security Scan Skill');
+    });
+
     test('ballast audit skill documents both 5 KB and 10 KB thresholds', () => {
       const content = buildSkillMarkdown('ballast-audit');
       expect(content).toContain('-size +5k');
@@ -867,7 +875,7 @@ alwaysApply: false
       expect(content).toContain('`.codex/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
       expect(content).toContain('## Installed skills');
-      expect(content).toContain('`.codex/rules/owasp-security-scan.md`');
+      expect(content).toContain('`.codex/skills/owasp-security-scan/SKILL.md`');
     });
 
     test('lists plan-lifecycle rule for codex', () => {

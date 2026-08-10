@@ -894,6 +894,19 @@ func install(opts installOptions) installResult {
 		processed := map[string]struct{}{}
 		processedSkills := map[string]struct{}{}
 
+		if target == "codex" && refreshManagedSkills {
+			for _, skillID := range commonSkills {
+				legacy := legacyCodexSkillDestination(opts.projectRoot, skillID)
+				content, err := os.ReadFile(legacy)
+				if err != nil {
+					continue
+				}
+				if strings.Contains(string(content), "Created by [Ballast]") || strings.Contains(string(content), "Created by Ballast.") {
+					_ = os.Remove(legacy)
+				}
+			}
+		}
+
 		for _, agentID := range opts.agents {
 			if !isValidAgent(agentID, opts.language) {
 				result.errors = append(result.errors, agentError{agent: agentID, err: "Unknown agent"})
@@ -1013,7 +1026,7 @@ func install(opts installOptions) installResult {
 					continue
 				}
 				err = os.WriteFile(file, content, 0o644)
-			case "opencode", "codex", "gemini":
+			case "opencode", "gemini":
 				content, buildErr := buildSkillMarkdown(skillID, opts.language)
 				if buildErr != nil {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
@@ -1029,6 +1042,24 @@ func install(opts installOptions) installResult {
 					nextContent = patchRuleContent(string(existing), content, target)
 				}
 				err = os.WriteFile(file, []byte(nextContent), 0o644)
+			case "codex":
+				content, buildErr := buildCodexSkillMarkdown(skillID, opts.language)
+				if buildErr != nil {
+					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
+					continue
+				}
+				nextContent := content
+				if exists(file) && !opts.force && opts.patch {
+					existing, readErr := os.ReadFile(file)
+					if readErr != nil {
+						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
+						continue
+					}
+					nextContent = patchRuleContent(string(existing), content, target)
+				}
+				if err = os.WriteFile(file, []byte(nextContent), 0o644); err == nil {
+					err = copyCodexSkillResources(skillID, opts.language, dir)
+				}
 			default:
 				err = fmt.Errorf("unknown target: %s", target)
 			}
@@ -1185,11 +1216,11 @@ func buildCodexAgentsMD(agents []string, skills []string, language string) (stri
 			"",
 			ballastNotice(),
 			"",
-			"Read and use these skill files in `.codex/rules/` when they are relevant:",
+			"Read and use these skill files in `.codex/skills/` when they are relevant:",
 			"",
 		)
 		for _, skillID := range skills {
-			lines = append(lines, fmt.Sprintf("- `.codex/rules/%s.md` — %s", skillID, skillDescription(skillID, language)))
+			lines = append(lines, fmt.Sprintf("- `.codex/skills/%s/SKILL.md` — %s", skillID, skillDescription(skillID, language)))
 		}
 	}
 	lines = append(lines, "")
@@ -1491,6 +1522,57 @@ func buildSkillMarkdown(skillID, language string) (string, error) {
 	}
 	_, body := splitSkillDocument(content)
 	return "<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
+}
+
+func buildCodexSkillMarkdown(skillID, language string) (string, error) {
+	content, err := readSkillContent(skillID, language)
+	if err != nil {
+		return "", err
+	}
+	frontmatter, body := splitSkillDocument(content)
+	if frontmatter == "" {
+		return "<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
+	}
+	return frontmatter + "\n\n<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
+}
+
+func copyCodexSkillResources(skillID, language, destinationDir string) error {
+	sourceDir := skillDir(skillID, language)
+	return copyCodexSkillResourceDir(sourceDir, destinationDir)
+}
+
+func copyCodexSkillResourceDir(sourceDir, destinationDir string) error {
+	entries, err := fs.ReadDir(embeddedSkillsFS, sourceDir)
+	if overrideRoot := repoRootOverride(); overrideRoot != "" {
+		entries, err = os.ReadDir(filepath.Join(overrideRoot, filepath.FromSlash(sourceDir)))
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.Name() == "SKILL.md" || entry.Name() == "claude-settings.json" {
+			continue
+		}
+		source := path.Join(sourceDir, entry.Name())
+		destination := filepath.Join(destinationDir, entry.Name())
+		if entry.IsDir() {
+			if err := os.MkdirAll(destination, 0o755); err != nil {
+				return err
+			}
+			if err := copyCodexSkillResourceDir(source, destination); err != nil {
+				return err
+			}
+			continue
+		}
+		data, err := readSkillFile(source)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(destination, data, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte, error) {
@@ -3001,14 +3083,18 @@ func skillDestination(projectRoot, target, skillID string) (string, string, erro
 		dir := filepath.Join(root, ".opencode", "skills")
 		return dir, filepath.Join(dir, skillID+".md"), nil
 	case "codex":
-		dir := filepath.Join(root, ".codex", "rules")
-		return dir, filepath.Join(dir, skillID+".md"), nil
+		dir := filepath.Join(root, ".codex", "skills", skillID)
+		return dir, filepath.Join(dir, "SKILL.md"), nil
 	case "gemini":
 		dir := filepath.Join(root, ".gemini", "rules")
 		return dir, filepath.Join(dir, skillID+".md"), nil
 	default:
 		return "", "", fmt.Errorf("unknown target: %s", target)
 	}
+}
+
+func legacyCodexSkillDestination(projectRoot, skillID string) string {
+	return filepath.Join(filepath.Clean(projectRoot), ".codex", "rules", skillID+".md")
 }
 
 func validatedRuleSubdir() (string, error) {

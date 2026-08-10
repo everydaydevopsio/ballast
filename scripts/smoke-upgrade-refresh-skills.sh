@@ -32,6 +32,8 @@ cat > "${PROJECT}/.rulesrc.json" <<'EOF'
 EOF
 
 cat > "${PROJECT}/.codex/rules/owasp-security-scan.md" <<'EOF'
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->
+
 stale skill content
 EOF
 
@@ -40,9 +42,10 @@ EOF
   ballast --language go upgrade
 )
 
-grep -q "# OWASP Security Scan Skill" "${PROJECT}/.codex/rules/owasp-security-scan.md"
-! grep -q "stale skill content" "${PROJECT}/.codex/rules/owasp-security-scan.md"
+grep -q "# OWASP Security Scan Skill" "${PROJECT}/.codex/skills/owasp-security-scan/SKILL.md"
+! grep -q "stale skill content" "${PROJECT}/.codex/skills/owasp-security-scan/SKILL.md"
+test ! -e "${PROJECT}/.codex/rules/owasp-security-scan.md"
 grep -q '"owasp-security-scan"' "${PROJECT}/.rulesrc.json"
-grep -q '`.codex/rules/owasp-security-scan.md`' "${PROJECT}/AGENTS.md"
+grep -q '`.codex/skills/owasp-security-scan/SKILL.md`' "${PROJECT}/AGENTS.md"
 
 echo "Ballast upgrade skill refresh smoke test passed."

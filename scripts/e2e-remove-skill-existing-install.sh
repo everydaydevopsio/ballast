@@ -47,11 +47,11 @@ EOF
   ballast install --refresh-config >/dev/null
 )
 
-assert_file_absent "${PROJECT}/.codex/rules/github-health-check.md"
+assert_file_absent "${PROJECT}/.codex/skills/github-health-check"
 assert_file_absent "${PROJECT}/.claude/skills/github-health-check.skill"
-assert_not_contains '`.codex/rules/github-health-check.md`' "${PROJECT}/AGENTS.md"
+assert_not_contains '`.codex/skills/github-health-check/SKILL.md`' "${PROJECT}/AGENTS.md"
 assert_not_contains '`.claude/skills/github-health-check.skill`' "${PROJECT}/CLAUDE.md"
-assert_file_exists "${PROJECT}/.codex/rules/owasp-security-scan.md"
+assert_file_exists "${PROJECT}/.codex/skills/owasp-security-scan/SKILL.md"
 assert_file_exists "${PROJECT}/.claude/skills/owasp-security-scan.skill"
 
 echo "PASS: remove-skill-existing-install-e2e"
