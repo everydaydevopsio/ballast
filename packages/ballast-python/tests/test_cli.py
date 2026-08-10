@@ -910,6 +910,8 @@ class PatchInstallTests(unittest.TestCase):
             cli.skill_destination(root, "codex", "owasp-security-scan"),
             root / ".codex" / "skills" / "owasp-security-scan" / "SKILL.md",
         )
+        with self.assertRaisesRegex(ValueError, "Unknown target: bogus"):
+            cli.skill_destination(root, "bogus", "owasp-security-scan")
 
     def test_resolve_target_and_agents_uses_saved_skill_only_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

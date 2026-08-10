@@ -1178,7 +1178,9 @@ def skill_destination(root: Path, target: str, skill: str) -> Path:
         return root / ".gemini" / "rules" / f"{skill}.md"
     if target == "opencode":
         return root / ".opencode" / "skills" / f"{skill}.md"
-    return root / ".codex" / "skills" / skill / "SKILL.md"
+    if target == "codex":
+        return root / ".codex" / "skills" / skill / "SKILL.md"
+    raise ValueError(f"Unknown target: {target}")
 
 
 def legacy_codex_skill_destination(root: Path, skill: str) -> Path:
