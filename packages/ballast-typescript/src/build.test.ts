@@ -314,24 +314,21 @@ describe('build', () => {
       expect(content).toContain('preview deployments');
     });
 
-    test('returns Kubernetes GitOps web deployment placeholders', () => {
+    test('returns compact Kubernetes GitOps web deployment guidance', () => {
       const content = getContent('publishing', 'web', 'typescript');
       expect(content).toContain('deploymentModel: none');
       expect(content).toContain('Deployment is inactive');
       expect(content).toContain('Deployment guidance is reference-only');
       expect(content).toContain('do not create deploy-on-main workflows');
-      expect(content).toContain('Kubernetes Workflow Template (`deploy.yml`)');
-      expect(content).toContain(
-        'GitOps Deploy Workflow Template (`gitops-deploy.yml`)'
+      expect(content).toContain('Do not paste full workflow templates');
+      expect(content).not.toContain(
+        'Kubernetes Workflow Template (`deploy.yml`)'
       );
       expect(content).toContain('release_tag');
-      expect(content).toContain(
-        'refs/tags/${{ needs.bump_and_tag.outputs.release_tag }}'
-      );
-      expect(content).toContain('repository: OWNER/GITOPS_REPO');
-      expect(content).toContain('GITOPS_TOKEN');
-      expect(content).toContain('image_digest');
-      expect(content).toContain('Never create unprefixed Git release tags');
+      expect(content).toContain('refs/tags/v<version>');
+      expect(content).toContain('GitOps handoff');
+      expect(content).toContain('pushed digest');
+      expect(content).toContain('never create unprefixed release tags');
     });
 
     test('keeps REST API baseline goals platform neutral', () => {

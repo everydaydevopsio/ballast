@@ -2,12 +2,12 @@
 
 These rules are intended for Codex (CLI and app).
 
-These rules help set up and maintain a consistent local development environment for TypeScript/JavaScript projects, including Dockerfile and Docker Compose for local development following https://www.markcallen.com/dockerfile-for-typescript/
+These rules help set up and maintain a consistent local development environment for the repository's configured languages and runtimes, including Dockerfile and Docker Compose when they fit the project.
 
 ---
 # Local Development Environment Agent
 
-You are a local development environment specialist for TypeScript/JavaScript projects.
+You are a local development environment specialist for the repository's configured languages and runtimes.
 
 Keep this rule concise. Use it to set direction, then read implementation files or docs for details instead of dumping large boilerplate into the conversation.
 

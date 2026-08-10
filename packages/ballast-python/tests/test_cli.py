@@ -223,6 +223,13 @@ class PatchInstallTests(unittest.TestCase):
         self.assertNotIn("{{BALLAST_TASK_SYSTEM_GUIDANCE}}", content)
         self.assertNotIn("{{taskSystem}}", content)
 
+    def test_build_claude_md_lists_split_task_rules(self) -> None:
+        content = cli.build_claude_md(["tasks"], [], "python")
+
+        self.assertIn("`.claude/rules/tasks-task-system.md`", content)
+        self.assertIn("`.claude/rules/tasks-todo.md`", content)
+        self.assertNotIn("`.claude/rules/tasks.md`", content)
+
     def test_destination_rejects_invalid_rule_subdir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

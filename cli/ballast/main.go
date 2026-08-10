@@ -3604,13 +3604,16 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 	trackedPaths := ballastManagedPathsFromSupportFile(root, target)
 	configBackedStaleRulePaths := configBackedStaleRulePathSet(root, target, previous)
 	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePaths(root, target, next)) {
-		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !configBackedStaleRulePaths[file] {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !configBackedStaleRulePaths[file] && !looksLikeLegacyGeneratedRule(file) {
 			continue
 		}
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
+	}
+	if err := removeUnlistedManagedRuleFiles(root, target, next); err != nil {
+		return err
 	}
 	for _, file := range stringDifference(allManagedSkillPaths(root, target), managedSkillPaths(root, target, next.Skills)) {
 		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !allowConfigBackedStaleSkillRemoval(root, target, file, previous) {
@@ -3621,6 +3624,40 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		}
 	}
 	return nil
+}
+
+func removeUnlistedManagedRuleFiles(root string, target string, next *monorepoConfig) error {
+	rulesRoot := targetRulesRoot(root, target)
+	expected := map[string]bool{}
+	for _, file := range managedRulePaths(root, target, next) {
+		expected[filepath.Clean(file)] = true
+	}
+	return filepath.WalkDir(rulesRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != targetRuleExtension(target) {
+			return nil
+		}
+		cleaned := filepath.Clean(path)
+		if expected[cleaned] {
+			return nil
+		}
+		if !ballastOwnsManagedFile(cleaned) && !looksLikeLegacyGeneratedRule(cleaned) {
+			return nil
+		}
+		if err := os.Remove(cleaned); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		pruneEmptyParents(filepath.Dir(cleaned), targetRootDir(root, target))
+		return nil
+	})
 }
 
 func configBackedStaleRulePathSet(root string, target string, previous *monorepoConfig) map[string]bool {
@@ -3635,7 +3672,20 @@ func configBackedStaleRulePathSet(root string, target string, previous *monorepo
 	for _, previousPath := range managedRulePaths(root, target, previousLanguageRules) {
 		paths[previousPath] = true
 	}
+	for _, previousPath := range legacyRootManagedRulePaths(root, target, previous.Agents, previous.Languages) {
+		paths[previousPath] = true
+	}
 	return paths
+}
+
+func looksLikeLegacyGeneratedRule(path string) bool {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	text := string(content)
+	return (strings.HasPrefix(text, "# ") || strings.HasPrefix(text, "---\n# ")) &&
+		strings.Contains(text, "\n---\n")
 }
 
 func allowConfigBackedStaleSkillRemoval(root string, target string, path string, previous *monorepoConfig) bool {
@@ -3658,10 +3708,35 @@ func allManagedRulePaths(root string, target string) []string {
 	for _, lang := range supportedLanguages {
 		languages = append(languages, string(lang))
 	}
-	return managedRulePaths(root, target, &monorepoConfig{
+	paths := managedRulePaths(root, target, &monorepoConfig{
 		Agents:    supportedAgentIDs(),
 		Languages: languages,
 	})
+	paths = append(paths, legacyRootManagedRulePaths(root, target, supportedAgentIDs(), languages)...)
+	return uniqueStrings(paths)
+}
+
+func legacyRootManagedRulePaths(root string, target string, agents []string, languages []string) []string {
+	paths := []string{}
+	ext := targetRuleExtension(target)
+	rulesRoot := targetRulesRoot(root, target)
+	commonSelection := filterAgents(agents, commonAgentIDs())
+	languageSelection := filterAgents(agents, languageAgentIDs())
+	for _, agent := range commonSelection {
+		for _, suffix := range ruleSuffixesForAgent(agent) {
+			base := agentBaseName(agent, suffix)
+			paths = append(paths, filepath.Join(rulesRoot, base+ext))
+		}
+	}
+	for _, lang := range languages {
+		for _, agent := range languageSelection {
+			for _, suffix := range ruleSuffixesForAgent(agent) {
+				base := agentBaseName(agent, suffix)
+				paths = append(paths, filepath.Join(rulesRoot, lang+"-"+base+ext))
+			}
+		}
+	}
+	return uniqueStrings(paths)
 }
 
 func allManagedSkillPaths(root string, target string) []string {
@@ -3920,7 +3995,10 @@ func ruleSuffixesForAgent(agent string) []string {
 		return []string{"badges", "env", "license", "mcp"}
 	}
 	if agent == "publishing" {
-		return []string{"libraries", "sdks", "apps"}
+		return []string{"api", "apps", "apt", "brew", "cli", "libraries", "sdks", "web"}
+	}
+	if agent == "tasks" {
+		return []string{"task-system", "todo"}
 	}
 	return []string{""}
 }

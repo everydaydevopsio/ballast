@@ -1974,6 +1974,54 @@ func TestRunInstallRefreshConfigUsesSavedConfig(t *testing.T) {
 	}
 }
 
+func TestRunInstallRefreshConfigPreservesDiscoveryExcludePaths(t *testing.T) {
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "packages", "web", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "packages", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, "examples", "terraform", "main.tf"), "terraform {}\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude", "codex"],
+  "agents": ["linting"],
+  "skills": [],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["packages/web"],
+    "python": ["packages/api"]
+  },
+  "discovery": {"excludePaths": ["examples"]}
+}`)
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--refresh-config"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	config, err := loadMonorepoConfig(root)
+	if err != nil {
+		t.Fatalf("loadMonorepoConfig returned error: %v", err)
+	}
+	if config.Discovery == nil || !reflect.DeepEqual(config.Discovery.ExcludePaths, []string{"examples"}) {
+		t.Fatalf("expected discovery exclude paths to be preserved, got %#v", config.Discovery)
+	}
+	if slices.Contains(config.Languages, "terraform") {
+		t.Fatalf("expected excluded example terraform profile to stay out of languages, got %#v", config.Languages)
+	}
+}
+
 func TestRunInstallRefreshConfigCleansUpSingleLanguageStaleSelections(t *testing.T) {
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
@@ -5126,6 +5174,87 @@ func TestBuildMonorepoSupportFileIncludesDocsForCodex(t *testing.T) {
 
 	if !strings.Contains(content, "`.codex/rules/common/docs.md`") {
 		t.Fatalf("expected docs rule entry in codex support file, got %q", content)
+	}
+}
+
+func TestBuildMonorepoSupportFileIncludesSplitTaskRules(t *testing.T) {
+	plan := &monorepoPlan{
+		Common: []string{"tasks"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+		},
+	}
+
+	root := resolvedTempDir(t)
+	content := buildMonorepoSupportFile(root, plan, "claude")
+
+	if !strings.Contains(content, "`.claude/rules/common/tasks-task-system.md`") {
+		t.Fatalf("expected task-system rule entry in claude support file, got %q", content)
+	}
+	if !strings.Contains(content, "`.claude/rules/common/tasks-todo.md`") {
+		t.Fatalf("expected todo rule entry in claude support file, got %q", content)
+	}
+	if strings.Contains(content, "`.claude/rules/common/tasks.md`") {
+		t.Fatalf("did not expect unsplit tasks rule entry in claude support file, got %q", content)
+	}
+}
+
+func TestManagedRulePathsIncludeAllPublishingVariants(t *testing.T) {
+	root := resolvedTempDir(t)
+	config := &monorepoConfig{
+		Agents:    []string{"publishing"},
+		Languages: []string{"typescript"},
+	}
+
+	paths := managedRulePaths(root, "claude", config)
+	for _, suffix := range []string{"api", "apps", "apt", "brew", "cli", "libraries", "sdks", "web"} {
+		want := filepath.Join(root, ".claude", "rules", "common", "publishing-"+suffix+".md")
+		if !slices.Contains(paths, want) {
+			t.Fatalf("expected publishing variant %q in managed paths: %#v", want, paths)
+		}
+	}
+}
+
+func TestRemoveStaleManagedFilesRemovesLegacyRootRules(t *testing.T) {
+	root := resolvedTempDir(t)
+	legacy := filepath.Join(root, ".claude", "rules", "publishing-web.md")
+	removedLanguageGitHooks := filepath.Join(root, ".claude", "rules", "ansible", "ansible-git-hooks.md")
+	crossLanguageRule := filepath.Join(root, ".claude", "rules", "go", "go-typescript-testing.md")
+	commonLanguageRule := filepath.Join(root, ".claude", "rules", "common", "go-testing.md")
+	languageLocalDevRule := filepath.Join(root, ".claude", "rules", "go", "go-local-dev-badges.md")
+	current := filepath.Join(root, ".claude", "rules", "common", "publishing-web.md")
+	mustWriteFile(t, legacy, "---\n# Publishing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, removedLanguageGitHooks, "# Git Hooks Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, crossLanguageRule, "# Testing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, commonLanguageRule, "# Go Testing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, languageLocalDevRule, "# Local Development: README Badges\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, current, "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v1.0.0. Do not edit this section. -->\n")
+
+	next := &monorepoConfig{
+		Agents:    []string{"publishing", "git-hooks"},
+		Languages: []string{"typescript"},
+	}
+
+	if err := removeStaleManagedFiles(root, "claude", nil, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles returned error: %v", err)
+	}
+	if fileExists(legacy) {
+		t.Fatalf("expected stale legacy root rule to be removed: %s", legacy)
+	}
+	if fileExists(removedLanguageGitHooks) {
+		t.Fatalf("expected stale removed-language git-hooks rule to be removed: %s", removedLanguageGitHooks)
+	}
+	if fileExists(crossLanguageRule) {
+		t.Fatalf("expected stale cross-language rule to be removed: %s", crossLanguageRule)
+	}
+	if fileExists(commonLanguageRule) {
+		t.Fatalf("expected stale common language rule to be removed: %s", commonLanguageRule)
+	}
+	if fileExists(languageLocalDevRule) {
+		t.Fatalf("expected stale language local-dev rule to be removed: %s", languageLocalDevRule)
+	}
+	if !fileExists(current) {
+		t.Fatalf("expected current common rule to remain: %s", current)
 	}
 }
 
