@@ -61,10 +61,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 ```
 
-Do not cancel in-progress release, image publish, or GitOps deployment runs. If the project needs aggressively cancellable pull request checks, put PR-only CI in a separate workflow with `cancel-in-progress: true`.
+Cancel superseded pull request checks, but do not cancel in-progress release, image publish, or GitOps deployment runs.
 
 ## Kubernetes Workflow Template (`deploy.yml`)
 
@@ -95,7 +95,7 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   quality:
@@ -131,7 +131,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          existing_tag="$(git tag --points-at HEAD --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n 1)"
+          existing_tag="$(
+            git tag --points-at HEAD --list 'v*' \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | sort -V \
+              | tail -n 1 \
+              || true
+          )"
           echo "tag=${existing_tag}" >> "$GITHUB_OUTPUT"
 
       - name: Get previous tag
