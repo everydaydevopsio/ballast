@@ -4429,7 +4429,7 @@ func TestRunMonorepoRemoveTargetDoesNotPersistConfigWhenCleanupFails(t *testing.
 func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
-  "targets": ["codex"],
+  "targets": ["codex", "claude"],
   "agents": ["linting"],
   "languages": ["typescript", "python"],
   "paths": {
@@ -4449,8 +4449,23 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	)
 	mustWriteFile(
 		t,
+		filepath.Join(root, ".claude", "rules", "python", "python-linting.md"),
+		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".claude", "rules", "typescript", "typescript-linting.md"),
+		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+	mustWriteFile(
+		t,
 		filepath.Join(root, "AGENTS.md"),
 		"# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\nRead and follow these rule files in `.codex/rules/` when they apply:\n\n- `.codex/rules/typescript/typescript-linting.md` — Rules for typescript/linting\n- `.codex/rules/python/python-linting.md` — Rules for python/linting\n",
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "CLAUDE.md"),
+		"# CLAUDE.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\nRead and follow these rule files in `.claude/rules/` when they apply:\n\n- `.claude/rules/typescript/typescript-linting.md` — Rules for typescript/linting\n- `.claude/rules/python/python-linting.md` — Rules for python/linting\n",
 	)
 
 	originalEnsure := ensureInstalledFunc
@@ -4477,6 +4492,12 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")); err != nil {
 		t.Fatalf("expected typescript rule to remain, got %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(root, ".claude", "rules", "python", "python-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected claude python rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".claude", "rules", "typescript", "typescript-linting.md")); err != nil {
+		t.Fatalf("expected claude typescript rule to remain, got %v", err)
+	}
 
 	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
 	if err != nil {
@@ -4496,6 +4517,17 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	}
 	if strings.Contains(agentsText, "`.codex/rules/python/python-linting.md`") {
 		t.Fatalf("expected AGENTS.md to remove python rule, got %s", agentsText)
+	}
+	claudeContent, err := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read CLAUDE.md: %v", err)
+	}
+	claudeText := string(claudeContent)
+	if !strings.Contains(claudeText, "`.claude/rules/typescript/typescript-linting.md`") {
+		t.Fatalf("expected CLAUDE.md to keep remaining typescript rule, got %s", claudeText)
+	}
+	if strings.Contains(claudeText, "`.claude/rules/python/python-linting.md`") {
+		t.Fatalf("expected CLAUDE.md to remove python rule, got %s", claudeText)
 	}
 }
 
