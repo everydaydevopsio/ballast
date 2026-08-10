@@ -28,29 +28,23 @@
   "languages": [
     "typescript",
     "python",
-    "go",
-    "ansible",
-    "terraform"
+    "go"
   ],
   "paths": {
-    "ansible": [
-      "examples/smoke/ansible-sample"
-    ],
     "go": [
       "cli/ballast",
-      "examples/smoke/go-sample",
       "packages/ballast-go"
     ],
     "python": [
-      "examples/smoke/python-sample",
       "packages/ballast-python"
     ],
-    "terraform": [
-      "examples/smoke/terraform-sample"
-    ],
     "typescript": [
-      "examples/smoke/typescript-sample",
       "packages/ballast-typescript"
+    ]
+  },
+  "discovery": {
+    "excludePaths": [
+      "examples"
     ]
   },
   "taskSystem": "github",

@@ -2665,6 +2665,58 @@ func TestDetectRepoProfilesFindsMultiLanguageMonorepo(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesHonorsConfigExcludePaths(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "packages", "web", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "examples", "web", "tsconfig.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "examples", "ansible", "playbook.yml"), "---\n")
+	mustWriteFile(t, filepath.Join(root, "examples", "terraform", "main.tf"), "terraform {}\n")
+
+	profiles, err := detectRepoProfilesWithConfig(root, &monorepoConfig{
+		Discovery: &discoveryConfig{ExcludePaths: []string{"examples/"}},
+	})
+	if err != nil {
+		t.Fatalf("detectRepoProfilesWithConfig returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langTypeScript, Paths: []string{filepath.Join(root, "packages", "web")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected excluded examples to be skipped; want %#v, got %#v", want, profiles)
+	}
+}
+
+func TestDiscoveryConfigFromConfigNormalizesExcludePaths(t *testing.T) {
+	config := &monorepoConfig{
+		Discovery: &discoveryConfig{ExcludePaths: []string{
+			" examples/ ",
+			"examples",
+			".",
+			"/tmp/outside",
+			"../outside",
+		}},
+	}
+
+	discovery := discoveryConfigFromConfig(config)
+	if discovery == nil {
+		t.Fatal("expected normalized discovery config")
+	}
+	want := []string{"examples"}
+	if !reflect.DeepEqual(discovery.ExcludePaths, want) {
+		t.Fatalf("expected normalized exclude paths %#v, got %#v", want, discovery.ExcludePaths)
+	}
+	if got := discoveryConfigFromConfig(nil); got != nil {
+		t.Fatalf("expected nil config to produce nil discovery config, got %#v", got)
+	}
+	if got := discoveryConfigFromConfig(&monorepoConfig{}); got != nil {
+		t.Fatalf("expected missing discovery config to produce nil, got %#v", got)
+	}
+	if got := discoveryConfigFromConfig(&monorepoConfig{Discovery: &discoveryConfig{ExcludePaths: []string{"."}}}); got != nil {
+		t.Fatalf("expected empty normalized discovery config to produce nil, got %#v", got)
+	}
+}
+
 func TestDetectRepoProfilesFindsAnsibleProfile(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "infra", "ansible", "ansible.cfg"), "[defaults]\n")
@@ -3358,6 +3410,12 @@ func TestResolveMonorepoPlanRemoveLanguageCleanupOnly(t *testing.T) {
 	}
 	if got := plan.Config.Paths["typescript"]; !reflect.DeepEqual(got, []string{"apps/frontend"}) {
 		t.Fatalf("expected typescript path to remain, got %#v", plan.Config.Paths)
+	}
+	if !reflect.DeepEqual(plan.Common, []string{"local-dev"}) {
+		t.Fatalf("expected cleanup-only plan to keep common rule selection, got %#v", plan.Common)
+	}
+	if !reflect.DeepEqual(plan.Language, []string{"linting"}) {
+		t.Fatalf("expected cleanup-only plan to keep language rule selection, got %#v", plan.Language)
 	}
 }
 
@@ -4423,7 +4481,7 @@ func TestRunMonorepoRemoveTargetDoesNotPersistConfigWhenCleanupFails(t *testing.
 func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
-  "targets": ["codex"],
+  "targets": ["codex", "claude"],
   "agents": ["linting"],
   "languages": ["typescript", "python"],
   "paths": {
@@ -4440,6 +4498,26 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 		t,
 		filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md"),
 		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".claude", "rules", "python", "python-linting.md"),
+		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, ".claude", "rules", "typescript", "typescript-linting.md"),
+		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "AGENTS.md"),
+		"# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\nRead and follow these rule files in `.codex/rules/` when they apply:\n\n- `.codex/rules/typescript/typescript-linting.md` — Rules for typescript/linting\n- `.codex/rules/python/python-linting.md` — Rules for python/linting\n",
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "CLAUDE.md"),
+		"# CLAUDE.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\nRead and follow these rule files in `.claude/rules/` when they apply:\n\n- `.claude/rules/typescript/typescript-linting.md` — Rules for typescript/linting\n- `.claude/rules/python/python-linting.md` — Rules for python/linting\n",
 	)
 
 	originalEnsure := ensureInstalledFunc
@@ -4466,6 +4544,12 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")); err != nil {
 		t.Fatalf("expected typescript rule to remain, got %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(root, ".claude", "rules", "python", "python-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected claude python rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".claude", "rules", "typescript", "typescript-linting.md")); err != nil {
+		t.Fatalf("expected claude typescript rule to remain, got %v", err)
+	}
 
 	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
 	if err != nil {
@@ -4474,6 +4558,28 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	text := string(config)
 	if strings.Contains(text, `"python"`) || !strings.Contains(text, `"typescript"`) {
 		t.Fatalf("expected python removed and typescript retained in config, got %q", text)
+	}
+	agentsContent, err := os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	agentsText := string(agentsContent)
+	if !strings.Contains(agentsText, "`.codex/rules/typescript/typescript-linting.md`") {
+		t.Fatalf("expected AGENTS.md to keep remaining typescript rule, got %s", agentsText)
+	}
+	if strings.Contains(agentsText, "`.codex/rules/python/python-linting.md`") {
+		t.Fatalf("expected AGENTS.md to remove python rule, got %s", agentsText)
+	}
+	claudeContent, err := os.ReadFile(filepath.Join(root, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read CLAUDE.md: %v", err)
+	}
+	claudeText := string(claudeContent)
+	if !strings.Contains(claudeText, "`.claude/rules/typescript/typescript-linting.md`") {
+		t.Fatalf("expected CLAUDE.md to keep remaining typescript rule, got %s", claudeText)
+	}
+	if strings.Contains(claudeText, "`.claude/rules/python/python-linting.md`") {
+		t.Fatalf("expected CLAUDE.md to remove python rule, got %s", claudeText)
 	}
 }
 
