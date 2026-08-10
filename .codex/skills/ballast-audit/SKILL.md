@@ -1,3 +1,10 @@
+---
+name: ballast-audit
+description: audit AI rule and skill files for context density, duplication, and bloat
+---
+
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.15.3. Do not edit this section. -->
+
 # Ballast Audit Skill
 
 This skill performs a "Context Hygiene" audit of the repository's AI rule files (`.codex/rules/`, `.gemini/rules/`, etc.). It identifies redundant, oversized, or low-density rules that degrade AI performance by consuming excessive context tokens.

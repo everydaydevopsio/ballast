@@ -889,7 +889,7 @@ func TestSkillDestinationReturnsExpectedPaths(t *testing.T) {
 		{target: "cursor", dir: filepath.Join(tmpDir, ".cursor", "rules"), file: filepath.Join(tmpDir, ".cursor", "rules", "owasp-security-scan.mdc")},
 		{target: "claude", dir: filepath.Join(tmpDir, ".claude", "skills"), file: filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")},
 		{target: "opencode", dir: filepath.Join(tmpDir, ".opencode", "skills"), file: filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")},
-		{target: "codex", dir: filepath.Join(tmpDir, ".codex", "rules"), file: filepath.Join(tmpDir, ".codex", "rules", "owasp-security-scan.md")},
+		{target: "codex", dir: filepath.Join(tmpDir, ".codex", "skills", "owasp-security-scan"), file: filepath.Join(tmpDir, ".codex", "skills", "owasp-security-scan", "SKILL.md")},
 		{target: "gemini", dir: filepath.Join(tmpDir, ".gemini", "rules"), file: filepath.Join(tmpDir, ".gemini", "rules", "owasp-security-scan.md")},
 	}
 
@@ -1366,6 +1366,20 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
 		t.Fatalf("expected installed skill, got %+v", result.installedSkills)
 	}
+	skillPath := filepath.Join(tmpDir, ".codex", "skills", "owasp-security-scan", "SKILL.md")
+	skillContent, err := os.ReadFile(skillPath)
+	if err != nil {
+		t.Fatalf("expected native codex skill file: %v", err)
+	}
+	if !strings.HasPrefix(string(skillContent), "---\nname: owasp-security-scan") {
+		t.Fatalf("expected preserved skill frontmatter, got %s", string(skillContent))
+	}
+	if !strings.Contains(string(skillContent), "Created by [Ballast]") {
+		t.Fatalf("expected managed marker in native codex skill, got %s", string(skillContent))
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".codex", "skills", "owasp-security-scan", "references", "owasp-mapping.md")); err != nil {
+		t.Fatalf("expected copied skill reference: %v", err)
+	}
 	agentsMD, err := os.ReadFile(filepath.Join(tmpDir, "AGENTS.md"))
 	if err != nil {
 		t.Fatalf("read AGENTS.md: %v", err)
@@ -1380,7 +1394,7 @@ func TestInstallCreatesCodexSupportFileForSkillOnlyInstall(t *testing.T) {
 	if !strings.Contains(text, "## Installed skills") {
 		t.Fatalf("expected installed skills section in AGENTS.md: %s", text)
 	}
-	if !strings.Contains(text, "`.codex/rules/owasp-security-scan.md`") {
+	if !strings.Contains(text, "`.codex/skills/owasp-security-scan/SKILL.md`") {
 		t.Fatalf("expected codex skill entry in AGENTS.md: %s", text)
 	}
 }
@@ -1572,11 +1586,11 @@ func TestInstallPatchOverwritesUnreadableClaudeSkillArchive(t *testing.T) {
 
 func TestInstallRefreshOverwritesExistingCodexSkill(t *testing.T) {
 	tmpDir := t.TempDir()
-	skillPath := filepath.Join(tmpDir, ".codex", "rules", "owasp-security-scan.md")
-	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+	legacySkillPath := filepath.Join(tmpDir, ".codex", "rules", "owasp-security-scan.md")
+	if err := os.MkdirAll(filepath.Dir(legacySkillPath), 0o755); err != nil {
 		t.Fatalf("create skill dir: %v", err)
 	}
-	if err := os.WriteFile(skillPath, []byte("stale skill content\n"), 0o644); err != nil {
+	if err := os.WriteFile(legacySkillPath, []byte("<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n\nstale skill content\n"), 0o644); err != nil {
 		t.Fatalf("seed stale skill: %v", err)
 	}
 
@@ -1594,6 +1608,10 @@ func TestInstallRefreshOverwritesExistingCodexSkill(t *testing.T) {
 	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
 		t.Fatalf("expected refreshed skill install, got %+v", result.installedSkills)
 	}
+	if _, err := os.Stat(legacySkillPath); !os.IsNotExist(err) {
+		t.Fatalf("expected legacy codex skill to be removed, stat err=%v", err)
+	}
+	skillPath := filepath.Join(tmpDir, ".codex", "skills", "owasp-security-scan", "SKILL.md")
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
 		t.Fatalf("read refreshed skill: %v", err)
@@ -2359,10 +2377,10 @@ func TestSkillOnlyPatchKeepsCodexRuleReferencesFromRulesrc(t *testing.T) {
 	if !strings.Contains(text, "`.codex/rules/go-linting.md`") {
 		t.Fatalf("expected config-backed agent entry to remain: %s", text)
 	}
-	if !strings.Contains(text, "`.codex/rules/owasp-security-scan.md`") {
+	if !strings.Contains(text, "`.codex/skills/owasp-security-scan/SKILL.md`") {
 		t.Fatalf("expected saved skill entry to remain: %s", text)
 	}
-	if strings.Contains(text, "`.codex/rules/github-health-check.md`") {
+	if strings.Contains(text, "`.codex/skills/github-health-check/SKILL.md`") {
 		t.Fatalf("expected unsaved skill entry to stay absent: %s", text)
 	}
 }

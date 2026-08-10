@@ -3616,10 +3616,9 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !allowConfigBackedStaleSkillRemoval(root, target, file, previous) {
 			continue
 		}
-		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := removeManagedSkillPath(root, target, file); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
 	return nil
 }
@@ -3640,13 +3639,13 @@ func configBackedStaleRulePathSet(root string, target string, previous *monorepo
 }
 
 func allowConfigBackedStaleSkillRemoval(root string, target string, path string, previous *monorepoConfig) bool {
-	if target != "cursor" && target != "opencode" {
+	if target != "cursor" && target != "opencode" && target != "codex" {
 		return false
 	}
 	if previous == nil {
 		return false
 	}
-	for _, previousPath := range managedSkillPaths(root, target, previous.Skills) {
+	for _, previousPath := range managedSkillRemovalPaths(root, target, previous.Skills) {
 		if previousPath == path {
 			return true
 		}
@@ -3666,7 +3665,7 @@ func allManagedRulePaths(root string, target string) []string {
 }
 
 func allManagedSkillPaths(root string, target string) []string {
-	return managedSkillPaths(root, target, supportedSkillIDs())
+	return managedSkillRemovalPaths(root, target, supportedSkillIDs())
 }
 
 func removeManagedTargetFiles(root string, target string, config *monorepoConfig) error {
@@ -3679,11 +3678,10 @@ func removeManagedTargetFiles(root string, target string, config *monorepoConfig
 		}
 		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
-	for _, file := range managedSkillPaths(root, target, config.Skills) {
-		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+	for _, file := range managedSkillRemovalPaths(root, target, config.Skills) {
+		if err := removeManagedSkillPath(root, target, file); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
 	return nil
 }
@@ -3720,6 +3718,31 @@ func managedSkillPaths(root string, target string, skills []string) []string {
 		}
 	}
 	return uniqueStrings(paths)
+}
+
+func managedSkillRemovalPaths(root string, target string, skills []string) []string {
+	paths := managedSkillPaths(root, target, skills)
+	if target == "codex" {
+		for _, skill := range skills {
+			paths = append(paths, legacyCodexSkillPath(root, skill))
+		}
+	}
+	return uniqueStrings(paths)
+}
+
+func removeManagedSkillPath(root string, target string, file string) error {
+	if target == "codex" && filepath.Base(file) == "SKILL.md" && filepath.Base(filepath.Dir(filepath.Dir(file))) == "skills" {
+		if err := os.RemoveAll(filepath.Dir(file)); err != nil {
+			return err
+		}
+		pruneEmptyParents(filepath.Dir(filepath.Dir(file)), targetRootDir(root, target))
+		return nil
+	}
+	if err := os.Remove(file); err != nil {
+		return err
+	}
+	pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
+	return nil
 }
 
 func targetRootDir(root string, target string) string {
@@ -3774,10 +3797,14 @@ func targetSkillPath(root string, target string, skill string) string {
 	case "opencode":
 		return filepath.Join(root, ".opencode", "skills", skill+".md")
 	case "codex":
-		return filepath.Join(root, ".codex", "rules", skill+".md")
+		return filepath.Join(root, ".codex", "skills", skill, "SKILL.md")
 	default:
 		return ""
 	}
+}
+
+func legacyCodexSkillPath(root string, skill string) string {
+	return filepath.Join(root, ".codex", "rules", skill+".md")
 }
 
 func pruneEmptyParents(dir string, stop string) {
@@ -3866,13 +3893,17 @@ func buildMonorepoSupportFile(root string, plan *monorepoPlan, target string) st
 		}
 	}
 	if len(plan.Config.Skills) > 0 {
+		skillDir := strings.TrimPrefix(filepath.Dir(targetSkillPath(rootPlaceholder, target, "example")), rootPlaceholder+"/")
+		if target == "codex" {
+			skillDir = ".codex/skills"
+		}
 		lines = append(lines,
 			"",
 			"## Installed skills",
 			"",
 			"Created by Ballast. Do not edit this section.",
 			"",
-			fmt.Sprintf("Read and use these skill files in `%s/` when they are relevant:", strings.TrimPrefix(filepath.Dir(targetSkillPath(rootPlaceholder, target, "example")), rootPlaceholder+"/")),
+			fmt.Sprintf("Read and use these skill files in `%s/` when they are relevant:", skillDir),
 			"",
 		)
 		for _, skill := range plan.Config.Skills {
@@ -3978,6 +4009,10 @@ const rootPlaceholder = "__BALLAST_ROOT__"
 const ballastManagedMarker = "Created by [Ballast]"
 const ballastManagedSectionNotice = "Created by Ballast. Do not edit this section."
 
+func containsBallastManagedMarker(content string) bool {
+	return strings.Contains(content, ballastManagedMarker) || strings.Contains(content, ballastManagedSectionNotice)
+}
+
 func patchManagedSupportSections(existing string, canonical string) string {
 	next := existing
 	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
@@ -4080,11 +4115,11 @@ func ballastOwnsManagedFile(path string) bool {
 			if readErr != nil {
 				return false
 			}
-			return strings.Contains(string(data), ballastManagedMarker)
+			return containsBallastManagedMarker(string(data))
 		}
 		return false
 	}
-	return strings.Contains(string(content), ballastManagedMarker)
+	return containsBallastManagedMarker(string(content))
 }
 
 func ballastManagedPathsFromSupportFile(root string, target string) map[string]bool {

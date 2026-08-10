@@ -1,3 +1,18 @@
+---
+name: owasp-security-scan
+description: >
+  Run OWASP-aligned security scans across Go, TypeScript, and Python codebases.
+  Use this skill whenever the user asks to: scan for security vulnerabilities,
+  run OWASP checks, audit dependencies, find CVEs, check for injection flaws,
+  run SAST or SCA analysis, review code security, or harden their app against
+  the OWASP Top 10. Also trigger for phrases like "security audit", "check my
+  code for vulns", "are my dependencies safe", or any mention of gosec, bandit,
+  semgrep, or npm audit in a security context. Covers Go, TypeScript/JavaScript,
+  and Python with language-specific tools plus cross-language Semgrep rulesets.
+---
+
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.15.3. Do not edit this section. -->
+
 # OWASP Security Scan Skill
 
 Runs a layered, OWASP Top 10-aligned security audit across Go, TypeScript, and Python projects using best-in-class open-source tools. Produces a consolidated findings report with severity, OWASP category, and remediation guidance.
@@ -139,7 +154,6 @@ Severity mapping from tool scores:
 Present findings in this structure:
 
 ```text
-
 ## Security Scan Report
 **Date**: <date>
 **Project**: <detected name>

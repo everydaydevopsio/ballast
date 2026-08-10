@@ -1,3 +1,20 @@
+---
+name: github-health-check
+description: >
+  Run a comprehensive GitHub repository health check. Use this skill whenever
+  the user asks to: check GitHub health, audit the repo, check CI status,
+  review open PRs, merge Dependabot PRs, check code coverage, check GitHub
+  Code Quality, check GitHub security feature enablement, check security
+  advisories, check Dependabot alerts, check code scanning alerts, check secret
+  scanning alerts, check Snyk integration, keep GitHub in good shape, or any
+  variation of "how is the repo doing". Also trigger for:
+  "check dependabot PRs", "any PRs to merge", "check branch status", "repo
+  health", "GitHub status check", "what needs attention in GitHub", "tidy up
+  GitHub".
+---
+
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.15.3. Do not edit this section. -->
+
 # GitHub Repository Health Check Skill
 
 Runs a comprehensive health audit of the current GitHub repository using the `gh` CLI. Produces a structured report with status indicators and actionable items. Auto-merges safe Dependabot PRs and checks whether required GitHub security and code quality features are enabled.
@@ -649,7 +666,6 @@ grep -RhoE 'uses: +[^ ]+' .github/workflows 2>/dev/null | \
 After running all checks, present findings in this structure:
 
 ```text
-
 ## GitHub Repository Health Report
 **Repo**: owner/name
 **Date**: <today>

@@ -1049,6 +1049,29 @@ def build_skill_markdown(skill: str, language: str) -> str:
     return f"<!-- {ballast_notice()} -->\n\n" + body.rstrip() + "\n"
 
 
+def build_codex_skill_markdown(skill: str, language: str) -> str:
+    frontmatter, body = split_skill_document(read_skill(skill, language))
+    if not frontmatter:
+        return f"<!-- {ballast_notice()} -->\n\n" + body.rstrip() + "\n"
+    return (
+        frontmatter + "\n\n" + f"<!-- {ballast_notice()} -->\n\n" + body.rstrip() + "\n"
+    )
+
+
+def copy_codex_skill_resources(
+    skill: str, language: str, destination_dir: Path
+) -> None:
+    source_dir = skill_dir(skill, language)
+    for child in source_dir.iterdir():
+        if child.name in {"SKILL.md", "claude-settings.json"}:
+            continue
+        destination = destination_dir / child.name
+        if child.is_dir():
+            shutil.copytree(child, destination, dirs_exist_ok=True)
+        elif child.is_file():
+            shutil.copy2(child, destination)
+
+
 def build_claude_skill(
     skill: str, language: str, skill_content: str | None = None
 ) -> bytes:
@@ -1155,6 +1178,10 @@ def skill_destination(root: Path, target: str, skill: str) -> Path:
         return root / ".gemini" / "rules" / f"{skill}.md"
     if target == "opencode":
         return root / ".opencode" / "skills" / f"{skill}.md"
+    return root / ".codex" / "skills" / skill / "SKILL.md"
+
+
+def legacy_codex_skill_destination(root: Path, skill: str) -> Path:
     return root / ".codex" / "rules" / f"{skill}.md"
 
 
@@ -1286,13 +1313,13 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
                 "",
                 ballast_notice(),
                 "",
-                "Read and use these skill files in `.codex/rules/` when they are relevant:",
+                "Read and use these skill files in `.codex/skills/` when they are relevant:",
                 "",
             ]
         )
         for skill in skills:
             lines.append(
-                f"- `.codex/rules/{skill}.md` — {skill_description(skill, language)}"
+                f"- `.codex/skills/{skill}/SKILL.md` — {skill_description(skill, language)}"
             )
     lines.append("")
     return "\n".join(lines)
@@ -1972,6 +1999,14 @@ def install(
     )
     skipped_support_files = skip_support_files or set()
 
+    if target == "codex" and refresh_managed_skills:
+        for skill in COMMON_SKILLS:
+            legacy = legacy_codex_skill_destination(root, skill)
+            if not legacy.exists():
+                continue
+            if "Created by Ballast" in legacy.read_text(encoding="utf-8"):
+                legacy.unlink()
+
     for agent in agents:
         if not is_valid_agent(agent, language):
             result.errors.append((agent, "Unknown agent"))
@@ -2048,6 +2083,15 @@ def install(
                     else skill_content
                 )
                 dst.write_bytes(build_claude_skill(skill, language, next_content))
+            elif target == "codex":
+                content = build_codex_skill_markdown(skill, language)
+                next_content = (
+                    patch_rule_content(dst.read_text(encoding="utf-8"), content, target)
+                    if file_exists and not force and patch
+                    else content
+                )
+                dst.write_text(next_content, encoding="utf-8")
+                copy_codex_skill_resources(skill, language, dst.parent)
             else:
                 content = build_skill_markdown(skill, language)
                 next_content = (

@@ -60,14 +60,14 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 
 Created by Ballast. Do not edit this section.
 
-Read and use these skill files in `.codex/rules/` when they are relevant:
+Read and use these skill files in `.codex/skills/` when they are relevant:
 
-- `.codex/rules/owasp-security-scan.md` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
-- `.codex/rules/github-health-check.md` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
-- `.codex/rules/aws-health-review.md` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
-- `.codex/rules/aws-live-health-review.md` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
-- `.codex/rules/aws-weekly-security-review.md` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
-- `.codex/rules/ballast-audit.md` — audit AI rule and skill files for context density, duplication, and bloat
+- `.codex/skills/owasp-security-scan/SKILL.md` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
+- `.codex/skills/github-health-check/SKILL.md` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
+- `.codex/skills/aws-health-review/SKILL.md` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
+- `.codex/skills/aws-live-health-review/SKILL.md` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
+- `.codex/skills/aws-weekly-security-review/SKILL.md` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
+- `.codex/skills/ballast-audit/SKILL.md` — audit AI rule and skill files for context density, duplication, and bloat
 
 ## Codex code review expectations
 

@@ -180,7 +180,7 @@ verify_skills() {
   test -f "${monorepo}/.cursor/rules/owasp-security-scan.mdc"
   test -f "${monorepo}/.claude/skills/owasp-security-scan.skill"
   test -f "${monorepo}/.opencode/skills/owasp-security-scan.md"
-  test -f "${monorepo}/.codex/rules/owasp-security-scan.md"
+  test -f "${monorepo}/.codex/skills/owasp-security-scan/SKILL.md"
 }
 
 verify_skill_patch_keeps_support_rules() {
@@ -189,7 +189,7 @@ verify_skill_patch_keeps_support_rules() {
   grep -q '`.claude/rules/typescript/typescript-linting.md`' "${monorepo}/CLAUDE.md"
   grep -q '`.claude/skills/github-health-check.skill`' "${monorepo}/CLAUDE.md"
   grep -q '`.codex/rules/typescript/typescript-linting.md`' "${monorepo}/AGENTS.md"
-  grep -q '`.codex/rules/github-health-check.md`' "${monorepo}/AGENTS.md"
+  grep -q '`.codex/skills/github-health-check/SKILL.md`' "${monorepo}/AGENTS.md"
 }
 
 verify_codex_removed() {
@@ -198,7 +198,7 @@ verify_codex_removed() {
   test ! -e "${monorepo}/.codex/rules/common/local-dev-env.md"
   test ! -e "${monorepo}/.codex/rules/typescript/typescript-linting.md"
   test ! -e "${monorepo}/.codex/rules/dart/dart-linting.md"
-  test ! -e "${monorepo}/.codex/rules/owasp-security-scan.md"
+  test ! -e "${monorepo}/.codex/skills/owasp-security-scan"
   ! grep -q '"codex"' "${monorepo}/.rulesrc.json"
   ! grep -q '`.codex/rules/' "${monorepo}/AGENTS.md"
   grep -q '"cursor"' "${monorepo}/.rulesrc.json"
@@ -326,6 +326,8 @@ EOF
 }
 EOF
   cat > "${project}/.codex/rules/owasp-security-scan.md" <<'EOF'
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->
+
 stale skill content
 EOF
 
@@ -334,10 +336,11 @@ EOF
     ballast --language go upgrade --force
   )
 
-  grep -q "# OWASP Security Scan Skill" "${project}/.codex/rules/owasp-security-scan.md"
-  ! grep -q "stale skill content" "${project}/.codex/rules/owasp-security-scan.md"
+  grep -q "# OWASP Security Scan Skill" "${project}/.codex/skills/owasp-security-scan/SKILL.md"
+  ! grep -q "stale skill content" "${project}/.codex/skills/owasp-security-scan/SKILL.md"
+  test ! -e "${project}/.codex/rules/owasp-security-scan.md"
   grep -q '"owasp-security-scan"' "${project}/.rulesrc.json"
-  grep -q '`.codex/rules/owasp-security-scan.md`' "${project}/AGENTS.md"
+  grep -q '`.codex/skills/owasp-security-scan/SKILL.md`' "${project}/AGENTS.md"
 }
 
 main() {

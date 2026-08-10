@@ -879,7 +879,7 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("## Repository Facts", content)
         self.assertIn("Canonical GitHub repo: `<OWNER/REPO>`", content)
         self.assertIn("## Installed skills", content)
-        self.assertIn("`.codex/rules/owasp-security-scan.md`", content)
+        self.assertIn("`.codex/skills/owasp-security-scan/SKILL.md`", content)
 
     def test_build_gemini_md_includes_repository_facts_and_rules(self) -> None:
         content = cli.build_gemini_md(["linting"], ["owasp-security-scan"], "python")
@@ -908,7 +908,7 @@ class PatchInstallTests(unittest.TestCase):
         )
         self.assertEqual(
             cli.skill_destination(root, "codex", "owasp-security-scan"),
-            root / ".codex" / "rules" / "owasp-security-scan.md",
+            root / ".codex" / "skills" / "owasp-security-scan" / "SKILL.md",
         )
 
     def test_resolve_target_and_agents_uses_saved_skill_only_config(self) -> None:
@@ -1010,11 +1010,53 @@ class PatchInstallTests(unittest.TestCase):
             self.assertEqual(result.installed, [])
             self.assertEqual(result.installed_skills, ["owasp-security-scan"])
             self.assertTrue(
-                (root / ".codex" / "rules" / "owasp-security-scan.md").exists()
+                (
+                    root / ".codex" / "skills" / "owasp-security-scan" / "SKILL.md"
+                ).exists()
+            )
+            self.assertTrue(
+                (
+                    root
+                    / ".codex"
+                    / "skills"
+                    / "owasp-security-scan"
+                    / "references"
+                    / "owasp-mapping.md"
+                ).exists()
             )
             agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("## Installed skills", agents_md)
-            self.assertIn("`.codex/rules/owasp-security-scan.md`", agents_md)
+            self.assertIn("`.codex/skills/owasp-security-scan/SKILL.md`", agents_md)
+
+    def test_refresh_removes_legacy_codex_rule_format_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            legacy = root / ".codex" / "rules" / "owasp-security-scan.md"
+            legacy.parent.mkdir(parents=True, exist_ok=True)
+            legacy.write_text(
+                "<!-- Created by Ballast. Do not edit this section. -->\n\nlegacy",
+                encoding="utf-8",
+            )
+
+            with mock.patch.dict(os.environ, {"BALLAST_REFRESH_SKILLS": "1"}):
+                result = cli.install(
+                    root,
+                    "codex",
+                    [],
+                    ["owasp-security-scan"],
+                    "python",
+                    False,
+                    False,
+                    False,
+                )
+
+            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
+            self.assertFalse(legacy.exists())
+            self.assertTrue(
+                (
+                    root / ".codex" / "skills" / "owasp-security-scan" / "SKILL.md"
+                ).exists()
+            )
 
     def test_install_skips_existing_skill_when_force_and_patch_are_false(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1386,8 +1428,8 @@ Read and follow these rule files in `.codex/rules/` when they apply:
             self.assertEqual(result.errors, [])
             agents_md = (root / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("`.codex/rules/python-linting.md`", agents_md)
-            self.assertIn("`.codex/rules/owasp-security-scan.md`", agents_md)
-            self.assertNotIn("`.codex/rules/github-health-check.md`", agents_md)
+            self.assertIn("`.codex/skills/owasp-security-scan/SKILL.md`", agents_md)
+            self.assertNotIn("`.codex/skills/github-health-check/SKILL.md`", agents_md)
 
     def test_patch_updates_claude_md_section_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -628,6 +628,88 @@ Keep team-specific usage notes.
       );
     });
 
+    test('installs codex skills in native skill directories and copies resources', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        force: false,
+        saveConfig: false
+      });
+
+      const skillFile = path.join(
+        tmpDir,
+        '.codex',
+        'skills',
+        'owasp-security-scan',
+        'SKILL.md'
+      );
+      expect(result.installedSkills).toContain('owasp-security-scan');
+      expect(fs.readFileSync(skillFile, 'utf8')).toMatch(
+        /^---\nname: owasp-security-scan/m
+      );
+      expect(fs.readFileSync(skillFile, 'utf8')).toContain(
+        'Created by [Ballast]'
+      );
+      expect(
+        fs.existsSync(
+          path.join(
+            tmpDir,
+            '.codex',
+            'skills',
+            'owasp-security-scan',
+            'references',
+            'owasp-mapping.md'
+          )
+        )
+      ).toBe(true);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.codex', 'rules', 'owasp-security-scan.md')
+        )
+      ).toBe(false);
+    });
+
+    test('refresh mode removes legacy managed codex rule-format skill files', () => {
+      process.env.BALLAST_REFRESH_SKILLS = '1';
+      const legacySkillFile = path.join(
+        tmpDir,
+        '.codex',
+        'rules',
+        'owasp-security-scan.md'
+      );
+      fs.mkdirSync(path.dirname(legacySkillFile), { recursive: true });
+      fs.writeFileSync(
+        legacySkillFile,
+        'Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section.\n\nlegacy',
+        'utf8'
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        force: false,
+        saveConfig: false
+      });
+
+      expect(result.installedSkills).toContain('owasp-security-scan');
+      expect(fs.existsSync(legacySkillFile)).toBe(false);
+      expect(
+        fs.existsSync(
+          path.join(
+            tmpDir,
+            '.codex',
+            'skills',
+            'owasp-security-scan',
+            'SKILL.md'
+          )
+        )
+      ).toBe(true);
+    });
+
     test('changing taskSystem rewrites existing task rules without force or patch', () => {
       const taskRule = path.join(
         tmpDir,
@@ -2174,8 +2256,12 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
           'utf8'
         );
         expect(agentsMd).toContain('`.codex/rules/typescript-linting.md`');
-        expect(agentsMd).toContain('`.codex/rules/owasp-security-scan.md`');
-        expect(agentsMd).not.toContain('`.codex/rules/github-health-check.md`');
+        expect(agentsMd).toContain(
+          '`.codex/skills/owasp-security-scan/SKILL.md`'
+        );
+        expect(agentsMd).not.toContain(
+          '`.codex/skills/github-health-check/SKILL.md`'
+        );
       });
 
       test('written path matches getDestination for each target', () => {
@@ -2508,7 +2594,13 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       ).toBe(true);
       expect(
         fs.existsSync(
-          path.join(tmpDir, '.codex', 'rules', 'owasp-security-scan.md')
+          path.join(
+            tmpDir,
+            '.codex',
+            'skills',
+            'owasp-security-scan',
+            'SKILL.md'
+          )
         )
       ).toBe(true);
     });

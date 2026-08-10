@@ -6,15 +6,19 @@ import {
   buildContent,
   buildClaudeSkill,
   buildClaudeMd,
+  buildCodexSkillMarkdown,
   buildGeminiMd,
   buildCursorSkillFormat,
   buildCodexAgentsMd,
   buildSkillMarkdown,
+  copyCodexSkillResources,
+  getAllSkillIds,
   getSkillContent,
   getClaudeMdPath,
   getGeminiMdPath,
   getCodexAgentsMdPath,
   getDestination,
+  getLegacyCodexSkillDestination,
   getSkillDestination,
   getSkillClaudeSettings,
   listRuleSuffixes,
@@ -637,6 +641,19 @@ export function install(options: InstallOptions): InstallResult {
   );
   const skippedSupportSet = new Set(skipSupportFiles);
 
+  if (target === 'codex' && refreshManagedSkills) {
+    for (const skillId of getAllSkillIds()) {
+      const legacy = getLegacyCodexSkillDestination(skillId, projectRoot).file;
+      if (!fs.existsSync(legacy)) {
+        continue;
+      }
+      const content = fs.readFileSync(legacy, 'utf8');
+      if (content.includes('Created by [Ballast]')) {
+        fs.rmSync(legacy, { force: true });
+      }
+    }
+  }
+
   for (const agentId of effectiveAgents) {
     if (!isValidAgent(agentId, language)) {
       errors.push({ agent: agentId, error: 'Unknown agent' });
@@ -757,7 +774,6 @@ export function install(options: InstallOptions): InstallResult {
           break;
         }
         case 'opencode':
-        case 'codex':
         case 'gemini': {
           const content = buildSkillMarkdown(skillId);
           const nextContent =
@@ -765,6 +781,16 @@ export function install(options: InstallOptions): InstallResult {
               ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
               : content;
           fs.writeFileSync(file, nextContent, 'utf8');
+          break;
+        }
+        case 'codex': {
+          const content = buildCodexSkillMarkdown(skillId);
+          const nextContent =
+            fileExists && !force && patch
+              ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
+              : content;
+          fs.writeFileSync(file, nextContent, 'utf8');
+          copyCodexSkillResources(skillId, dir);
           break;
         }
         default:

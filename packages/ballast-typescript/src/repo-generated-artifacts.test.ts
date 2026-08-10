@@ -2,14 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import {
   buildClaudeSkill,
+  buildCodexSkillMarkdown,
   buildContent,
-  buildSkillMarkdown,
   getDestination,
   getSkillDestination,
   listRuleSuffixes
 } from './build';
 import {
   LANGUAGES,
+  getSkillDir,
   resolveAgents,
   resolveSkills,
   type Language
@@ -48,6 +49,28 @@ function collectFiles(dir: string): string[] {
   };
 
   walk(dir);
+  files.sort();
+  return files;
+}
+
+function collectCodexSkillResourceFiles(skillId: string): string[] {
+  const root = getSkillDir(skillId);
+  const files: string[] = [];
+  const walk = (currentDir: string, prefix = ''): void => {
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      if (entry.name === 'SKILL.md' || entry.name === 'claude-settings.json') {
+        continue;
+      }
+      const fullPath = path.join(currentDir, entry.name);
+      const relativePath = prefix ? path.join(prefix, entry.name) : entry.name;
+      if (entry.isDirectory()) {
+        walk(fullPath, relativePath);
+      } else if (entry.isFile()) {
+        files.push(relativePath);
+      }
+    }
+  };
+  walk(root);
   files.sort();
   return files;
 }
@@ -147,8 +170,21 @@ describe('repo generated artifacts', () => {
           content:
             target === 'claude'
               ? buildClaudeSkill(skillId)
-              : Buffer.from(buildSkillMarkdown(skillId), 'utf8')
+              : Buffer.from(buildCodexSkillMarkdown(skillId), 'utf8')
         });
+        if (target === 'codex') {
+          for (const resourcePath of collectCodexSkillResourceFiles(skillId)) {
+            addCandidate(
+              candidates,
+              path.join(path.dirname(relPath), resourcePath),
+              {
+                content: fs.readFileSync(
+                  path.join(getSkillDir(skillId), resourcePath)
+                )
+              }
+            );
+          }
+        }
       }
     }
 

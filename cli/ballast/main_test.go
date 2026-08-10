@@ -2005,6 +2005,44 @@ func TestRunInstallRefreshConfigCleansUpSingleLanguageStaleSelections(t *testing
 	}
 }
 
+func TestRunInstallRefreshConfigCleansUpLegacyAndNativeCodexSkills(t *testing.T) {
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"codex","agents":["linting"],"skills":[]}`)
+	legacySkill := filepath.Join(root, ".codex", "rules", "owasp-security-scan.md")
+	nativeSkill := filepath.Join(root, ".codex", "skills", "github-health-check", "SKILL.md")
+	nativeReference := filepath.Join(root, ".codex", "skills", "github-health-check", "references", "details.md")
+	mustWriteFile(t, legacySkill, "<!-- Created by Ballast. Do not edit this section. -->\n")
+	mustWriteFile(t, nativeSkill, "---\nname: github-health-check\n---\n\n<!-- Created by Ballast. Do not edit this section. -->\n")
+	mustWriteFile(t, nativeReference, "managed reference\n")
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--refresh-config"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(legacySkill); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy codex skill to be removed, stat err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Dir(nativeSkill)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected native codex skill directory to be removed, stat err=%v", err)
+	}
+}
+
 func TestRunInstallCLICommand(t *testing.T) {
 	originalRun := runCommandFunc
 	t.Cleanup(func() {
@@ -4993,17 +5031,17 @@ func TestPatchInstalledRulesSectionIgnoresHeadingInsideCodeFence(t *testing.T) {
 }
 
 func TestPatchManagedSupportSectionsUpdatesInstalledSkills(t *testing.T) {
-	existing := "# AGENTS.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/typescript-linting.md` — Rules for typescript/linting\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/old-skill.md` — Old skill\n"
-	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/typescript-linting.md` — Rules for typescript/linting\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/owasp-security-scan.md` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects\n"
+	existing := "# AGENTS.md\n\n## Team Notes\n\nKeep this section.\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/typescript-linting.md` — Rules for typescript/linting\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/skills/old-skill/SKILL.md` — Old skill\n"
+	canonical := "# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/rules/typescript-linting.md` — Rules for typescript/linting\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- `.codex/skills/owasp-security-scan/SKILL.md` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects\n"
 
 	merged := patchManagedSupportSections(existing, canonical)
 	if !strings.Contains(merged, "## Team Notes") {
 		t.Fatalf("expected non-managed content to remain, got %q", merged)
 	}
-	if !strings.Contains(merged, "`.codex/rules/owasp-security-scan.md`") {
+	if !strings.Contains(merged, "`.codex/skills/owasp-security-scan/SKILL.md`") {
 		t.Fatalf("expected installed skills section to be updated, got %q", merged)
 	}
-	if strings.Contains(merged, "`.codex/rules/old-skill.md`") {
+	if strings.Contains(merged, "`.codex/skills/old-skill/SKILL.md`") {
 		t.Fatalf("expected old installed skill entry to be replaced, got %q", merged)
 	}
 }
@@ -5048,7 +5086,7 @@ func TestBuildMonorepoSupportFileIncludesPublishingAndSkillsForCodex(t *testing.
 	if !strings.Contains(content, "## Installed skills") {
 		t.Fatalf("expected installed skills section in codex support file, got %q", content)
 	}
-	if !strings.Contains(content, "`.codex/rules/owasp-security-scan.md`") {
+	if !strings.Contains(content, "`.codex/skills/owasp-security-scan/SKILL.md`") {
 		t.Fatalf("expected codex skill entry in support file, got %q", content)
 	}
 }
