@@ -13,7 +13,7 @@ description: >
   GitHub".
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.15.3. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) vdev. Do not edit this section. -->
 
 # GitHub Repository Health Check Skill
 
