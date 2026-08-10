@@ -3359,6 +3359,12 @@ func TestResolveMonorepoPlanRemoveLanguageCleanupOnly(t *testing.T) {
 	if got := plan.Config.Paths["typescript"]; !reflect.DeepEqual(got, []string{"apps/frontend"}) {
 		t.Fatalf("expected typescript path to remain, got %#v", plan.Config.Paths)
 	}
+	if !reflect.DeepEqual(plan.Common, []string{"local-dev"}) {
+		t.Fatalf("expected cleanup-only plan to keep common rule selection, got %#v", plan.Common)
+	}
+	if !reflect.DeepEqual(plan.Language, []string{"linting"}) {
+		t.Fatalf("expected cleanup-only plan to keep language rule selection, got %#v", plan.Language)
+	}
 }
 
 func TestResolveMonorepoPlanRemoveLanguageWithTargetRunsInstallPath(t *testing.T) {
@@ -4441,6 +4447,11 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 		filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md"),
 		"# rule\n\n<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n",
 	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "AGENTS.md"),
+		"# AGENTS.md\n\n## Installed agent rules\n\nCreated by Ballast. Do not edit this section.\n\nRead and follow these rule files in `.codex/rules/` when they apply:\n\n- `.codex/rules/typescript/typescript-linting.md` — Rules for typescript/linting\n- `.codex/rules/python/python-linting.md` — Rules for python/linting\n",
+	)
 
 	originalEnsure := ensureInstalledFunc
 	originalExec := execToolFunc
@@ -4474,6 +4485,17 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	text := string(config)
 	if strings.Contains(text, `"python"`) || !strings.Contains(text, `"typescript"`) {
 		t.Fatalf("expected python removed and typescript retained in config, got %q", text)
+	}
+	agentsContent, err := os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	agentsText := string(agentsContent)
+	if !strings.Contains(agentsText, "`.codex/rules/typescript/typescript-linting.md`") {
+		t.Fatalf("expected AGENTS.md to keep remaining typescript rule, got %s", agentsText)
+	}
+	if strings.Contains(agentsText, "`.codex/rules/python/python-linting.md`") {
+		t.Fatalf("expected AGENTS.md to remove python rule, got %s", agentsText)
 	}
 }
 

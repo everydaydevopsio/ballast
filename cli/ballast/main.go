@@ -2724,13 +2724,15 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
 	}
+	commonSelection := filterAgents(selectedAgents, commonAgentIDs())
+	languageSelection := filterAgents(selectedAgents, languageAgentIDs())
 	if cleanupOnly || languageCleanupOnly {
 		return &monorepoPlan{
 			Invocations: nil,
 			Config:      configToSave,
 			Targets:     requestedTargets,
-			Common:      nil,
-			Language:    nil,
+			Common:      commonSelection,
+			Language:    languageSelection,
 			Removed:     removeTargets,
 			Previous:    config,
 		}, nil
@@ -2739,8 +2741,6 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		return nil, errors.New("no languages remain after --remove-language; run with only --remove-language to clean up and persist config, or select a language with --language for single-language installs")
 	}
 
-	commonSelection := filterAgents(selectedAgents, commonAgentIDs())
-	languageSelection := filterAgents(selectedAgents, languageAgentIDs())
 	baseArgs := withTargetSelection(stripMonorepoFlags(args), requestedTargets)
 	plan := make([]backendInvocation, 0, len(profiles)+1)
 	commonArgs := withSkillSelection(withAgentSelection(baseArgs, commonSelection), selectedSkills)
