@@ -1317,8 +1317,7 @@ func discoveryConfigFromConfig(config *monorepoConfig) *discoveryConfig {
 	return &discoveryConfig{ExcludePaths: excludePaths}
 }
 
-func isDiscoveryExcluded(root string, currentPath string, config *monorepoConfig) bool {
-	discovery := discoveryConfigFromConfig(config)
+func isDiscoveryExcluded(root string, currentPath string, discovery *discoveryConfig) bool {
 	if discovery == nil || len(discovery.ExcludePaths) == 0 {
 		return false
 	}
@@ -3031,6 +3030,7 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 		langTerraform:  {},
 		langDart:       {},
 	}
+	discovery := discoveryConfigFromConfig(config)
 
 	if err := walkDirFunc(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -3041,7 +3041,7 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 			if path != root && strings.HasPrefix(name, ".") {
 				return filepath.SkipDir
 			}
-			if path != root && isDiscoveryExcluded(root, path, config) {
+			if path != root && isDiscoveryExcluded(root, path, discovery) {
 				return filepath.SkipDir
 			}
 			if name == ".git" || name == "node_modules" || name == ".venv" || name == "dist" || name == "build" || name == "vendor" || name == ".terraform" || name == ".terragrunt-cache" {
