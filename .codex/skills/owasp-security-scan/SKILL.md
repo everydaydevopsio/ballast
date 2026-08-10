@@ -154,6 +154,7 @@ Severity mapping from tool scores:
 Present findings in this structure:
 
 ```text
+
 ## Security Scan Report
 **Date**: <date>
 **Project**: <detected name>
