@@ -4384,6 +4384,26 @@ func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
 	}
 }
 
+func TestRemoveStaleManagedFilesPreservesCursorSkillsUnderRules(t *testing.T) {
+	root := resolvedTempDir(t)
+	skillPath := filepath.Join(root, ".cursor", "rules", "owasp-security-scan.mdc")
+	mustWriteFile(t, skillPath, "<!-- Created by Ballast. Do not edit this section. -->\n")
+
+	next := &monorepoConfig{
+		Targets:   []string{"cursor"},
+		Agents:    []string{"local-dev"},
+		Skills:    []string{"owasp-security-scan"},
+		Languages: []string{"typescript"},
+	}
+
+	if err := removeStaleManagedFiles(root, "cursor", nil, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles(cursor): %v", err)
+	}
+	if _, err := os.Stat(skillPath); err != nil {
+		t.Fatalf("expected cursor skill under rules root to remain, got %v", err)
+	}
+}
+
 func TestRemoveStaleManagedFilesDeletesConfigBackedOpencodeSkill(t *testing.T) {
 	root := resolvedTempDir(t)
 	skillPath := filepath.Join(root, ".opencode", "skills", "github-health-check.md")

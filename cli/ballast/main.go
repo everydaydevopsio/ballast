@@ -3632,6 +3632,9 @@ func removeUnlistedManagedRuleFiles(root string, target string, next *monorepoCo
 	for _, file := range managedRulePaths(root, target, next) {
 		expected[filepath.Clean(file)] = true
 	}
+	for _, file := range managedSkillPaths(root, target, next.Skills) {
+		expected[filepath.Clean(file)] = true
+	}
 	return filepath.WalkDir(rulesRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
