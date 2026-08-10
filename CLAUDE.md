@@ -55,12 +55,6 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/go/go-linting.md` — Rules for go/linting
 - `.claude/rules/go/go-logging.md` — Rules for go/logging
 - `.claude/rules/go/go-testing.md` — Rules for go/testing
-- `.claude/rules/ansible/ansible-linting.md` — Rules for ansible/linting
-- `.claude/rules/ansible/ansible-logging.md` — Rules for ansible/logging
-- `.claude/rules/ansible/ansible-testing.md` — Rules for ansible/testing
-- `.claude/rules/terraform/terraform-linting.md` — Rules for terraform/linting
-- `.claude/rules/terraform/terraform-logging.md` — Rules for terraform/logging
-- `.claude/rules/terraform/terraform-testing.md` — Rules for terraform/testing
 
 ## Installed skills
 
