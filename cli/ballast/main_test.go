@@ -154,6 +154,45 @@ func TestRunSetupDevDetectsNpmFromLockfile(t *testing.T) {
 	}
 }
 
+func TestRunSetupDevUsesConfiguredTypescriptToolWhenPackageManagerMissing(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["local-dev"],
+  "languages": ["typescript"],
+  "tools": {
+    "TypeScript": ["pnpm", "corepack"]
+  }
+}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"setup-dev"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	want := [][]string{{"pnpm", "install"}}
+	if !reflect.DeepEqual(commands, want) {
+		t.Fatalf("expected setup commands %#v, got %#v", want, commands)
+	}
+	if !strings.Contains(output, "Detected package manager: pnpm") {
+		t.Fatalf("expected configured package manager output, got %q", output)
+	}
+}
+
 func TestRunSetupDevIgnoresUnsafeDeclaredPackageManager(t *testing.T) {
 	originalRun := runCommandFunc
 	t.Cleanup(func() { runCommandFunc = originalRun })
@@ -3228,11 +3267,15 @@ func TestResolveMonorepoPlanSupportsSkillOnlyConfig(t *testing.T) {
   "target": "claude",
   "skills": ["owasp-security-scan"],
   "languages": ["typescript", "python"],
-  "paths": {
-    "typescript": ["apps/frontend"],
-    "python": ["services/api"]
-  }
-}`)
+	  "paths": {
+	    "typescript": ["apps/frontend"],
+	    "python": ["services/api"]
+	  },
+	  "tools": {
+	    "typescript": ["pnpm", "corepack"],
+	    "python": ["uv", "pyenv"]
+	  }
+	}`)
 
 	plan, err := resolveMonorepoPlan(root, []string{"install"})
 	if err != nil {
@@ -3496,6 +3539,12 @@ func TestResolveMonorepoPlanRemoveLanguageCleanupOnly(t *testing.T) {
 	}
 	if got := plan.Config.Paths["typescript"]; !reflect.DeepEqual(got, []string{"apps/frontend"}) {
 		t.Fatalf("expected typescript path to remain, got %#v", plan.Config.Paths)
+	}
+	if _, ok := plan.Config.Tools["python"]; ok {
+		t.Fatalf("expected python tools to be removed, got %#v", plan.Config.Tools)
+	}
+	if got := plan.Config.Tools["typescript"]; !reflect.DeepEqual(got, []string{"pnpm", "corepack"}) {
+		t.Fatalf("expected typescript tools to remain, got %#v", plan.Config.Tools)
 	}
 	if !reflect.DeepEqual(plan.Common, []string{"local-dev"}) {
 		t.Fatalf("expected cleanup-only plan to keep common rule selection, got %#v", plan.Common)

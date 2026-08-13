@@ -82,7 +82,7 @@ The chosen solution in plain language. What will change and how.
 
 ## Verification
 
-How the decision was validated.
+How will we know this works? Commands, tests, or checks to run.
 
 ## Alternatives Rejected
 

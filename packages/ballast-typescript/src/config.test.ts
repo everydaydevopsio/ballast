@@ -138,6 +138,29 @@ describe('config', () => {
       expect(loadConfig(tmpDir)).toEqual(config);
     });
 
+    test('returns normalized language tools when present', () => {
+      const config = {
+        targets: ['claude'] as const,
+        agents: ['local-dev'],
+        tools: {
+          Python: ['uv', 'pyenv', 'uv', ''],
+          typescript: ['pnpm', 'corepack']
+        }
+      };
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify(config)
+      );
+      expect(loadConfig(tmpDir)).toEqual({
+        targets: ['claude'],
+        agents: ['local-dev'],
+        tools: {
+          python: ['uv', 'pyenv'],
+          typescript: ['pnpm', 'corepack']
+        }
+      });
+    });
+
     test('returns ballastVersion when present', () => {
       const config = {
         targets: ['claude'] as const,
@@ -235,8 +258,67 @@ describe('config', () => {
         paths: {
           typescript: ['.'],
           go: ['.']
+        },
+        tools: {
+          typescript: ['pnpm', 'corepack'],
+          go: ['go', 'gofumpt', 'golangci-lint']
         }
       });
+    });
+
+    test('preserves explicit tool overrides while defaulting new languages', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['local-dev'],
+          ballastVersion: BALLAST_VERSION,
+          languages: ['python'],
+          tools: {
+            python: ['poetry', 'pyenv']
+          }
+        },
+        tmpDir
+      );
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['local-dev'],
+          ballastVersion: BALLAST_VERSION,
+          languages: ['typescript']
+        },
+        tmpDir
+      );
+
+      const parsed = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, RULESRC_FILENAME), 'utf8')
+      );
+      expect(parsed.tools).toEqual({
+        python: ['poetry', 'pyenv'],
+        typescript: ['pnpm', 'corepack']
+      });
+    });
+
+    test('normalizes tool keys when defaulting mixed-case languages', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['local-dev'],
+          ballastVersion: BALLAST_VERSION,
+          languages: ['TypeScript'],
+          tools: {
+            TypeScript: ['pnpm', 'corepack']
+          }
+        },
+        tmpDir
+      );
+
+      const parsed = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, RULESRC_FILENAME), 'utf8')
+      );
+      expect(parsed.tools).toEqual({
+        typescript: ['pnpm', 'corepack']
+      });
+      expect(parsed.tools).not.toHaveProperty('TypeScript');
     });
 
     test('loads legacy .rulesrc.ts.json for typescript', () => {

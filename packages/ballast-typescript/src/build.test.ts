@@ -140,16 +140,10 @@ describe('build', () => {
     test('returns Copilot review loop guidance for local-dev PR workflow', () => {
       const content = getContent('local-dev', 'env');
       expect(content).toContain(
-        'After PR creation and every push, poll Copilot and human review comments until the PR is ready.'
+        'Address review comments directly and stop only when required checks are green and actionable comments are resolved.'
       );
       expect(content).toContain(
-        'Before changes, summarize actionable Copilot asks and related human-review asks.'
-      );
-      expect(content).toContain(
-        'Reply directly on addressed Copilot and human comments; resolve addressed review threads when supported.'
-      );
-      expect(content).toContain(
-        'Stop only when required checks are green and no unresolved actionable Copilot or human review comments remain.'
+        'Inspect failing checks with `gh`; summarize the failure.'
       );
       expect(content).toContain('gh pr checks');
       expect(content).toContain('gh pr view');
