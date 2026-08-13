@@ -1103,6 +1103,7 @@ export async function runInstall(
       skills,
       ballastVersion: BALLAST_VERSION,
       languages: [language],
+      tools: priorConfig?.tools,
       taskSystem: resolvedTaskSystem,
       deploymentModel: resolvedDeploymentModel,
       publishingProfiles: resolvedPublishingProfiles

@@ -1423,7 +1423,8 @@ Keep my custom responsibilities.
         agents: ['linting', 'local-dev', 'git-hooks'],
         ballastVersion: BALLAST_VERSION,
         languages: ['typescript'],
-        paths: { typescript: ['.'] }
+        paths: { typescript: ['.'] },
+        tools: { typescript: ['pnpm', 'corepack'] }
       });
       const raw = JSON.parse(
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
@@ -1431,6 +1432,7 @@ Keep my custom responsibilities.
       expect(raw.languages).toEqual(['typescript']);
       expect(raw.ballastVersion).toBe(BALLAST_VERSION);
       expect(raw.paths).toEqual({ typescript: ['.'] });
+      expect(raw.tools).toEqual({ typescript: ['pnpm', 'corepack'] });
     });
 
     test('saves shared .rulesrc.json for go installs', () => {
@@ -1448,7 +1450,8 @@ Keep my custom responsibilities.
         agents: ['linting', 'local-dev', 'git-hooks'],
         ballastVersion: BALLAST_VERSION,
         languages: ['go'],
-        paths: { go: ['.'] }
+        paths: { go: ['.'] },
+        tools: { go: ['go', 'gofumpt', 'golangci-lint'] }
       });
       const raw = JSON.parse(
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
@@ -1456,6 +1459,7 @@ Keep my custom responsibilities.
       expect(raw.languages).toEqual(['go']);
       expect(raw.ballastVersion).toBe(BALLAST_VERSION);
       expect(raw.paths).toEqual({ go: ['.'] });
+      expect(raw.tools).toEqual({ go: ['go', 'gofumpt', 'golangci-lint'] });
     });
 
     test('manual language installs accumulate languages in shared config', () => {

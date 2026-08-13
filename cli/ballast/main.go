@@ -139,6 +139,14 @@ var collectDoctorBackendsFunc = collectDoctorBackends
 
 var supportedTaskSystems = []string{"github", "jira", "linear"}
 var supportedDeploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
+var defaultLanguageTools = map[string][]string{
+	"python":     {"uv", "pyenv"},
+	"typescript": {"pnpm", "corepack"},
+	"go":         {"go", "gofumpt", "golangci-lint"},
+	"terraform":  {"tfenv", "tflint", "trivy"},
+	"ansible":    {"ansible-lint", "molecule"},
+	"dart":       {"flutter", "fvm"},
+}
 
 type monorepoConfig struct {
 	Target          string              `json:"target,omitempty"`
@@ -148,6 +156,7 @@ type monorepoConfig struct {
 	BallastVersion  string              `json:"ballastVersion,omitempty"`
 	Languages       []string            `json:"languages,omitempty"`
 	Paths           map[string][]string `json:"paths,omitempty"`
+	Tools           map[string][]string `json:"tools,omitempty"`
 	Discovery       *discoveryConfig    `json:"discovery,omitempty"`
 	TaskSystem      string              `json:"taskSystem,omitempty"`
 	DeploymentModel string              `json:"deploymentModel,omitempty"`
@@ -787,6 +796,9 @@ func runSetupDev(args []string) int {
 func setupDevCommands(root string) []setupDevCommand {
 	manager, declared := detectNodePackageManager(root)
 	if manager == "" {
+		manager = configuredPackageManager(root, "typescript")
+	}
+	if manager == "" {
 		return nil
 	}
 
@@ -804,6 +816,20 @@ func setupDevCommands(root string) []setupDevCommand {
 		Remediation: fmt.Sprintf("install `%s` or run `%s install` from the project root after fixing the package manager.", manager, manager),
 	})
 	return commands
+}
+
+func configuredPackageManager(root string, lang string) string {
+	config, err := loadDoctorConfig(root)
+	if err != nil || config == nil {
+		return ""
+	}
+	for _, tool := range config.Tools[strings.ToLower(strings.TrimSpace(lang))] {
+		manager := packageManagerName(tool)
+		if safeNodePackageManager(manager) {
+			return manager
+		}
+	}
+	return ""
 }
 
 func detectNodePackageManager(root string) (string, bool) {
@@ -1093,6 +1119,9 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	if formattedPaths := formatDoctorConfigPaths(config.Languages, config.Paths); formattedPaths != "" {
 		fmt.Printf("- paths: %s\n", formattedPaths)
+	}
+	if formattedTools := formatDoctorConfigPaths(config.Languages, config.Tools); formattedTools != "" {
+		fmt.Printf("- tools: %s\n", formattedTools)
 	}
 	if strings.TrimSpace(config.TaskSystem) != "" {
 		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
@@ -2062,6 +2091,57 @@ func mergeResolvedEnv(base map[string]string, extra map[string]string) map[strin
 	return merged
 }
 
+func mergeLanguageTools(config *monorepoConfig, languages []string) map[string][]string {
+	merged := map[string][]string{}
+	languageSet := map[string]struct{}{}
+	for _, language := range languages {
+		normalizedLanguage := strings.ToLower(strings.TrimSpace(language))
+		if normalizedLanguage != "" {
+			languageSet[normalizedLanguage] = struct{}{}
+		}
+	}
+	if config != nil {
+		for language, tools := range config.Tools {
+			normalizedLanguage := strings.ToLower(strings.TrimSpace(language))
+			normalizedTools := uniqueNonEmptyStrings(tools)
+			if normalizedLanguage == "" || len(normalizedTools) == 0 {
+				continue
+			}
+			if len(languageSet) > 0 {
+				if _, ok := languageSet[normalizedLanguage]; !ok {
+					continue
+				}
+			}
+			merged[normalizedLanguage] = normalizedTools
+		}
+	}
+	for _, language := range languages {
+		normalizedLanguage := strings.ToLower(strings.TrimSpace(language))
+		if normalizedLanguage == "" || len(merged[normalizedLanguage]) > 0 {
+			continue
+		}
+		merged[normalizedLanguage] = slices.Clone(defaultLanguageTools[normalizedLanguage])
+	}
+	return merged
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	seen := map[string]struct{}{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+	return result
+}
+
 func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendCommand {
 	if siblingBinary, ok := siblingBackendBinary(lang); ok {
 		return resolvedBackendCommand{
@@ -2761,6 +2841,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		BallastVersion:  normalizeVersion(resolveVersion()),
 		Languages:       make([]string, 0, len(profiles)),
 		Paths:           map[string][]string{},
+		Tools:           mergeLanguageTools(config, nil),
 		Discovery:       discoveryConfigFromConfig(config),
 		TaskSystem:      savedTaskSystem,
 		DeploymentModel: savedDeploymentModel,
@@ -2769,6 +2850,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
 	}
+	configToSave.Tools = mergeLanguageTools(config, configToSave.Languages)
 	commonSelection := filterAgents(configToSave.Agents, commonAgentIDs())
 	languageSelection := filterAgents(configToSave.Agents, languageAgentIDs())
 	if cleanupOnly || languageCleanupOnly {

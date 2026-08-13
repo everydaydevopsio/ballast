@@ -48,6 +48,14 @@ var taskSystemGuidanceToken = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
 var taskSystemToken = "{{taskSystem}}"
 var taskSystems = []string{"github", "jira", "linear", "none"}
 var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
+var defaultLanguageTools = map[string][]string{
+	"python":     {"uv", "pyenv"},
+	"typescript": {"pnpm", "corepack"},
+	"go":         {"go", "gofumpt", "golangci-lint"},
+	"terraform":  {"tfenv", "tflint", "trivy"},
+	"ansible":    {"ansible-lint", "molecule"},
+	"dart":       {"flutter", "fvm"},
+}
 
 func withImplicitAgents(agents []string) []string {
 	resolved := slices.Clone(agents)
@@ -82,6 +90,7 @@ type rulesConfig struct {
 	BallastVersion  string              `json:"ballastVersion,omitempty"`
 	Languages       []string            `json:"languages,omitempty"`
 	Paths           map[string][]string `json:"paths,omitempty"`
+	Tools           map[string][]string `json:"tools,omitempty"`
 	TaskSystem      string              `json:"taskSystem,omitempty"`
 	DeploymentModel string              `json:"deploymentModel,omitempty"`
 }
@@ -94,6 +103,7 @@ type rawRulesConfig struct {
 	BallastVersion  string              `json:"ballastVersion,omitempty"`
 	Languages       []string            `json:"languages,omitempty"`
 	Paths           map[string][]string `json:"paths,omitempty"`
+	Tools           map[string][]string `json:"tools,omitempty"`
 	TaskSystem      string              `json:"taskSystem,omitempty"`
 	DeploymentModel string              `json:"deploymentModel,omitempty"`
 }
@@ -613,6 +623,9 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		}
 		if formattedPaths := formatDoctorConfigPaths(config.Languages, config.Paths); formattedPaths != "" {
 			lines = append(lines, fmt.Sprintf("- paths: %s", formattedPaths))
+		}
+		if formattedTools := formatDoctorConfigPaths(config.Languages, config.Tools); formattedTools != "" {
+			lines = append(lines, fmt.Sprintf("- tools: %s", formattedTools))
 		}
 		if strings.TrimSpace(config.TaskSystem) != "" {
 			lines = append(lines, fmt.Sprintf("- taskSystem: %s", config.TaskSystem))
@@ -2462,6 +2475,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		BallastVersion:  raw.BallastVersion,
 		Languages:       raw.Languages,
 		Paths:           raw.Paths,
+		Tools:           normalizeLanguageTools(raw.Tools),
 		TaskSystem:      normalizeRequiredInstallOptionValue(raw.TaskSystem),
 		DeploymentModel: normalizeDeploymentModel(raw.DeploymentModel),
 	}
@@ -2487,8 +2501,10 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		cfg.Targets = mergeStringLists(existing.Targets, cfg.Targets)
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)
 		cfg.Paths = mergeLanguagePaths(existing.Paths, cfg.Languages)
+		cfg.Tools = mergeLanguageTools(existing.Tools, cfg.Tools, cfg.Languages)
 	} else {
 		cfg.Paths = mergeLanguagePaths(nil, cfg.Languages)
+		cfg.Tools = mergeLanguageTools(nil, cfg.Tools, cfg.Languages)
 	}
 	cfg.DeploymentModel = normalizeDeploymentModel(cfg.DeploymentModel)
 	cfg.TaskSystem = normalizeRequiredInstallOptionValue(cfg.TaskSystem)
@@ -2582,6 +2598,56 @@ func mergeLanguagePaths(existing map[string][]string, languages []string) map[st
 		}
 	}
 	return merged
+}
+
+func mergeLanguageTools(existing map[string][]string, incoming map[string][]string, languages []string) map[string][]string {
+	merged := normalizeLanguageTools(existing)
+	for language, tools := range normalizeLanguageTools(incoming) {
+		merged[language] = tools
+	}
+	for _, language := range languages {
+		normalizedLanguage := strings.ToLower(strings.TrimSpace(language))
+		if normalizedLanguage == "" || len(merged[normalizedLanguage]) > 0 {
+			continue
+		}
+		merged[normalizedLanguage] = append([]string(nil), defaultLanguageTools[normalizedLanguage]...)
+	}
+	for language, tools := range merged {
+		if len(tools) == 0 {
+			delete(merged, language)
+		}
+	}
+	return merged
+}
+
+func normalizeLanguageTools(raw map[string][]string) map[string][]string {
+	normalized := make(map[string][]string, len(raw))
+	for language, tools := range raw {
+		normalizedLanguage := strings.ToLower(strings.TrimSpace(language))
+		normalizedTools := uniqueToolList(tools)
+		if normalizedLanguage == "" || len(normalizedTools) == 0 {
+			continue
+		}
+		normalized[normalizedLanguage] = normalizedTools
+	}
+	return normalized
+}
+
+func uniqueToolList(values []string) []string {
+	seen := map[string]struct{}{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+	return result
 }
 
 func rulesrcFilename(language string) string {

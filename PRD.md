@@ -151,6 +151,8 @@ AI agents need a deterministic first command that prepares a repository for loca
 5. Missing prerequisite and command failure output must name the failed command and provide actionable remediation.
 6. Repositories without recognized dependency manifests must be skipped with clear output instead of failing.
 7. Agent local-development guidance must tell agents to run `ballast setup-dev` as their first startup step when Ballast is available.
+8. Ballast must persist opinionated default developer tools per configured language in `.rulesrc.json` while allowing repositories to override each language's tool list.
+9. `ballast doctor` and generated local-development guidance must make the configured language tools visible so agents and contributors prefer the repository policy over ad hoc tool choices.
 
 ### Acceptance Criteria
 
@@ -160,6 +162,9 @@ AI agents need a deterministic first command that prepares a repository for loca
 4. Given a setup command failure, `ballast setup-dev` exits non-zero and prints the command that failed plus manual remediation guidance.
 5. Wrapper tests cover Corepack/package-manager behavior and the no-op path.
 6. Generated local-dev rule output references `ballast setup-dev` as the first agent startup step.
+7. Given a saved `.rulesrc.json` without `tools`, Ballast defaults Python to `uv, pyenv` and TypeScript to `pnpm, corepack`, with documented defaults for Go, Terraform, Ansible, and Dart.
+8. Given `.rulesrc.json` contains `tools.python`, Ballast preserves that override instead of replacing it with defaults.
+9. Given `ballast doctor` runs with configured tools, the report prints a `tools` line grouped by language.
 
 ## Generated Rule Context Hygiene
 

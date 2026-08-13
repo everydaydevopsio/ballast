@@ -25,6 +25,14 @@ export const PUBLISHING_PROFILES = [
   'apt',
   'brew'
 ] as const;
+export const DEFAULT_LANGUAGE_TOOLS: Record<string, string[]> = {
+  python: ['uv', 'pyenv'],
+  typescript: ['pnpm', 'corepack'],
+  go: ['go', 'gofumpt', 'golangci-lint'],
+  terraform: ['tfenv', 'tflint', 'trivy'],
+  ansible: ['ansible-lint', 'molecule'],
+  dart: ['flutter', 'fvm']
+};
 
 export type Target = (typeof TARGETS)[number];
 export type TaskSystem = (typeof TASK_SYSTEMS)[number];
@@ -38,6 +46,7 @@ export interface RulesConfig {
   ballastVersion?: string;
   languages?: string[];
   paths?: Record<string, string[]>;
+  tools?: Record<string, string[]>;
   taskSystem?: TaskSystem;
   deploymentModel?: DeploymentModel;
   publishingProfiles?: PublishingProfile[];
@@ -188,11 +197,13 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
 
   const mergedLanguages = mergeLanguages(existing, config);
   const mergedPaths = mergePaths(existing, config, mergedLanguages);
+  const mergedTools = mergeTools(existing, config, mergedLanguages);
   if (mergedLanguages.length > 0) {
     nextConfig = {
       ...nextConfig,
       languages: mergedLanguages,
-      paths: mergedPaths
+      paths: mergedPaths,
+      tools: mergedTools
     };
   }
 
@@ -236,6 +247,7 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     ballastVersion?: unknown;
     languages?: unknown;
     paths?: unknown;
+    tools?: unknown;
     taskSystem?: unknown;
     deploymentModel?: unknown;
     publishingProfiles?: unknown;
@@ -275,6 +287,9 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
       )
     );
   }
+  if (record.tools && typeof record.tools === 'object') {
+    config.tools = normalizeTools(record.tools);
+  }
   if (
     typeof record.taskSystem === 'string' &&
     (TASK_SYSTEMS as readonly string[]).includes(record.taskSystem)
@@ -293,6 +308,31 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     );
   }
   return config;
+}
+
+export function normalizeTools(raw: unknown): Record<string, string[]> {
+  if (!raw || typeof raw !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(raw).flatMap(([key, value]) => {
+      const language = key.trim().toLowerCase();
+      if (!language || !Array.isArray(value)) return [];
+      const tools = uniqueToolList(value);
+      return tools.length > 0 ? [[language, tools]] : [];
+    })
+  );
+}
+
+function uniqueToolList(values: unknown[]): string[] {
+  const seen = new Set<string>();
+  const tools: string[] = [];
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const tool = value.trim();
+    if (!tool || seen.has(tool)) continue;
+    seen.add(tool);
+    tools.push(tool);
+  }
+  return tools;
 }
 
 export function normalizePublishingProfiles(
@@ -343,6 +383,27 @@ function mergePaths(
     }
   }
   return merged;
+}
+
+function mergeTools(
+  existing: RulesConfig | null,
+  config: RulesConfig,
+  languages: string[]
+): Record<string, string[]> {
+  const merged: Record<string, string[]> = { ...(existing?.tools ?? {}) };
+  for (const [language, tools] of Object.entries(config.tools ?? {})) {
+    if (tools.length > 0) {
+      merged[language] = [...tools];
+    }
+  }
+  for (const language of languages) {
+    if (!merged[language] || merged[language].length === 0) {
+      merged[language] = DEFAULT_LANGUAGE_TOOLS[language] ?? [];
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(merged).filter(([, tools]) => tools.length > 0)
+  );
 }
 
 export function isCiMode(): boolean {

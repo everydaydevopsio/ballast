@@ -22,7 +22,7 @@ For the full playbook and examples, use `docs/agents/local-dev.md`.
 - If the `ballast` wrapper is available, run `ballast setup-dev` before inspecting or changing code.
 - Use `ballast doctor` to inspect Ballast-managed local state; if `.ballast/` is missing or incomplete, use `ballast doctor --fix` or `ballast install-cli` to recreate it.
 - Treat `.ballast/` as generated local tool state. Do not commit it.
-- Treat setup output as the source of truth for missing tools, skipped steps, and manual remediation.
+- Treat setup output and `.rulesrc.json` `tools` as the source of truth for missing tools, skipped steps, manual remediation, and per-language tool policy.
 - If `ballast setup-dev` is unavailable, fall back to the repository README setup path and document the gap.
 
 ## Apply This Rule When
@@ -45,6 +45,8 @@ Before modifying files, check the current branch with `git branch --show-current
 ## Core Responsibilities
 
 1. Establish the local runtime baseline.
+   - Check `.rulesrc.json` `tools` first. Defaults: Python `uv, pyenv`; TypeScript `pnpm, corepack`; Go `go, gofumpt, golangci-lint`; Terraform `tfenv, tflint, trivy`; Ansible `ansible-lint, molecule`; Dart `flutter, fvm`.
+   - Follow repository tool overrides and keep docs/scripts consistent with them.
    - Add or update `.nvmrc` when the repo is Node-based.
    - Keep `package.json` `engines` aligned with the supported Node range.
    - Document prerequisites and setup commands in `README.md`.
@@ -56,8 +58,7 @@ Before modifying files, check the current branch with `git branch --show-current
 3. Containerize local development only when it helps the repo.
    - Prefer a production-style `Dockerfile`.
    - Use `docker-compose.yaml` for the base stack.
-   - Use `docker-compose.local.yaml` for fast iteration and watch-mode overrides.
-   - Add a `Makefile` with simple entrypoints such as `make up`, `make down`, `make logs`, and `make up-local`.
+   - Use `docker-compose.local.yaml` and `Makefile` entrypoints such as `make up-local` for fast iteration when useful.
 
 4. Keep developer commands coherent.
    - Ensure `build`, `start`, and `dev` scripts exist when the app needs them.
@@ -66,11 +67,8 @@ Before modifying files, check the current branch with `git branch --show-current
 5. Treat PR hygiene as part of local-dev workflow.
    - Verify expected reviewers are assigned.
    - Inspect failing checks with `gh`; summarize the failure.
-   - After PR creation and every push, poll Copilot and human review comments until the PR is ready.
-   - Before changes, summarize actionable Copilot asks and related human-review asks.
    - Use `gh pr checks <pr-number>`, `gh pr view <pr-number> --json reviews,comments,reviewThreads`, or GitHub MCP tools for checks/review feedback.
-   - Reply directly on addressed Copilot and human comments; resolve addressed review threads when supported.
-   - Stop only when required checks are green and no unresolved actionable Copilot or human review comments remain.
+   - Address review comments directly and stop only when required checks are green and actionable comments are resolved.
 
 ## Node Guidance
 
