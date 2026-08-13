@@ -15,6 +15,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      {},
       null,
       null,
       [
@@ -58,6 +59,10 @@ describe('doctor', () => {
         typescript: ['apps/web'],
         ansible: ['infra/ansible']
       },
+      {
+        typescript: ['pnpm', 'corepack'],
+        ansible: ['ansible-lint', 'molecule']
+      },
       'jira',
       'hosted',
       [
@@ -84,6 +89,9 @@ describe('doctor', () => {
     expect(output).toContain(
       '- paths: typescript=apps/web; ansible=infra/ansible'
     );
+    expect(output).toContain(
+      '- tools: typescript=pnpm,corepack; ansible=ansible-lint,molecule'
+    );
     expect(output).toContain('- taskSystem: jira');
     expect(output).toContain('- deploymentModel: hosted');
     expect(output).toContain('- No action needed.');
@@ -99,6 +107,7 @@ describe('doctor', () => {
       ['publishing'],
       [],
       [],
+      {},
       {},
       null,
       'kubernetes',
@@ -121,6 +130,7 @@ describe('doctor', () => {
       [],
       [],
       {},
+      {},
       null,
       null,
       [],
@@ -140,6 +150,7 @@ describe('doctor', () => {
       ['linting'],
       [],
       [],
+      {},
       {},
       null,
       null,
@@ -163,6 +174,7 @@ describe('doctor', () => {
       ['publishing'],
       [],
       [],
+      {},
       {},
       null,
       null,

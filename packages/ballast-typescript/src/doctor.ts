@@ -22,6 +22,7 @@ export interface DoctorReport {
   configSkills: string[];
   configLanguages: string[];
   configPaths: Record<string, string[]>;
+  configTools: Record<string, string[]>;
   configTaskSystem: string | null;
   configDeploymentModel: string | null;
   installed: InstalledCliStatus[];
@@ -205,6 +206,7 @@ export function buildDoctorReport(
   configSkills: string[],
   configLanguages: string[],
   configPaths: Record<string, string[]>,
+  configTools: Record<string, string[]>,
   configTaskSystem: string | null,
   configDeploymentModel: string | null,
   installed: InstalledCliStatus[],
@@ -268,6 +270,7 @@ export function buildDoctorReport(
     configSkills,
     configLanguages,
     configPaths,
+    configTools,
     configTaskSystem,
     configDeploymentModel,
     installed,
@@ -288,6 +291,25 @@ function formatConfigPaths(
   ];
   const entries = orderedKeys.flatMap((language) => {
     const values = paths[language];
+    return Array.isArray(values) && values.length > 0
+      ? [`${language}=${values.join(',')}`]
+      : [];
+  });
+  return entries.length > 0 ? entries.join('; ') : null;
+}
+
+function formatConfigTools(
+  languages: string[],
+  tools: Record<string, string[]>
+): string | null {
+  const orderedKeys = [
+    ...languages.filter((language) => Array.isArray(tools[language])),
+    ...Object.keys(tools)
+      .filter((language) => !languages.includes(language))
+      .sort()
+  ];
+  const entries = orderedKeys.flatMap((language) => {
+    const values = tools[language];
     return Array.isArray(values) && values.length > 0
       ? [`${language}=${values.join(',')}`]
       : [];
@@ -340,6 +362,13 @@ export function formatDoctorReport(report: DoctorReport): string {
     if (formattedPaths) {
       lines.push(`- paths: ${formattedPaths}`);
     }
+    const formattedTools = formatConfigTools(
+      report.configLanguages,
+      report.configTools
+    );
+    if (formattedTools) {
+      lines.push(`- tools: ${formattedTools}`);
+    }
     if (report.configTaskSystem) {
       lines.push(`- taskSystem: ${report.configTaskSystem}`);
     }
@@ -374,6 +403,7 @@ export function runDoctor(): number {
     config?.skills ?? [],
     config?.languages ?? [],
     config?.paths ?? {},
+    config?.tools ?? {},
     config?.taskSystem ?? null,
     config?.deploymentModel ?? null,
     CLI_NAMES.map((name) => detectInstalledCli(name)),

@@ -2151,6 +2151,38 @@ func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	}
 }
 
+func TestSaveConfigDefaultsAndPreservesLanguageTools(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := saveConfig(tmpDir, "python", rulesConfig{
+		Targets:   []string{"codex"},
+		Agents:    []string{"local-dev"},
+		Languages: []string{"python"},
+		Tools: map[string][]string{
+			"python": {"poetry", "pyenv", "poetry"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveConfig(tmpDir, "typescript", rulesConfig{
+		Targets:   []string{"codex"},
+		Agents:    []string{"local-dev"},
+		Languages: []string{"typescript"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := loadConfig(tmpDir, "go")
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	if !slices.Equal(cfg.Tools["python"], []string{"poetry", "pyenv"}) {
+		t.Fatalf("expected python tool override to be preserved, got %#v", cfg.Tools)
+	}
+	if !slices.Equal(cfg.Tools["typescript"], []string{"pnpm", "corepack"}) {
+		t.Fatalf("expected typescript default tools, got %#v", cfg.Tools)
+	}
+}
+
 func TestPatchFlagUpdatesClaudeMDSection(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {

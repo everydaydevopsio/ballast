@@ -42,6 +42,21 @@
       "packages/ballast-typescript"
     ]
   },
+  "tools": {
+    "go": [
+      "go",
+      "gofumpt",
+      "golangci-lint"
+    ],
+    "python": [
+      "uv",
+      "pyenv"
+    ],
+    "typescript": [
+      "pnpm",
+      "corepack"
+    ]
+  },
   "discovery": {
     "excludePaths": [
       "examples"

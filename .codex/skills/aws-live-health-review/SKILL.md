@@ -3,7 +3,7 @@ name: aws-live-health-review
 description: Run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and CloudWatch logs, then generate a Markdown status report with current health, risks, and evidence. Use when asked for the system's health right now or a current AWS operations snapshot.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) vdev. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.16.1. Do not edit this section. -->
 
 # AWS Live Health Review
 

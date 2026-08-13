@@ -154,6 +154,45 @@ func TestRunSetupDevDetectsNpmFromLockfile(t *testing.T) {
 	}
 }
 
+func TestRunSetupDevUsesConfiguredTypescriptToolWhenPackageManagerMissing(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	makeGitBoundary(t, root)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["local-dev"],
+  "languages": ["typescript"],
+  "tools": {
+    "typescript": ["pnpm", "corepack"]
+  }
+}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"setup-dev"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	want := [][]string{{"pnpm", "install"}}
+	if !reflect.DeepEqual(commands, want) {
+		t.Fatalf("expected setup commands %#v, got %#v", want, commands)
+	}
+	if !strings.Contains(output, "Detected package manager: pnpm") {
+		t.Fatalf("expected configured package manager output, got %q", output)
+	}
+}
+
 func TestRunSetupDevIgnoresUnsafeDeclaredPackageManager(t *testing.T) {
 	originalRun := runCommandFunc
 	t.Cleanup(func() { runCommandFunc = originalRun })
