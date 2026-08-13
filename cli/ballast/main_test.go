@@ -171,7 +171,7 @@ func TestRunSetupDevUsesConfiguredTypescriptToolWhenPackageManagerMissing(t *tes
   "agents": ["local-dev"],
   "languages": ["typescript"],
   "tools": {
-    "typescript": ["pnpm", "corepack"]
+    "TypeScript": ["pnpm", "corepack"]
   }
 }`)
 

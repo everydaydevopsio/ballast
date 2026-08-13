@@ -823,10 +823,16 @@ func configuredPackageManager(root string, lang string) string {
 	if err != nil || config == nil {
 		return ""
 	}
-	for _, tool := range config.Tools[strings.ToLower(strings.TrimSpace(lang))] {
-		manager := packageManagerName(tool)
-		if safeNodePackageManager(manager) {
-			return manager
+	normalizedLanguage := strings.ToLower(strings.TrimSpace(lang))
+	for language, tools := range config.Tools {
+		if strings.ToLower(strings.TrimSpace(language)) != normalizedLanguage {
+			continue
+		}
+		for _, tool := range tools {
+			manager := packageManagerName(tool)
+			if safeNodePackageManager(manager) {
+				return manager
+			}
 		}
 	}
 	return ""

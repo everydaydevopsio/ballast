@@ -392,13 +392,20 @@ function mergeTools(
 ): Record<string, string[]> {
   const merged: Record<string, string[]> = { ...(existing?.tools ?? {}) };
   for (const [language, tools] of Object.entries(config.tools ?? {})) {
+    const normalizedLanguage = language.trim().toLowerCase();
+    if (!normalizedLanguage) continue;
     if (tools.length > 0) {
-      merged[language] = [...tools];
+      merged[normalizedLanguage] = [...tools];
     }
   }
   for (const language of languages) {
-    if (!merged[language] || merged[language].length === 0) {
-      merged[language] = DEFAULT_LANGUAGE_TOOLS[language] ?? [];
+    const normalizedLanguage = language.trim().toLowerCase();
+    if (
+      normalizedLanguage &&
+      (!merged[normalizedLanguage] || merged[normalizedLanguage].length === 0)
+    ) {
+      merged[normalizedLanguage] =
+        DEFAULT_LANGUAGE_TOOLS[normalizedLanguage] ?? [];
     }
   }
   return Object.fromEntries(

@@ -298,6 +298,29 @@ describe('config', () => {
       });
     });
 
+    test('normalizes tool keys when defaulting mixed-case languages', () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['local-dev'],
+          ballastVersion: BALLAST_VERSION,
+          languages: ['TypeScript'],
+          tools: {
+            TypeScript: ['pnpm', 'corepack']
+          }
+        },
+        tmpDir
+      );
+
+      const parsed = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, RULESRC_FILENAME), 'utf8')
+      );
+      expect(parsed.tools).toEqual({
+        typescript: ['pnpm', 'corepack']
+      });
+      expect(parsed.tools).not.toHaveProperty('TypeScript');
+    });
+
     test('loads legacy .rulesrc.ts.json for typescript', () => {
       const config = { target: 'cursor' as const, agents: ['linting'] };
       fs.writeFileSync(
