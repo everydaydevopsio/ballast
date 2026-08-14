@@ -71,6 +71,7 @@ export const COMMON_SKILL_IDS = [
   'aws-live-health-review',
   'aws-weekly-security-review',
   'github-health-check',
+  'github-pr-copilot-cycle',
   'ballast-audit',
   'ballast-project-maintenance'
 ] as const;

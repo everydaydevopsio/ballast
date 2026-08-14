@@ -596,6 +596,13 @@ describe('build', () => {
       );
     });
 
+    test('reads github pr copilot cycle skill content', () => {
+      const content = getSkillContent('github-pr-copilot-cycle');
+      expect(content).toContain('name: github-pr-copilot-cycle');
+      expect(content).toContain('# GitHub PR Copilot Cycle Skill');
+      expect(content).toContain('Run at most three Copilot review cycles.');
+    });
+
     test('builds cursor skill format', () => {
       const content = buildCursorSkillFormat('owasp-security-scan');
       expect(content).toContain('alwaysApply: false');

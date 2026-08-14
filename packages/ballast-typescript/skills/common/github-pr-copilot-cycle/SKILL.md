@@ -1,0 +1,182 @@
+---
+name: github-pr-copilot-cycle
+description: >
+  Manage a GitHub pull request feedback loop with Copilot review. Use when
+  asked to create or update a PR, request Copilot as reviewer, collect Copilot
+  review comments, score whether comments need human input, fix actionable
+  feedback, reply or resolve comments, push fixes, check CI, and repeat the
+  Copilot review cycle until no unresolved Copilot comments remain or three
+  cycles have completed.
+---
+
+# GitHub PR Copilot Cycle Skill
+
+Drive a PR from local branch to a bounded Copilot review loop. Use `gh` for GitHub operations and keep the PR branch as the single source of truth.
+
+## Preconditions
+
+Run from the repository root:
+
+```bash
+gh auth status
+gh repo view --json nameWithOwner,defaultBranchRef
+git status --short
+git branch --show-current
+```
+
+If the worktree has unrelated user changes, preserve them. Do not rewrite history, force-push, or delete branches unless the user explicitly asked for that.
+
+## Create Or Update The PR
+
+1. Confirm the branch is not the default branch.
+2. Run the repo's smallest relevant tests before opening or updating the PR.
+3. Push the branch:
+
+```bash
+git push -u origin HEAD
+```
+
+4. Create the PR with Copilot requested as a reviewer:
+
+```bash
+gh pr create --fill --reviewer "@copilot"
+```
+
+For an existing PR, request or re-request Copilot review by PR number:
+
+```bash
+PR_NUMBER=$(gh pr view --json number --jq .number)
+gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
+```
+
+Use `@copilot` only with `--reviewer` or `--add-reviewer`. Do not use `--add-assignee`, `copilot-pull-request-reviewer[bot]`, `github-copilot[bot]`, or the requested-reviewers API as a substitute for requesting Copilot code review.
+
+## Cycle Limit
+
+Run at most three Copilot review cycles. A cycle is:
+
+1. Request or re-request Copilot review.
+2. Wait for Copilot review comments.
+3. Score unresolved Copilot comments.
+4. Fix, reply, resolve, test, push.
+5. Check PR CI.
+
+Stop before three cycles if there are no unresolved Copilot comments. Stop immediately and ask the user when any unresolved comment needs human input.
+
+## Gather Copilot Comments
+
+Get the current PR number and review threads:
+
+```bash
+OWNER_REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+OWNER=${OWNER_REPO%/*}
+REPO=${OWNER_REPO#*/}
+PR_NUMBER=$(gh pr view --json number --jq .number)
+gh api graphql -f owner="$OWNER" -f repo="$REPO" -F number="$PR_NUMBER" -f query='
+query($owner:String!, $repo:String!, $number:Int!) {
+  repository(owner:$owner, name:$repo) {
+    pullRequest(number:$number) {
+      reviewThreads(first:100) {
+        nodes {
+          id
+          isResolved
+          path
+          line
+          comments(first:20) {
+            nodes {
+              id
+              author { login }
+              bodyText
+              url
+              createdAt
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+```
+
+Treat comments from `copilot-pull-request-reviewer[bot]`, `github-copilot[bot]`, or an author login containing `copilot` as Copilot comments. Only act on unresolved threads unless the user explicitly asks to revisit resolved history.
+
+Copilot does not read replies added to its review comments. Replies are for human auditability, not for continuing a conversation with Copilot.
+
+## Score Comments
+
+Score each unresolved Copilot thread before changing code:
+
+- `0 - no action`: demonstrably incorrect, obsolete after later commits, duplicate of another comment, or purely optional style that conflicts with repo policy.
+- `1 - direct fix`: localized and clearly correct, with low regression risk.
+- `2 - fix with validation`: likely correct but affects behavior, public output, persistence, concurrency, security controls, tests, CI, build, or generated artifacts.
+- `3 - human input required`: ambiguous product intent, API contract, migration, rollout, data deletion, auth/permissions, billing, legal/compliance, security tradeoff, secret handling, or any fix that requires choosing between materially different designs.
+
+Reply on every Copilot thread before resolving or stopping, including ignored comments. For every `0`, reply with the reason it is not being changed. For every `1` or `2`, implement the fix and reply with what changed plus the validation command. For every `3`, reply that human input is required, include the specific choice needed, then stop the cycle and ask the user for a decision with the thread URL.
+
+## Fix And Verify
+
+For score `1` and `2` comments:
+
+1. Read the referenced files and surrounding code.
+2. Make the smallest coherent fix.
+3. Add or update tests when behavior changes or regression risk is meaningful.
+4. Run targeted validation for score `1`; run broader relevant validation for score `2`.
+5. Keep notes mapping each thread id to the fix and validation result.
+
+Before pushing, check:
+
+```bash
+git status --short
+git diff --check
+```
+
+Push fixes:
+
+```bash
+git push
+```
+
+## Reply And Resolve Threads
+
+Reply to every Copilot thread, even when no code change is made:
+
+```bash
+gh api graphql -f threadId=THREAD_ID -f body='Handled in the latest push. Validation: COMMAND.' -f query='
+mutation($threadId:ID!, $body:String!) {
+  addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$threadId, body:$body}) {
+    comment { url }
+  }
+}'
+```
+
+Resolve a thread only after the code fix is pushed or after a `0` reply explains why no change is needed. Do not resolve score `3` threads while waiting for human input.
+
+```bash
+gh api graphql -f threadId=THREAD_ID -f query='
+mutation($threadId:ID!) {
+  resolveReviewThread(input:{threadId:$threadId}) {
+    thread { id isResolved }
+  }
+}'
+```
+
+## Check CI After Each Push
+
+After every push:
+
+```bash
+gh pr checks --watch
+```
+
+If checks fail, inspect the failing logs, fix the root cause, run relevant validation locally, push, and re-check before requesting another Copilot review.
+
+## Re-Request Copilot
+
+After comments are handled and CI is green or pending with no known failures, re-request Copilot unless the cycle limit is reached:
+
+```bash
+PR_NUMBER=$(gh pr view --json number --jq .number)
+gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
+```
+
+Wait briefly, then gather comments again. If no unresolved Copilot threads remain, report the PR URL, cycle count, validation commands, and whether CI is green, pending, or blocked.

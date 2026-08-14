@@ -120,6 +120,7 @@ describe('agents', () => {
       expect(listSkills()).toContain('aws-live-health-review');
       expect(listSkills()).toContain('aws-weekly-security-review');
       expect(listSkills()).toContain('github-health-check');
+      expect(listSkills()).toContain('github-pr-copilot-cycle');
       expect(listSkills()).toContain('ballast-project-maintenance');
     });
 
@@ -129,6 +130,7 @@ describe('agents', () => {
       expect(isValidSkill('aws-live-health-review')).toBe(true);
       expect(isValidSkill('aws-weekly-security-review')).toBe(true);
       expect(isValidSkill('github-health-check')).toBe(true);
+      expect(isValidSkill('github-pr-copilot-cycle')).toBe(true);
       expect(isValidSkill('ballast-project-maintenance')).toBe(true);
       expect(isValidSkill('unknown')).toBe(false);
     });

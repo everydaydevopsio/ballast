@@ -74,6 +74,7 @@ Read and use these skill files in `.codex/skills/` when they are relevant:
 - `.codex/skills/aws-live-health-review/SKILL.md` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
 - `.codex/skills/aws-weekly-security-review/SKILL.md` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `.codex/skills/ballast-audit/SKILL.md` — audit AI rule and skill files for context density, duplication, and bloat
+- `.codex/skills/github-pr-copilot-cycle/SKILL.md` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
 
 ## Codex code review expectations
 

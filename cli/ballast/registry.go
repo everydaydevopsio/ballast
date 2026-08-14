@@ -98,6 +98,11 @@ var skillRegistry = []skillEntry{
 		Status:      statusActive,
 	},
 	{
+		ID:          "github-pr-copilot-cycle",
+		Description: "create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles",
+		Status:      statusActive,
+	},
+	{
 		ID:          "ballast-audit",
 		Description: "audit AI rule and skill files for context density, duplication, and bloat",
 		Status:      statusActive,

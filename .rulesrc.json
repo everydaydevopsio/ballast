@@ -22,7 +22,8 @@
     "aws-health-review",
     "aws-live-health-review",
     "aws-weekly-security-review",
-    "ballast-audit"
+    "ballast-audit",
+    "github-pr-copilot-cycle"
   ],
   "ballastVersion": "5.16.2",
   "languages": [
