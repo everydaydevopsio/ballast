@@ -39,6 +39,10 @@ export type TaskSystem = (typeof TASK_SYSTEMS)[number];
 export type DeploymentModel = (typeof DEPLOYMENT_MODELS)[number];
 export type PublishingProfile = (typeof PUBLISHING_PROFILES)[number];
 
+export interface DiscoveryConfig {
+  excludePaths?: string[];
+}
+
 export interface RulesConfig {
   targets: Target[];
   agents: string[];
@@ -47,6 +51,7 @@ export interface RulesConfig {
   languages?: string[];
   paths?: Record<string, string[]>;
   tools?: Record<string, string[]>;
+  discovery?: DiscoveryConfig;
   taskSystem?: TaskSystem;
   deploymentModel?: DeploymentModel;
   publishingProfiles?: PublishingProfile[];
@@ -207,6 +212,11 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     };
   }
 
+  const discovery = config.discovery ?? existing?.discovery;
+  if (discovery !== undefined) {
+    nextConfig = { ...nextConfig, discovery };
+  }
+
   const taskSystem = config.taskSystem ?? existing?.taskSystem;
   if (taskSystem) {
     nextConfig = { ...nextConfig, taskSystem };
@@ -248,6 +258,7 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     languages?: unknown;
     paths?: unknown;
     tools?: unknown;
+    discovery?: unknown;
     taskSystem?: unknown;
     deploymentModel?: unknown;
     publishingProfiles?: unknown;
@@ -290,6 +301,10 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
   if (record.tools && typeof record.tools === 'object') {
     config.tools = normalizeTools(record.tools);
   }
+  const discovery = normalizeDiscovery(record.discovery);
+  if (discovery) {
+    config.discovery = discovery;
+  }
   if (
     typeof record.taskSystem === 'string' &&
     (TASK_SYSTEMS as readonly string[]).includes(record.taskSystem)
@@ -308,6 +323,19 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     );
   }
   return config;
+}
+
+function normalizeDiscovery(raw: unknown): DiscoveryConfig | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const record = raw as { excludePaths?: unknown };
+  const discovery: DiscoveryConfig = {};
+  if (Array.isArray(record.excludePaths)) {
+    const excludePaths = uniqueToolList(record.excludePaths);
+    if (excludePaths.length > 0) {
+      discovery.excludePaths = excludePaths;
+    }
+  }
+  return Object.keys(discovery).length > 0 ? discovery : undefined;
 }
 
 export function normalizeTools(raw: unknown): Record<string, string[]> {
