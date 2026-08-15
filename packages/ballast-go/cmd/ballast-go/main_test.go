@@ -2152,6 +2152,24 @@ func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	}
 }
 
+func TestLoadConfigNormalizesDiscoveryExcludePaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"targets":["codex"],"agents":["linting"],"discovery":{"excludePaths":["examples","tmp","examples",""]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := loadConfig(tmpDir, "go")
+	if cfg == nil {
+		t.Fatal("expected config, got nil")
+	}
+	if cfg.Discovery == nil {
+		t.Fatal("expected discovery config")
+	}
+	if !slices.Equal(cfg.Discovery.ExcludePaths, []string{"examples", "tmp"}) {
+		t.Fatalf("expected normalized exclude paths, got %#v", cfg.Discovery.ExcludePaths)
+	}
+}
+
 func TestSaveConfigDefaultsAndPreservesLanguageTools(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := saveConfig(tmpDir, "python", rulesConfig{
@@ -2181,6 +2199,29 @@ func TestSaveConfigDefaultsAndPreservesLanguageTools(t *testing.T) {
 	}
 	if !slices.Equal(cfg.Tools["typescript"], []string{"pnpm", "corepack"}) {
 		t.Fatalf("expected typescript default tools, got %#v", cfg.Tools)
+	}
+}
+
+func TestSaveConfigPreservesDiscoveryExcludePaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"targets":["codex"],"agents":["linting"],"discovery":{"excludePaths":["examples"]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := saveConfig(tmpDir, "go", rulesConfig{
+		Targets:   []string{"codex"},
+		Agents:    []string{"linting"},
+		Languages: []string{"go"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), `"discovery": {`) || !strings.Contains(string(content), `"excludePaths": [`) || !strings.Contains(string(content), `"examples"`) {
+		t.Fatalf("expected discovery exclude paths to be preserved: %s", string(content))
 	}
 }
 

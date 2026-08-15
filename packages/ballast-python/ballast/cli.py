@@ -253,6 +253,24 @@ def is_ci_mode() -> bool:
     )
 
 
+def normalize_discovery(raw: object | None) -> dict[str, list[str]] | None:
+    if not isinstance(raw, dict):
+        return None
+    exclude_paths = raw.get("excludePaths")
+    if not isinstance(exclude_paths, list):
+        return None
+    normalized: list[str] = []
+    for item in exclude_paths:
+        if not isinstance(item, str):
+            continue
+        token = item.strip()
+        if token and token not in normalized:
+            normalized.append(token)
+    if not normalized:
+        return None
+    return {"excludePaths": normalized}
+
+
 def load_config(root: Path, language: str) -> dict[str, object] | None:
     file_path = root / rulesrc_filename(language)
     if not file_path.exists():
@@ -276,6 +294,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
         skills = data.get("skills")
         task_system = data.get("taskSystem")
         deployment_model = data.get("deploymentModel")
+        discovery = normalize_discovery(data.get("discovery"))
         return {
             "targets": targets,
             "agents": agents,
@@ -299,6 +318,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
             }
             if isinstance(data.get("paths"), dict)
             else {},
+            "discovery": discovery,
             "taskSystem": task_system if isinstance(task_system, str) else None,
             "deploymentModel": (
                 deployment_model.strip().lower()
@@ -322,6 +342,7 @@ def save_config(
     file_path = root / rulesrc_filename(language)
     languages: list[str] = []
     paths: dict[str, list[str]] = {}
+    existing_discovery: dict[str, list[str]] | None = None
     existing_task_system: str | None = None
     existing_deployment_model: str | None = None
     if file_path.exists():
@@ -342,6 +363,7 @@ def save_config(
                             and all(isinstance(item, str) for item in value)
                         ):
                             paths[key] = list(value)
+                existing_discovery = normalize_discovery(raw.get("discovery"))
                 if isinstance(raw.get("taskSystem"), str):
                     existing_task_system = raw["taskSystem"].strip().lower()
                 if isinstance(raw.get("deploymentModel"), str):
@@ -385,6 +407,8 @@ def save_config(
         "languages": languages,
         "paths": paths,
     }
+    if existing_discovery is not None:
+        payload["discovery"] = existing_discovery
     if normalized_task_system:
         payload["taskSystem"] = normalized_task_system
     if normalized_deployment_model:

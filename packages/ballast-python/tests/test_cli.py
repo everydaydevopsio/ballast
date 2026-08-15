@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import tempfile
 import unittest
@@ -270,6 +271,26 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(config["targets"], ["cursor"])
             self.assertEqual(config["agents"], ["linting"])
+
+    def test_load_config_normalizes_discovery_exclude_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["codex"],
+                        "agents": ["linting"],
+                        "discovery": {
+                            "excludePaths": ["examples", "tmp", "examples", ""]
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            config = cli.load_config(root, "python")
+
+            self.assertEqual(config["discovery"], {"excludePaths": ["examples", "tmp"]})
 
     def test_resolve_project_root_supports_ansible_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -555,6 +576,25 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn('"go": [', content)
             self.assertIn('"skills": [', content)
             self.assertIn('"targets": [', content)
+
+    def test_save_config_preserves_discovery_exclude_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["codex"],
+                        "agents": ["linting"],
+                        "discovery": {"excludePaths": ["examples"]},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            cli.save_config(root, "python", ["codex"], ["linting"], [])
+
+            config = json.loads((root / ".rulesrc.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["discovery"], {"excludePaths": ["examples"]})
 
     def test_install_supports_ansible_language_profile(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

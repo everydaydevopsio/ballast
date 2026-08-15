@@ -92,8 +92,13 @@ type rulesConfig struct {
 	Languages       []string            `json:"languages,omitempty"`
 	Paths           map[string][]string `json:"paths,omitempty"`
 	Tools           map[string][]string `json:"tools,omitempty"`
+	Discovery       *discoveryConfig    `json:"discovery,omitempty"`
 	TaskSystem      string              `json:"taskSystem,omitempty"`
 	DeploymentModel string              `json:"deploymentModel,omitempty"`
+}
+
+type discoveryConfig struct {
+	ExcludePaths []string `json:"excludePaths,omitempty"`
 }
 
 type rawRulesConfig struct {
@@ -105,6 +110,7 @@ type rawRulesConfig struct {
 	Languages       []string            `json:"languages,omitempty"`
 	Paths           map[string][]string `json:"paths,omitempty"`
 	Tools           map[string][]string `json:"tools,omitempty"`
+	Discovery       json.RawMessage     `json:"discovery,omitempty"`
 	TaskSystem      string              `json:"taskSystem,omitempty"`
 	DeploymentModel string              `json:"deploymentModel,omitempty"`
 }
@@ -2477,6 +2483,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		Languages:       raw.Languages,
 		Paths:           raw.Paths,
 		Tools:           normalizeLanguageTools(raw.Tools),
+		Discovery:       normalizeDiscovery(raw.Discovery),
 		TaskSystem:      normalizeRequiredInstallOptionValue(raw.TaskSystem),
 		DeploymentModel: normalizeDeploymentModel(raw.DeploymentModel),
 	}
@@ -2499,6 +2506,9 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		if strings.TrimSpace(cfg.DeploymentModel) == "" {
 			cfg.DeploymentModel = existing.DeploymentModel
 		}
+		if cfg.Discovery == nil {
+			cfg.Discovery = existing.Discovery
+		}
 		cfg.Targets = mergeStringLists(existing.Targets, cfg.Targets)
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)
 		cfg.Paths = mergeLanguagePaths(existing.Paths, cfg.Languages)
@@ -2520,6 +2530,23 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		return err
 	}
 	return os.WriteFile(filePath, bytes, 0o644)
+}
+
+func normalizeDiscovery(raw json.RawMessage) *discoveryConfig {
+	if len(raw) == 0 {
+		return nil
+	}
+	var parsed struct {
+		ExcludePaths []string `json:"excludePaths"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return nil
+	}
+	excludePaths := uniqueToolList(parsed.ExcludePaths)
+	if len(excludePaths) == 0 {
+		return nil
+	}
+	return &discoveryConfig{ExcludePaths: excludePaths}
 }
 
 func ensureGitignoreEntry(projectRoot, entry string) error {

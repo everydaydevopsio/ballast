@@ -161,6 +161,27 @@ describe('config', () => {
       });
     });
 
+    test('returns normalized discovery exclude paths when present', () => {
+      const config = {
+        targets: ['claude'] as const,
+        agents: ['local-dev'],
+        discovery: {
+          excludePaths: ['examples', 'tmp', 'examples', '']
+        }
+      };
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify(config)
+      );
+      expect(loadConfig(tmpDir)).toEqual({
+        targets: ['claude'],
+        agents: ['local-dev'],
+        discovery: {
+          excludePaths: ['examples', 'tmp']
+        }
+      });
+    });
+
     test('returns ballastVersion when present', () => {
       const config = {
         targets: ['claude'] as const,
@@ -295,6 +316,36 @@ describe('config', () => {
       expect(parsed.tools).toEqual({
         python: ['poetry', 'pyenv'],
         typescript: ['pnpm', 'corepack']
+      });
+    });
+
+    test('preserves discovery exclude paths when saving existing config', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['codex'],
+          agents: ['linting'],
+          discovery: {
+            excludePaths: ['examples']
+          }
+        })
+      );
+
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['linting'],
+          ballastVersion: BALLAST_VERSION,
+          languages: ['typescript']
+        },
+        tmpDir
+      );
+
+      const parsed = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, RULESRC_FILENAME), 'utf8')
+      );
+      expect(parsed.discovery).toEqual({
+        excludePaths: ['examples']
       });
     });
 
