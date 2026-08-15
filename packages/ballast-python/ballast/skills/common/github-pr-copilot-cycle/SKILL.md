@@ -72,17 +72,20 @@ OWNER_REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 OWNER=${OWNER_REPO%/*}
 REPO=${OWNER_REPO#*/}
 PR_NUMBER=$(gh pr view --json number --jq .number)
-gh api graphql -f owner="$OWNER" -f repo="$REPO" -F number="$PR_NUMBER" -f query='
-query($owner:String!, $repo:String!, $number:Int!) {
+gh api graphql --paginate -f owner="$OWNER" -f repo="$REPO" -F number="$PR_NUMBER" -f query='
+query($owner:String!, $repo:String!, $number:Int!, $endCursor:String) {
   repository(owner:$owner, name:$repo) {
     pullRequest(number:$number) {
-      reviewThreads(first:100) {
+      reviewThreads(first:100, after:$endCursor) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           id
           isResolved
           path
           line
-          comments(first:20) {
+          url
+          comments(first:100) {
+            pageInfo { hasNextPage endCursor }
             nodes {
               id
               author { login }
@@ -91,6 +94,28 @@ query($owner:String!, $repo:String!, $number:Int!) {
               createdAt
             }
           }
+        }
+      }
+    }
+  }
+}'
+```
+
+If any returned thread has `comments.pageInfo.hasNextPage: true`, fetch the remaining comments for that thread before scoring it:
+
+```bash
+gh api graphql --paginate -f threadId="THREAD_ID" -f query='
+query($threadId:ID!, $endCursor:String) {
+  node(id:$threadId) {
+    ... on PullRequestReviewThread {
+      comments(first:100, after:$endCursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          author { login }
+          bodyText
+          url
+          createdAt
         }
       }
     }
