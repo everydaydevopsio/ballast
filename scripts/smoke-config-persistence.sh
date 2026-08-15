@@ -283,7 +283,7 @@ test_add_all_skills() {
     ballast "${dir}" install --target "${target}" --all-skills --yes
     assert_targets "${dir}" "${target}"
     assert_agents "${dir}" "linting" "git-hooks"
-    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check ballast-audit; do
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check github-pr-copilot-cycle ballast-audit; do
       assert_skills "${dir}" "${skill}"
     done
     assert_doctor_agents "${dir}" "linting"
@@ -431,7 +431,7 @@ test_full_sequential() {
     for agent in linting git-hooks testing logging; do
       assert_agents "${dir}" "${agent}"
     done
-    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check ballast-audit; do
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check github-pr-copilot-cycle ballast-audit; do
       assert_skills "${dir}" "${skill}"
     done
     assert_doctor_agents "${dir}" "linting" "testing"
@@ -453,7 +453,7 @@ test_full_sequential() {
     for agent in linting git-hooks testing logging; do
       assert_agents "${dir}" "${agent}"
     done
-    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check ballast-audit; do
+    for skill in owasp-security-scan aws-health-review aws-live-health-review aws-weekly-security-review github-health-check github-pr-copilot-cycle ballast-audit; do
       assert_skills "${dir}" "${skill}"
     done
     assert_doctor_agents "${dir}" "linting" "testing"

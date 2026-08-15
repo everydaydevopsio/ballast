@@ -1,5 +1,30 @@
 # Product Requirements
 
+## GitHub PR Copilot Review Cycle Skill
+
+### Problem
+
+Agents repeatedly need to create pull requests, request GitHub Copilot review, triage Copilot comments, decide whether comments require human input, fix actionable feedback, push updates, and repeat the review loop. Without a dedicated skill, agents often request Copilot incorrectly or silently ignore comments, leaving PRs in an unclear review state.
+
+### Requirements
+
+1. Ballast must distribute a `github-pr-copilot-cycle` common skill for PR creation and bounded Copilot review loops.
+2. The skill must use the documented GitHub CLI reviewer syntax for Copilot: `gh pr create --reviewer "@copilot"` and `gh pr edit <pr-number> --add-reviewer "@copilot"`.
+3. The skill must explicitly prohibit common incorrect Copilot request paths such as assigning Copilot, using Copilot bot logins as reviewers, or using requested-reviewer API calls as substitutes for the documented CLI flow.
+4. The skill must gather unresolved Copilot review threads and score each comment for no action, direct fix, fix with validation, or human input required.
+5. The skill must require a reply on every Copilot comment, including comments that are ignored or require human input.
+6. The skill must cap Copilot review iterations at three cycles unless all unresolved Copilot comments are handled earlier.
+7. The skill must be installable through Codex and Claude target outputs and through all language package skill registries.
+
+### Acceptance Criteria
+
+1. `github-pr-copilot-cycle` is listed in the saved skill config and all package skill registries.
+2. Generated Codex and Claude skill outputs exist for `github-pr-copilot-cycle`.
+3. The skill text includes the documented `@copilot` reviewer commands and forbids assignee/bot/API substitutes.
+4. The skill text requires replying to every Copilot comment before resolving or stopping.
+5. Tests cover skill registration and skill content loading.
+6. Smoke checks that validate `--all-skills` include `github-pr-copilot-cycle`.
+
 ## Dart Flutter Mobile App Language Support
 
 ### Problem

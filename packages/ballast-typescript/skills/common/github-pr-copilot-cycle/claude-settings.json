@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth*)",
+      "Bash(gh repo*)",
+      "Bash(gh pr*)",
+      "Bash(gh api*)",
+      "Bash(gh run*)",
+      "Bash(git status*)",
+      "Bash(git branch*)",
+      "Bash(git push*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git fetch*)",
+      "Bash(go test*)",
+      "Bash(npm test*)",
+      "Bash(pnpm test*)",
+      "Bash(uv run*)",
+      "Bash(make test*)"
+    ]
+  }
+}

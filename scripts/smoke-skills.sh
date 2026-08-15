@@ -81,6 +81,7 @@ run_target() {
       grep -q "# OWASP Security Scan Skill" "$dir/.codex/skills/owasp-security-scan/SKILL.md"
       if [[ "$mode" == "all-skills" ]]; then
         assert_file "$dir/.codex/skills/github-health-check/SKILL.md"
+        assert_file "$dir/.codex/skills/github-pr-copilot-cycle/SKILL.md"
         assert_file "$dir/.codex/skills/ballast-audit/SKILL.md"
         grep -q "# Ballast Audit Skill" "$dir/.codex/skills/ballast-audit/SKILL.md"
       fi

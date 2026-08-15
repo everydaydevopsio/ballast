@@ -117,6 +117,7 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"aws-live-health-review",
 		"aws-weekly-security-review",
 		"github-health-check",
+		"github-pr-copilot-cycle",
 		"ballast-audit",
 		"ballast-project-maintenance",
 	}
