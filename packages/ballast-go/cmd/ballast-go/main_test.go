@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -2220,8 +2221,14 @@ func TestSaveConfigPreservesDiscoveryExcludePaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(content), `"discovery": {`) || !strings.Contains(string(content), `"excludePaths": [`) || !strings.Contains(string(content), `"examples"`) {
-		t.Fatalf("expected discovery exclude paths to be preserved: %s", string(content))
+	var saved struct {
+		Discovery discoveryConfig `json:"discovery"`
+	}
+	if err := json.Unmarshal(content, &saved); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(saved.Discovery.ExcludePaths, []string{"examples"}) {
+		t.Fatalf("expected discovery exclude paths to be preserved, got %#v", saved.Discovery.ExcludePaths)
 	}
 }
 
