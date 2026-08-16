@@ -304,6 +304,24 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(config["discovery"], {"excludePaths": ["examples", "tmp"]})
 
+    def test_normalize_tools_filters_invalid_entries(self) -> None:
+        self.assertEqual(cli.normalize_tools(None), {})
+        self.assertEqual(
+            cli.normalize_tools(
+                {
+                    " TypeScript ": ["pnpm", "corepack", "pnpm", "", 42],
+                    "": ["ignored"],
+                    "python": "uv",
+                    123: ["ignored"],
+                    "go": ["go"],
+                }
+            ),
+            {
+                "typescript": ["pnpm", "corepack"],
+                "go": ["go"],
+            },
+        )
+
     def test_resolve_project_root_supports_ansible_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
