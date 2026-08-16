@@ -3872,7 +3872,11 @@ func removeManagedTargetFiles(root string, target string, config *monorepoConfig
 	if config == nil {
 		return nil
 	}
-	for _, file := range managedRulePaths(root, target, config) {
+	rulePaths := managedRulePaths(root, target, config)
+	if target == "opencode" {
+		rulePaths = append(rulePaths, legacyOpenCodeRulePaths(root, config.Agents, config.Languages)...)
+	}
+	for _, file := range uniqueStrings(rulePaths) {
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -3903,6 +3907,28 @@ func managedRulePaths(root string, target string, config *monorepoConfig) []stri
 			for _, suffix := range ruleSuffixesForAgent(agent) {
 				base := agentBaseName(agent, suffix)
 				paths = append(paths, filepath.Join(rulesRoot, lang, lang+"-"+base+ext))
+			}
+		}
+	}
+	return uniqueStrings(paths)
+}
+
+func legacyOpenCodeRulePaths(root string, agents []string, languages []string) []string {
+	paths := []string{}
+	rulesRoot := filepath.Join(root, ".opencode", "rules")
+	commonSelection := filterAgents(agents, commonAgentIDs())
+	languageSelection := filterAgents(agents, languageAgentIDs())
+	for _, agent := range commonSelection {
+		for _, suffix := range ruleSuffixesForAgent(agent) {
+			base := agentBaseName(agent, suffix)
+			paths = append(paths, filepath.Join(rulesRoot, "common", base+".md"))
+		}
+	}
+	for _, lang := range languages {
+		for _, agent := range languageSelection {
+			for _, suffix := range ruleSuffixesForAgent(agent) {
+				base := agentBaseName(agent, suffix)
+				paths = append(paths, filepath.Join(rulesRoot, lang, lang+"-"+base+".md"))
 			}
 		}
 	}
