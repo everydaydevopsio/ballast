@@ -58,7 +58,7 @@ var publishingProfileAliases = map[string]string{
 	"sdk":     "sdks",
 }
 
-var ruleMarkerRegex = regexp.MustCompile(`<!-- ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]+)"\s*-->\r?\n?`)
+var ruleMarkerRegex = regexp.MustCompile(`^<!-- ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]{64})"\s*-->\r?\n?`)
 
 type ruleMarker struct {
 	ruleID   string
@@ -2141,7 +2141,7 @@ func ruleMarkerID(agentID, language, suffix string) string {
 }
 
 func parseRuleMarker(content string) (*ruleMarker, bool) {
-	matches := ruleMarkerRegex.FindStringSubmatch(content)
+	matches := ruleMarkerRegex.FindStringSubmatch(content[ruleMarkerHeaderStart(content):])
 	if len(matches) != 4 {
 		return nil, false
 	}
@@ -2153,7 +2153,20 @@ func parseRuleMarker(content string) (*ruleMarker, bool) {
 }
 
 func stripRuleMarker(content string) string {
-	return ruleMarkerRegex.ReplaceAllString(content, "")
+	start := ruleMarkerHeaderStart(content)
+	match := ruleMarkerRegex.FindStringIndex(content[start:])
+	if match == nil || match[0] != 0 {
+		return content
+	}
+	return content[:start] + content[start+match[1]:]
+}
+
+func ruleMarkerHeaderStart(content string) int {
+	frontmatterRegex := regexp.MustCompile(`(?s)^---\r?\n.*?\r?\n---\r?\n?`)
+	if match := frontmatterRegex.FindStringIndex(content); match != nil && match[0] == 0 {
+		return match[1]
+	}
+	return 0
 }
 
 func calculateRuleChecksum(content string) string {

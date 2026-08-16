@@ -5401,8 +5401,14 @@ func TestContainsBallastManagedMarkerRequiresLiteralRuleMarkerPrefix(t *testing.
 	if !containsBallastManagedMarker(`<!-- ballast:rule id="typescript/linting" version="5.0.0" checksum="abc123" -->`) {
 		t.Fatal("expected literal rule marker prefix to be treated as managed")
 	}
+	if !containsBallastManagedMarker("---\ntitle: Rule\n---\n<!-- ballast:rule id=\"typescript/linting\" version=\"5.0.0\" checksum=\"abc123\" -->") {
+		t.Fatal("expected rule marker after frontmatter to be treated as managed")
+	}
 	if containsBallastManagedMarker("Manual notes that mention ballast:rule without a marker comment") {
 		t.Fatal("did not expect prose mentioning ballast:rule to be treated as managed")
+	}
+	if containsBallastManagedMarker("# Docs\n\n```md\n<!-- ballast:rule id=\"typescript/linting\" version=\"5.0.0\" checksum=\"abc123\" -->\n```") {
+		t.Fatal("did not expect copied rule marker in body to be treated as managed")
 	}
 }
 

@@ -1140,7 +1140,7 @@ def rule_marker_id(agent: str, language: str, suffix: str = "") -> str:
 
 
 def parse_rule_marker(content: str) -> dict[str, str] | None:
-    match = RULE_MARKER_RE.search(content)
+    match = RULE_MARKER_RE.match(content, rule_marker_header_start(content))
     if not match:
         return None
     return {
@@ -1151,7 +1151,15 @@ def parse_rule_marker(content: str) -> dict[str, str] | None:
 
 
 def strip_rule_marker(content: str) -> str:
-    return RULE_MARKER_RE.sub("", content, count=1)
+    match = RULE_MARKER_RE.match(content, rule_marker_header_start(content))
+    if not match:
+        return content
+    return content[: match.start()] + content[match.end() :]
+
+
+def rule_marker_header_start(content: str) -> int:
+    frontmatter = re.match(r"^---\r?\n[\s\S]*?\r?\n---\r?\n?", content)
+    return frontmatter.end() if frontmatter else 0
 
 
 def calculate_rule_checksum(content: str) -> str:
@@ -2644,5 +2652,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 RULE_MARKER_RE = re.compile(
-    r'<!--\s*ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]+)"\s*-->\r?\n?'
+    r'<!--\s*ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]{64})"\s*-->\r?\n?'
 )

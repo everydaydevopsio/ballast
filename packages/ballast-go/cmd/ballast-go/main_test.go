@@ -241,6 +241,29 @@ func TestParseRuleMarkerRequiresGeneratedPrefix(t *testing.T) {
 	}
 }
 
+func TestParseRuleMarkerRequiresGeneratedHeaderPosition(t *testing.T) {
+	marker := "<!-- ballast:rule id=\"go/linting\" version=\"dev\" checksum=\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\" -->\n"
+	bodyExample := "# Notes\n\n```md\n" + marker + "```\n"
+	if parsed, ok := parseRuleMarker(bodyExample); ok {
+		t.Fatalf("expected copied marker in body to be ignored, got %#v", parsed)
+	}
+	if stripped := stripRuleMarker(bodyExample); stripped != bodyExample {
+		t.Fatalf("expected copied marker in body to remain, got %q", stripped)
+	}
+
+	withFrontmatter := "---\ntitle: Rule\n---\n" + marker + "# Rule\n"
+	parsed, ok := parseRuleMarker(withFrontmatter)
+	if !ok {
+		t.Fatal("expected marker after frontmatter to parse")
+	}
+	if parsed.ruleID != "go/linting" {
+		t.Fatalf("expected rule id go/linting, got %q", parsed.ruleID)
+	}
+	if stripped := stripRuleMarker(withFrontmatter); stripped != "---\ntitle: Rule\n---\n# Rule\n" {
+		t.Fatalf("expected marker after frontmatter to be stripped, got %q", stripped)
+	}
+}
+
 func makeGitBoundary(t *testing.T, dir string) {
 	t.Helper()
 	gitDir := filepath.Join(dir, ".git")

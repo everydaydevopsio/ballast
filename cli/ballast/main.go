@@ -4215,7 +4215,17 @@ const ballastRuleMarkerPrefix = "<!-- ballast:rule "
 func containsBallastManagedMarker(content string) bool {
 	return strings.Contains(content, ballastManagedMarker) ||
 		strings.Contains(content, ballastManagedSectionNotice) ||
-		strings.Contains(content, ballastRuleMarkerPrefix)
+		hasRuleMarkerAtGeneratedHeader(content)
+}
+
+func hasRuleMarkerAtGeneratedHeader(content string) bool {
+	if strings.HasPrefix(content, ballastRuleMarkerPrefix) {
+		return true
+	}
+	if match := regexp.MustCompile(`(?s)^---\r?\n.*?\r?\n---\r?\n?`).FindStringIndex(content); match != nil && match[0] == 0 {
+		return strings.HasPrefix(content[match[1]:], ballastRuleMarkerPrefix)
+	}
+	return false
 }
 
 func patchManagedSupportSections(existing string, canonical string) string {

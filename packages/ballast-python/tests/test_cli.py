@@ -100,6 +100,24 @@ class PatchInstallTests(unittest.TestCase):
         self.assertTrue(cli.verify_rule_checksum(content))
         self.assertFalse(cli.verify_rule_checksum(content + "\nManual edit\n"))
 
+    def test_rule_marker_requires_generated_header_position(self) -> None:
+        marker = (
+            '<!-- ballast:rule id="python/linting" version="dev" '
+            'checksum="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" -->\n'
+        )
+        body_example = "# Notes\n\n```md\n" + marker + "```\n"
+
+        self.assertIsNone(cli.parse_rule_marker(body_example))
+        self.assertEqual(cli.strip_rule_marker(body_example), body_example)
+
+        with_frontmatter = "---\ntitle: Rule\n---\n" + marker + "# Rule\n"
+        parsed = cli.parse_rule_marker(with_frontmatter)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["ruleId"], "python/linting")
+        self.assertEqual(
+            cli.strip_rule_marker(with_frontmatter), "---\ntitle: Rule\n---\n# Rule\n"
+        )
+
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:
             cli.parser().parse_args(["--help"])
