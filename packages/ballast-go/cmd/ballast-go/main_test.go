@@ -231,6 +231,16 @@ func TestBuildContentWritesRuleMarkerAndDetectsDrift(t *testing.T) {
 	}
 }
 
+func TestParseRuleMarkerRequiresGeneratedPrefix(t *testing.T) {
+	content := "<!--\nballast:rule id=\"go/linting\" version=\"dev\" checksum=\"0123456789abcdef\" -->\n# Rule\n"
+	if marker, ok := parseRuleMarker(content); ok {
+		t.Fatalf("expected non-generated marker prefix to be ignored, got %#v", marker)
+	}
+	if stripped := stripRuleMarker(content); stripped != content {
+		t.Fatalf("expected non-generated marker prefix to remain, got %q", stripped)
+	}
+}
+
 func makeGitBoundary(t *testing.T, dir string) {
 	t.Helper()
 	gitDir := filepath.Join(dir, ".git")

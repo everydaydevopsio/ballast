@@ -58,7 +58,7 @@ var publishingProfileAliases = map[string]string{
 	"sdk":     "sdks",
 }
 
-var ruleMarkerRegex = regexp.MustCompile(`<!--\s*ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]+)"\s*-->\r?\n?`)
+var ruleMarkerRegex = regexp.MustCompile(`<!-- ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]+)"\s*-->\r?\n?`)
 
 type ruleMarker struct {
 	ruleID   string
