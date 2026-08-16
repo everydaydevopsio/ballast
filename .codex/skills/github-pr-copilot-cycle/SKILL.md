@@ -9,6 +9,8 @@ description: >
   cycles have completed.
 ---
 
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.16.4. Do not edit this section. -->
+
 # GitHub PR Copilot Cycle Skill
 
 Drive a PR from local branch to a bounded Copilot review loop. Use `gh` for GitHub operations and keep the PR branch as the single source of truth.

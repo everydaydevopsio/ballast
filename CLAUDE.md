@@ -33,7 +33,25 @@ Created by Ballast. Do not edit this section.
 
 Read and follow these rule files in `.claude/rules/` when they apply:
 
+- `.claude/rules/common/local-dev-badges.md` — Rules for common/local-dev-badges
+- `.claude/rules/common/local-dev-env.md` — Rules for common/local-dev-env
+- `.claude/rules/common/local-dev-license.md` — Rules for common/local-dev-license
+- `.claude/rules/common/local-dev-mcp.md` — Rules for common/local-dev-mcp
+- `.claude/rules/common/docs.md` — Rules for common/docs
+- `.claude/rules/common/cicd.md` — Rules for common/cicd
+- `.claude/rules/common/observability.md` — Rules for common/observability
+- `.claude/rules/common/publishing-api.md` — Rules for common/publishing-api
+- `.claude/rules/common/publishing-apps.md` — Rules for common/publishing-apps
+- `.claude/rules/common/publishing-apt.md` — Rules for common/publishing-apt
+- `.claude/rules/common/publishing-brew.md` — Rules for common/publishing-brew
+- `.claude/rules/common/publishing-cli.md` — Rules for common/publishing-cli
+- `.claude/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
+- `.claude/rules/common/publishing-sdks.md` — Rules for common/publishing-sdks
+- `.claude/rules/common/publishing-web.md` — Rules for common/publishing-web
 - `.claude/rules/common/git-hooks.md` — Rules for common/git-hooks
+- `.claude/rules/common/plan-lifecycle.md` — Rules for common/plan-lifecycle
+- `.claude/rules/common/tasks-task-system.md` — Rules for common/tasks-task-system
+- `.claude/rules/common/tasks-todo.md` — Rules for common/tasks-todo
 - `.claude/rules/typescript/typescript-linting.md` — Rules for typescript/linting
 - `.claude/rules/typescript/typescript-logging.md` — Rules for typescript/logging
 - `.claude/rules/typescript/typescript-testing.md` — Rules for typescript/testing
@@ -43,15 +61,6 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/go/go-linting.md` — Rules for go/linting
 - `.claude/rules/go/go-logging.md` — Rules for go/logging
 - `.claude/rules/go/go-testing.md` — Rules for go/testing
-- `.claude/rules/ansible/ansible-linting.md` — Rules for ansible/linting
-- `.claude/rules/ansible/ansible-logging.md` — Rules for ansible/logging
-- `.claude/rules/ansible/ansible-testing.md` — Rules for ansible/testing
-- `.claude/rules/terraform/terraform-linting.md` — Rules for terraform/linting
-- `.claude/rules/terraform/terraform-logging.md` — Rules for terraform/logging
-- `.claude/rules/terraform/terraform-testing.md` — Rules for terraform/testing
-- `.claude/rules/dart/dart-linting.md` — Rules for dart/linting
-- `.claude/rules/dart/dart-logging.md` — Rules for dart/logging
-- `.claude/rules/dart/dart-testing.md` — Rules for dart/testing
 
 ## Installed skills
 
