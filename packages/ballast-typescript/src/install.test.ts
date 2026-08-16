@@ -1157,6 +1157,8 @@ This section should be gone after force.
       expect(fs.existsSync(gitHooksFile)).toBe(true);
       const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
       expect(gitHooksContent).toContain('.pre-commit-config.yaml');
+      expect(gitHooksContent).toContain('gitleaks');
+      expect(gitHooksContent).not.toContain('scripts/check-no-secrets.sh');
       expect(gitHooksContent).toContain(
         'pre-commit install --hook-type pre-push'
       );
@@ -1165,6 +1167,39 @@ This section should be gone after force.
       );
       expect(gitHooksContent).not.toContain('lint-staged');
       expect(gitHooksContent).not.toContain('.husky/pre-push');
+    });
+
+    test('refresh keeps pre-commit secret detection in hook config guidance', () => {
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['linting'],
+          languages: ['python']
+        },
+        tmpDir
+      );
+
+      install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        language: 'python',
+        agents: ['linting'],
+        force: true,
+        saveConfig: false
+      });
+      install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        language: 'python',
+        agents: ['linting'],
+        patch: true,
+        saveConfig: false
+      });
+
+      const gitHooksFile = path.join(tmpDir, '.codex', 'rules', 'git-hooks.md');
+      const gitHooksContent = fs.readFileSync(gitHooksFile, 'utf8');
+      expect(gitHooksContent).toContain('gitleaks');
+      expect(gitHooksContent).not.toContain('scripts/check-no-secrets.sh');
     });
 
     test('uses husky guidance for typescript workspace monorepos even with one language', () => {

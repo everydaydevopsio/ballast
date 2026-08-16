@@ -791,6 +791,12 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	if !strings.Contains(string(gitHooksContent), "pre-commit install --hook-type pre-push") {
 		t.Fatalf("expected dedicated git-hooks guidance, got %s", string(gitHooksContent))
 	}
+	if !strings.Contains(string(gitHooksContent), "gitleaks") {
+		t.Fatalf("expected pre-commit secret detection guidance, got %s", string(gitHooksContent))
+	}
+	if strings.Contains(string(gitHooksContent), "scripts/check-no-secrets.sh") {
+		t.Fatalf("expected no legacy no-secrets script guidance, got %s", string(gitHooksContent))
+	}
 }
 
 func TestInstallWritesRulesForMultipleTargets(t *testing.T) {
