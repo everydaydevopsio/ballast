@@ -74,9 +74,10 @@ Stop immediately and ask the user when any unresolved comment needs human input.
 
 ## Wait For Copilot To Settle
 
-After requesting or re-requesting Copilot, record the current head commit and request time:
+Before requesting or re-requesting Copilot, set the PR number and record the current head commit and request time:
 
 ```bash
+PR_NUMBER=$(gh pr view --json number --jq .number)
 REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
 ```
