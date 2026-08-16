@@ -485,8 +485,33 @@ describe('build', () => {
       const content = getContent('git-hooks', undefined, 'python');
       expect(content).toContain('Git hook specialist');
       expect(content).toContain('.pre-commit-config.yaml');
+      expect(content).toContain('gitleaks');
+      expect(content).not.toContain('scripts/check-no-secrets.sh');
       expect(content).toContain('pre-commit install --hook-type pre-push');
       expect(content).toContain('pre-commit autoupdate');
+      expect(content).toContain('Bandit');
+      expect(content).toContain('pip-audit');
+    });
+
+    test('returns go git-hooks command guidance', () => {
+      const content = getContent('git-hooks', undefined, 'go');
+      expect(content).toContain('sub-pre-commit');
+      expect(content).toContain('pre-commit install --hook-type pre-push');
+      expect(content).toContain('Go unit tests');
+      expect(content).toContain('gitleaks');
+      expect(content).toContain('govulncheck');
+      expect(content).toContain('go test -race');
+      expect(content).not.toContain('scripts/check-no-secrets.sh');
+    });
+
+    test('returns ansible git-hooks command guidance', () => {
+      const content = getContent('git-hooks', undefined, 'ansible');
+      expect(content).toContain('ansible-lint');
+      expect(content).toContain('yamllint');
+      expect(content).toContain('ansible-playbook --syntax-check');
+      expect(content).toContain('gitleaks');
+      expect(content).toContain('ansible-lint --profile=safety');
+      expect(content).not.toContain('scripts/check-no-secrets.sh');
     });
 
     test('returns initialized terraform git-hooks command guidance', () => {
@@ -498,6 +523,9 @@ describe('build', () => {
       expect(content).toContain('tflint --recursive');
       expect(content).toContain('trivy config .');
       expect(content).toContain('tfsec');
+      expect(content).toContain('gitleaks');
+      expect(content).not.toContain('scripts/check-no-secrets.sh');
+      expect(content).toContain('cloud/runtime posture scanning');
     });
 
     test('returns flutter dart git-hooks command guidance', () => {
@@ -507,6 +535,8 @@ describe('build', () => {
       expect(content).toContain('flutter test');
       expect(content).toContain('flutter test integration_test');
       expect(content).toContain('.dart_tool/');
+      expect(content).toContain('gitleaks');
+      expect(content).not.toContain('scripts/check-no-secrets.sh');
     });
 
     test('returns husky git-hooks content for typescript', () => {

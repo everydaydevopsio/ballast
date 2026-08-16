@@ -6,8 +6,9 @@ The **git-hooks** agent owns local Git hook orchestration for Ballast-managed re
 
 - Husky with `lint-staged` or the repo formatter/linter for TypeScript-only repos
 - `pre-commit` for multi-language repos and non-TypeScript language profiles
+- secret detection declared as a `pre-commit` hook, using Gitleaks by default
 - `pre-push` hooks that run unit tests
-- maintenance guidance such as `pre-commit autoupdate` and executable hook scripts
+- maintenance guidance such as `pre-commit autoupdate` and executable hook scripts only when a hook backend requires scripts
 
 ## Ownership Model
 
@@ -24,7 +25,9 @@ Ballast auto-installs `git-hooks` whenever `linting` is selected so existing ins
 - TypeScript-only `.husky/pre-push` hooks run the detected or canonical package-manager test command, with build or typecheck first when the repo convention requires it
 - Multi-language repos use `pre-commit` at the repo root
 - Python, Go, Ansible, and Terraform use `pre-commit`
+- `pre-commit` repos should declare Gitleaks in `.pre-commit-config.yaml` for secret detection and should not generate a repo-local no-secrets shell script
 - `pre-push` runs the repo's unit test command
+- CI and security-review workflows own heavier language-aware checks such as `govulncheck`, fuzzing, `go test -race`, Bandit, `pip-audit`, package-manager audits, `ansible-lint --profile=safety`, deeper IaC static analysis, and cloud/runtime posture scans unless a repo explicitly opts into running them from hooks
 
 ## Prompts to Improve Your App
 

@@ -763,6 +763,10 @@ def read_content(agent: str, language: str, suffix: str = "") -> str:
 
 
 def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
+    gitleaks_hook_guidance = (
+        "- Add the official `gitleaks` pre-commit hook in `.pre-commit-config.yaml` "
+        "for secret detection; do not generate or call a repo-local no-secrets shell script."
+    )
     if language == "typescript":
         if hook_mode == "husky":
             return "\n".join(
@@ -783,6 +787,7 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Install hooks with `pre-commit install`.",
                 "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
                 "- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.",
+                gitleaks_hook_guidance,
                 "- Keep the configuration current with `pre-commit autoupdate`.",
                 "- Verify the hook configuration with `pre-commit run --all-files`.",
             ]
@@ -795,6 +800,8 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Install hooks with `pre-commit install`.",
                 "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
                 "- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.",
+                gitleaks_hook_guidance,
+                "- Keep Bandit and `pip-audit` in CI or explicit security-review workflows unless this repository opts into running them from hooks.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
                 "- Re-run `pre-commit run --all-files` after hook changes.",
             ]
@@ -807,6 +814,8 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.",
                 "- Install hooks with `pre-commit install` and `pre-commit install --hook-type pre-push`.",
                 "- Configure the pre-push stage to run Go unit tests for each module.",
+                gitleaks_hook_guidance,
+                "- Keep `govulncheck`, fuzzing, and `go test -race` in CI, pre-push, or explicit security-review workflows unless this repository opts into running them at commit time.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
                 "- Verify the hook configuration with `pre-commit run --all-files`.",
             ]
@@ -819,6 +828,8 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Install hooks with `pre-commit install`.",
                 "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
                 "- Run `ansible-lint`, `yamllint`, and `ansible-playbook --syntax-check` from the hook configuration.",
+                gitleaks_hook_guidance,
+                "- Prefer `ansible-lint --profile=safety` in CI or explicit security-review workflows when the repository is ready for safety-oriented rules.",
                 "- Keep secrets out of logs and commits; prefer Ansible Vault or external secret stores.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
             ]
@@ -833,6 +844,8 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
                 "- Run `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .` from the hook configuration; keep `tfsec` only for legacy-compatible pipelines.",
                 "- Keep `.terraform/`, state files, and plan files out of Git.",
+                gitleaks_hook_guidance,
+                "- Keep deeper IaC static analysis, policy checks, and cloud/runtime posture scanning in CI or operational review workflows.",
                 "- Keep the configuration current with `pre-commit autoupdate`.",
             ]
         )
@@ -846,6 +859,7 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.",
                 "- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.",
                 "- Keep `.dart_tool/`, `build/`, and platform build output out of Git.",
+                gitleaks_hook_guidance,
                 "- Keep the configuration current with `pre-commit autoupdate`.",
             ]
         )

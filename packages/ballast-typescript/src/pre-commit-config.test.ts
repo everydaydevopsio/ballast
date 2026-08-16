@@ -4,7 +4,6 @@ import YAML from 'yaml';
 
 type PreCommitHook = {
   id?: string;
-  repo?: string;
   entry?: string;
   stages?: string[];
 };
@@ -49,5 +48,21 @@ describe('root pre-commit config', () => {
     expect(unitTestHook).toBeTruthy();
     expect(unitTestHook?.entry).toBe('scripts/run-unit-tests-pre-push.sh');
     expect(unitTestHook?.stages).toContain('pre-push');
+  });
+
+  test('declares gitleaks as a pre-commit hook instead of a local script', () => {
+    const config = readPreCommitConfig();
+    const gitleaksRepo = config.repos.find(
+      (repo) => repo.repo === 'https://github.com/gitleaks/gitleaks'
+    );
+    const hooks = config.repos.flatMap((repo) => repo.hooks ?? []);
+
+    expect(gitleaksRepo).toBeTruthy();
+    expect(gitleaksRepo?.hooks?.some((hook) => hook.id === 'gitleaks')).toBe(
+      true
+    );
+    expect(
+      hooks.some((hook) => hook.entry === 'scripts/check-no-secrets.sh')
+    ).toBe(false);
   });
 });
