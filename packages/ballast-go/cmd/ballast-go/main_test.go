@@ -715,6 +715,8 @@ func TestRenderGitHooksContentSupportsAnsibleGitleaksGuidance(t *testing.T) {
 		"ansible-lint",
 		"yamllint",
 		"ansible-playbook --syntax-check",
+		"pre-push stage",
+		"pre-commit autoupdate",
 		"gitleaks",
 		"ansible-lint --profile=safety",
 	} {
@@ -722,8 +724,16 @@ func TestRenderGitHooksContentSupportsAnsibleGitleaksGuidance(t *testing.T) {
 			t.Fatalf("expected ansible git-hooks content to mention %q, got %q", want, got)
 		}
 	}
-	if strings.Contains(got, "scripts/check-no-secrets.sh") {
-		t.Fatalf("expected ansible git-hooks content to avoid local no-secrets script, got %q", got)
+	for _, unwanted := range []string{
+		"Use Husky for TypeScript-only repositories.",
+		"Husky",
+		"lint-staged",
+		"npx lint-staged",
+		"scripts/check-no-secrets.sh",
+	} {
+		if strings.Contains(got, unwanted) {
+			t.Fatalf("expected ansible git-hooks content not to mention %q, got %q", unwanted, got)
+		}
 	}
 }
 

@@ -509,9 +509,26 @@ describe('build', () => {
       expect(content).toContain('ansible-lint');
       expect(content).toContain('yamllint');
       expect(content).toContain('ansible-playbook --syntax-check');
+      expect(content).toContain('pre-push stage');
+      expect(content).toContain('pre-commit autoupdate');
       expect(content).toContain('gitleaks');
       expect(content).toContain('ansible-lint --profile=safety');
+      expect(content).not.toContain(
+        'Use Husky for TypeScript-only repositories.'
+      );
+      expect(content).not.toContain('Husky');
+      expect(content).not.toContain('lint-staged');
+      expect(content).not.toContain('npx lint-staged');
       expect(content).not.toContain('scripts/check-no-secrets.sh');
+    });
+
+    test('returns ansible cicd guidance without unsupported dependabot ecosystem', () => {
+      const content = getContent('cicd', undefined, 'ansible');
+      expect(content).toContain('Dependabot does not support Ansible Galaxy');
+      expect(content).toContain('requirements.yml');
+      expect(content).toContain('github-actions');
+      expect(content).not.toContain("package-ecosystem: 'ansible");
+      expect(content).not.toContain('ansible-galaxy');
     });
 
     test('returns initialized terraform git-hooks command guidance', () => {
