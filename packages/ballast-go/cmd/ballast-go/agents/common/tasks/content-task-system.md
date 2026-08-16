@@ -99,6 +99,6 @@ For Linear:
 
 ## Important Notes
 
-- Do not use `tasks/todo.md` as a substitute for durable issue tracking. It is branch-scoped working memory only (see the `tasks/todo.md` rule).
+- Do not use `tasks/todo.md` as a substitute for durable issue tracking. It is a structured branch-local task artifact for the current branch (see the `tasks/todo.md` rule).
 - If the MCP server is unavailable, fall back to using the **{{taskSystem}}** web UI and link issues manually in PR descriptions.
 - Keep credentials out of committed files; use environment variables or platform secret stores.

@@ -596,3 +596,27 @@ Ballast-generated local-development rules treat PR hygiene as part of the agent 
 3. Generated local-development rule output defines the stop condition for the review loop.
 4. Generated local-development rule output says the workflow also applies to human review comments.
 5. Automated tests cover the generated PR workflow rule text.
+
+## Structured Task Templates And TDD Rule Discipline
+
+### Problem
+
+Ballast-generated task guidance still treats `tasks/todo.md` as a simple branch scratchpad, while the global execution framework uses lowercase `tasks/todo.md` as a structured planning and evidence artifact. Ballast testing rules also focus on runner setup and coverage plumbing without telling agents to drive behavioral changes through TDD.
+
+### Requirements
+
+1. Ballast task guidance must standardize on lowercase `tasks/todo.md`.
+2. Ballast task guidance must align `tasks/todo.md` with the global execution template sections for context, scope, acceptance criteria, execution checklist, test strategy, rollback, and outcome.
+3. Lightweight branch notes may omit sections that do not apply, but they must remain a subset of the canonical structured template rather than a separate checklist format.
+4. Ballast task guidance must include canonical templates for `tasks/todo.md`, `tasks/lessons.md`, and strict issue output.
+5. Task-system guidance must continue to distinguish branch-local notes from durable external issue tracking.
+6. TypeScript, Python, and Go testing rules must include explicit TDD process discipline in addition to runner and coverage setup.
+7. TDD guidance must require acceptance criteria, a failing test first, minimum implementation, green/refactor, proof, failure-path coverage, and traceability to requirements or issues.
+
+### Acceptance Criteria
+
+1. Generated task TODO guidance mentions only lowercase `tasks/todo.md` and contains the structured task template.
+2. Generated task TODO guidance contains canonical `tasks/lessons.md` and issue output templates.
+3. Generated task TODO guidance allows lightweight optional sections only as a subset of the structured template.
+4. Generated TypeScript, Python, and Go testing guidance includes the required TDD cycle and distinguishes process discipline from tooling setup.
+5. Tests cover the task templates and TDD guidance across supported generated testing rules.

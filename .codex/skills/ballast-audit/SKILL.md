@@ -3,7 +3,7 @@ name: ballast-audit
 description: audit AI rule and skill files for context density, duplication, and bloat
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.16.4. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.16.5. Do not edit this section. -->
 
 # Ballast Audit Skill
 

@@ -1,3 +1,8 @@
+# Task System Integration
+
+Use the configured task system for durable work items. Check and configure the task system MCP server when asked and when a non-`none` task system is configured.
+
+---
 # Task System Integration Rules
 
 These rules define the configured task system behavior for durable work items and MCP setup.
@@ -5,20 +10,22 @@ These rules define the configured task system behavior for durable work items an
 ---
 You are a task system integration specialist. Your role is to ensure the configured task system is used consistently for work tracking and that the correct MCP server is available.
 
-{{BALLAST_TASK_SYSTEM_GUIDANCE}}
+## Activation
+
+External issue tracking is active (`taskSystem: github`). This repository uses **github** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
 
 ## MCP Server Setup
 
 When the user says any of the following, run the MCP setup check below:
 - "set up my task system MCP"
 - "check my MCP setup"
-- "configure MCP for {{taskSystem}}"
+- "configure MCP for github"
 - "is my MCP configured"
 
 ### MCP Setup Check Procedure
 
 1. Ask the user which AI platform they are using: Claude Code, Cursor, Codex, or OpenCode.
-2. Check whether the correct MCP server for **{{taskSystem}}** is already configured for that platform (see platform-specific paths below).
+2. Check whether the correct MCP server for **github** is already configured for that platform (see platform-specific paths below).
 3. If it is configured and the user can connect, confirm success and stop.
 4. If it is not configured or the connection fails, walk the user through the setup steps for their platform.
 
@@ -90,15 +97,15 @@ For Linear:
 }
 ```
 
-## Using {{taskSystem}} for Work Items
+## Using github for Work Items
 
-- Create issues/tickets in **{{taskSystem}}** for any planned work, bugs, or follow-up items that extend beyond the current branch.
-- When starting a new piece of work, check **{{taskSystem}}** first for an existing issue to link against.
-- When closing a PR, ensure any remaining work has a corresponding issue in **{{taskSystem}}** — do not leave it only in `tasks/todo.md`.
+- Create issues/tickets in **github** for any planned work, bugs, or follow-up items that extend beyond the current branch.
+- When starting a new piece of work, check **github** first for an existing issue to link against.
+- When closing a PR, ensure any remaining work has a corresponding issue in **github** — do not leave it only in `tasks/todo.md`.
 - Reference issue IDs in commit messages and PR descriptions so work is traceable.
 
 ## Important Notes
 
 - Do not use `tasks/todo.md` as a substitute for durable issue tracking. It is a structured branch-local task artifact for the current branch (see the `tasks/todo.md` rule).
-- If the MCP server is unavailable, fall back to using the **{{taskSystem}}** web UI and link issues manually in PR descriptions.
+- If the MCP server is unavailable, fall back to using the **github** web UI and link issues manually in PR descriptions.
 - Keep credentials out of committed files; use environment variables or platform secret stores.

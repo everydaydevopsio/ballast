@@ -2202,7 +2202,7 @@ func applyTaskSystemVariables(content, agentID, taskSystem string) string {
 				"",
 				"External issue tracking is disabled (`taskSystem: none`). This repository has no external task system configured. Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.",
 				"",
-				"Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.",
+				"Use `tasks/todo.md` as the structured branch-local task artifact. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.",
 				"",
 				"## MCP Server Setup",
 				"",
@@ -2211,7 +2211,7 @@ func applyTaskSystemVariables(content, agentID, taskSystem string) string {
 				"## Using Work Items",
 				"",
 				"- Do not create external issues or tickets by default.",
-				"- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them in branch-local notes, or ask the user where durable follow-up belongs.",
+				"- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them as branch-local evidence, or ask the user where durable follow-up belongs.",
 				"- Keep credentials out of committed files; use environment variables or platform secret stores if a task-system integration is added later.",
 			}, "\n")
 		}

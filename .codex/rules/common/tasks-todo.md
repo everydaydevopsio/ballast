@@ -1,3 +1,10 @@
+# Branch-Local TODO Tracking
+
+These rules are intended for Codex (CLI and app).
+
+Manage `tasks/todo.md` during branch work. Triage all unchecked items before creating a PR.
+
+---
 # Structured Task TODO Rules
 
 These rules define how to use lowercase `tasks/todo.md` for branch-scoped planning, execution notes, evidence, and PR triage.
