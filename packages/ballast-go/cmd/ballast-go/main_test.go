@@ -658,6 +658,9 @@ func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
 		!strings.Contains(got, "tfsec") {
 		t.Fatalf("expected terraform git-hooks content to mention terraform checks, got %q", got)
 	}
+	if !strings.Contains(got, "gitleaks") || strings.Contains(got, "scripts/check-no-secrets.sh") {
+		t.Fatalf("expected terraform git-hooks content to use gitleaks guidance, got %q", got)
+	}
 }
 
 func TestRenderGitHooksContentSupportsDartFlutter(t *testing.T) {
@@ -675,6 +678,52 @@ func TestRenderGitHooksContentSupportsDartFlutter(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected dart git-hooks content to mention %q, got %q", want, got)
 		}
+	}
+	if !strings.Contains(got, "gitleaks") || strings.Contains(got, "scripts/check-no-secrets.sh") {
+		t.Fatalf("expected dart git-hooks content to use gitleaks guidance, got %q", got)
+	}
+}
+
+func TestRenderGitHooksContentSupportsGoGitleaksGuidance(t *testing.T) {
+	got, err := readContent("git-hooks", "go", "", "standalone", "github", "none")
+	if err != nil {
+		t.Fatalf("read go git-hooks content: %v", err)
+	}
+	for _, want := range []string{
+		"sub-pre-commit",
+		"pre-commit install --hook-type pre-push",
+		"Go unit tests",
+		"gitleaks",
+		"govulncheck",
+		"go test -race",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected go git-hooks content to mention %q, got %q", want, got)
+		}
+	}
+	if strings.Contains(got, "scripts/check-no-secrets.sh") {
+		t.Fatalf("expected go git-hooks content to avoid local no-secrets script, got %q", got)
+	}
+}
+
+func TestRenderGitHooksContentSupportsAnsibleGitleaksGuidance(t *testing.T) {
+	got, err := readContent("git-hooks", "ansible", "", "standalone", "github", "none")
+	if err != nil {
+		t.Fatalf("read ansible git-hooks content: %v", err)
+	}
+	for _, want := range []string{
+		"ansible-lint",
+		"yamllint",
+		"ansible-playbook --syntax-check",
+		"gitleaks",
+		"ansible-lint --profile=safety",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected ansible git-hooks content to mention %q, got %q", want, got)
+		}
+	}
+	if strings.Contains(got, "scripts/check-no-secrets.sh") {
+		t.Fatalf("expected ansible git-hooks content to avoid local no-secrets script, got %q", got)
 	}
 }
 

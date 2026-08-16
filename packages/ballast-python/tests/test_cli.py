@@ -1447,6 +1447,26 @@ Keep team-specific usage notes.
         self.assertIn("cloud/runtime posture scanning", content)
         self.assertNotIn("scripts/check-no-secrets.sh", content)
 
+    def test_render_go_git_hooks_guidance_declares_gitleaks(self) -> None:
+        content = cli.render_git_hooks_guidance("go", "pre-commit")
+
+        self.assertIn("sub-pre-commit", content)
+        self.assertIn("pre-commit install --hook-type pre-push", content)
+        self.assertIn("Go unit tests", content)
+        self.assertIn("gitleaks", content)
+        self.assertIn("govulncheck", content)
+        self.assertIn("go test -race", content)
+        self.assertNotIn("scripts/check-no-secrets.sh", content)
+
+    def test_render_dart_git_hooks_guidance_declares_gitleaks(self) -> None:
+        content = cli.render_git_hooks_guidance("dart", "pre-commit")
+
+        self.assertIn("dart format --set-exit-if-changed .", content)
+        self.assertIn("flutter analyze", content)
+        self.assertIn("flutter test integration_test", content)
+        self.assertIn("gitleaks", content)
+        self.assertNotIn("scripts/check-no-secrets.sh", content)
+
     def test_patch_preserves_existing_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
