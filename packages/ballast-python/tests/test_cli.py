@@ -37,8 +37,14 @@ class PatchInstallTests(unittest.TestCase):
                     "typescript": ["apps/web"],
                     "ansible": ["infra/ansible"],
                 },
+                "tools": {
+                    "typescript": ["pnpm", "corepack"],
+                    "ansible": ["ansible-lint", "molecule"],
+                },
+                "discovery": {"excludePaths": ["examples", "tmp"]},
                 "taskSystem": "jira",
                 "deploymentModel": "serverless",
+                "publishingProfiles": ["cli", "web"],
             },
             [
                 {
@@ -67,8 +73,14 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("- skills: owasp-security-scan", output)
         self.assertIn("- languages: typescript, ansible", output)
         self.assertIn("- paths: typescript=apps/web; ansible=infra/ansible", output)
+        self.assertIn(
+            "- tools: typescript=pnpm,corepack; ansible=ansible-lint,molecule",
+            output,
+        )
+        self.assertIn("- discovery.excludePaths: examples,tmp", output)
         self.assertIn("- taskSystem: jira", output)
         self.assertIn("- deploymentModel: serverless", output)
+        self.assertIn("- publishingProfiles: cli, web", output)
 
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:
@@ -291,6 +303,52 @@ class PatchInstallTests(unittest.TestCase):
             config = cli.load_config(root, "python")
 
             self.assertEqual(config["discovery"], {"excludePaths": ["examples", "tmp"]})
+
+    def test_normalize_tools_filters_invalid_entries(self) -> None:
+        self.assertEqual(cli.normalize_tools(None), {})
+        self.assertEqual(
+            cli.normalize_tools(
+                {
+                    " TypeScript ": ["pnpm", "corepack", "pnpm", "", 42],
+                    "": ["ignored"],
+                    "python": "uv",
+                    123: ["ignored"],
+                    "go": ["go"],
+                }
+            ),
+            {
+                "typescript": ["pnpm", "corepack"],
+                "go": ["go"],
+            },
+        )
+
+    def test_load_config_normalizes_publishing_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["codex"],
+                        "agents": ["publishing"],
+                        "publishingProfiles": [
+                            "APP",
+                            " library ",
+                            "sdk",
+                            "cli",
+                            "cli",
+                            "",
+                            "unknown",
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            config = cli.load_config(root, "python")
+
+            self.assertEqual(
+                config["publishingProfiles"], ["apps", "libraries", "sdks", "cli"]
+            )
 
     def test_resolve_project_root_supports_ansible_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

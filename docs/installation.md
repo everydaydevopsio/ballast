@@ -231,7 +231,7 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
   - Python CLI (legacy): `.rulesrc.python.json`
   - Go CLI (legacy): `.rulesrc.go.json`
 
-Saved config values include `target`, `agents`, `skills`, `taskSystem`, and `deploymentModel`. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
+Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVersion`, `languages`, `paths`, `tools`, `discovery.excludePaths`, `taskSystem`, `deploymentModel`, and `publishingProfiles`. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
 
 ## Install Paths
 

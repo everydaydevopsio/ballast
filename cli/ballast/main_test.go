@@ -332,8 +332,16 @@ func TestRunDoctorReportsConfiguredBackends(t *testing.T) {
     "typescript":["apps/web"],
     "ansible":["infra/ansible"]
   },
+  "tools":{
+    "typescript":["pnpm","corepack"],
+    "ansible":["ansible-lint","molecule"]
+  },
+  "discovery":{
+    "excludePaths":["examples","tmp"]
+  },
 	  "taskSystem":"jira",
-	  "deploymentModel":"kubernetes"
+	  "deploymentModel":"kubernetes",
+	  "publishingProfiles":["APP"," library ","sdk","cli","cli","","unknown"]
 	}`)
 
 	output := captureStdout(t, func() {
@@ -365,8 +373,17 @@ func TestRunDoctorReportsConfiguredBackends(t *testing.T) {
 	if !strings.Contains(output, "paths: typescript=apps/web; ansible=infra/ansible") {
 		t.Fatalf("expected config paths in doctor output, got %q", output)
 	}
+	if !strings.Contains(output, "tools: typescript=pnpm,corepack; ansible=ansible-lint,molecule") {
+		t.Fatalf("expected config tools in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "discovery.excludePaths: examples,tmp") {
+		t.Fatalf("expected discovery exclude paths in doctor output, got %q", output)
+	}
 	if !strings.Contains(output, "taskSystem: jira") {
 		t.Fatalf("expected config task system in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "publishingProfiles: apps, libraries, sdks, cli") {
+		t.Fatalf("expected publishing profiles in doctor output, got %q", output)
 	}
 	if !strings.Contains(output, "deploymentModel: kubernetes") {
 		t.Fatalf("expected config deployment model in doctor output, got %q", output)

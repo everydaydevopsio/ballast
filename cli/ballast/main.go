@@ -139,6 +139,12 @@ var collectDoctorBackendsFunc = collectDoctorBackends
 
 var supportedTaskSystems = []string{"github", "jira", "linear"}
 var supportedDeploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
+var supportedPublishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
+var publishingProfileAliases = map[string]string{
+	"app":     "apps",
+	"library": "libraries",
+	"sdk":     "sdks",
+}
 var defaultLanguageTools = map[string][]string{
 	"python":     {"uv", "pyenv"},
 	"typescript": {"pnpm", "corepack"},
@@ -149,17 +155,18 @@ var defaultLanguageTools = map[string][]string{
 }
 
 type monorepoConfig struct {
-	Target          string              `json:"target,omitempty"`
-	Targets         []string            `json:"targets,omitempty"`
-	Agents          []string            `json:"agents,omitempty"`
-	Skills          []string            `json:"skills,omitempty"`
-	BallastVersion  string              `json:"ballastVersion,omitempty"`
-	Languages       []string            `json:"languages,omitempty"`
-	Paths           map[string][]string `json:"paths,omitempty"`
-	Tools           map[string][]string `json:"tools,omitempty"`
-	Discovery       *discoveryConfig    `json:"discovery,omitempty"`
-	TaskSystem      string              `json:"taskSystem,omitempty"`
-	DeploymentModel string              `json:"deploymentModel,omitempty"`
+	Target             string              `json:"target,omitempty"`
+	Targets            []string            `json:"targets,omitempty"`
+	Agents             []string            `json:"agents,omitempty"`
+	Skills             []string            `json:"skills,omitempty"`
+	BallastVersion     string              `json:"ballastVersion,omitempty"`
+	Languages          []string            `json:"languages,omitempty"`
+	Paths              map[string][]string `json:"paths,omitempty"`
+	Tools              map[string][]string `json:"tools,omitempty"`
+	Discovery          *discoveryConfig    `json:"discovery,omitempty"`
+	TaskSystem         string              `json:"taskSystem,omitempty"`
+	DeploymentModel    string              `json:"deploymentModel,omitempty"`
+	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 }
 
 type discoveryConfig struct {
@@ -1129,11 +1136,17 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	if formattedTools := formatDoctorConfigPaths(config.Languages, config.Tools); formattedTools != "" {
 		fmt.Printf("- tools: %s\n", formattedTools)
 	}
+	if config.Discovery != nil && len(config.Discovery.ExcludePaths) > 0 {
+		fmt.Printf("- discovery.excludePaths: %s\n", strings.Join(config.Discovery.ExcludePaths, ","))
+	}
 	if strings.TrimSpace(config.TaskSystem) != "" {
 		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
 	}
 	if strings.TrimSpace(config.DeploymentModel) != "" {
 		fmt.Printf("- deploymentModel: %s\n", config.DeploymentModel)
+	}
+	if len(config.PublishingProfiles) > 0 {
+		fmt.Printf("- publishingProfiles: %s\n", strings.Join(config.PublishingProfiles, ", "))
 	}
 	printDoctorConfigDrift(root, config)
 	fmt.Println()
@@ -1998,7 +2011,28 @@ func loadDoctorConfig(root string) (*monorepoConfig, error) {
 	if len(config.Targets) == 0 && strings.TrimSpace(config.Target) != "" {
 		config.Targets = []string{strings.TrimSpace(config.Target)}
 	}
+	config.PublishingProfiles = normalizePublishingProfiles(config.PublishingProfiles)
 	return &config, nil
+}
+
+func normalizePublishingProfiles(values []string) []string {
+	seen := map[string]struct{}{}
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		profile := strings.ToLower(strings.TrimSpace(value))
+		if alias, ok := publishingProfileAliases[profile]; ok {
+			profile = alias
+		}
+		if !slices.Contains(supportedPublishingProfiles, profile) {
+			continue
+		}
+		if _, ok := seen[profile]; ok {
+			continue
+		}
+		seen[profile] = struct{}{}
+		normalized = append(normalized, profile)
+	}
+	return normalized
 }
 
 type resolvedBackendCommand struct {

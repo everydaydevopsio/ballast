@@ -49,6 +49,12 @@ var taskSystemGuidanceToken = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
 var taskSystemToken = "{{taskSystem}}"
 var taskSystems = []string{"github", "jira", "linear", "none"}
 var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
+var publishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
+var publishingProfileAliases = map[string]string{
+	"app":     "apps",
+	"library": "libraries",
+	"sdk":     "sdks",
+}
 var defaultLanguageTools = map[string][]string{
 	"python":     {"uv", "pyenv"},
 	"typescript": {"pnpm", "corepack"},
@@ -85,16 +91,17 @@ var embeddedAgentsFS embed.FS
 var embeddedSkillsFS embed.FS
 
 type rulesConfig struct {
-	Targets         []string            `json:"targets,omitempty"`
-	Agents          []string            `json:"agents"`
-	Skills          []string            `json:"skills,omitempty"`
-	BallastVersion  string              `json:"ballastVersion,omitempty"`
-	Languages       []string            `json:"languages,omitempty"`
-	Paths           map[string][]string `json:"paths,omitempty"`
-	Tools           map[string][]string `json:"tools,omitempty"`
-	Discovery       *discoveryConfig    `json:"discovery,omitempty"`
-	TaskSystem      string              `json:"taskSystem,omitempty"`
-	DeploymentModel string              `json:"deploymentModel,omitempty"`
+	Targets            []string            `json:"targets,omitempty"`
+	Agents             []string            `json:"agents"`
+	Skills             []string            `json:"skills,omitempty"`
+	BallastVersion     string              `json:"ballastVersion,omitempty"`
+	Languages          []string            `json:"languages,omitempty"`
+	Paths              map[string][]string `json:"paths,omitempty"`
+	Tools              map[string][]string `json:"tools,omitempty"`
+	Discovery          *discoveryConfig    `json:"discovery,omitempty"`
+	TaskSystem         string              `json:"taskSystem,omitempty"`
+	DeploymentModel    string              `json:"deploymentModel,omitempty"`
+	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 }
 
 type discoveryConfig struct {
@@ -102,17 +109,18 @@ type discoveryConfig struct {
 }
 
 type rawRulesConfig struct {
-	Target          string              `json:"target,omitempty"`
-	Targets         []string            `json:"targets,omitempty"`
-	Agents          []string            `json:"agents,omitempty"`
-	Skills          []string            `json:"skills,omitempty"`
-	BallastVersion  string              `json:"ballastVersion,omitempty"`
-	Languages       []string            `json:"languages,omitempty"`
-	Paths           map[string][]string `json:"paths,omitempty"`
-	Tools           map[string][]string `json:"tools,omitempty"`
-	Discovery       json.RawMessage     `json:"discovery,omitempty"`
-	TaskSystem      string              `json:"taskSystem,omitempty"`
-	DeploymentModel string              `json:"deploymentModel,omitempty"`
+	Target             string              `json:"target,omitempty"`
+	Targets            []string            `json:"targets,omitempty"`
+	Agents             []string            `json:"agents,omitempty"`
+	Skills             []string            `json:"skills,omitempty"`
+	BallastVersion     string              `json:"ballastVersion,omitempty"`
+	Languages          []string            `json:"languages,omitempty"`
+	Paths              map[string][]string `json:"paths,omitempty"`
+	Tools              map[string][]string `json:"tools,omitempty"`
+	Discovery          json.RawMessage     `json:"discovery,omitempty"`
+	TaskSystem         string              `json:"taskSystem,omitempty"`
+	DeploymentModel    string              `json:"deploymentModel,omitempty"`
+	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 }
 
 type installResult struct {
@@ -634,11 +642,17 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		if formattedTools := formatDoctorConfigPaths(config.Languages, config.Tools); formattedTools != "" {
 			lines = append(lines, fmt.Sprintf("- tools: %s", formattedTools))
 		}
+		if config.Discovery != nil && len(config.Discovery.ExcludePaths) > 0 {
+			lines = append(lines, fmt.Sprintf("- discovery.excludePaths: %s", strings.Join(config.Discovery.ExcludePaths, ",")))
+		}
 		if strings.TrimSpace(config.TaskSystem) != "" {
 			lines = append(lines, fmt.Sprintf("- taskSystem: %s", config.TaskSystem))
 		}
 		if strings.TrimSpace(config.DeploymentModel) != "" {
 			lines = append(lines, fmt.Sprintf("- deploymentModel: %s", config.DeploymentModel))
+		}
+		if len(config.PublishingProfiles) > 0 {
+			lines = append(lines, fmt.Sprintf("- publishingProfiles: %s", strings.Join(config.PublishingProfiles, ", ")))
 		}
 		if configVersion == "" || compareVersions(configVersion, targetVersion) < 0 {
 			recommendations = append(
@@ -2476,17 +2490,38 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		return nil
 	}
 	return &rulesConfig{
-		Targets:         targets,
-		Agents:          raw.Agents,
-		Skills:          raw.Skills,
-		BallastVersion:  raw.BallastVersion,
-		Languages:       raw.Languages,
-		Paths:           raw.Paths,
-		Tools:           normalizeLanguageTools(raw.Tools),
-		Discovery:       normalizeDiscovery(raw.Discovery),
-		TaskSystem:      normalizeRequiredInstallOptionValue(raw.TaskSystem),
-		DeploymentModel: normalizeDeploymentModel(raw.DeploymentModel),
+		Targets:            targets,
+		Agents:             raw.Agents,
+		Skills:             raw.Skills,
+		BallastVersion:     raw.BallastVersion,
+		Languages:          raw.Languages,
+		Paths:              raw.Paths,
+		Tools:              normalizeLanguageTools(raw.Tools),
+		Discovery:          normalizeDiscovery(raw.Discovery),
+		TaskSystem:         normalizeRequiredInstallOptionValue(raw.TaskSystem),
+		DeploymentModel:    normalizeDeploymentModel(raw.DeploymentModel),
+		PublishingProfiles: normalizePublishingProfiles(raw.PublishingProfiles),
 	}
+}
+
+func normalizePublishingProfiles(values []string) []string {
+	seen := map[string]struct{}{}
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		profile := strings.ToLower(strings.TrimSpace(value))
+		if alias, ok := publishingProfileAliases[profile]; ok {
+			profile = alias
+		}
+		if !contains(publishingProfiles, profile) {
+			continue
+		}
+		if _, ok := seen[profile]; ok {
+			continue
+		}
+		seen[profile] = struct{}{}
+		normalized = append(normalized, profile)
+	}
+	return normalized
 }
 
 func saveConfig(projectRoot, language string, cfg rulesConfig) error {
