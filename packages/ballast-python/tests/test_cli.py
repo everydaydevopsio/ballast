@@ -1428,8 +1428,14 @@ Keep team-specific usage notes.
             content = git_hooks.read_text(encoding="utf-8")
             self.assertIn("pre-commit install --hook-type pre-push", content)
             self.assertIn("ansible-playbook --syntax-check", content)
+            self.assertIn("pre-push stage", content)
+            self.assertIn("pre-commit autoupdate", content)
             self.assertIn("gitleaks", content)
             self.assertIn("ansible-lint --profile=safety", content)
+            self.assertNotIn("Use Husky for TypeScript-only repositories.", content)
+            self.assertNotIn("Husky", content)
+            self.assertNotIn("lint-staged", content)
+            self.assertNotIn("npx lint-staged", content)
             self.assertNotIn("scripts/check-no-secrets.sh", content)
 
     def test_render_terraform_git_hooks_guidance_uses_initialized_commands(

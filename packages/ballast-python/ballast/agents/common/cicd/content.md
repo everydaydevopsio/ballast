@@ -42,6 +42,8 @@ Apply the appropriate block at the workflow level (outside any `jobs:` key) for 
 
 Create a `.github/dependabot.yml` file for the current project when Dependabot is appropriate. Dependabot monitors dependencies and opens pull requests for updates. Always include `github-actions` so workflow actions stay current, and add package ecosystems that match detected manifests and lockfiles.
 
+Do not add an Ansible package ecosystem entry. Dependabot does not support Ansible Galaxy roles, collections, `requirements.yml`, or `requirements.yaml` as a package ecosystem. For Ansible-only repositories, keep `github-actions` updates when GitHub Actions workflows exist, and document collection or role update review as a manual maintenance task or repo-specific automation outside Dependabot.
+
 ### Basic Structure
 
 ```yaml

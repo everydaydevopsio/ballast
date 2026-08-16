@@ -9,18 +9,43 @@ You are an Ansible linting specialist. Your role is to establish a clean, repeat
 5. Keep tasks idempotent and explicit with `changed_when`, `failed_when`, and `creates`/`removes` when shell or command steps are unavoidable.
 6. Add CI steps that run linting before any apply/deploy workflow.
 7. Coordinate with the `git-hooks` rules when the repo should enforce local hook checks.
+8. Use `pre-commit` for local Ansible validation.
+9. Do not configure Dependabot for Ansible Galaxy roles or collections; Dependabot has no Ansible ecosystem for `requirements.yml` or `requirements.yaml`.
 
 ## Baseline Tooling
 
 - `ansible-lint`
 - `yamllint`
+
+## Local Hooks
+
+Use `pre-commit` for local Ansible enforcement.
+
+The root `.pre-commit-config.yaml` should run:
+
+- `ansible-lint` for playbooks, roles, and collections
+- `yamllint` for YAML formatting and style
+- `ansible-playbook --syntax-check` for each representative top-level playbook
+
+Install both hook stages:
+
+- `pre-commit install`
+- `pre-commit install --hook-type pre-push`
+
+Keep the hook set current with `pre-commit autoupdate`. Use the pre-push stage for slower validation such as syntax checks across all top-level playbooks or check-mode smoke validation.
+
+## Dependency Updates
+
+Dependabot can update GitHub Actions used by Ansible repositories, but it cannot update Ansible Galaxy roles or collections from `requirements.yml` or `requirements.yaml`. Do not add an unsupported Ansible ecosystem entry to `.github/dependabot.yml`; track role and collection updates through manual review or project-specific automation.
+
 ## Implementation Order
 
 1. Detect the repo shape and keep it consistent.
 2. Add or update `.ansible-lint`.
 3. Add or update `.yamllint`.
-4. Add CI lint commands.
-5. Run syntax and lint checks.
+4. Add or update `.pre-commit-config.yaml` when local hooks are in scope.
+5. Add CI lint commands.
+6. Run syntax and lint checks.
 
 ## Example Layout
 
@@ -58,6 +83,7 @@ That repo demonstrates good baseline conventions:
 - Avoid raw `shell` and `command` tasks unless no purpose-built module exists.
 - When `shell` or `command` is required, make the task idempotent and explain the safety condition.
 - Keep `requirements.yml` in sync with any referenced collections or external roles.
+- Review Galaxy role and collection updates manually or through project-specific CI because Dependabot does not update Ansible Galaxy dependencies.
 
 ## When Completed
 

@@ -2355,11 +2355,12 @@ func renderGitHooksGuidance(language, hookMode string) string {
 			"- Create or update `.pre-commit-config.yaml` at the repo root.",
 			"- Install hooks with `pre-commit install`.",
 			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
-			"- Run `ansible-lint`, `yamllint`, and `ansible-playbook --syntax-check` from the hook configuration.",
+			"- Run `ansible-lint` and `yamllint` from the pre-commit stage.",
+			"- Run `ansible-playbook --syntax-check` for representative top-level playbooks from the pre-push stage.",
 			gitleaksHookGuidance,
 			"- Prefer `ansible-lint --profile=safety` in CI or explicit security-review workflows when the repository is ready for safety-oriented rules.",
 			"- Keep secrets out of logs and commits; prefer Ansible Vault or external secret stores.",
-			"- Keep the configuration current with `pre-commit autoupdate`.",
+			"- Keep the configuration current with `pre-commit autoupdate`; rerun `pre-commit run --all-files` after hook changes.",
 		}, "\n")
 	case "terraform":
 		return strings.Join([]string{
