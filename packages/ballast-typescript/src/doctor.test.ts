@@ -16,8 +16,10 @@ describe('doctor', () => {
       [],
       {},
       {},
+      [],
       null,
       null,
+      [],
       [
         {
           name: 'ballast-typescript',
@@ -63,8 +65,10 @@ describe('doctor', () => {
         typescript: ['pnpm', 'corepack'],
         ansible: ['ansible-lint', 'molecule']
       },
+      ['examples', 'tmp'],
       'jira',
       'hosted',
+      ['cli', 'web'],
       [
         {
           name: 'ballast-typescript',
@@ -92,8 +96,10 @@ describe('doctor', () => {
     expect(output).toContain(
       '- tools: typescript=pnpm,corepack; ansible=ansible-lint,molecule'
     );
+    expect(output).toContain('- discovery.excludePaths: examples,tmp');
     expect(output).toContain('- taskSystem: jira');
     expect(output).toContain('- deploymentModel: hosted');
+    expect(output).toContain('- publishingProfiles: cli, web');
     expect(output).toContain('- No action needed.');
   });
 
@@ -109,8 +115,10 @@ describe('doctor', () => {
       [],
       {},
       {},
+      [],
       null,
       'kubernetes',
+      [],
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'cli'
     );
@@ -131,8 +139,10 @@ describe('doctor', () => {
       [],
       {},
       {},
+      [],
       null,
       null,
+      [],
       [],
       'unknown'
     );
@@ -152,8 +162,10 @@ describe('doctor', () => {
       [],
       {},
       {},
+      [],
       null,
       null,
+      [],
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'web'
     );
@@ -176,8 +188,10 @@ describe('doctor', () => {
       [],
       {},
       {},
+      [],
       null,
       null,
+      [],
       [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
       'api'
     );

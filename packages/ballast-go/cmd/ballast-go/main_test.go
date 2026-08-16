@@ -155,8 +155,16 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 				"typescript": {"apps/web"},
 				"ansible":    {"infra/ansible"},
 			},
-			TaskSystem:      "jira",
-			DeploymentModel: "serverless",
+			Tools: map[string][]string{
+				"typescript": {"pnpm", "corepack"},
+				"ansible":    {"ansible-lint", "molecule"},
+			},
+			Discovery: &discoveryConfig{
+				ExcludePaths: []string{"examples", "tmp"},
+			},
+			TaskSystem:         "jira",
+			DeploymentModel:    "serverless",
+			PublishingProfiles: []string{"cli", "web"},
 		},
 		[]installedCLIStatus{
 			{Name: "ballast-typescript", Version: "5.0.2", Path: "/tmp/ballast-typescript"},
@@ -180,11 +188,20 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	if !strings.Contains(output, "- paths: typescript=apps/web; ansible=infra/ansible") {
 		t.Fatalf("expected paths in doctor output, got %q", output)
 	}
+	if !strings.Contains(output, "- tools: typescript=pnpm,corepack; ansible=ansible-lint,molecule") {
+		t.Fatalf("expected tools in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "- discovery.excludePaths: examples,tmp") {
+		t.Fatalf("expected discovery exclude paths in doctor output, got %q", output)
+	}
 	if !strings.Contains(output, "- taskSystem: jira") {
 		t.Fatalf("expected task system in doctor output, got %q", output)
 	}
 	if !strings.Contains(output, "- deploymentModel: serverless") {
 		t.Fatalf("expected deployment model in doctor output, got %q", output)
+	}
+	if !strings.Contains(output, "- publishingProfiles: cli, web") {
+		t.Fatalf("expected publishing profiles in doctor output, got %q", output)
 	}
 }
 

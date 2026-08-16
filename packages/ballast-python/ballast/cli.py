@@ -271,6 +271,28 @@ def normalize_discovery(raw: object | None) -> dict[str, list[str]] | None:
     return {"excludePaths": normalized}
 
 
+def normalize_tools(raw: object | None) -> dict[str, list[str]]:
+    if not isinstance(raw, dict):
+        return {}
+    normalized: dict[str, list[str]] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not isinstance(value, list):
+            continue
+        language = key.strip().lower()
+        if not language:
+            continue
+        tools: list[str] = []
+        for item in value:
+            if not isinstance(item, str):
+                continue
+            token = item.strip()
+            if token and token not in tools:
+                tools.append(token)
+        if tools:
+            normalized[language] = tools
+    return normalized
+
+
 def load_config(root: Path, language: str) -> dict[str, object] | None:
     file_path = root / rulesrc_filename(language)
     if not file_path.exists():
@@ -294,6 +316,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
         skills = data.get("skills")
         task_system = data.get("taskSystem")
         deployment_model = data.get("deploymentModel")
+        publishing_profiles = data.get("publishingProfiles")
         discovery = normalize_discovery(data.get("discovery"))
         return {
             "targets": targets,
@@ -318,6 +341,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
             }
             if isinstance(data.get("paths"), dict)
             else {},
+            "tools": normalize_tools(data.get("tools")),
             "discovery": discovery,
             "taskSystem": task_system if isinstance(task_system, str) else None,
             "deploymentModel": (
@@ -325,6 +349,11 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
                 if isinstance(deployment_model, str)
                 else None
             ),
+            "publishingProfiles": [
+                item for item in publishing_profiles if isinstance(item, str)
+            ]
+            if isinstance(publishing_profiles, list)
+            else [],
         }
     except Exception:
         return None
@@ -557,8 +586,11 @@ def build_doctor_report(
         skills = config.get("skills")
         languages = config.get("languages")
         paths = config.get("paths")
+        tools = config.get("tools")
+        discovery = config.get("discovery")
         task_system = config.get("taskSystem")
         deployment_model = config.get("deploymentModel")
+        publishing_profiles = config.get("publishingProfiles")
         if isinstance(targets, list) and all(
             isinstance(target, str) for target in targets
         ):
@@ -588,10 +620,39 @@ def build_doctor_report(
             )
             if formatted_paths:
                 lines.append(f"- paths: {formatted_paths}")
+        if (
+            isinstance(languages, list)
+            and all(isinstance(language, str) for language in languages)
+            and isinstance(tools, dict)
+        ):
+            formatted_tools = _format_config_paths(
+                languages,
+                {
+                    key: value
+                    for key, value in tools.items()
+                    if isinstance(key, str)
+                    and isinstance(value, list)
+                    and all(isinstance(item, str) for item in value)
+                },
+            )
+            if formatted_tools:
+                lines.append(f"- tools: {formatted_tools}")
+        if isinstance(discovery, dict):
+            exclude_paths = discovery.get("excludePaths")
+            if isinstance(exclude_paths, list) and all(
+                isinstance(item, str) for item in exclude_paths
+            ):
+                lines.append(f"- discovery.excludePaths: {','.join(exclude_paths)}")
         if isinstance(task_system, str) and task_system.strip():
             lines.append(f"- taskSystem: {task_system}")
         if isinstance(deployment_model, str) and deployment_model.strip():
             lines.append(f"- deploymentModel: {deployment_model}")
+        if (
+            isinstance(publishing_profiles, list)
+            and publishing_profiles
+            and all(isinstance(item, str) for item in publishing_profiles)
+        ):
+            lines.append(f"- publishingProfiles: {', '.join(publishing_profiles)}")
 
     lines.extend(["", "Recommendations:"])
     if recommendations:

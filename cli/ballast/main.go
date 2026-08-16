@@ -149,17 +149,18 @@ var defaultLanguageTools = map[string][]string{
 }
 
 type monorepoConfig struct {
-	Target          string              `json:"target,omitempty"`
-	Targets         []string            `json:"targets,omitempty"`
-	Agents          []string            `json:"agents,omitempty"`
-	Skills          []string            `json:"skills,omitempty"`
-	BallastVersion  string              `json:"ballastVersion,omitempty"`
-	Languages       []string            `json:"languages,omitempty"`
-	Paths           map[string][]string `json:"paths,omitempty"`
-	Tools           map[string][]string `json:"tools,omitempty"`
-	Discovery       *discoveryConfig    `json:"discovery,omitempty"`
-	TaskSystem      string              `json:"taskSystem,omitempty"`
-	DeploymentModel string              `json:"deploymentModel,omitempty"`
+	Target             string              `json:"target,omitempty"`
+	Targets            []string            `json:"targets,omitempty"`
+	Agents             []string            `json:"agents,omitempty"`
+	Skills             []string            `json:"skills,omitempty"`
+	BallastVersion     string              `json:"ballastVersion,omitempty"`
+	Languages          []string            `json:"languages,omitempty"`
+	Paths              map[string][]string `json:"paths,omitempty"`
+	Tools              map[string][]string `json:"tools,omitempty"`
+	Discovery          *discoveryConfig    `json:"discovery,omitempty"`
+	TaskSystem         string              `json:"taskSystem,omitempty"`
+	DeploymentModel    string              `json:"deploymentModel,omitempty"`
+	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 }
 
 type discoveryConfig struct {
@@ -1129,11 +1130,17 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	if formattedTools := formatDoctorConfigPaths(config.Languages, config.Tools); formattedTools != "" {
 		fmt.Printf("- tools: %s\n", formattedTools)
 	}
+	if config.Discovery != nil && len(config.Discovery.ExcludePaths) > 0 {
+		fmt.Printf("- discovery.excludePaths: %s\n", strings.Join(config.Discovery.ExcludePaths, ","))
+	}
 	if strings.TrimSpace(config.TaskSystem) != "" {
 		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
 	}
 	if strings.TrimSpace(config.DeploymentModel) != "" {
 		fmt.Printf("- deploymentModel: %s\n", config.DeploymentModel)
+	}
+	if len(config.PublishingProfiles) > 0 {
+		fmt.Printf("- publishingProfiles: %s\n", strings.Join(config.PublishingProfiles, ", "))
 	}
 	printDoctorConfigDrift(root, config)
 	fmt.Println()

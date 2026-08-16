@@ -23,8 +23,10 @@ export interface DoctorReport {
   configLanguages: string[];
   configPaths: Record<string, string[]>;
   configTools: Record<string, string[]>;
+  configDiscoveryExcludePaths: string[];
   configTaskSystem: string | null;
   configDeploymentModel: string | null;
+  configPublishingProfiles: string[];
   installed: InstalledCliStatus[];
   detectedAppType: AppType;
   recommendations: string[];
@@ -207,8 +209,10 @@ export function buildDoctorReport(
   configLanguages: string[],
   configPaths: Record<string, string[]>,
   configTools: Record<string, string[]>,
+  configDiscoveryExcludePaths: string[],
   configTaskSystem: string | null,
   configDeploymentModel: string | null,
+  configPublishingProfiles: string[],
   installed: InstalledCliStatus[],
   detectedAppType: AppType = 'unknown'
 ): DoctorReport {
@@ -271,8 +275,10 @@ export function buildDoctorReport(
     configLanguages,
     configPaths,
     configTools,
+    configDiscoveryExcludePaths,
     configTaskSystem,
     configDeploymentModel,
+    configPublishingProfiles,
     installed,
     detectedAppType,
     recommendations
@@ -369,11 +375,21 @@ export function formatDoctorReport(report: DoctorReport): string {
     if (formattedTools) {
       lines.push(`- tools: ${formattedTools}`);
     }
+    if (report.configDiscoveryExcludePaths.length > 0) {
+      lines.push(
+        `- discovery.excludePaths: ${report.configDiscoveryExcludePaths.join(',')}`
+      );
+    }
     if (report.configTaskSystem) {
       lines.push(`- taskSystem: ${report.configTaskSystem}`);
     }
     if (report.configDeploymentModel) {
       lines.push(`- deploymentModel: ${report.configDeploymentModel}`);
+    }
+    if (report.configPublishingProfiles.length > 0) {
+      lines.push(
+        `- publishingProfiles: ${report.configPublishingProfiles.join(', ')}`
+      );
     }
   }
 
@@ -404,8 +420,10 @@ export function runDoctor(): number {
     config?.languages ?? [],
     config?.paths ?? {},
     config?.tools ?? {},
+    config?.discovery?.excludePaths ?? [],
     config?.taskSystem ?? null,
     config?.deploymentModel ?? null,
+    config?.publishingProfiles ?? [],
     CLI_NAMES.map((name) => detectInstalledCli(name)),
     detectAppType(projectRoot)
   );
