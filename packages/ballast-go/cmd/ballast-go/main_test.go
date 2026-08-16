@@ -1100,6 +1100,12 @@ func TestBuildContentRendersActiveTaskSystem(t *testing.T) {
 	if !strings.Contains(content, "External issue tracking is active (`taskSystem: github`).") {
 		t.Fatalf("expected active task-system guidance, got %q", content)
 	}
+	if !strings.Contains(content, "**GitHub** as the system of record") {
+		t.Fatalf("expected GitHub display name in task-system guidance, got %q", content)
+	}
+	if strings.Contains(content, "**github**") {
+		t.Fatalf("expected GitHub brand capitalization, got %q", content)
+	}
 }
 
 func TestBuildContentRendersNoneTaskSystem(t *testing.T) {

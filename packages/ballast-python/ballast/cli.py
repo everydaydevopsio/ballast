@@ -993,6 +993,7 @@ def normalize_task_system(value: object) -> str:
 
 def render_task_system_guidance(task_system: str | None) -> str:
     normalized = normalize_task_system(task_system) or DEFAULT_TASK_SYSTEM
+    display_name = task_system_display_name(normalized)
     if normalized == "none":
         return "\n".join(
             [
@@ -1017,9 +1018,17 @@ def render_task_system_guidance(task_system: str | None) -> str:
         [
             "## Activation",
             "",
-            f"External issue tracking is active (`taskSystem: {normalized}`). This repository uses **{normalized}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.",
+            f"External issue tracking is active (`taskSystem: {normalized}`). This repository uses **{display_name}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.",
         ]
     )
+
+
+def task_system_display_name(task_system: str) -> str:
+    return {
+        "github": "GitHub",
+        "jira": "Jira",
+        "linear": "Linear",
+    }.get(task_system, task_system)
 
 
 def apply_task_system_guidance(
@@ -1038,7 +1047,10 @@ def apply_task_system_guidance(
             render_task_system_guidance(task_system),
         )
     if TASK_SYSTEM_TOKEN in content:
-        content = content.replace(TASK_SYSTEM_TOKEN, normalized)
+        content = content.replace(
+            TASK_SYSTEM_TOKEN,
+            task_system_display_name(normalized),
+        )
     return content
 
 

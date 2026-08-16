@@ -360,6 +360,7 @@ function applyDeploymentModelGuidance(
 
 function renderTaskSystemGuidance(options?: BuildOptions): string {
   const taskSystem = options?.variables?.taskSystem ?? '{{taskSystem}}';
+  const taskSystemName = renderTaskSystemDisplayName(taskSystem);
   if (taskSystem === 'none') {
     return [
       '## Activation',
@@ -383,8 +384,21 @@ function renderTaskSystemGuidance(options?: BuildOptions): string {
   return [
     '## Activation',
     '',
-    `External issue tracking is active (\`taskSystem: ${taskSystem}\`). This repository uses **${taskSystem}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.`
+    `External issue tracking is active (\`taskSystem: ${taskSystem}\`). This repository uses **${taskSystemName}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.`
   ].join('\n');
+}
+
+function renderTaskSystemDisplayName(taskSystem: string): string {
+  switch (taskSystem) {
+    case 'github':
+      return 'GitHub';
+    case 'jira':
+      return 'Jira';
+    case 'linear':
+      return 'Linear';
+    default:
+      return taskSystem;
+  }
 }
 
 function applyTaskSystemGuidance(
@@ -474,7 +488,9 @@ export function getContent(
   let raw = fs.readFileSync(file, 'utf8');
   if (options?.variables) {
     for (const [key, value] of Object.entries(options.variables)) {
-      raw = raw.replaceAll(`{{${key}}}`, value);
+      const replacement =
+        key === 'taskSystem' ? renderTaskSystemDisplayName(value) : value;
+      raw = raw.replaceAll(`{{${key}}}`, replacement);
     }
   }
   return applyTaskSystemGuidance(

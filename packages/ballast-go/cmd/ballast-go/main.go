@@ -2218,13 +2218,26 @@ func applyTaskSystemVariables(content, agentID, taskSystem string) string {
 		content = strings.ReplaceAll(content, taskSystemGuidanceToken, strings.Join([]string{
 			"## Activation",
 			"",
-			fmt.Sprintf("External issue tracking is active (`taskSystem: %s`). This repository uses **%s** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.", normalized, normalized),
+			fmt.Sprintf("External issue tracking is active (`taskSystem: %s`). This repository uses **%s** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.", normalized, taskSystemDisplayName(normalized)),
 		}, "\n"))
 	}
 	if strings.Contains(content, taskSystemToken) {
-		return strings.ReplaceAll(content, taskSystemToken, normalized)
+		return strings.ReplaceAll(content, taskSystemToken, taskSystemDisplayName(normalized))
 	}
 	return content
+}
+
+func taskSystemDisplayName(taskSystem string) string {
+	switch taskSystem {
+	case "github":
+		return "GitHub"
+	case "jira":
+		return "Jira"
+	case "linear":
+		return "Linear"
+	default:
+		return taskSystem
+	}
 }
 
 func applyHookTemplateVariables(content, agentID, language, hookMode string) string {

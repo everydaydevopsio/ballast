@@ -34,7 +34,7 @@
 - [x] Update canonical task and testing rule sources.
 - [x] Sync package mirrors and regenerate checked-in generated outputs.
 - [x] Run focused tests and generated-artifact checks.
-- [ ] Push branch and create PR against `main`.
+- [x] Push branch and create PR against `main`.
 
 ## Test Strategy
 - Unit: targeted Jest tests for generated content in `packages/ballast-typescript/src/build.test.ts`.

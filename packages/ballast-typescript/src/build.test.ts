@@ -184,6 +184,9 @@ describe('build', () => {
         variables: { taskSystem: 'github' }
       });
       expect(content).toContain('github');
+      expect(content).toContain('**GitHub** as the system of record');
+      expect(content).toContain('"configure MCP for GitHub"');
+      expect(content).not.toContain('**github**');
       expect(content).toContain(
         'External issue tracking is active (`taskSystem: github`).'
       );
