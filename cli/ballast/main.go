@@ -4210,12 +4210,12 @@ func patchInstalledRulesSection(existing string, canonical string) string {
 const rootPlaceholder = "__BALLAST_ROOT__"
 const ballastManagedMarker = "Created by [Ballast]"
 const ballastManagedSectionNotice = "Created by Ballast. Do not edit this section."
-const ballastRuleMarker = "ballast:rule"
+const ballastRuleMarkerPrefix = "<!-- ballast:rule "
 
 func containsBallastManagedMarker(content string) bool {
 	return strings.Contains(content, ballastManagedMarker) ||
 		strings.Contains(content, ballastManagedSectionNotice) ||
-		strings.Contains(content, ballastRuleMarker)
+		strings.Contains(content, ballastRuleMarkerPrefix)
 }
 
 func patchManagedSupportSections(existing string, canonical string) string {

@@ -332,6 +332,7 @@ interface RuleConfig {
   targets: Target[];
   agents: string[];
   languages: string[];
+  paths: Record<string, string[]>;
   taskSystem?: string | null;
   deploymentModel?: string | null;
   publishingProfiles?: PublishingProfile[];
@@ -437,17 +438,41 @@ function canonicalRuleContent(
       ? { deploymentModel: config.deploymentModel }
       : {})
   };
+  const hookMode =
+    parsed.agentId === 'git-hooks'
+      ? ruleHookMode(parsed.language, config)
+      : undefined;
+  const options = {
+    ...(hookMode ? { hookMode } : {}),
+    ...(Object.keys(variables).length > 0 ? { variables } : {})
+  };
   try {
     return buildContent(
       parsed.agentId,
       target,
       parsed.ruleSuffix,
       parsed.language,
-      Object.keys(variables).length > 0 ? { variables } : undefined
+      Object.keys(options).length > 0 ? options : undefined
     );
   } catch {
     return null;
   }
+}
+
+function ruleHookMode(
+  language: Language,
+  config: RuleConfig
+): 'pre-commit' | 'husky' {
+  if (language !== 'typescript') {
+    return 'pre-commit';
+  }
+  if (new Set(config.languages).size > 1) {
+    return 'pre-commit';
+  }
+  if (Object.keys(config.paths).length > 1) {
+    return 'pre-commit';
+  }
+  return 'husky';
 }
 
 export function collectRuleFileStatuses(
@@ -675,11 +700,13 @@ export function runDoctor(options: { fix?: boolean } = {}): number {
     targets: config?.targets ?? [],
     agents: config?.agents ?? [],
     languages: config?.languages ?? [],
+    paths: config?.paths ?? {},
     taskSystem: config?.taskSystem ?? null,
     deploymentModel: config?.deploymentModel ?? null,
     publishingProfiles: config?.publishingProfiles ?? []
   });
-  const removedRuleFiles = options.fix ? removeStaleRuleFiles(ruleFiles) : [];
+  const removedRuleFiles =
+    options.fix && config ? removeStaleRuleFiles(ruleFiles) : [];
   const nextRuleFiles =
     removedRuleFiles.length > 0
       ? ruleFiles.filter(

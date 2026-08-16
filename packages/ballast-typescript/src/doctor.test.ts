@@ -7,7 +7,8 @@ import {
   collectRuleFileStatuses,
   detectAppType,
   formatDoctorReport,
-  removeStaleRuleFiles
+  removeStaleRuleFiles,
+  runDoctor
 } from './doctor';
 
 describe('doctor', () => {
@@ -314,7 +315,8 @@ describe('rule file status collection', () => {
     const statuses = collectRuleFileStatuses(tmpDir, {
       targets: ['codex'],
       agents: ['linting', 'testing'],
-      languages: ['typescript']
+      languages: ['typescript'],
+      paths: {}
     });
 
     expect(
@@ -366,7 +368,8 @@ describe('rule file status collection', () => {
     const statuses = collectRuleFileStatuses(tmpDir, {
       targets: ['codex'],
       agents: ['testing'],
-      languages: ['typescript']
+      languages: ['typescript'],
+      paths: {}
     });
     const removed = removeStaleRuleFiles(statuses);
 
@@ -374,6 +377,85 @@ describe('rule file status collection', () => {
     expect(fs.existsSync(stale)).toBe(false);
     expect(fs.existsSync(drifted)).toBe(true);
     expect(fs.existsSync(unowned)).toBe(true);
+  });
+
+  test('uses TypeScript-only hook mode when comparing git-hooks content', () => {
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+    fs.writeFileSync(
+      path.join(codexRules, 'git-hooks.md'),
+      buildContent('git-hooks', 'codex', undefined, 'typescript', {
+        hookMode: 'husky'
+      }),
+      'utf8'
+    );
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex'],
+      agents: ['git-hooks'],
+      languages: ['typescript'],
+      paths: { typescript: ['apps/web'] }
+    });
+
+    expect(statuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ruleId: 'typescript/git-hooks',
+          status: 'ok'
+        })
+      ])
+    );
+  });
+
+  test('uses multi-path hook mode when comparing git-hooks content', () => {
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+    fs.writeFileSync(
+      path.join(codexRules, 'git-hooks.md'),
+      buildContent('git-hooks', 'codex', undefined, 'typescript', {
+        hookMode: 'pre-commit'
+      }),
+      'utf8'
+    );
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex'],
+      agents: ['git-hooks'],
+      languages: ['typescript'],
+      paths: { typescript: ['apps/web'], python: ['packages/api'] }
+    });
+
+    expect(statuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ruleId: 'typescript/git-hooks',
+          status: 'ok'
+        })
+      ])
+    );
+  });
+
+  test('doctor fix does not delete stale managed rules without a loaded config', () => {
+    const previousCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{}\n', 'utf8');
+      fs.writeFileSync(path.join(tmpDir, '.rulesrc.json'), '{not json', 'utf8');
+      const codexRules = path.join(tmpDir, '.codex', 'rules');
+      fs.mkdirSync(codexRules, { recursive: true });
+      const managedRule = path.join(codexRules, 'typescript-linting.md');
+      fs.writeFileSync(
+        managedRule,
+        buildContent('linting', 'codex', undefined, 'typescript'),
+        'utf8'
+      );
+
+      runDoctor({ fix: true });
+
+      expect(fs.existsSync(managedRule)).toBe(true);
+    } finally {
+      process.chdir(previousCwd);
+    }
   });
 });
 

@@ -5363,6 +5363,15 @@ func TestRemoveStaleManagedFilesPreservesUnownedGeneratedLookingRules(t *testing
 	}
 }
 
+func TestContainsBallastManagedMarkerRequiresLiteralRuleMarkerPrefix(t *testing.T) {
+	if !containsBallastManagedMarker(`<!-- ballast:rule id="typescript/linting" version="5.0.0" checksum="abc123" -->`) {
+		t.Fatal("expected literal rule marker prefix to be treated as managed")
+	}
+	if containsBallastManagedMarker("Manual notes that mention ballast:rule without a marker comment") {
+		t.Fatal("did not expect prose mentioning ballast:rule to be treated as managed")
+	}
+}
+
 // resolvedTempDir wraps t.TempDir and resolves symlinks so that path
 // comparisons work on macOS where /tmp is a symlink to /private/tmp.
 func resolvedTempDir(t *testing.T) string {
