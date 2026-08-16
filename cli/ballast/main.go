@@ -139,6 +139,12 @@ var collectDoctorBackendsFunc = collectDoctorBackends
 
 var supportedTaskSystems = []string{"github", "jira", "linear"}
 var supportedDeploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
+var supportedPublishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
+var publishingProfileAliases = map[string]string{
+	"app":     "apps",
+	"library": "libraries",
+	"sdk":     "sdks",
+}
 var defaultLanguageTools = map[string][]string{
 	"python":     {"uv", "pyenv"},
 	"typescript": {"pnpm", "corepack"},
@@ -2005,7 +2011,28 @@ func loadDoctorConfig(root string) (*monorepoConfig, error) {
 	if len(config.Targets) == 0 && strings.TrimSpace(config.Target) != "" {
 		config.Targets = []string{strings.TrimSpace(config.Target)}
 	}
+	config.PublishingProfiles = normalizePublishingProfiles(config.PublishingProfiles)
 	return &config, nil
+}
+
+func normalizePublishingProfiles(values []string) []string {
+	seen := map[string]struct{}{}
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		profile := strings.ToLower(strings.TrimSpace(value))
+		if alias, ok := publishingProfileAliases[profile]; ok {
+			profile = alias
+		}
+		if !slices.Contains(supportedPublishingProfiles, profile) {
+			continue
+		}
+		if _, ok := seen[profile]; ok {
+			continue
+		}
+		seen[profile] = struct{}{}
+		normalized = append(normalized, profile)
+	}
+	return normalized
 }
 
 type resolvedBackendCommand struct {

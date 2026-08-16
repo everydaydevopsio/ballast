@@ -322,6 +322,34 @@ class PatchInstallTests(unittest.TestCase):
             },
         )
 
+    def test_load_config_normalizes_publishing_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["codex"],
+                        "agents": ["publishing"],
+                        "publishingProfiles": [
+                            "APP",
+                            " library ",
+                            "sdk",
+                            "cli",
+                            "cli",
+                            "",
+                            "unknown",
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            config = cli.load_config(root, "python")
+
+            self.assertEqual(
+                config["publishingProfiles"], ["apps", "libraries", "sdks", "cli"]
+            )
+
     def test_resolve_project_root_supports_ansible_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

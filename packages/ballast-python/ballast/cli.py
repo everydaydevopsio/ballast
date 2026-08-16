@@ -59,6 +59,12 @@ TASK_SYSTEM_TOKEN = "{{taskSystem}}"
 DEFAULT_TASK_SYSTEM = "github"
 TASK_SYSTEMS = ["github", "jira", "linear", "none"]
 DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "hosted"]
+PUBLISHING_PROFILE_ALIASES = {
+    "app": "apps",
+    "library": "libraries",
+    "sdk": "sdks",
+}
+PUBLISHING_PROFILES = ["cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"]
 
 
 def with_implicit_agents(agents: list[str]) -> list[str]:
@@ -293,6 +299,20 @@ def normalize_tools(raw: object | None) -> dict[str, list[str]]:
     return normalized
 
 
+def normalize_publishing_profiles(raw: object | None) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    normalized: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        token = item.strip().lower()
+        profile = PUBLISHING_PROFILE_ALIASES.get(token, token)
+        if profile in PUBLISHING_PROFILES and profile not in normalized:
+            normalized.append(profile)
+    return normalized
+
+
 def load_config(root: Path, language: str) -> dict[str, object] | None:
     file_path = root / rulesrc_filename(language)
     if not file_path.exists():
@@ -349,11 +369,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
                 if isinstance(deployment_model, str)
                 else None
             ),
-            "publishingProfiles": [
-                item for item in publishing_profiles if isinstance(item, str)
-            ]
-            if isinstance(publishing_profiles, list)
-            else [],
+            "publishingProfiles": normalize_publishing_profiles(publishing_profiles),
         }
     except Exception:
         return None

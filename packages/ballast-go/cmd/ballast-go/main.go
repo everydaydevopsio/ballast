@@ -49,6 +49,12 @@ var taskSystemGuidanceToken = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
 var taskSystemToken = "{{taskSystem}}"
 var taskSystems = []string{"github", "jira", "linear", "none"}
 var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
+var publishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
+var publishingProfileAliases = map[string]string{
+	"app":     "apps",
+	"library": "libraries",
+	"sdk":     "sdks",
+}
 var defaultLanguageTools = map[string][]string{
 	"python":     {"uv", "pyenv"},
 	"typescript": {"pnpm", "corepack"},
@@ -2494,8 +2500,28 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		Discovery:          normalizeDiscovery(raw.Discovery),
 		TaskSystem:         normalizeRequiredInstallOptionValue(raw.TaskSystem),
 		DeploymentModel:    normalizeDeploymentModel(raw.DeploymentModel),
-		PublishingProfiles: uniqueToolList(raw.PublishingProfiles),
+		PublishingProfiles: normalizePublishingProfiles(raw.PublishingProfiles),
 	}
+}
+
+func normalizePublishingProfiles(values []string) []string {
+	seen := map[string]struct{}{}
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		profile := strings.ToLower(strings.TrimSpace(value))
+		if alias, ok := publishingProfileAliases[profile]; ok {
+			profile = alias
+		}
+		if !contains(publishingProfiles, profile) {
+			continue
+		}
+		if _, ok := seen[profile]; ok {
+			continue
+		}
+		seen[profile] = struct{}{}
+		normalized = append(normalized, profile)
+	}
+	return normalized
 }
 
 func saveConfig(projectRoot, language string, cfg rulesConfig) error {

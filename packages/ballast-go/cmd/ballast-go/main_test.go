@@ -2151,7 +2151,7 @@ func TestNormalizeTargetsDetailedReturnsInvalidTokens(t *testing.T) {
 
 func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"],"taskSystem":"jira","deploymentModel":"SERVERLESS"}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(`{"target":"cursor","agents":["linting"],"taskSystem":"jira","deploymentModel":"SERVERLESS","publishingProfiles":["APP"," library ","sdk","cli","cli","","unknown"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2167,6 +2167,9 @@ func TestLoadConfigSupportsLegacyTargetField(t *testing.T) {
 	}
 	if cfg.DeploymentModel != "serverless" {
 		t.Fatalf("expected deploymentModel to be normalized from config, got %#v", cfg)
+	}
+	if !slices.Equal(cfg.PublishingProfiles, []string{"apps", "libraries", "sdks", "cli"}) {
+		t.Fatalf("expected publishingProfiles to be normalized from config, got %#v", cfg.PublishingProfiles)
 	}
 }
 

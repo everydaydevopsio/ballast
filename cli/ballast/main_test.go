@@ -341,7 +341,7 @@ func TestRunDoctorReportsConfiguredBackends(t *testing.T) {
   },
 	  "taskSystem":"jira",
 	  "deploymentModel":"kubernetes",
-	  "publishingProfiles":["cli","web"]
+	  "publishingProfiles":["APP"," library ","sdk","cli","cli","","unknown"]
 	}`)
 
 	output := captureStdout(t, func() {
@@ -382,7 +382,7 @@ func TestRunDoctorReportsConfiguredBackends(t *testing.T) {
 	if !strings.Contains(output, "taskSystem: jira") {
 		t.Fatalf("expected config task system in doctor output, got %q", output)
 	}
-	if !strings.Contains(output, "publishingProfiles: cli, web") {
+	if !strings.Contains(output, "publishingProfiles: apps, libraries, sdks, cli") {
 		t.Fatalf("expected publishing profiles in doctor output, got %q", output)
 	}
 	if !strings.Contains(output, "deploymentModel: kubernetes") {
