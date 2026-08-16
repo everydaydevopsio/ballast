@@ -4470,6 +4470,40 @@ func TestRemoveStaleManagedFilesPreservesCursorSkillsUnderRules(t *testing.T) {
 	}
 }
 
+func TestRemoveStaleManagedFilesOnlyOwnsLiteralRuleMarkerPrefix(t *testing.T) {
+	root := resolvedTempDir(t)
+	mentioned := filepath.Join(root, ".codex", "rules", "common", "docs.md")
+	marked := filepath.Join(root, ".codex", "rules", "common", "observability.md")
+	legacy := filepath.Join(root, ".codex", "rules", "common", "cicd.md")
+	mustWriteFile(t, mentioned, "# Docs\n\nThis example mentions ballast:rule but is user-authored.\n")
+	mustWriteFile(t, marked, "<!-- ballast:rule id=\"common/observability\" version=\"dev\" checksum=\"0123456789abcdef\" -->\n# Observability\n")
+	mustWriteFile(t, legacy, "<!-- Created by Ballast. Do not edit this section. -->\n# CI/CD\n")
+
+	previous := &monorepoConfig{
+		Targets:   []string{"codex"},
+		Agents:    []string{"docs", "observability", "cicd"},
+		Languages: []string{"typescript"},
+	}
+	next := &monorepoConfig{
+		Targets:   []string{"codex"},
+		Agents:    []string{"local-dev"},
+		Languages: []string{"typescript"},
+	}
+
+	if err := removeStaleManagedFiles(root, "codex", previous, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles(codex): %v", err)
+	}
+	if _, err := os.Stat(mentioned); err != nil {
+		t.Fatalf("expected user-authored ballast:rule mention to remain, got %v", err)
+	}
+	if fileExists(marked) {
+		t.Fatalf("expected literal generated rule marker file to be removed: %s", marked)
+	}
+	if fileExists(legacy) {
+		t.Fatalf("expected legacy Ballast notice file to be removed: %s", legacy)
+	}
+}
+
 func TestRemoveStaleManagedFilesDeletesConfigBackedOpencodeSkill(t *testing.T) {
 	root := resolvedTempDir(t)
 	skillPath := filepath.Join(root, ".opencode", "skills", "github-health-check.md")
