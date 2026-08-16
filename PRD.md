@@ -1,5 +1,27 @@
 # Product Requirements
 
+## OpenCode First-Class Target Support
+
+### Problem
+
+OpenCode must remain a first-class Ballast target with parity across CLI target selection, saved configuration, generated artifacts, cleanup flows, documentation, and CI validation. Regressions in target-specific paths can leave stale `.opencode/` rules or make OpenCode behave differently from Cursor, Claude Code, Codex, and Gemini.
+
+### Requirements
+
+1. Ballast must accept `opencode` anywhere targets are listed or validated, including install commands, saved `.rulesrc.json` configuration, add/remove target flows, help text, and error messaging.
+2. `ballast install --target opencode` must generate OpenCode rules and skills in canonical `.opencode/` locations using the same source `agents/` and `skills/` content as other supported targets.
+3. OpenCode cleanup and refresh flows must remove only Ballast-managed `.opencode/` rules and skills for removed selections while preserving unrelated targets.
+4. Automated tests and smoke checks must cover OpenCode install, config persistence, idempotent reinstall behavior, remove-target cleanup, and cross-language target parity.
+5. Documentation and examples must list OpenCode consistently as a supported target.
+
+### Acceptance Criteria
+
+1. `opencode` is included in wrapper, TypeScript, Python, and Go target allowlists and target-related help text.
+2. OpenCode installs write rules under `.opencode/` and skills under `.opencode/skills/`.
+3. Removing `opencode` from an existing install deletes managed `.opencode/` language rules and skills while leaving other target artifacts intact.
+4. CI smoke coverage includes OpenCode in examples, config persistence, monorepo target parity, and cross-language validation paths.
+5. README and reference docs list OpenCode as a supported first-class target and document its output paths.
+
 ## GitHub PR Copilot Review Cycle Skill
 
 ### Problem
