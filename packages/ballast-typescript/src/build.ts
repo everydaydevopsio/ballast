@@ -42,7 +42,8 @@ interface SkillEntry {
 }
 
 const RULE_MARKER_PATTERN =
-  /<!--\s*ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]+)"\s*-->\r?\n?/;
+  /^<!-- ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]+)"\s*-->\r?\n?/;
+const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 
 function getCreatedByBallastLine(): string {
   return `Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section.`;
@@ -95,7 +96,11 @@ export function getRuleMarkerId(
 }
 
 export function parseRuleMarker(content: string): RuleMarker | null {
-  const match = content.match(RULE_MARKER_PATTERN);
+  const frontmatter = content.match(FRONTMATTER_PATTERN);
+  const markerContent = frontmatter
+    ? content.slice(frontmatter[0].length)
+    : content;
+  const match = markerContent.match(RULE_MARKER_PATTERN);
   if (!match) return null;
   return {
     ruleId: match[1],
@@ -105,7 +110,12 @@ export function parseRuleMarker(content: string): RuleMarker | null {
 }
 
 export function stripRuleMarker(content: string): string {
-  return content.replace(RULE_MARKER_PATTERN, '');
+  const frontmatter = content.match(FRONTMATTER_PATTERN);
+  if (!frontmatter) {
+    return content.replace(RULE_MARKER_PATTERN, '');
+  }
+  const body = content.slice(frontmatter[0].length);
+  return `${frontmatter[0]}${body.replace(RULE_MARKER_PATTERN, '')}`;
 }
 
 export function calculateRuleChecksum(content: string): string {
@@ -124,7 +134,7 @@ export function verifyRuleChecksum(content: string): boolean {
 function addRuleMarker(content: string, ruleId: string): string {
   const body = stripRuleMarker(content);
   const marker = `<!-- ballast:rule id="${ruleId}" version="${pkg.version}" checksum="${calculateRuleChecksum(body)}" -->`;
-  const frontmatter = body.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+  const frontmatter = body.match(FRONTMATTER_PATTERN);
   if (frontmatter) {
     return `${frontmatter[0]}${marker}\n${body.slice(frontmatter[0].length)}`;
   }

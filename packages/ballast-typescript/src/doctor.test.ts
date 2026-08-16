@@ -379,6 +379,41 @@ describe('rule file status collection', () => {
     expect(fs.existsSync(unowned)).toBe(true);
   });
 
+  test('treats copied rule marker examples in body content as unowned', () => {
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+    const unowned = path.join(codexRules, 'manual.md');
+    fs.writeFileSync(
+      unowned,
+      [
+        '# Manual notes',
+        '',
+        'Example managed marker:',
+        '<!-- ballast:rule id="typescript/logging" version="5.0.0" checksum="0123456789abcdef" -->',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex'],
+      agents: ['testing'],
+      languages: ['typescript'],
+      paths: {}
+    });
+    const removed = removeStaleRuleFiles(statuses);
+
+    expect(statuses).toEqual([
+      expect.objectContaining({
+        path: unowned,
+        ruleId: null,
+        status: 'unowned'
+      })
+    ]);
+    expect(removed).toEqual([]);
+    expect(fs.existsSync(unowned)).toBe(true);
+  });
+
   test('uses TypeScript-only hook mode when comparing git-hooks content', () => {
     const codexRules = path.join(tmpDir, '.codex', 'rules');
     fs.mkdirSync(codexRules, { recursive: true });

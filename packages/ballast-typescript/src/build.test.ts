@@ -53,6 +53,38 @@ describe('build', () => {
 
       expect(verifyRuleChecksum(drifted)).toBe(false);
     });
+
+    test('parseRuleMarker ignores markers outside the generated location', () => {
+      const content = [
+        '# Manual rule',
+        '',
+        'Example:',
+        '<!-- ballast:rule id="typescript/linting" version="5.0.0" checksum="0123456789abcdef" -->',
+        ''
+      ].join('\n');
+
+      expect(parseRuleMarker(content)).toBeNull();
+      expect(verifyRuleChecksum(content)).toBe(false);
+    });
+
+    test('parseRuleMarker accepts markers directly after frontmatter', () => {
+      const content = buildContent(
+        'linting',
+        'cursor',
+        undefined,
+        'typescript'
+      );
+
+      expect(content).toMatch(
+        /^---\n[\s\S]*?\n---\n<!-- ballast:rule id="typescript\/linting"/
+      );
+      expect(parseRuleMarker(content)).toEqual(
+        expect.objectContaining({
+          ruleId: 'typescript/linting'
+        })
+      );
+      expect(verifyRuleChecksum(content)).toBe(true);
+    });
   });
 
   describe('listRuleSuffixes', () => {
