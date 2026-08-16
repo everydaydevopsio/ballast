@@ -3971,7 +3971,7 @@ func targetRulesRoot(root string, target string) string {
 	case "gemini":
 		return filepath.Join(root, ".gemini", "rules")
 	case "opencode":
-		return filepath.Join(root, ".opencode", "rules")
+		return filepath.Join(root, ".opencode")
 	case "codex":
 		return filepath.Join(root, ".codex", "rules")
 	default:

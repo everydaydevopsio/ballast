@@ -4601,6 +4601,72 @@ func TestRunMonorepoRemoveTargetCleansManagedRulesAndSupportFiles(t *testing.T) 
 	}
 }
 
+func TestRunMonorepoRemoveTargetCleansOpencodeManagedRulesAndSkills(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "services", "api", "pyproject.toml"), "[project]\nname='api'\n")
+	mustWriteFile(t, filepath.Join(root, "tools", "worker", "go.mod"), "module example.com/worker\n\ngo 1.24\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude", "opencode"],
+  "agents": ["linting"],
+  "skills": ["owasp-security-scan"],
+  "languages": ["python", "go"],
+  "paths": {
+    "python": ["services/api"],
+    "go": ["tools/worker"]
+  }
+}`)
+
+	mustWriteFile(t, filepath.Join(root, ".opencode", "python", "python-linting.md"), "managed")
+	mustWriteFile(t, filepath.Join(root, ".opencode", "go", "go-linting.md"), "managed")
+	mustWriteFile(t, filepath.Join(root, ".opencode", "skills", "owasp-security-scan.md"), "managed")
+	mustWriteFile(t, filepath.Join(root, ".claude", "rules", "python", "python-linting.md"), "managed")
+	mustWriteFile(t, filepath.Join(root, ".claude", "skills", "owasp-security-scan.skill"), "managed")
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureInstalledFunc = func(tool toolConfig) error { return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		exitCode := run([]string{"install", "--remove-target", "opencode", "--yes"})
+		if exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "python", "python-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected opencode python rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "go", "go-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected opencode go rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "skills", "owasp-security-scan.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected opencode skill to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".claude", "rules", "python", "python-linting.md")); err != nil {
+		t.Fatalf("expected claude rule to remain, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".claude", "skills", "owasp-security-scan.skill")); err != nil {
+		t.Fatalf("expected claude skill to remain, got %v", err)
+	}
+
+	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	text := string(config)
+	if strings.Contains(text, `"opencode"`) || !strings.Contains(text, `"claude"`) {
+		t.Fatalf("expected saved config targets to drop opencode and keep claude, got %q", text)
+	}
+}
+
 func TestRunMonorepoRemoveTargetDoesNotPersistConfigWhenCleanupFails(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")
