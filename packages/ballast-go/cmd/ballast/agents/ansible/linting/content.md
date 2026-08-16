@@ -25,7 +25,7 @@ The root `.pre-commit-config.yaml` should run:
 
 - `ansible-lint` for playbooks, roles, and collections
 - `yamllint` for YAML formatting and style
-- pre-push or manual `ansible-playbook --syntax-check` for representative top-level playbooks
+- `ansible-playbook --syntax-check` for representative top-level playbooks, run at pre-push or during manual validation
 
 Install both hook stages:
 
