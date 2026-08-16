@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/git-hooks" version="5.16.5" checksum="311cd62d8ef40005084e9ab817062bb805dd30e12214a89d68c40d2b499a60de" -->
 # Git Hooks Rules
 
 These rules are intended for Codex (CLI and app).

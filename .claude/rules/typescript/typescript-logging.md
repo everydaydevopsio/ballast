@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/logging" version="5.16.5" checksum="edc1d479f376578af29ef07ec0956c834fb314b0e88709678d1feccb7d38d375" -->
 # Centralized Logging Rules
 
 These rules provide instructions for configuring Pino with Fluentd (Node.js, Next.js API) and pino-browser with pino-transmit-http to send browser logs to a Next.js /api/logs endpoint.

@@ -23,11 +23,38 @@ import {
   extractDescriptionFromFrontmatter,
   getDestination,
   getSkillDestination,
-  listTargets
+  listTargets,
+  parseRuleMarker,
+  verifyRuleChecksum
 } from './build';
 import { COMMON_SKILL_IDS } from './agents';
 
 describe('build', () => {
+  describe('managed rule marker', () => {
+    test('buildContent writes a machine-readable rule marker', () => {
+      const content = buildContent('linting', 'codex', undefined, 'typescript');
+
+      expect(content).toMatch(
+        /^<!-- ballast:rule id="typescript\/linting" version="[^"]+" checksum="[a-f0-9]{64}" -->\n/
+      );
+      expect(parseRuleMarker(content)).toEqual(
+        expect.objectContaining({
+          ruleId: 'typescript/linting',
+          version: expect.any(String),
+          checksum: expect.stringMatching(/^[a-f0-9]{64}$/)
+        })
+      );
+      expect(verifyRuleChecksum(content)).toBe(true);
+    });
+
+    test('verifyRuleChecksum detects body drift after the marker', () => {
+      const content = buildContent('linting', 'codex', undefined, 'typescript');
+      const drifted = `${content}\nManual edit\n`;
+
+      expect(verifyRuleChecksum(drifted)).toBe(false);
+    });
+  });
+
   describe('listRuleSuffixes', () => {
     test('returns only main rule for linting (no content-*.md)', () => {
       expect(listRuleSuffixes('linting')).toEqual(['']);

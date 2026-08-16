@@ -205,6 +205,32 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 }
 
+func TestBuildContentWritesRuleMarkerAndDetectsDrift(t *testing.T) {
+	content, err := buildContent("linting", "codex", "go", "", "pre-commit", "", "")
+	if err != nil {
+		t.Fatalf("build content: %v", err)
+	}
+	marker, ok := parseRuleMarker(content)
+	if !ok {
+		t.Fatalf("expected rule marker in %q", content[:120])
+	}
+	if marker.ruleID != "go/linting" {
+		t.Fatalf("expected rule id go/linting, got %q", marker.ruleID)
+	}
+	if marker.version != resolveVersion() {
+		t.Fatalf("expected marker version %q, got %q", resolveVersion(), marker.version)
+	}
+	if !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(marker.checksum) {
+		t.Fatalf("expected sha256 checksum, got %q", marker.checksum)
+	}
+	if !verifyRuleChecksum(content) {
+		t.Fatalf("expected generated content checksum to verify")
+	}
+	if verifyRuleChecksum(content + "\nManual edit\n") {
+		t.Fatalf("expected checksum verification to fail after body edit")
+	}
+}
+
 func makeGitBoundary(t *testing.T, dir string) {
 	t.Helper()
 	gitDir := filepath.Join(dir, ".git")

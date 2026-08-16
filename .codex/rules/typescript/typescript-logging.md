@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/logging" version="5.16.5" checksum="4eb1c4f956b6f3f55b3c7f6f441ef5b0fe3283ec0ca9e55b050d8fcb6e47a1ea" -->
 # Centralized Logging Rules
 
 These rules are intended for Codex (CLI and app).

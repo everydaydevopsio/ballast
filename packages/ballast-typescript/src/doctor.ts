@@ -2,6 +2,16 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { findProjectRoot, getRulesrcFilename, loadConfig } from './config';
+import type { PublishingProfile, Target } from './config';
+import type { Language } from './agents';
+import {
+  buildContent,
+  getRuleMarkerId,
+  listRuleSuffixes,
+  parseRuleMarker,
+  stripRuleMarker,
+  verifyRuleChecksum
+} from './build';
 import { BALLAST_VERSION } from './version';
 
 export interface InstalledCliStatus {
@@ -29,7 +39,17 @@ export interface DoctorReport {
   configPublishingProfiles: string[];
   installed: InstalledCliStatus[];
   detectedAppType: AppType;
+  ruleFiles: RuleFileStatus[];
   recommendations: string[];
+}
+
+export type RuleFileState = 'ok' | 'drifted' | 'stale' | 'unowned';
+
+export interface RuleFileStatus {
+  path: string;
+  target: Target;
+  ruleId: string | null;
+  status: RuleFileState;
 }
 
 const CLI_NAMES = [
@@ -198,6 +218,14 @@ function refreshConfigCommand(
   return 'ballast install --refresh-config';
 }
 
+function withImplicitAgents(agents: string[]): string[] {
+  const next = [...agents];
+  if (next.includes('linting') && !next.includes('git-hooks')) {
+    next.push('git-hooks');
+  }
+  return next;
+}
+
 export function buildDoctorReport(
   currentCli: string,
   currentVersion: string,
@@ -214,7 +242,8 @@ export function buildDoctorReport(
   configDeploymentModel: string | null,
   configPublishingProfiles: string[],
   installed: InstalledCliStatus[],
-  detectedAppType: AppType = 'unknown'
+  detectedAppType: AppType = 'unknown',
+  ruleFiles: RuleFileStatus[] = []
 ): DoctorReport {
   const targetVersion = latestVersion([
     currentVersion,
@@ -264,6 +293,19 @@ export function buildDoctorReport(
     );
   }
 
+  for (const ruleFile of ruleFiles) {
+    if (ruleFile.status === 'drifted') {
+      recommendations.push(
+        `Refresh drifted rule file ${ruleFile.path}: ballast install --refresh-config`
+      );
+    }
+    if (ruleFile.status === 'stale') {
+      recommendations.push(
+        `Remove stale managed rule file ${ruleFile.path}: ballast doctor --fix`
+      );
+    }
+  }
+
   return {
     currentCli,
     currentVersion,
@@ -281,8 +323,193 @@ export function buildDoctorReport(
     configPublishingProfiles,
     installed,
     detectedAppType,
+    ruleFiles,
     recommendations
   };
+}
+
+interface RuleConfig {
+  targets: Target[];
+  agents: string[];
+  languages: string[];
+  taskSystem?: string | null;
+  deploymentModel?: string | null;
+  publishingProfiles?: PublishingProfile[];
+}
+
+const TARGET_RULE_DIRS: Record<Target, string[]> = {
+  cursor: ['.cursor/rules'],
+  claude: ['.claude/rules'],
+  opencode: ['.opencode'],
+  codex: ['.codex/rules'],
+  gemini: ['.gemini/rules']
+};
+
+function isRuleFile(filePath: string): boolean {
+  return ['.md', '.mdc'].includes(path.extname(filePath));
+}
+
+function walkRuleFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const files: string[] = [];
+  const walk = (current: string): void => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const next = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(next);
+        continue;
+      }
+      if (entry.isFile() && isRuleFile(next)) {
+        files.push(next);
+      }
+    }
+  };
+  walk(dir);
+  return files;
+}
+
+function configuredLanguages(config: RuleConfig): Language[] {
+  const values =
+    config.languages.length > 0 ? config.languages : ['typescript'];
+  return values.filter((value): value is Language =>
+    ['typescript', 'python', 'go', 'ansible', 'terraform', 'dart'].includes(
+      value
+    )
+  );
+}
+
+function configuredRuleKeys(config: RuleConfig): Set<string> {
+  const active = new Set<string>();
+  for (const target of config.targets) {
+    for (const language of configuredLanguages(config)) {
+      for (const agentId of withImplicitAgents(config.agents)) {
+        try {
+          for (const suffix of listRuleSuffixes(
+            agentId,
+            language,
+            config.publishingProfiles
+          )) {
+            active.add(
+              `${target}:${getRuleMarkerId(agentId, language, suffix || undefined)}`
+            );
+          }
+        } catch {
+          // Ignore invalid or unavailable agents in saved config; doctor reports
+          // existing marked files as stale rather than failing the whole report.
+        }
+      }
+    }
+  }
+  return active;
+}
+
+function parseRuleId(
+  ruleId: string
+): { language: Language; agentId: string; ruleSuffix?: string } | null {
+  const [language, agentId, ...suffixParts] = ruleId.split('/');
+  if (!language || !agentId) return null;
+  if (
+    !['typescript', 'python', 'go', 'ansible', 'terraform', 'dart'].includes(
+      language
+    )
+  ) {
+    return null;
+  }
+  return {
+    language: language as Language,
+    agentId,
+    ruleSuffix: suffixParts.length > 0 ? suffixParts.join('/') : undefined
+  };
+}
+
+function canonicalRuleContent(
+  target: Target,
+  ruleId: string,
+  config: RuleConfig
+): string | null {
+  const parsed = parseRuleId(ruleId);
+  if (!parsed) return null;
+  const variables: Record<string, string> = {
+    ...(parsed.agentId === 'tasks' && config.taskSystem
+      ? { taskSystem: config.taskSystem }
+      : {}),
+    ...(parsed.agentId === 'publishing' && config.deploymentModel
+      ? { deploymentModel: config.deploymentModel }
+      : {})
+  };
+  try {
+    return buildContent(
+      parsed.agentId,
+      target,
+      parsed.ruleSuffix,
+      parsed.language,
+      Object.keys(variables).length > 0 ? { variables } : undefined
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function collectRuleFileStatuses(
+  projectRoot: string,
+  config: RuleConfig
+): RuleFileStatus[] {
+  const active = configuredRuleKeys(config);
+  const statuses: RuleFileStatus[] = [];
+  for (const [target, dirs] of Object.entries(TARGET_RULE_DIRS) as Array<
+    [Target, string[]]
+  >) {
+    for (const relativeDir of dirs) {
+      const dir = path.join(projectRoot, relativeDir);
+      for (const filePath of walkRuleFiles(dir)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const marker = parseRuleMarker(content);
+        if (!marker) {
+          statuses.push({
+            path: filePath,
+            target,
+            ruleId: null,
+            status: 'unowned'
+          });
+          continue;
+        }
+        const key = `${target}:${marker.ruleId}`;
+        if (!active.has(key)) {
+          statuses.push({
+            path: filePath,
+            target,
+            ruleId: marker.ruleId,
+            status: 'stale'
+          });
+          continue;
+        }
+        const canonical = canonicalRuleContent(target, marker.ruleId, config);
+        const drifted =
+          !verifyRuleChecksum(content) ||
+          !canonical ||
+          stripRuleMarker(content) !== stripRuleMarker(canonical);
+        statuses.push({
+          path: filePath,
+          target,
+          ruleId: marker.ruleId,
+          status: drifted ? 'drifted' : 'ok'
+        });
+      }
+    }
+  }
+  return statuses.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+export function removeStaleRuleFiles(ruleFiles: RuleFileStatus[]): string[] {
+  const removed: string[] = [];
+  for (const ruleFile of ruleFiles) {
+    if (ruleFile.status !== 'stale' || ruleFile.ruleId === null) {
+      continue;
+    }
+    fs.rmSync(ruleFile.path, { force: true });
+    removed.push(ruleFile.path);
+  }
+  return removed;
 }
 
 function formatConfigPaths(
@@ -323,6 +550,30 @@ function formatConfigTools(
   return entries.length > 0 ? entries.join('; ') : null;
 }
 
+function formatRuleFilePath(report: DoctorReport, filePath: string): string {
+  if (!path.isAbsolute(filePath)) return filePath;
+  const root = report.configPath
+    ? path.dirname(report.configPath)
+    : process.cwd();
+  const relative = path.relative(root, filePath);
+  return relative && !relative.startsWith('..') ? relative : filePath;
+}
+
+function formatRuleStatus(status: RuleFileState): string {
+  switch (status) {
+    case 'ok':
+      return 'ok';
+    case 'drifted':
+      return 'DRIFTED - run ballast install --refresh-config to restore';
+    case 'stale':
+      return 'STALE - run ballast doctor --fix to remove';
+    case 'unowned':
+      return 'unowned - not managed by Ballast, skipped';
+    default:
+      return status;
+  }
+}
+
 export function formatDoctorReport(report: DoctorReport): string {
   const lines = [
     'Ballast doctor',
@@ -341,6 +592,17 @@ export function formatDoctorReport(report: DoctorReport): string {
 
   if (report.detectedAppType !== 'unknown') {
     lines.push('', `Detected app type: ${report.detectedAppType}`);
+  }
+
+  lines.push('', 'Rule files:');
+  if (report.ruleFiles.length === 0) {
+    lines.push('- none found');
+  } else {
+    for (const ruleFile of report.ruleFiles) {
+      lines.push(
+        `- ${formatRuleFilePath(report, ruleFile.path)} [${formatRuleStatus(ruleFile.status)}]`
+      );
+    }
   }
 
   lines.push('', 'Config:');
@@ -405,10 +667,25 @@ export function formatDoctorReport(report: DoctorReport): string {
   return `${lines.join('\n')}\n`;
 }
 
-export function runDoctor(): number {
+export function runDoctor(options: { fix?: boolean } = {}): number {
   const projectRoot = findProjectRoot();
   const configPath = path.join(projectRoot, getRulesrcFilename());
   const config = loadConfig(projectRoot);
+  const ruleFiles = collectRuleFileStatuses(projectRoot, {
+    targets: config?.targets ?? [],
+    agents: config?.agents ?? [],
+    languages: config?.languages ?? [],
+    taskSystem: config?.taskSystem ?? null,
+    deploymentModel: config?.deploymentModel ?? null,
+    publishingProfiles: config?.publishingProfiles ?? []
+  });
+  const removedRuleFiles = options.fix ? removeStaleRuleFiles(ruleFiles) : [];
+  const nextRuleFiles =
+    removedRuleFiles.length > 0
+      ? ruleFiles.filter(
+          (ruleFile) => !removedRuleFiles.includes(ruleFile.path)
+        )
+      : ruleFiles;
   const report = buildDoctorReport(
     'ballast-typescript',
     BALLAST_VERSION,
@@ -425,8 +702,16 @@ export function runDoctor(): number {
     config?.deploymentModel ?? null,
     config?.publishingProfiles ?? [],
     CLI_NAMES.map((name) => detectInstalledCli(name)),
-    detectAppType(projectRoot)
+    detectAppType(projectRoot),
+    nextRuleFiles
   );
+  if (removedRuleFiles.length > 0) {
+    process.stdout.write('Removed stale managed rule files:\n');
+    for (const filePath of removedRuleFiles) {
+      process.stdout.write(`- ${filePath}\n`);
+    }
+    process.stdout.write('\n');
+  }
   process.stdout.write(formatDoctorReport(report));
   return 0;
 }

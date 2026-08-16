@@ -3724,9 +3724,8 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		return nil
 	}
 	trackedPaths := ballastManagedPathsFromSupportFile(root, target)
-	configBackedStaleRulePaths := configBackedStaleRulePathSet(root, target, previous)
 	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePaths(root, target, next)) {
-		if !ballastOwnsManagedFile(file) && !trackedPaths[file] && !configBackedStaleRulePaths[file] && !looksLikeLegacyGeneratedRule(file) {
+		if !ballastOwnsManagedFile(file) && !trackedPaths[file] {
 			continue
 		}
 		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -3774,7 +3773,7 @@ func removeUnlistedManagedRuleFiles(root string, target string, next *monorepoCo
 		if expected[cleaned] {
 			return nil
 		}
-		if !ballastOwnsManagedFile(cleaned) && !looksLikeLegacyGeneratedRule(cleaned) {
+		if !ballastOwnsManagedFile(cleaned) {
 			return nil
 		}
 		if err := os.Remove(cleaned); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -4211,9 +4210,12 @@ func patchInstalledRulesSection(existing string, canonical string) string {
 const rootPlaceholder = "__BALLAST_ROOT__"
 const ballastManagedMarker = "Created by [Ballast]"
 const ballastManagedSectionNotice = "Created by Ballast. Do not edit this section."
+const ballastRuleMarker = "ballast:rule"
 
 func containsBallastManagedMarker(content string) bool {
-	return strings.Contains(content, ballastManagedMarker) || strings.Contains(content, ballastManagedSectionNotice)
+	return strings.Contains(content, ballastManagedMarker) ||
+		strings.Contains(content, ballastManagedSectionNotice) ||
+		strings.Contains(content, ballastRuleMarker)
 }
 
 func patchManagedSupportSections(existing string, canonical string) string {

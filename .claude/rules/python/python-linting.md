@@ -1,3 +1,4 @@
+<!-- ballast:rule id="python/linting" version="5.16.5" checksum="41ca738ba52efd2b12d8bb2e73e1b100aad63edfb7b5e47f436a0ba8c6061f62" -->
 # Python Linting Rules
 
 These rules provide Python Linting Rules guidance for projects in this repository.

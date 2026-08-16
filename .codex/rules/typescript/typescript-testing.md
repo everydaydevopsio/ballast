@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/testing" version="5.16.5" checksum="94c40698e162d97039f3fd50ec809e064746b46f6996a5f49f2a2ec8f4ad3da2" -->
 # Testing Rules
 
 These rules are intended for Codex (CLI and app).

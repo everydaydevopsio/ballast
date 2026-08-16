@@ -4755,7 +4755,7 @@ func TestRunMonorepoRemoveLanguageCleansManagedRulesAndConfig(t *testing.T) {
 	}
 }
 
-func TestRunMonorepoRemoveLanguageCleansConfigBackedRuleWithoutMarker(t *testing.T) {
+func TestRunMonorepoRemoveLanguagePreservesConfigBackedRuleWithoutMarker(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
   "targets": ["codex"],
@@ -4792,8 +4792,8 @@ func TestRunMonorepoRemoveLanguageCleansConfigBackedRuleWithoutMarker(t *testing
 		}
 	})
 
-	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected config-backed markerless typescript rule to be removed, got err=%v", err)
+	if _, err := os.Stat(filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")); err != nil {
+		t.Fatalf("expected config-backed markerless typescript rule to be preserved, got err=%v", err)
 	}
 }
 
@@ -5309,11 +5309,12 @@ func TestRemoveStaleManagedFilesRemovesLegacyRootRules(t *testing.T) {
 	commonLanguageRule := filepath.Join(root, ".claude", "rules", "common", "go-testing.md")
 	languageLocalDevRule := filepath.Join(root, ".claude", "rules", "go", "go-local-dev-badges.md")
 	current := filepath.Join(root, ".claude", "rules", "common", "publishing-web.md")
-	mustWriteFile(t, legacy, "---\n# Publishing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
-	mustWriteFile(t, removedLanguageGitHooks, "# Git Hooks Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
-	mustWriteFile(t, crossLanguageRule, "# Testing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
-	mustWriteFile(t, commonLanguageRule, "# Go Testing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
-	mustWriteFile(t, languageLocalDevRule, "# Local Development: README Badges\n\nThese rules are intended for Claude Code.\n\n---\n")
+	legacyNotice := "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v1.0.0. Do not edit this section. -->\n"
+	mustWriteFile(t, legacy, legacyNotice+"---\n# Publishing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, removedLanguageGitHooks, legacyNotice+"# Git Hooks Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, crossLanguageRule, legacyNotice+"# Testing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, commonLanguageRule, legacyNotice+"# Go Testing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+	mustWriteFile(t, languageLocalDevRule, legacyNotice+"# Local Development: README Badges\n\nThese rules are intended for Claude Code.\n\n---\n")
 	mustWriteFile(t, current, "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v1.0.0. Do not edit this section. -->\n")
 
 	next := &monorepoConfig{
@@ -5341,6 +5342,24 @@ func TestRemoveStaleManagedFilesRemovesLegacyRootRules(t *testing.T) {
 	}
 	if !fileExists(current) {
 		t.Fatalf("expected current common rule to remain: %s", current)
+	}
+}
+
+func TestRemoveStaleManagedFilesPreservesUnownedGeneratedLookingRules(t *testing.T) {
+	root := resolvedTempDir(t)
+	unowned := filepath.Join(root, ".claude", "rules", "publishing-web.md")
+	mustWriteFile(t, unowned, "---\n# Publishing Rules\n\nThese rules are intended for Claude Code.\n\n---\n")
+
+	next := &monorepoConfig{
+		Agents:    []string{"linting"},
+		Languages: []string{"typescript"},
+	}
+
+	if err := removeStaleManagedFiles(root, "claude", nil, next); err != nil {
+		t.Fatalf("removeStaleManagedFiles returned error: %v", err)
+	}
+	if !fileExists(unowned) {
+		t.Fatalf("expected unowned generated-looking rule to remain: %s", unowned)
 	}
 }
 

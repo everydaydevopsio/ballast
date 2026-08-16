@@ -82,6 +82,24 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("- deploymentModel: serverless", output)
         self.assertIn("- publishingProfiles: cli, web", output)
 
+    def test_build_content_writes_rule_marker_and_detects_drift(self) -> None:
+        content = cli.build_content("linting", "codex", "python")
+
+        self.assertRegex(
+            content,
+            r'^<!-- ballast:rule id="python/linting" version="[^"]+" checksum="[a-f0-9]{64}" -->\n',
+        )
+        self.assertEqual(
+            cli.parse_rule_marker(content),
+            {
+                "ruleId": "python/linting",
+                "version": cli.ballast_version(),
+                "checksum": cli.parse_rule_marker(content)["checksum"],
+            },
+        )
+        self.assertTrue(cli.verify_rule_checksum(content))
+        self.assertFalse(cli.verify_rule_checksum(content + "\nManual edit\n"))
+
     def test_parser_top_level_help_flag_exits_zero(self) -> None:
         with self.assertRaises(SystemExit) as exc:
             cli.parser().parse_args(["--help"])

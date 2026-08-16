@@ -1,3 +1,4 @@
+<!-- ballast:rule id="go/testing" version="5.16.5" checksum="d41e060516206ed4749ad7a825cc10ac7b185f5f1f3174ff9fc72320cd68eee6" -->
 # Go Testing Rules
 
 These rules provide Go Testing Rules guidance for projects in this repository.

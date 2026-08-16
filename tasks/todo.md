@@ -1,5 +1,15 @@
 # Tasks
 
+- [x] Confirm issue #166 scope, operating mode, and governing PRD requirements.
+- [x] Add PRD requirements for managed rule markers, doctor categorization, and stale cleanup safety.
+- [x] Add focused failing tests for marker parsing, checksum comparison, report formatting, stale cleanup, and safety.
+- [x] Implement TypeScript rule marker generation and doctor rule-file status reporting.
+- [x] Mirror marker generation and focused coverage across Python and Go rule-generation surfaces as appropriate.
+- [x] Run focused tests, formatting, and relevant cross-surface checks.
+- [ ] Push branch, open PR against `main`, request Copilot review, and check CI/review state.
+
+## Previous Tasks
+
 - [x] Confirm issue #154 scope, operating mode, and governing PRD requirements.
 - [x] Add PRD requirements for distributing plan-lifecycle guidance through Ballast.
 - [x] Add failing generated-content coverage for the plan-lifecycle rule and installed support-file entries.
@@ -7,8 +17,6 @@
 - [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
 - [x] Run focused tests and required sync/generation checks.
 - [x] Push branch, open PR for #154, request Copilot review, and resolve actionable review comments. No actionable review comments were present at the latest poll.
-
-## Previous Tasks
 
 - [x] Confirm issue #145 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for integration-framework detection and Playwright preference across supported languages.

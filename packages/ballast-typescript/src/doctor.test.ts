@@ -1,9 +1,83 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { buildDoctorReport, detectAppType, formatDoctorReport } from './doctor';
+import { buildContent } from './build';
+import {
+  buildDoctorReport,
+  collectRuleFileStatuses,
+  detectAppType,
+  formatDoctorReport,
+  removeStaleRuleFiles
+} from './doctor';
 
 describe('doctor', () => {
+  test('formats rule file status categories and remediation recommendations', () => {
+    const report = buildDoctorReport(
+      'ballast-typescript',
+      '5.0.2',
+      '/tmp/project/.rulesrc.json',
+      '5.0.2',
+      ['codex'],
+      ['linting'],
+      [],
+      ['typescript'],
+      {},
+      {},
+      [],
+      null,
+      null,
+      [],
+      [{ name: 'ballast-typescript', version: '5.0.2', path: '/tmp/bt' }],
+      'unknown',
+      [
+        {
+          path: '/tmp/project/.codex/rules/typescript-linting.md',
+          target: 'codex',
+          ruleId: 'typescript/linting',
+          status: 'ok'
+        },
+        {
+          path: '/tmp/project/.codex/rules/typescript-testing.md',
+          target: 'codex',
+          ruleId: 'typescript/testing',
+          status: 'drifted'
+        },
+        {
+          path: '/tmp/project/.codex/rules/typescript-docs.md',
+          target: 'codex',
+          ruleId: 'typescript/docs',
+          status: 'stale'
+        },
+        {
+          path: '/tmp/project/.codex/rules/manual.md',
+          target: 'codex',
+          ruleId: null,
+          status: 'unowned'
+        }
+      ]
+    );
+
+    const output = formatDoctorReport(report);
+
+    expect(output).toContain('Rule files:');
+    expect(output).toContain('.codex/rules/typescript-linting.md [ok]');
+    expect(output).toContain(
+      '.codex/rules/typescript-testing.md [DRIFTED - run ballast install --refresh-config to restore]'
+    );
+    expect(output).toContain(
+      '.codex/rules/typescript-docs.md [STALE - run ballast doctor --fix to remove]'
+    );
+    expect(output).toContain(
+      '.codex/rules/manual.md [unowned - not managed by Ballast, skipped]'
+    );
+    expect(report.recommendations).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Refresh drifted rule file'),
+        expect.stringContaining('Remove stale managed rule file')
+      ])
+    );
+  });
+
   test('recommends upgrades for older CLIs and config', () => {
     const report = buildDoctorReport(
       'ballast-typescript',
@@ -199,6 +273,107 @@ describe('doctor', () => {
       r.includes('add the publishing agent')
     );
     expect(publishingRecs).toHaveLength(0);
+  });
+});
+
+describe('rule file status collection', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-rule-status-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('categorizes ok, drifted, stale, and unowned rule files', () => {
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+    fs.writeFileSync(
+      path.join(codexRules, 'typescript-linting.md'),
+      buildContent('linting', 'codex', undefined, 'typescript'),
+      'utf8'
+    );
+    fs.writeFileSync(
+      path.join(codexRules, 'typescript-testing.md'),
+      `${buildContent('testing', 'codex', undefined, 'typescript')}\nManual edit\n`,
+      'utf8'
+    );
+    fs.writeFileSync(
+      path.join(codexRules, 'typescript-logging.md'),
+      buildContent('logging', 'codex', undefined, 'typescript'),
+      'utf8'
+    );
+    fs.writeFileSync(
+      path.join(codexRules, 'manual.md'),
+      '# Manual notes\n',
+      'utf8'
+    );
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex'],
+      agents: ['linting', 'testing'],
+      languages: ['typescript']
+    });
+
+    expect(
+      statuses.map((status) => ({
+        basename: path.basename(status.path),
+        ruleId: status.ruleId,
+        status: status.status
+      }))
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          basename: 'typescript-linting.md',
+          ruleId: 'typescript/linting',
+          status: 'ok'
+        },
+        {
+          basename: 'typescript-testing.md',
+          ruleId: 'typescript/testing',
+          status: 'drifted'
+        },
+        {
+          basename: 'typescript-logging.md',
+          ruleId: 'typescript/logging',
+          status: 'stale'
+        },
+        { basename: 'manual.md', ruleId: null, status: 'unowned' }
+      ])
+    );
+  });
+
+  test('removeStaleRuleFiles removes only stale managed files', () => {
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+    const stale = path.join(codexRules, 'typescript-logging.md');
+    const drifted = path.join(codexRules, 'typescript-testing.md');
+    const unowned = path.join(codexRules, 'manual.md');
+    fs.writeFileSync(
+      stale,
+      buildContent('logging', 'codex', undefined, 'typescript'),
+      'utf8'
+    );
+    fs.writeFileSync(
+      drifted,
+      `${buildContent('testing', 'codex', undefined, 'typescript')}\nManual edit\n`,
+      'utf8'
+    );
+    fs.writeFileSync(unowned, '# Manual notes\n', 'utf8');
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex'],
+      agents: ['testing'],
+      languages: ['typescript']
+    });
+    const removed = removeStaleRuleFiles(statuses);
+
+    expect(removed).toEqual([stale]);
+    expect(fs.existsSync(stale)).toBe(false);
+    expect(fs.existsSync(drifted)).toBe(true);
+    expect(fs.existsSync(unowned)).toBe(true);
   });
 });
 
