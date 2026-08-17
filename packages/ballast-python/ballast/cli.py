@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -1108,7 +1109,7 @@ def build_content(
         task_system,
     )
     if target == "cursor":
-        return (
+        rendered = (
             apply_hook_template_variables(
                 read_template(agent, language, "cursor-frontmatter.yaml", suffix),
                 agent,
@@ -1118,8 +1119,10 @@ def build_content(
             + "\n"
             + body
         )
+        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
     if target == "claude":
-        return read_template(agent, language, "claude-header.md", suffix) + body
+        rendered = read_template(agent, language, "claude-header.md", suffix) + body
+        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
     if target == "gemini":
         try:
             header = read_template(agent, language, "gemini-header.md", suffix)
@@ -1128,18 +1131,70 @@ def build_content(
                 header = read_template(agent, language, "claude-header.md", suffix)
             except FileNotFoundError:
                 header = read_template(agent, language, "codex-header.md", suffix)
-        return header + "\n---\n\n" + render_gemini_mandates() + body
+        rendered = header + "\n---\n\n" + render_gemini_mandates() + body
+        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
     if target == "opencode":
-        return (
+        rendered = (
             read_template(agent, language, "opencode-frontmatter.yaml", suffix)
             + "\n"
             + body
         )
+        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
     try:
         header = read_template(agent, language, "codex-header.md", suffix)
     except FileNotFoundError:
         header = read_template(agent, language, "claude-header.md", suffix)
-    return header + body
+    rendered = header + body
+    return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
+
+
+def rule_marker_id(agent: str, language: str, suffix: str = "") -> str:
+    return "/".join(part for part in [language, agent, suffix] if part)
+
+
+def parse_rule_marker(content: str) -> dict[str, str] | None:
+    match = RULE_MARKER_RE.match(content, rule_marker_header_start(content))
+    if not match:
+        return None
+    return {
+        "ruleId": match.group(1),
+        "version": match.group(2),
+        "checksum": match.group(3).lower(),
+    }
+
+
+def strip_rule_marker(content: str) -> str:
+    match = RULE_MARKER_RE.match(content, rule_marker_header_start(content))
+    if not match:
+        return content
+    return content[: match.start()] + content[match.end() :]
+
+
+def rule_marker_header_start(content: str) -> int:
+    frontmatter = re.match(r"^---\r?\n[\s\S]*?\r?\n---\r?\n?", content)
+    return frontmatter.end() if frontmatter else 0
+
+
+def calculate_rule_checksum(content: str) -> str:
+    return hashlib.sha256(strip_rule_marker(content).encode("utf-8")).hexdigest()
+
+
+def verify_rule_checksum(content: str) -> bool:
+    marker = parse_rule_marker(content)
+    return bool(marker and calculate_rule_checksum(content) == marker["checksum"])
+
+
+def add_rule_marker(content: str, rule_id: str) -> str:
+    body = strip_rule_marker(content)
+    checksum = calculate_rule_checksum(body)
+    marker = (
+        f'<!-- ballast:rule id="{rule_id}" version="{ballast_version()}" '
+        f'checksum="{checksum}" -->'
+    )
+    frontmatter = re.match(r"^---\r?\n[\s\S]*?\r?\n---\r?\n?", body)
+    if frontmatter:
+        return body[: frontmatter.end()] + marker + "\n" + body[frontmatter.end() :]
+    return marker + "\n" + body
 
 
 def read_skill(skill: str, language: str) -> str:
@@ -2607,3 +2662,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Unknown command: {command}")
         return 1
     return run_install(args)
+
+
+RULE_MARKER_RE = re.compile(
+    r'<!--\s*ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]{64})"\s*-->\r?\n?'
+)

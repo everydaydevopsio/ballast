@@ -1,4 +1,5 @@
 import fs from 'fs';
+import crypto from 'crypto';
 import path from 'path';
 import YAML from 'yaml';
 import {
@@ -29,10 +30,20 @@ interface BuildOptions {
   variables?: Record<string, string>;
 }
 
+export interface RuleMarker {
+  ruleId: string;
+  version: string;
+  checksum: string;
+}
+
 interface SkillEntry {
   name: string;
   data: Buffer;
 }
+
+const RULE_MARKER_PATTERN =
+  /^<!-- ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]+)"\s*-->\r?\n?/;
+const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 
 function getCreatedByBallastLine(): string {
   return `Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section.`;
@@ -74,6 +85,60 @@ function getRuleBasename(
     return basename;
   }
   return `${language}-${basename}`;
+}
+
+export function getRuleMarkerId(
+  agentId: string,
+  language: Language,
+  ruleSuffix?: string
+): string {
+  return [language, agentId, ruleSuffix].filter(Boolean).join('/');
+}
+
+export function parseRuleMarker(content: string): RuleMarker | null {
+  const frontmatter = content.match(FRONTMATTER_PATTERN);
+  const markerContent = frontmatter
+    ? content.slice(frontmatter[0].length)
+    : content;
+  const match = markerContent.match(RULE_MARKER_PATTERN);
+  if (!match) return null;
+  return {
+    ruleId: match[1],
+    version: match[2],
+    checksum: match[3].toLowerCase()
+  };
+}
+
+export function stripRuleMarker(content: string): string {
+  const frontmatter = content.match(FRONTMATTER_PATTERN);
+  if (!frontmatter) {
+    return content.replace(RULE_MARKER_PATTERN, '');
+  }
+  const body = content.slice(frontmatter[0].length);
+  return `${frontmatter[0]}${body.replace(RULE_MARKER_PATTERN, '')}`;
+}
+
+export function calculateRuleChecksum(content: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(stripRuleMarker(content), 'utf8')
+    .digest('hex');
+}
+
+export function verifyRuleChecksum(content: string): boolean {
+  const marker = parseRuleMarker(content);
+  if (!marker) return false;
+  return calculateRuleChecksum(content) === marker.checksum;
+}
+
+function addRuleMarker(content: string, ruleId: string): string {
+  const body = stripRuleMarker(content);
+  const marker = `<!-- ballast:rule id="${ruleId}" version="${pkg.version}" checksum="${calculateRuleChecksum(body)}" -->`;
+  const frontmatter = body.match(FRONTMATTER_PATTERN);
+  if (frontmatter) {
+    return `${frontmatter[0]}${marker}\n${body.slice(frontmatter[0].length)}`;
+  }
+  return `${marker}\n${body}`;
 }
 
 function getPreferredAgentDir(agentId: string, language: Language): string {
@@ -1239,7 +1304,7 @@ export function buildContent(
       result = result.replaceAll(`{{${key}}}`, value);
     }
   }
-  return result;
+  return addRuleMarker(result, getRuleMarkerId(agentId, language, ruleSuffix));
 }
 
 /**

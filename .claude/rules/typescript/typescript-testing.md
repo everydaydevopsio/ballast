@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/testing" version="5.16.5" checksum="4d154aa4218a2c8f3effff95547680b26d1e17e515bb45aa2e0bf49b2f255d84" -->
 # Testing Rules
 
 These rules provide testing setup for TypeScript/JavaScript projects: Jest by default, Vitest for Vite projects, 50% coverage default, and a test step in the build GitHub Action.

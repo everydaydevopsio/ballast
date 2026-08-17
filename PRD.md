@@ -447,6 +447,33 @@ Operators also need to know when saved language paths have drifted from the repo
 9. Given stale saved TypeScript paths and a current detected TypeScript path, wrapper `ballast doctor --fix` rewrites `.rulesrc.json` to the detected path before refreshing generated outputs.
 10. Given a `.rulesrc.json` with only `go` configured and a globally installed `ballast-typescript` on `PATH`, wrapper `ballast doctor` does not report the TypeScript backend.
 
+## Ballast Doctor Rule Drift Detection
+
+### Problem
+
+Ballast-generated rule files can diverge from current source templates when users edit generated files, merge conflicts leave noise behind, or saved `.rulesrc.json` targets and agents change while old managed files remain on disk. Without a machine-readable ownership marker, `ballast doctor` cannot reliably distinguish current managed files from stale managed files or user-authored files.
+
+### Requirements
+
+1. Every generated Ballast-managed rule file must include a machine-readable marker with `id`, `version`, and `checksum`.
+2. The marker checksum must be computed from generated rule content with the marker excluded so the checksum is stable and non-self-referential.
+3. `ballast doctor` must enumerate generated rule destinations for configured targets and known rule directories, parse rule markers, and categorize files as `ok`, `drifted`, `stale`, or `unowned`.
+4. `ballast doctor` must compare marked rule files against the canonical content Ballast would generate for the marked rule ID.
+5. `ballast doctor` must add recommendations for drifted and stale managed rule files while making unowned files explicitly skipped.
+6. `ballast doctor --fix` must delete stale managed rule files and print each deleted path.
+7. `ballast doctor --fix` must never delete unowned files and must never overwrite drifted files.
+8. The behavior must be covered across the TypeScript backend and mirrored rule-generation surfaces in Python and Go where applicable.
+
+### Acceptance Criteria
+
+1. Given a Ballast-generated rule file, the file contains `<!-- ballast:rule id="..." version="..." checksum="..." -->`.
+2. Given a marked file whose body still matches current generated content and remains in `.rulesrc.json`, `ballast doctor` reports it as `ok`.
+3. Given a marked active file whose content differs from its marker checksum or current generated content, `ballast doctor` reports it as `drifted` and recommends `ballast install --refresh-config`.
+4. Given a marked file that is no longer part of the current saved config, `ballast doctor` reports it as `stale` and recommends `ballast doctor --fix`.
+5. Given a file without a Ballast rule marker, `ballast doctor` reports it as `unowned` and skips remediation.
+6. Given stale, drifted, and unowned rule files, `ballast doctor --fix` removes only the stale managed files, prints removed paths, leaves drifted and unowned files untouched, and keeps recommending refresh for drifted files.
+7. Automated tests cover marker parsing, checksum comparison, report formatting, stale cleanup, and safety behavior.
+
 ## JavaScript Detection Warning
 
 ### Problem

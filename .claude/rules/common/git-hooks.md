@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/git-hooks" version="5.16.5" checksum="2c54b13a8666bf8340b95c46d939b33e9161c7cdc41246e69610ecf28daf4a73" -->
 # Git Hooks Rules
 
 These rules are intended for Claude Code.

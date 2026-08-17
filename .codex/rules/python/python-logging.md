@@ -1,3 +1,4 @@
+<!-- ballast:rule id="python/logging" version="5.16.5" checksum="31cbe4f167fb94530b4612f85cd02c89aa8d6c9978e9664ca5721aec635e6654" -->
 # Python Logging Rules
 
 These rules provide Python Logging Rules guidance for projects in this repository.

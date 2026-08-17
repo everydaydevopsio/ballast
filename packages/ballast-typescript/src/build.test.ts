@@ -23,11 +23,70 @@ import {
   extractDescriptionFromFrontmatter,
   getDestination,
   getSkillDestination,
-  listTargets
+  listTargets,
+  parseRuleMarker,
+  verifyRuleChecksum
 } from './build';
 import { COMMON_SKILL_IDS } from './agents';
 
 describe('build', () => {
+  describe('managed rule marker', () => {
+    test('buildContent writes a machine-readable rule marker', () => {
+      const content = buildContent('linting', 'codex', undefined, 'typescript');
+
+      expect(content).toMatch(
+        /^<!-- ballast:rule id="typescript\/linting" version="[^"]+" checksum="[a-f0-9]{64}" -->\n/
+      );
+      expect(parseRuleMarker(content)).toEqual(
+        expect.objectContaining({
+          ruleId: 'typescript/linting',
+          version: expect.any(String),
+          checksum: expect.stringMatching(/^[a-f0-9]{64}$/)
+        })
+      );
+      expect(verifyRuleChecksum(content)).toBe(true);
+    });
+
+    test('verifyRuleChecksum detects body drift after the marker', () => {
+      const content = buildContent('linting', 'codex', undefined, 'typescript');
+      const drifted = `${content}\nManual edit\n`;
+
+      expect(verifyRuleChecksum(drifted)).toBe(false);
+    });
+
+    test('parseRuleMarker ignores markers outside the generated location', () => {
+      const content = [
+        '# Manual rule',
+        '',
+        'Example:',
+        '<!-- ballast:rule id="typescript/linting" version="5.0.0" checksum="0123456789abcdef" -->',
+        ''
+      ].join('\n');
+
+      expect(parseRuleMarker(content)).toBeNull();
+      expect(verifyRuleChecksum(content)).toBe(false);
+    });
+
+    test('parseRuleMarker accepts markers directly after frontmatter', () => {
+      const content = buildContent(
+        'linting',
+        'cursor',
+        undefined,
+        'typescript'
+      );
+
+      expect(content).toMatch(
+        /^---\n[\s\S]*?\n---\n<!-- ballast:rule id="typescript\/linting"/
+      );
+      expect(parseRuleMarker(content)).toEqual(
+        expect.objectContaining({
+          ruleId: 'typescript/linting'
+        })
+      );
+      expect(verifyRuleChecksum(content)).toBe(true);
+    });
+  });
+
   describe('listRuleSuffixes', () => {
     test('returns only main rule for linting (no content-*.md)', () => {
       expect(listRuleSuffixes('linting')).toEqual(['']);

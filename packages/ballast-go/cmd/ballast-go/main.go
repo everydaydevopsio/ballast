@@ -4,7 +4,9 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -55,6 +57,15 @@ var publishingProfileAliases = map[string]string{
 	"library": "libraries",
 	"sdk":     "sdks",
 }
+
+var ruleMarkerRegex = regexp.MustCompile(`^<!-- ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]{64})"\s*-->\r?\n?`)
+
+type ruleMarker struct {
+	ruleID   string
+	version  string
+	checksum string
+}
+
 var defaultLanguageTools = map[string][]string{
 	"python":     {"uv", "pyenv"},
 	"typescript": {"pnpm", "corepack"},
@@ -2078,14 +2089,14 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 		}
 		front = applyHookTemplateVariables(front, agentID, language, hookMode)
 		front = applyTaskSystemVariables(front, agentID, taskSystem)
-		return front + "\n" + content, nil
+		return addRuleMarker(front+"\n"+content, ruleMarkerID(agentID, language, suffix)), nil
 	case "claude":
 		header, err := readTemplate(agentID, language, "claude-header.md", suffix)
 		if err != nil {
 			return "", err
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return header + content, nil
+		return addRuleMarker(header+content, ruleMarkerID(agentID, language, suffix)), nil
 	case "gemini":
 		header, err := readTemplate(agentID, language, "gemini-header.md", suffix)
 		if err != nil {
@@ -2098,14 +2109,14 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 			}
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return header + "\n---\n\n" + renderGeminiMandates() + content, nil
+		return addRuleMarker(header+"\n---\n\n"+renderGeminiMandates()+content, ruleMarkerID(agentID, language, suffix)), nil
 	case "opencode":
 		front, err := readTemplate(agentID, language, "opencode-frontmatter.yaml", suffix)
 		if err != nil {
 			return "", err
 		}
 		front = applyTaskSystemVariables(front, agentID, taskSystem)
-		return front + "\n" + content, nil
+		return addRuleMarker(front+"\n"+content, ruleMarkerID(agentID, language, suffix)), nil
 	case "codex":
 		header, err := readTemplate(agentID, language, "codex-header.md", suffix)
 		if err != nil {
@@ -2115,10 +2126,72 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 			}
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return header + content, nil
+		return addRuleMarker(header+content, ruleMarkerID(agentID, language, suffix)), nil
 	default:
 		return "", fmt.Errorf("unknown target: %s", target)
 	}
+}
+
+func ruleMarkerID(agentID, language, suffix string) string {
+	parts := []string{language, agentID}
+	if strings.TrimSpace(suffix) != "" {
+		parts = append(parts, suffix)
+	}
+	return strings.Join(parts, "/")
+}
+
+func parseRuleMarker(content string) (*ruleMarker, bool) {
+	matches := ruleMarkerRegex.FindStringSubmatch(content[ruleMarkerHeaderStart(content):])
+	if len(matches) != 4 {
+		return nil, false
+	}
+	return &ruleMarker{
+		ruleID:   matches[1],
+		version:  matches[2],
+		checksum: strings.ToLower(matches[3]),
+	}, true
+}
+
+func stripRuleMarker(content string) string {
+	start := ruleMarkerHeaderStart(content)
+	match := ruleMarkerRegex.FindStringIndex(content[start:])
+	if match == nil || match[0] != 0 {
+		return content
+	}
+	return content[:start] + content[start+match[1]:]
+}
+
+func ruleMarkerHeaderStart(content string) int {
+	frontmatterRegex := regexp.MustCompile(`(?s)^---\r?\n.*?\r?\n---\r?\n?`)
+	if match := frontmatterRegex.FindStringIndex(content); match != nil && match[0] == 0 {
+		return match[1]
+	}
+	return 0
+}
+
+func calculateRuleChecksum(content string) string {
+	sum := sha256.Sum256([]byte(stripRuleMarker(content)))
+	return hex.EncodeToString(sum[:])
+}
+
+func verifyRuleChecksum(content string) bool {
+	marker, ok := parseRuleMarker(content)
+	return ok && calculateRuleChecksum(content) == marker.checksum
+}
+
+func addRuleMarker(content, ruleID string) string {
+	body := stripRuleMarker(content)
+	marker := fmt.Sprintf(
+		`<!-- ballast:rule id="%s" version="%s" checksum="%s" -->`,
+		ruleID,
+		resolveVersion(),
+		calculateRuleChecksum(body),
+	)
+	frontmatterRegex := regexp.MustCompile(`(?s)^---\r?\n.*?\r?\n---\r?\n?`)
+	if match := frontmatterRegex.FindStringIndex(body); match != nil && match[0] == 0 {
+		return body[:match[1]] + marker + "\n" + body[match[1]:]
+	}
+	return marker + "\n" + body
 }
 
 func renderGitHooksPreCommitGlob(agentID, language, hookMode string) string {

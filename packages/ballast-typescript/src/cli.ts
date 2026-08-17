@@ -25,7 +25,7 @@ export type ParseArgsResult =
   | CliOptions
   | { help: true }
   | { version: true }
-  | { doctor: true }
+  | { doctor: true; fix?: boolean }
   | { list: true };
 
 function readFlagValue(args: string[], index: number, flag: string): string {
@@ -40,7 +40,9 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   const args = argv.slice(2);
   const command = args[0];
   if (command === 'doctor') {
-    return { doctor: true };
+    return args.includes('--fix')
+      ? { doctor: true, fix: true }
+      : { doctor: true };
   }
   if (command === 'list') {
     return { list: true };
@@ -218,7 +220,7 @@ export async function main(): Promise<void> {
 
   if (!isInstall) {
     if (command === 'doctor') {
-      process.exit(runDoctor());
+      process.exit(runDoctor({ fix: argv.includes('--fix') }));
     }
     if (command === 'list') {
       printList();
@@ -239,7 +241,7 @@ export async function main(): Promise<void> {
     process.exit(0);
   }
   if ('doctor' in options && options.doctor) {
-    process.exit(runDoctor());
+    process.exit(runDoctor({ fix: options.fix }));
   }
   const cliOptions = options as CliOptions;
   if (!LANGUAGES.includes(cliOptions.language as (typeof LANGUAGES)[number])) {

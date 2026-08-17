@@ -1,3 +1,4 @@
+<!-- ballast:rule id="python/testing" version="5.16.5" checksum="12b0a03707c933dcef8e54d49b7ae9de5d92415e227df4ec4b75e3eea805edbd" -->
 # Python Testing Rules
 
 These rules provide Python Testing Rules guidance for projects in this repository.

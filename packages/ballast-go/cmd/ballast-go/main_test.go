@@ -205,6 +205,65 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 	}
 }
 
+func TestBuildContentWritesRuleMarkerAndDetectsDrift(t *testing.T) {
+	content, err := buildContent("linting", "codex", "go", "", "pre-commit", "", "")
+	if err != nil {
+		t.Fatalf("build content: %v", err)
+	}
+	marker, ok := parseRuleMarker(content)
+	if !ok {
+		t.Fatalf("expected rule marker in %q", content[:120])
+	}
+	if marker.ruleID != "go/linting" {
+		t.Fatalf("expected rule id go/linting, got %q", marker.ruleID)
+	}
+	if marker.version != resolveVersion() {
+		t.Fatalf("expected marker version %q, got %q", resolveVersion(), marker.version)
+	}
+	if !regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(marker.checksum) {
+		t.Fatalf("expected sha256 checksum, got %q", marker.checksum)
+	}
+	if !verifyRuleChecksum(content) {
+		t.Fatalf("expected generated content checksum to verify")
+	}
+	if verifyRuleChecksum(content + "\nManual edit\n") {
+		t.Fatalf("expected checksum verification to fail after body edit")
+	}
+}
+
+func TestParseRuleMarkerRequiresGeneratedPrefix(t *testing.T) {
+	content := "<!--\nballast:rule id=\"go/linting\" version=\"dev\" checksum=\"0123456789abcdef\" -->\n# Rule\n"
+	if marker, ok := parseRuleMarker(content); ok {
+		t.Fatalf("expected non-generated marker prefix to be ignored, got %#v", marker)
+	}
+	if stripped := stripRuleMarker(content); stripped != content {
+		t.Fatalf("expected non-generated marker prefix to remain, got %q", stripped)
+	}
+}
+
+func TestParseRuleMarkerRequiresGeneratedHeaderPosition(t *testing.T) {
+	marker := "<!-- ballast:rule id=\"go/linting\" version=\"dev\" checksum=\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\" -->\n"
+	bodyExample := "# Notes\n\n```md\n" + marker + "```\n"
+	if parsed, ok := parseRuleMarker(bodyExample); ok {
+		t.Fatalf("expected copied marker in body to be ignored, got %#v", parsed)
+	}
+	if stripped := stripRuleMarker(bodyExample); stripped != bodyExample {
+		t.Fatalf("expected copied marker in body to remain, got %q", stripped)
+	}
+
+	withFrontmatter := "---\ntitle: Rule\n---\n" + marker + "# Rule\n"
+	parsed, ok := parseRuleMarker(withFrontmatter)
+	if !ok {
+		t.Fatal("expected marker after frontmatter to parse")
+	}
+	if parsed.ruleID != "go/linting" {
+		t.Fatalf("expected rule id go/linting, got %q", parsed.ruleID)
+	}
+	if stripped := stripRuleMarker(withFrontmatter); stripped != "---\ntitle: Rule\n---\n# Rule\n" {
+		t.Fatalf("expected marker after frontmatter to be stripped, got %q", stripped)
+	}
+}
+
 func makeGitBoundary(t *testing.T, dir string) {
 	t.Helper()
 	gitDir := filepath.Join(dir, ".git")
