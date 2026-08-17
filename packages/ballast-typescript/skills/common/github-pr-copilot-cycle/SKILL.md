@@ -46,6 +46,8 @@ For an existing PR, request or re-request Copilot review by PR number:
 
 ```bash
 PR_NUMBER=$(gh pr view --json number --jq .number)
+REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
 gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
 ```
 
@@ -55,13 +57,50 @@ Use `@copilot` only with `--reviewer` or `--add-reviewer`. Do not use `--add-ass
 
 Run at most three Copilot review cycles. A cycle is:
 
-1. Request or re-request Copilot review.
-2. Wait for Copilot review comments.
+1. Record `PR_NUMBER`, `REQUESTED_AT`, and `HEAD_OID`, then request or re-request Copilot review.
+2. Wait until Copilot review activity for the current head commit has settled.
 3. Score unresolved Copilot comments.
 4. Fix, reply, resolve, test, push.
 5. Check PR CI.
 
-Stop before three cycles if there are no unresolved Copilot comments. Stop immediately and ask the user when any unresolved comment needs human input.
+Stop before three cycles only when all of these are true:
+
+- There are no unresolved Copilot review threads.
+- `gh pr view "$PR_NUMBER" --json reviewRequests` shows Copilot is not present in pending review requests.
+- `gh pr view "$PR_NUMBER" --json latestReviews,reviews` shows a Copilot review submitted after `$REQUESTED_AT` and attached to `$HEAD_OID` when the API includes the review commit, or Copilot produced unresolved threads from that request and they have been handled.
+- A final review-thread query after that settled review still shows zero unresolved Copilot threads.
+
+Do not treat a single immediate "no unresolved threads" poll after requesting Copilot as complete. Copilot can accept the request, clear the review request, and publish comments later. If the review request disappears but no new Copilot review is visible yet, keep polling with backoff until a Copilot review appears, unresolved Copilot threads appear, or a reasonable timeout is reached. If the timeout is reached, report the PR as blocked/pending Copilot rather than complete.
+
+Stop immediately and ask the user when any unresolved comment needs human input.
+
+## Wait For Copilot To Settle
+
+Before requesting or re-requesting Copilot, set the PR number and record the current head commit and request time:
+
+```bash
+PR_NUMBER=$(gh pr view --json number --jq .number)
+REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
+gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
+```
+
+Poll both review request state and review history:
+
+```bash
+gh pr view "$PR_NUMBER" --json headRefOid,reviewRequests,reviews,latestReviews
+```
+
+Use `reviewRequests` to detect a pending Copilot review request. Use `reviews` or `latestReviews` to find the newest Copilot review, preferring known Copilot logins: `copilot-pull-request-reviewer`, `copilot-pull-request-reviewer[bot]`, or `github-copilot[bot]`. If GitHub changes the reviewer login, accept another author login containing `copilot` only when the review body or metadata identifies it as GitHub Copilot code review. A settled Copilot review for the current cycle is one submitted after `$REQUESTED_AT` and preferably attached to `$HEAD_OID`. Some GitHub API responses omit the review commit OID; in that case, accept the timestamp plus a fresh review-thread query as evidence.
+
+If `headRefOid` differs from `$HEAD_OID` during polling, the PR changed while waiting. Stop the current wait, record a new `REQUESTED_AT` and `HEAD_OID` for the new head, re-request Copilot, and restart settle polling for that head.
+
+After each poll, gather review threads again. If new unresolved Copilot threads appear, stop polling and score them. Otherwise, continue polling while any of these are true:
+
+- Copilot is still listed in `reviewRequests`.
+- No Copilot review newer than `$REQUESTED_AT` is visible yet.
+
+Recommended polling cadence: wait 30 seconds, then 60 seconds, then 120 seconds between checks; repeat the 120-second interval until Copilot settles or the timeout is reached. Do not wait forever. If Copilot has not settled after about 10 minutes, report the PR URL, the pending state, and the last observed review request/review timestamps.
 
 ## Gather Copilot Comments
 
@@ -123,7 +162,7 @@ query($threadId:ID!, $endCursor:String) {
 }'
 ```
 
-Treat comments from `copilot-pull-request-reviewer[bot]`, `github-copilot[bot]`, or an author login containing `copilot` as Copilot comments. Only act on unresolved threads unless the user explicitly asks to revisit resolved history.
+Treat comments from `copilot-pull-request-reviewer`, `copilot-pull-request-reviewer[bot]`, or `github-copilot[bot]` as Copilot comments. If GitHub changes the comment author login, accept another author login containing `copilot` only when the surrounding review metadata identifies it as GitHub Copilot code review. Only act on unresolved threads unless the user explicitly asks to revisit resolved history.
 
 Copilot does not read replies added to its review comments. Replies are for human auditability, not for continuing a conversation with Copilot.
 
@@ -201,7 +240,9 @@ After comments are handled and CI is green or pending with no known failures, re
 
 ```bash
 PR_NUMBER=$(gh pr view --json number --jq .number)
+REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
 gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
 ```
 
-Wait briefly, then gather comments again. If no unresolved Copilot threads remain, report the PR URL, cycle count, validation commands, and whether CI is green, pending, or blocked.
+Wait for Copilot to settle using the polling procedure above, then gather comments again. If no unresolved Copilot threads remain after the settled review, report the PR URL, cycle count, validation commands, CI state, current head commit, latest Copilot review timestamp, and whether any Copilot review request remains pending.
