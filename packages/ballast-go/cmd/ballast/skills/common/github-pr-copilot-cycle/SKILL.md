@@ -55,7 +55,7 @@ Use `@copilot` only with `--reviewer` or `--add-reviewer`. Do not use `--add-ass
 
 Run at most three Copilot review cycles. A cycle is:
 
-1. Record `REQUESTED_AT` and `HEAD_OID`, then request or re-request Copilot review.
+1. Record `PR_NUMBER`, `REQUESTED_AT`, and `HEAD_OID`, then request or re-request Copilot review.
 2. Wait until Copilot review activity for the current head commit has settled.
 3. Score unresolved Copilot comments.
 4. Fix, reply, resolve, test, push.
@@ -89,13 +89,14 @@ Poll both review request state and review history:
 gh pr view "$PR_NUMBER" --json headRefOid,reviewRequests,reviews,latestReviews
 ```
 
-Use `reviewRequests` to detect a pending Copilot review request. Use `reviews` or `latestReviews` to find the newest review whose author login contains `copilot`. A settled Copilot review for the current cycle is one submitted after `$REQUESTED_AT` and preferably attached to `$HEAD_OID`. Some GitHub API responses omit the review commit OID; in that case, accept the timestamp plus a fresh review-thread query as evidence.
+Use `reviewRequests` to detect a pending Copilot review request. Use `reviews` or `latestReviews` to find the newest review whose author login is `copilot-pull-request-reviewer`, `copilot-pull-request-reviewer[bot]`, or `github-copilot[bot]`. A settled Copilot review for the current cycle is one submitted after `$REQUESTED_AT` and preferably attached to `$HEAD_OID`. Some GitHub API responses omit the review commit OID; in that case, accept the timestamp plus a fresh review-thread query as evidence.
 
-After each poll, gather review threads again. Continue polling while any of these are true:
+If `headRefOid` differs from `$HEAD_OID` during polling, the PR changed while waiting. Stop the current wait, record a new `REQUESTED_AT` and `HEAD_OID` for the new head, re-request Copilot, and restart settle polling for that head.
+
+After each poll, gather review threads again. If new unresolved Copilot threads appear, stop polling and score them. Otherwise, continue polling while any of these are true:
 
 - Copilot is still listed in `reviewRequests`.
 - No Copilot review newer than `$REQUESTED_AT` is visible yet.
-- New unresolved Copilot threads appear and still need scoring.
 
 Recommended polling cadence: wait 30 seconds, then 60 seconds, then 120 seconds between checks. Do not wait forever. If Copilot has not settled after about 10 minutes, report the PR URL, the pending state, and the last observed review request/review timestamps.
 
