@@ -64,7 +64,7 @@ Run at most three Copilot review cycles. A cycle is:
 Stop before three cycles only when all of these are true:
 
 - There are no unresolved Copilot review threads.
-- `gh pr view "$PR_NUMBER" --json reviewRequests` shows no pending Copilot review request.
+- `gh pr view "$PR_NUMBER" --json reviewRequests` shows Copilot is not present in pending review requests.
 - `gh pr view "$PR_NUMBER" --json latestReviews,reviews` shows a Copilot review submitted after `$REQUESTED_AT` and attached to `$HEAD_OID` when the API includes the review commit, or Copilot produced unresolved threads from that request and they have been handled.
 - A final review-thread query after that settled review still shows zero unresolved Copilot threads.
 
@@ -89,7 +89,7 @@ Poll both review request state and review history:
 gh pr view "$PR_NUMBER" --json headRefOid,reviewRequests,reviews,latestReviews
 ```
 
-Use `reviewRequests` to detect a pending Copilot review request. Use `reviews` or `latestReviews` to find the newest review whose author login is `copilot-pull-request-reviewer`, `copilot-pull-request-reviewer[bot]`, or `github-copilot[bot]`. A settled Copilot review for the current cycle is one submitted after `$REQUESTED_AT` and preferably attached to `$HEAD_OID`. Some GitHub API responses omit the review commit OID; in that case, accept the timestamp plus a fresh review-thread query as evidence.
+Use `reviewRequests` to detect a pending Copilot review request. Use `reviews` or `latestReviews` to find the newest Copilot review, preferring known Copilot logins: `copilot-pull-request-reviewer`, `copilot-pull-request-reviewer[bot]`, or `github-copilot[bot]`. If GitHub changes the reviewer login, accept another author login containing `copilot` only when the review body or metadata identifies it as GitHub Copilot code review. A settled Copilot review for the current cycle is one submitted after `$REQUESTED_AT` and preferably attached to `$HEAD_OID`. Some GitHub API responses omit the review commit OID; in that case, accept the timestamp plus a fresh review-thread query as evidence.
 
 If `headRefOid` differs from `$HEAD_OID` during polling, the PR changed while waiting. Stop the current wait, record a new `REQUESTED_AT` and `HEAD_OID` for the new head, re-request Copilot, and restart settle polling for that head.
 
@@ -160,7 +160,7 @@ query($threadId:ID!, $endCursor:String) {
 }'
 ```
 
-Treat comments from `copilot-pull-request-reviewer[bot]`, `github-copilot[bot]`, or an author login containing `copilot` as Copilot comments. Only act on unresolved threads unless the user explicitly asks to revisit resolved history.
+Treat comments from `copilot-pull-request-reviewer`, `copilot-pull-request-reviewer[bot]`, or `github-copilot[bot]` as Copilot comments. If GitHub changes the comment author login, accept another author login containing `copilot` only when the surrounding review metadata identifies it as GitHub Copilot code review. Only act on unresolved threads unless the user explicitly asks to revisit resolved history.
 
 Copilot does not read replies added to its review comments. Replies are for human auditability, not for continuing a conversation with Copilot.
 
