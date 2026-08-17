@@ -2202,7 +2202,7 @@ func applyTaskSystemVariables(content, agentID, taskSystem string) string {
 				"",
 				"External issue tracking is disabled (`taskSystem: none`). This repository has no external task system configured. Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.",
 				"",
-				"Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.",
+				"Use `tasks/todo.md` as the structured branch-local task artifact. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.",
 				"",
 				"## MCP Server Setup",
 				"",
@@ -2211,20 +2211,33 @@ func applyTaskSystemVariables(content, agentID, taskSystem string) string {
 				"## Using Work Items",
 				"",
 				"- Do not create external issues or tickets by default.",
-				"- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them in branch-local notes, or ask the user where durable follow-up belongs.",
+				"- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them as branch-local evidence, or ask the user where durable follow-up belongs.",
 				"- Keep credentials out of committed files; use environment variables or platform secret stores if a task-system integration is added later.",
 			}, "\n")
 		}
 		content = strings.ReplaceAll(content, taskSystemGuidanceToken, strings.Join([]string{
 			"## Activation",
 			"",
-			fmt.Sprintf("External issue tracking is active (`taskSystem: %s`). This repository uses **%s** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.", normalized, normalized),
+			fmt.Sprintf("External issue tracking is active (`taskSystem: %s`). This repository uses **%s** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.", normalized, taskSystemDisplayName(normalized)),
 		}, "\n"))
 	}
 	if strings.Contains(content, taskSystemToken) {
-		return strings.ReplaceAll(content, taskSystemToken, normalized)
+		return strings.ReplaceAll(content, taskSystemToken, taskSystemDisplayName(normalized))
 	}
 	return content
+}
+
+func taskSystemDisplayName(taskSystem string) string {
+	switch taskSystem {
+	case "github":
+		return "GitHub"
+	case "jira":
+		return "Jira"
+	case "linear":
+		return "Linear"
+	default:
+		return taskSystem
+	}
 }
 
 func applyHookTemplateVariables(content, agentID, language, hookMode string) string {

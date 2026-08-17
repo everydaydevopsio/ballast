@@ -32,10 +32,25 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
 - Repeatable test commands for local development
 - CI checks for each language profile
 - Coverage visibility with configurable thresholds
+- TDD process discipline for behavioral changes: acceptance criteria, failing test first, minimum implementation, green/refactor, proof, failure-path coverage, and traceability
 - Web smoke tests that use the repo Dockerfile and `docker-compose.yaml` for runnable apps and verify a live route or health endpoint
 - Explicit smoke-test pass/fail output
 - A smoke-test GitHub Action and matching README badge
 - Narrow end-to-end coverage for one critical workflow when the app has a real user flow, keeping an existing browser E2E framework when present and preferring Playwright only when Playwright markers already exist or the repo has a real browser application surface with no existing browser E2E framework
+
+## TDD Process Discipline
+
+Tooling setup and process discipline are separate responsibilities. The testing agent must configure runners and coverage gates, and it must also require TDD for bug fixes, new features, refactors with behavioral impact, and contract changes.
+
+For behavioral changes:
+
+1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.
+2. Write a failing test first and confirm it fails for the right reason.
+3. Implement the minimum change needed to make that test pass.
+4. Refactor only after the relevant tests are green.
+5. Record proof that the previously failing test now passes.
+6. Include failure-path coverage for errors, edges, and misuse.
+7. Keep tests traceable to requirement IDs, issue IDs, or acceptance criteria.
 
 ## Framework Detection
 

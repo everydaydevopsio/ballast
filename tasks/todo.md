@@ -1,4 +1,59 @@
-# Tasks
+# Task: Issues #158 and #159 task template and TDD rule guidance
+
+## Context
+- Owner: Codex
+- Date: 2026-08-16
+- Mode: Autonomous
+- PRD Section: Structured Task Templates And TDD Rule Discipline
+- Requirement IDs: #158, #159
+
+## Scope
+- In scope: canonical task TODO guidance, task/lessons/issue templates, testing rule TDD discipline, generated/package mirrors, focused tests, PR creation.
+- Out of scope: changing AWS health review `TODO.md` integration semantics and unrelated task-system behavior.
+
+## Acceptance Criteria
+- AC1: `tasks/todo.md` filename is standardized to lowercase across Ballast task guidance.
+- AC2: Task TODO guidance uses the structured template while allowing lightweight optional sections as a subset.
+- AC3: Canonical `tasks/todo.md`, `tasks/lessons.md`, and issue output templates are available in generated task guidance.
+- AC4: TypeScript, Python, and Go testing rules require acceptance criteria, failing test first, minimum implementation, green/refactor, proof, failure-path coverage, and traceability.
+- AC5: Package mirrors and generated `.codex`/`.claude` outputs are refreshed.
+
+## Constraints
+- Preserve unrelated user changes.
+- Update canonical sources first, then mirrors/generated outputs.
+- Keep persistent rules concise.
+
+## Risks and Tradeoffs
+- Risk: generated mirrors drift if sync/regeneration is incomplete.
+- Tradeoff: templates make task guidance longer, so optional-section language must keep lightweight tasks ergonomic.
+
+## Execution Checklist
+- [x] Read `AGENTS.md`, task rules, testing rules, execution framework, execution templates, and issue details.
+- [x] Confirm operating mode and governing PRD section.
+- [x] Add failing generated-content tests for task templates and TDD guidance.
+- [x] Update canonical task and testing rule sources.
+- [x] Sync package mirrors and regenerate checked-in generated outputs.
+- [x] Run focused tests and generated-artifact checks.
+- [x] Push branch and create PR against `main`.
+
+## Test Strategy
+- Unit: targeted Jest tests for generated content in `packages/ballast-typescript/src/build.test.ts`.
+- Integration: generated artifact sync test with enforcement enabled after regeneration.
+- E2E: not required; no runtime CLI behavior changes.
+- Failure-path tests: assertions fail if guidance drops lowercase path, structured templates, failure-path coverage, or traceability.
+- Requirement-to-test mapping: #158 maps to task TODO template assertions; #159 maps to TypeScript/Python/Go TDD assertions.
+
+## Rollback Strategy
+- Trigger: generated output drift, failing tests, or PR feedback showing rule guidance conflicts with existing policy.
+- Rollback steps: revert this branch's source, test, mirror, and generated-output changes only.
+- Validation after rollback: rerun the focused Jest tests and generated-artifact check.
+
+## Outcome
+- Result: Implemented structured `tasks/todo.md` guidance, task/lessons/issue templates, and TDD process discipline across TypeScript, Python, and Go testing rules.
+- Evidence links/commands: `pnpm --filter @everydaydevopsio/ballast exec jest src/build.test.ts --runInBand`; `BALLAST_ENFORCE_REPO_GENERATED_ARTIFACTS=1 pnpm --filter @everydaydevopsio/ballast exec jest src/repo-generated-artifacts.test.ts --runInBand`; `pnpm --filter @everydaydevopsio/ballast run test`; `pnpm --filter @everydaydevopsio/ballast run lint`; `go test ./...` in `packages/ballast-go`; `uv run python -m unittest discover -s tests` in `packages/ballast-python`; `uv run ruff check .` in `packages/ballast-python`; `scripts/smoke-tasks.sh`; `git diff --check`.
+- PRD updates: Added `Structured Task Templates And TDD Rule Discipline`.
+
+## Previous Tasks
 
 - [x] Confirm issue #154 scope, operating mode, and governing PRD requirements.
 - [x] Add PRD requirements for distributing plan-lifecycle guidance through Ballast.
@@ -7,8 +62,6 @@
 - [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
 - [x] Run focused tests and required sync/generation checks.
 - [x] Push branch, open PR for #154, request Copilot review, and resolve actionable review comments. No actionable review comments were present at the latest poll.
-
-## Previous Tasks
 
 - [x] Confirm issue #145 scope, operating mode, and governing PRD gap.
 - [x] Add PRD requirements for integration-framework detection and Playwright preference across supported languages.

@@ -231,8 +231,9 @@ class PatchInstallTests(unittest.TestCase):
             None,
         )
 
-        self.assertIn("**github** as the system of record", content)
-        self.assertIn('"configure MCP for github"', content)
+        self.assertIn("**GitHub** as the system of record", content)
+        self.assertIn('"configure MCP for GitHub"', content)
+        self.assertNotIn("**github**", content)
         self.assertNotIn("{{BALLAST_TASK_SYSTEM_GUIDANCE}}", content)
         self.assertNotIn("{{taskSystem}}", content)
 
@@ -530,7 +531,7 @@ class PatchInstallTests(unittest.TestCase):
             content = (root / ".codex" / "rules" / "tasks-task-system.md").read_text(
                 encoding="utf-8"
             )
-            self.assertIn("**github** as the system of record", content)
+            self.assertIn("**GitHub** as the system of record", content)
             self.assertNotIn("{{taskSystem}}", content)
 
     def test_run_install_changing_task_system_refreshes_existing_task_rules(
@@ -577,7 +578,7 @@ class PatchInstallTests(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn("taskSystem: linear", content)
-            self.assertIn("**linear** as the system of record", content)
+            self.assertIn("**Linear** as the system of record", content)
             self.assertNotIn("taskSystem: jira", content)
             self.assertNotIn("**jira** as the system of record", content)
 

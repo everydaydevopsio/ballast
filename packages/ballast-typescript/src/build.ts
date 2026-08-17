@@ -361,13 +361,14 @@ function applyDeploymentModelGuidance(
 
 function renderTaskSystemGuidance(options?: BuildOptions): string {
   const taskSystem = options?.variables?.taskSystem ?? '{{taskSystem}}';
+  const taskSystemName = renderTaskSystemDisplayName(taskSystem);
   if (taskSystem === 'none') {
     return [
       '## Activation',
       '',
       'External issue tracking is disabled (`taskSystem: none`). This repository has no external task system configured. Do not require GitHub Issues, Jira, Linear, or MCP-backed ticket creation for routine branch work.',
       '',
-      'Use `tasks/todo.md` for branch-scoped working notes. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.',
+      'Use `tasks/todo.md` as the structured branch-local task artifact. If work must survive beyond the current branch, ask the user where they want durable follow-up tracked before creating external issues or tickets.',
       '',
       '## MCP Server Setup',
       '',
@@ -376,7 +377,7 @@ function renderTaskSystemGuidance(options?: BuildOptions): string {
       '## Using Work Items',
       '',
       '- Do not create external issues or tickets by default.',
-      '- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them in branch-local notes, or ask the user where durable follow-up belongs.',
+      '- When preparing a PR, triage `tasks/todo.md` and either resolve items, keep them as branch-local evidence, or ask the user where durable follow-up belongs.',
       '- Keep credentials out of committed files; use environment variables or platform secret stores if a task-system integration is added later.'
     ].join('\n');
   }
@@ -384,8 +385,21 @@ function renderTaskSystemGuidance(options?: BuildOptions): string {
   return [
     '## Activation',
     '',
-    `External issue tracking is active (\`taskSystem: ${taskSystem}\`). This repository uses **${taskSystem}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.`
+    `External issue tracking is active (\`taskSystem: ${taskSystem}\`). This repository uses **${taskSystemName}** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.`
   ].join('\n');
+}
+
+function renderTaskSystemDisplayName(taskSystem: string): string {
+  switch (taskSystem) {
+    case 'github':
+      return 'GitHub';
+    case 'jira':
+      return 'Jira';
+    case 'linear':
+      return 'Linear';
+    default:
+      return taskSystem;
+  }
 }
 
 function applyTaskSystemGuidance(
@@ -475,7 +489,9 @@ export function getContent(
   let raw = fs.readFileSync(file, 'utf8');
   if (options?.variables) {
     for (const [key, value] of Object.entries(options.variables)) {
-      raw = raw.replaceAll(`{{${key}}}`, value);
+      const replacement =
+        key === 'taskSystem' ? renderTaskSystemDisplayName(value) : value;
+      raw = raw.replaceAll(`{{${key}}}`, replacement);
     }
   }
   return applyTaskSystemGuidance(

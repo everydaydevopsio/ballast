@@ -184,6 +184,9 @@ describe('build', () => {
         variables: { taskSystem: 'github' }
       });
       expect(content).toContain('github');
+      expect(content).toContain('**GitHub** as the system of record');
+      expect(content).toContain('"configure MCP for GitHub"');
+      expect(content).not.toContain('**github**');
       expect(content).toContain(
         'External issue tracking is active (`taskSystem: github`).'
       );
@@ -223,7 +226,34 @@ describe('build', () => {
       const content = getContent('tasks', 'todo');
       expect(content).toContain('tasks/todo.md');
       expect(content).toContain('triage');
+      expect(content).not.toContain('tasks/TODO.md');
       expect(content).not.toContain('{{taskSystem}}');
+    });
+
+    test('returns structured tasks todo templates aligned with execution templates', () => {
+      const content = getContent('tasks', 'todo');
+      expect(content).toContain('# Task: <title>');
+      expect(content).toContain('## Acceptance Criteria');
+      expect(content).toContain('## Test Strategy');
+      expect(content).toContain('Failure-path tests:');
+      expect(content).toContain('Requirement-to-test mapping:');
+      expect(content).toContain('## Rollback Strategy');
+      expect(content).toContain('## Outcome');
+      expect(content).toContain('Lightweight tasks may omit optional sections');
+      expect(content).toContain(
+        'must remain a subset of the structured template'
+      );
+    });
+
+    test('returns canonical lessons and issue output templates in task guidance', () => {
+      const content = getContent('tasks', 'todo');
+      expect(content).toContain('tasks/lessons.md');
+      expect(content).toContain('# Lessons');
+      expect(content).toContain('Root cause pattern:');
+      expect(content).toContain('### Issue #N: <Short Description>');
+      expect(content).toContain('**Severity:** <Critical|High|Medium|Low>');
+      expect(content).toContain('**Option A (Recommended)**');
+      expect(content).toContain('**Decision Request**');
     });
 
     test('returns plan-lifecycle content', () => {
@@ -400,6 +430,26 @@ describe('build', () => {
       );
     });
 
+    test('returns TypeScript testing content with TDD process discipline', () => {
+      const content = getContent('testing', undefined, 'typescript');
+      expect(content).toContain('## TDD Process Discipline');
+      expect(content).toContain(
+        'Tooling setup and process discipline are separate responsibilities'
+      );
+      for (const required of [
+        'Start from acceptance criteria',
+        'Write a failing test first',
+        'Confirm the test fails for the right reason',
+        'Implement the minimum change',
+        'Refactor only after the relevant tests are green',
+        'Proof of completion',
+        'Failure-path coverage',
+        'Traceability'
+      ]) {
+        expect(content).toContain(required);
+      }
+    });
+
     test('returns Python testing content with web smoke and E2E placement guidance', () => {
       const content = getContent('testing', undefined, 'python');
       expect(content).toContain('web smoke test');
@@ -440,6 +490,26 @@ describe('build', () => {
       expect(content).toContain(
         'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
       );
+    });
+
+    test('returns Python testing content with TDD process discipline', () => {
+      const content = getContent('testing', undefined, 'python');
+      expect(content).toContain('## TDD Process Discipline');
+      expect(content).toContain(
+        'Tooling setup and process discipline are separate responsibilities'
+      );
+      for (const required of [
+        'Start from acceptance criteria',
+        'Write a failing test first',
+        'Confirm the test fails for the right reason',
+        'Implement the minimum change',
+        'Refactor only after the relevant tests are green',
+        'Proof of completion',
+        'Failure-path coverage',
+        'Traceability'
+      ]) {
+        expect(content).toContain(required);
+      }
     });
 
     test('returns CLI publishing content with packaged-command smoke guidance', () => {
@@ -604,6 +674,26 @@ describe('build', () => {
       expect(content).toContain(
         'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
       );
+    });
+
+    test('returns Go testing content with TDD process discipline', () => {
+      const content = getContent('testing', undefined, 'go');
+      expect(content).toContain('## TDD Process Discipline');
+      expect(content).toContain(
+        'Tooling setup and process discipline are separate responsibilities'
+      );
+      for (const required of [
+        'Start from acceptance criteria',
+        'Write a failing test first',
+        'Confirm the test fails for the right reason',
+        'Implement the minimum change',
+        'Refactor only after the relevant tests are green',
+        'Proof of completion',
+        'Failure-path coverage',
+        'Traceability'
+      ]) {
+        expect(content).toContain(required);
+      }
     });
   });
 
@@ -851,6 +941,22 @@ describe('build', () => {
       expect(goTesting).toContain(
         'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
       );
+    });
+
+    test('includes TDD process discipline in generated Codex testing rules', () => {
+      for (const language of ['typescript', 'python', 'go'] as const) {
+        const testing = buildCodexFormat('testing', undefined, language);
+        expect(testing).toContain('## TDD Process Discipline');
+        expect(testing).toContain(
+          'Tooling setup and process discipline are separate responsibilities'
+        );
+        expect(testing).toContain('Write a failing test first');
+        expect(testing).toContain(
+          'Confirm the test fails for the right reason'
+        );
+        expect(testing).toContain('Failure-path coverage');
+        expect(testing).toContain('Traceability');
+      }
     });
   });
 
