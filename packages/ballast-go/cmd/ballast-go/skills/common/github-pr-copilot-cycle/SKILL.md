@@ -46,6 +46,8 @@ For an existing PR, request or re-request Copilot review by PR number:
 
 ```bash
 PR_NUMBER=$(gh pr view --json number --jq .number)
+REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
 gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
 ```
 
@@ -98,7 +100,7 @@ After each poll, gather review threads again. If new unresolved Copilot threads 
 - Copilot is still listed in `reviewRequests`.
 - No Copilot review newer than `$REQUESTED_AT` is visible yet.
 
-Recommended polling cadence: wait 30 seconds, then 60 seconds, then 120 seconds between checks. Do not wait forever. If Copilot has not settled after about 10 minutes, report the PR URL, the pending state, and the last observed review request/review timestamps.
+Recommended polling cadence: wait 30 seconds, then 60 seconds, then 120 seconds between checks; repeat the 120-second interval until Copilot settles or the timeout is reached. Do not wait forever. If Copilot has not settled after about 10 minutes, report the PR URL, the pending state, and the last observed review request/review timestamps.
 
 ## Gather Copilot Comments
 
