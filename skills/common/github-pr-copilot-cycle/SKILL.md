@@ -55,7 +55,7 @@ Use `@copilot` only with `--reviewer` or `--add-reviewer`. Do not use `--add-ass
 
 Run at most three Copilot review cycles. A cycle is:
 
-1. Request or re-request Copilot review.
+1. Record `REQUESTED_AT` and `HEAD_OID`, then request or re-request Copilot review.
 2. Wait until Copilot review activity for the current head commit has settled.
 3. Score unresolved Copilot comments.
 4. Fix, reply, resolve, test, push.
