@@ -65,7 +65,7 @@ Stop before three cycles only when all of these are true:
 
 - There are no unresolved Copilot review threads.
 - `gh pr view --json reviewRequests` shows no pending Copilot review request.
-- `gh pr view --json latestReviews,reviews` shows a Copilot review submitted after the last Copilot request and attached to the current head commit, or Copilot produced unresolved threads from that request and they have been handled.
+- `gh pr view --json latestReviews,reviews` shows a Copilot review submitted after `$REQUESTED_AT` and attached to `$HEAD_OID` when the API includes the review commit, or Copilot produced unresolved threads from that request and they have been handled.
 - A final review-thread query after that settled review still shows zero unresolved Copilot threads.
 
 Do not treat a single immediate "no unresolved threads" poll after requesting Copilot as complete. Copilot can accept the request, clear the review request, and publish comments later. If the review request disappears but no new Copilot review is visible yet, keep polling with backoff until a Copilot review appears, unresolved Copilot threads appear, or a reasonable timeout is reached. If the timeout is reached, report the PR as blocked/pending Copilot rather than complete.
@@ -80,6 +80,7 @@ Before requesting or re-requesting Copilot, set the PR number and record the cur
 PR_NUMBER=$(gh pr view --json number --jq .number)
 REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
+gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
 ```
 
 Poll both review request state and review history:
