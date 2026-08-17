@@ -63,6 +63,16 @@ run_opencode_case() {
 EOF
 
   materialize_saved_install "${project}"
+  mkdir -p "${project}/.opencode/rules/python" "${project}/.opencode/rules/go"
+  cat > "${project}/.opencode/rules/python/python-linting.md" <<'EOF'
+legacy managed python linting rule
+EOF
+  cat > "${project}/.opencode/rules/go/go-linting.md" <<'EOF'
+legacy managed go linting rule
+EOF
+  cat > "${project}/.opencode/rules/go/manual.md" <<'EOF'
+manual opencode rule
+EOF
 
   (
     cd "${project}"
@@ -73,6 +83,9 @@ EOF
   assert_contains '"claude"' "${project}/.rulesrc.json"
   assert_file_absent "${project}/.opencode/python/python-linting.md"
   assert_file_absent "${project}/.opencode/go/go-linting.md"
+  assert_file_absent "${project}/.opencode/rules/python/python-linting.md"
+  assert_file_absent "${project}/.opencode/rules/go/go-linting.md"
+  assert_file_exists "${project}/.opencode/rules/go/manual.md"
   assert_file_absent "${project}/.opencode/skills/owasp-security-scan.md"
   assert_file_exists "${project}/.claude/rules/python/python-linting.md"
   assert_file_exists "${project}/.claude/skills/owasp-security-scan.skill"

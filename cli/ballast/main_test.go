@@ -4652,6 +4652,9 @@ func TestRunMonorepoRemoveTargetCleansOpencodeManagedRulesAndSkills(t *testing.T
 
 	mustWriteFile(t, filepath.Join(root, ".opencode", "python", "python-linting.md"), "managed")
 	mustWriteFile(t, filepath.Join(root, ".opencode", "go", "go-linting.md"), "managed")
+	mustWriteFile(t, filepath.Join(root, ".opencode", "rules", "python", "python-linting.md"), "legacy managed")
+	mustWriteFile(t, filepath.Join(root, ".opencode", "rules", "go", "go-linting.md"), "legacy managed")
+	mustWriteFile(t, filepath.Join(root, ".opencode", "rules", "go", "manual.md"), "manual opencode rule")
 	mustWriteFile(t, filepath.Join(root, ".opencode", "skills", "owasp-security-scan.md"), "managed")
 	mustWriteFile(t, filepath.Join(root, ".claude", "rules", "python", "python-linting.md"), "managed")
 	mustWriteFile(t, filepath.Join(root, ".claude", "skills", "owasp-security-scan.skill"), "managed")
@@ -4680,6 +4683,15 @@ func TestRunMonorepoRemoveTargetCleansOpencodeManagedRulesAndSkills(t *testing.T
 	}
 	if _, err := os.Stat(filepath.Join(root, ".opencode", "go", "go-linting.md")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected opencode go rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "rules", "python", "python-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy opencode python rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "rules", "go", "go-linting.md")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy opencode go rule to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "rules", "go", "manual.md")); err != nil {
+		t.Fatalf("expected manual legacy opencode rule to remain, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, ".opencode", "skills", "owasp-security-scan.md")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected opencode skill to be removed, got err=%v", err)
