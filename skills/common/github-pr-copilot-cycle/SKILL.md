@@ -64,8 +64,8 @@ Run at most three Copilot review cycles. A cycle is:
 Stop before three cycles only when all of these are true:
 
 - There are no unresolved Copilot review threads.
-- `gh pr view --json reviewRequests` shows no pending Copilot review request.
-- `gh pr view --json latestReviews,reviews` shows a Copilot review submitted after `$REQUESTED_AT` and attached to `$HEAD_OID` when the API includes the review commit, or Copilot produced unresolved threads from that request and they have been handled.
+- `gh pr view "$PR_NUMBER" --json reviewRequests` shows no pending Copilot review request.
+- `gh pr view "$PR_NUMBER" --json latestReviews,reviews` shows a Copilot review submitted after `$REQUESTED_AT` and attached to `$HEAD_OID` when the API includes the review commit, or Copilot produced unresolved threads from that request and they have been handled.
 - A final review-thread query after that settled review still shows zero unresolved Copilot threads.
 
 Do not treat a single immediate "no unresolved threads" poll after requesting Copilot as complete. Copilot can accept the request, clear the review request, and publish comments later. If the review request disappears but no new Copilot review is visible yet, keep polling with backoff until a Copilot review appears, unresolved Copilot threads appear, or a reasonable timeout is reached. If the timeout is reached, report the PR as blocked/pending Copilot rather than complete.
@@ -243,4 +243,4 @@ HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
 gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
 ```
 
-Wait for Copilot to settle using the procedure above, then gather comments again. If no unresolved Copilot threads remain after the settled review, report the PR URL, cycle count, validation commands, CI state, current head commit, latest Copilot review timestamp, and whether any Copilot review request remains pending.
+Wait for Copilot to settle using the polling procedure above, then gather comments again. If no unresolved Copilot threads remain after the settled review, report the PR URL, cycle count, validation commands, CI state, current head commit, latest Copilot review timestamp, and whether any Copilot review request remains pending.
