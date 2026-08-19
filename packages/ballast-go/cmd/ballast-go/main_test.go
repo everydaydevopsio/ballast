@@ -2060,6 +2060,11 @@ func TestRunInstallForceSupportFileDeclinedSkipsFile(t *testing.T) {
 	t.Setenv("GITHUB_ACTIONS", "")
 	t.Setenv("GITLAB_CI", "")
 	t.Setenv("TF_BUILD", "")
+	originalInteractive := isStdinInteractiveFunc
+	isStdinInteractiveFunc = func() bool { return true }
+	t.Cleanup(func() {
+		isStdinInteractiveFunc = originalInteractive
+	})
 	tmpDir := t.TempDir()
 	originalWD, err := os.Getwd()
 	if err != nil {
@@ -2120,6 +2125,11 @@ func TestRunInstallForceSupportFileAcceptedOverwritesFile(t *testing.T) {
 	t.Setenv("GITHUB_ACTIONS", "")
 	t.Setenv("GITLAB_CI", "")
 	t.Setenv("TF_BUILD", "")
+	originalInteractive := isStdinInteractiveFunc
+	isStdinInteractiveFunc = func() bool { return true }
+	t.Cleanup(func() {
+		isStdinInteractiveFunc = originalInteractive
+	})
 	tmpDir := t.TempDir()
 	originalWD, err := os.Getwd()
 	if err != nil {
@@ -2209,6 +2219,86 @@ func TestRunInstallForceSupportFileNonInteractiveAborts(t *testing.T) {
 	}
 	if !strings.Contains(output, "Cannot overwrite existing support file AGENTS.md in non-interactive mode") {
 		t.Fatalf("expected non-interactive error, got %q", output)
+	}
+}
+
+func TestRunInstallForceSupportFileNonTTYAborts(t *testing.T) {
+	t.Setenv("CI", "")
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+	t.Setenv("TF_BUILD", "")
+	originalInteractive := isStdinInteractiveFunc
+	isStdinInteractiveFunc = func() bool { return false }
+	t.Cleanup(func() {
+		isStdinInteractiveFunc = originalInteractive
+	})
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agentsPath := filepath.Join(tmpDir, "AGENTS.md")
+	if err := os.WriteFile(agentsPath, []byte("# AGENTS.md\n\nTeam customizations.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := captureStdout(t, func() {
+		exitCode := runInstall([]string{"install", "--target", "codex", "--skill", "owasp-security-scan", "--force"})
+		if exitCode != 1 {
+			t.Fatalf("expected exit code 1, got %d", exitCode)
+		}
+	})
+
+	content, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "Team customizations.") {
+		t.Fatalf("expected AGENTS.md to remain unchanged: %s", string(content))
+	}
+	if !strings.Contains(output, "Cannot overwrite existing support file AGENTS.md in non-interactive mode") {
+		t.Fatalf("expected non-interactive error, got %q", output)
+	}
+}
+
+func TestIsStdinInteractive(t *testing.T) {
+	originalStdin := os.Stdin
+	t.Cleanup(func() {
+		os.Stdin = originalStdin
+	})
+
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdin = reader
+	if isStdinInteractive() {
+		t.Fatal("expected pipe stdin to be non-interactive")
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer devNull.Close()
+	os.Stdin = devNull
+	if isStdinInteractive() {
+		t.Fatal("expected non-TTY character device stdin to be non-interactive")
 	}
 }
 

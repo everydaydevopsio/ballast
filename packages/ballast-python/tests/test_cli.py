@@ -1804,6 +1804,7 @@ Read and follow these rule files in `.gemini/rules/` when they apply:
             with (
                 mock.patch.object(cli, "resolve_project_root", return_value=root),
                 mock.patch.object(cli, "is_ci_mode", return_value=False),
+                mock.patch.object(cli, "is_stdin_interactive", return_value=True),
                 mock.patch.object(cli, "prompt_yes_no", return_value=False),
                 io.StringIO() as buf,
                 redirect_stdout(buf),
@@ -1842,6 +1843,7 @@ Read and follow these rule files in `.gemini/rules/` when they apply:
             with (
                 mock.patch.object(cli, "resolve_project_root", return_value=root),
                 mock.patch.object(cli, "is_ci_mode", return_value=False),
+                mock.patch.object(cli, "is_stdin_interactive", return_value=True),
                 mock.patch.object(cli, "prompt_yes_no", return_value=True),
             ):
                 exit_code = cli.run_install(args)
@@ -1890,6 +1892,51 @@ Read and follow these rule files in `.gemini/rules/` when they apply:
                 "Team customizations.",
                 (root / "AGENTS.md").read_text(encoding="utf-8"),
             )
+
+    def test_run_install_force_support_file_non_tty_aborts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "pyproject.toml").write_text(
+                "[project]\nname='demo'\n", encoding="utf-8"
+            )
+            (root / "AGENTS.md").write_text(
+                "# AGENTS.md\n\nTeam customizations.\n",
+                encoding="utf-8",
+            )
+            args = cli.parser().parse_args(
+                [
+                    "install",
+                    "--target",
+                    "codex",
+                    "--skill",
+                    "owasp-security-scan",
+                    "--force",
+                ]
+            )
+
+            with (
+                mock.patch.object(cli, "resolve_project_root", return_value=root),
+                mock.patch.object(cli, "is_ci_mode", return_value=False),
+                mock.patch.object(cli, "is_stdin_interactive", return_value=False),
+                io.StringIO() as buf,
+                redirect_stdout(buf),
+            ):
+                exit_code = cli.run_install(args)
+                output = buf.getvalue()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(
+                "Cannot overwrite existing support file AGENTS.md in non-interactive mode",
+                output,
+            )
+            self.assertIn(
+                "Team customizations.",
+                (root / "AGENTS.md").read_text(encoding="utf-8"),
+            )
+
+    def test_is_stdin_interactive_detects_non_tty_stream(self) -> None:
+        with mock.patch.object(cli.sys, "stdin", io.StringIO("")):
+            self.assertFalse(cli.is_stdin_interactive())
 
     def test_patch_flag_updates_claude_md_section(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

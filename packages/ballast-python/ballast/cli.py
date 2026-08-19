@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import zipfile
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -1916,6 +1917,10 @@ def prompt_yes_no(question: str, default: bool = False) -> bool:
     return value in {"y", "yes"}
 
 
+def is_stdin_interactive() -> bool:
+    return sys.stdin.isatty()
+
+
 def support_file_path(root: Path, target: str) -> Path | None:
     if target == "claude":
         return root / "CLAUDE.md"
@@ -1936,10 +1941,10 @@ def confirm_support_file_overwrite(
     support_file = support_file_path(root, target)
     if support_file is None or not support_file.exists():
         return None, None
-    if is_ci_mode() or yes:
+    if is_ci_mode() or yes or not is_stdin_interactive():
         return (
             None,
-            f"Cannot overwrite existing support file {support_file.name} in non-interactive mode. Re-run interactively without --yes to confirm the destructive overwrite.",
+            f"Cannot overwrite existing support file {support_file.name} in non-interactive mode. Re-run from an interactive terminal without --yes to confirm the destructive overwrite.",
         )
     approved = prompt_yes_no(
         "\n"

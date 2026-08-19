@@ -949,6 +949,10 @@ async function promptYesNo(
   return line === 'y' || line === 'yes';
 }
 
+function isStdinInteractive(): boolean {
+  return process.stdin.isTTY === true;
+}
+
 async function confirmSupportFileOverwrite(
   target: Target,
   projectRoot: string,
@@ -962,9 +966,9 @@ async function confirmSupportFileOverwrite(
     return {};
   }
   const label = getSupportFileLabel(supportFilePath);
-  if (isCiMode() || yes) {
+  if (isCiMode() || yes || !isStdinInteractive()) {
     return {
-      error: `Cannot overwrite existing support file ${label} in non-interactive mode. Re-run interactively without --yes to confirm the destructive overwrite.`
+      error: `Cannot overwrite existing support file ${label} in non-interactive mode. Re-run from an interactive terminal without --yes to confirm the destructive overwrite.`
     };
   }
 
