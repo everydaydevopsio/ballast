@@ -17,6 +17,10 @@ import { BALLAST_VERSION } from './version';
 describe('install', () => {
   let tmpDir: string;
   const origEnv = process.env;
+  const originalStdinIsTTY = Object.getOwnPropertyDescriptor(
+    process.stdin,
+    'isTTY'
+  );
 
   beforeEach(() => {
     tmpDir = path.join(os.tmpdir(), `ballast-install-${Date.now()}`);
@@ -32,7 +36,22 @@ describe('install', () => {
     }
     jest.restoreAllMocks();
     process.env = origEnv;
+    if (originalStdinIsTTY) {
+      Object.defineProperty(process.stdin, 'isTTY', originalStdinIsTTY);
+    } else {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: undefined,
+        configurable: true
+      });
+    }
   });
+
+  function mockStdinTTY(isTTY: boolean): void {
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: isTTY,
+      configurable: true
+    });
+  }
 
   function buildClaudeSkillWithDataDescriptor(skillMd: string): Buffer {
     const fileName = Buffer.from('SKILL.md', 'utf8');
@@ -2654,6 +2673,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
     });
 
     test('prompts before force-overwriting an existing support file and skips on no', async () => {
+      mockStdinTTY(true);
       const agentsMdPath = path.join(tmpDir, 'AGENTS.md');
       fs.writeFileSync(
         agentsMdPath,
@@ -2689,6 +2709,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
     });
 
     test('force-overwrites an existing support file when prompt is accepted', async () => {
+      mockStdinTTY(true);
       const agentsMdPath = path.join(tmpDir, 'AGENTS.md');
       fs.writeFileSync(
         agentsMdPath,
@@ -2734,6 +2755,36 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         skills: ['owasp-security-scan'],
         force: true,
         yes: true
+      });
+
+      expect(exitCode).toBe(1);
+      expect(fs.readFileSync(agentsMdPath, 'utf8')).toContain(
+        'Team customizations.'
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Cannot overwrite existing support file AGENTS.md in non-interactive mode'
+        )
+      );
+    });
+
+    test('refuses force-overwriting an existing support file when stdin is not a TTY', async () => {
+      mockStdinTTY(false);
+      const agentsMdPath = path.join(tmpDir, 'AGENTS.md');
+      fs.writeFileSync(
+        agentsMdPath,
+        '# AGENTS.md\n\nTeam customizations.\n',
+        'utf8'
+      );
+      const consoleError = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'codex',
+        skills: ['owasp-security-scan'],
+        force: true
       });
 
       expect(exitCode).toBe(1);

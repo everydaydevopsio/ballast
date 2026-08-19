@@ -22,10 +22,14 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 var targets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
 var languages = []string{"typescript", "python", "go", "ansible", "terraform", "dart"}
+
+var isStdinInteractiveFunc = isStdinInteractive
 
 var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks"}
 var languageAgents = []string{"linting", "logging", "testing"}
@@ -325,8 +329,8 @@ func runInstall(args []string) int {
 		if os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1" {
 			continue
 		}
-		if *yes || isCIMode() {
-			fmt.Printf("Cannot overwrite existing support file %s in non-interactive mode. Re-run interactively without --yes to confirm the destructive overwrite.\n", filepath.Base(supportPath))
+		if *yes || isCIMode() || !isStdinInteractiveFunc() {
+			fmt.Printf("Cannot overwrite existing support file %s in non-interactive mode. Re-run from an interactive terminal without --yes to confirm the destructive overwrite.\n", filepath.Base(supportPath))
 			return 1
 		}
 		approved, promptErr := promptYesNo(
@@ -2828,6 +2832,10 @@ func isCIMode() bool {
 		os.Getenv("TF_BUILD") == "true" ||
 		os.Getenv("GITHUB_ACTIONS") == "true" ||
 		os.Getenv("GITLAB_CI") == "true"
+}
+
+func isStdinInteractive() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 func promptTarget() (string, error) {
