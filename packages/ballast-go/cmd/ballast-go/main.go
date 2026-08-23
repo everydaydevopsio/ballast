@@ -189,6 +189,10 @@ type installOptions struct {
 	deploymentModel string
 }
 
+type buildOptions struct {
+	tools map[string][]string
+}
+
 type markdownSection struct {
 	heading string
 	text    string
@@ -932,9 +936,12 @@ func install(opts installOptions) installResult {
 
 	supportAgents := slices.Clone(opts.agents)
 	supportSkills := slices.Clone(opts.skills)
-	if config := loadConfig(opts.projectRoot, opts.language); config != nil {
-		supportAgents = withImplicitAgents(config.Agents)
-		supportSkills = slices.Clone(config.Skills)
+	configForInstall := loadConfig(opts.projectRoot, opts.language)
+	effectiveTools := map[string][]string{}
+	if configForInstall != nil {
+		effectiveTools = configForInstall.Tools
+		supportAgents = withImplicitAgents(configForInstall.Agents)
+		supportSkills = slices.Clone(configForInstall.Skills)
 	}
 	supportAgents = uniqueStrings(supportAgents)
 	supportSkills = uniqueStrings(supportSkills)
@@ -978,7 +985,7 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
 				}
-				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, opts.taskSystem, opts.deploymentModel)
+				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, opts.taskSystem, opts.deploymentModel, buildOptions{tools: effectiveTools})
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
@@ -2080,10 +2087,17 @@ func patchCodexAgentsMDWithOptions(existing, canonical string, replaceUnmanagedS
 	return current
 }
 
-func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deploymentModel string) (string, error) {
+func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deploymentModel string, options ...buildOptions) (string, error) {
 	content, err := readContent(agentID, language, suffix, hookMode, taskSystem, deploymentModel)
 	if err != nil {
 		return "", err
+	}
+	buildOpts := buildOptions{}
+	if len(options) > 0 {
+		buildOpts = options[0]
+	}
+	withToolPolicy := func(rendered string) string {
+		return insertRepositoryToolPolicy(rendered, buildOpts.tools)
 	}
 	switch target {
 	case "cursor":
@@ -2093,14 +2107,14 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 		}
 		front = applyHookTemplateVariables(front, agentID, language, hookMode)
 		front = applyTaskSystemVariables(front, agentID, taskSystem)
-		return addRuleMarker(front+"\n"+content, ruleMarkerID(agentID, language, suffix)), nil
+		return addRuleMarker(withToolPolicy(front+"\n"+content), ruleMarkerID(agentID, language, suffix)), nil
 	case "claude":
 		header, err := readTemplate(agentID, language, "claude-header.md", suffix)
 		if err != nil {
 			return "", err
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return addRuleMarker(header+content, ruleMarkerID(agentID, language, suffix)), nil
+		return addRuleMarker(withToolPolicy(header+content), ruleMarkerID(agentID, language, suffix)), nil
 	case "gemini":
 		header, err := readTemplate(agentID, language, "gemini-header.md", suffix)
 		if err != nil {
@@ -2113,14 +2127,14 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 			}
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return addRuleMarker(header+"\n---\n\n"+renderGeminiMandates()+content, ruleMarkerID(agentID, language, suffix)), nil
+		return addRuleMarker(withToolPolicy(header+"\n---\n\n"+renderGeminiMandates()+content), ruleMarkerID(agentID, language, suffix)), nil
 	case "opencode":
 		front, err := readTemplate(agentID, language, "opencode-frontmatter.yaml", suffix)
 		if err != nil {
 			return "", err
 		}
 		front = applyTaskSystemVariables(front, agentID, taskSystem)
-		return addRuleMarker(front+"\n"+content, ruleMarkerID(agentID, language, suffix)), nil
+		return addRuleMarker(withToolPolicy(front+"\n"+content), ruleMarkerID(agentID, language, suffix)), nil
 	case "codex":
 		header, err := readTemplate(agentID, language, "codex-header.md", suffix)
 		if err != nil {
@@ -2130,10 +2144,61 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 			}
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return addRuleMarker(header+content, ruleMarkerID(agentID, language, suffix)), nil
+		return addRuleMarker(withToolPolicy(header+content), ruleMarkerID(agentID, language, suffix)), nil
 	default:
 		return "", fmt.Errorf("unknown target: %s", target)
 	}
+}
+
+func renderRepositoryToolPolicy(tools map[string][]string) string {
+	normalized := normalizeLanguageTools(tools)
+	if len(normalized) == 0 {
+		return ""
+	}
+	languages := make([]string, 0, len(normalized))
+	for language := range normalized {
+		languages = append(languages, language)
+	}
+	sort.Strings(languages)
+
+	formatted := make([]string, 0, len(languages))
+	for _, language := range languages {
+		formatted = append(formatted, language+"="+strings.Join(normalized[language], ","))
+	}
+
+	lines := []string{
+		"## Repository Tool Policy",
+		"",
+		"- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.",
+		"- Configured tools: " + strings.Join(formatted, "; ") + ".",
+	}
+	if slices.Contains(normalized["python"], "uv") {
+		lines = append(lines, "- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.")
+	}
+	if slices.Contains(normalized["typescript"], "pnpm") {
+		lines = append(lines, "- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.")
+	}
+	lines = append(lines, "")
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func insertRepositoryToolPolicy(content string, tools map[string][]string) string {
+	policy := renderRepositoryToolPolicy(tools)
+	if policy == "" || strings.Contains(content, "## Repository Tool Policy") {
+		return content
+	}
+
+	prefix := ""
+	body := content
+	if match := frontmatterRegex.FindString(content); match != "" {
+		prefix = match
+		body = strings.TrimPrefix(content, match)
+	}
+	insertAt := strings.Index(body, "\n## ")
+	if insertAt == -1 {
+		return prefix + policy + body
+	}
+	return prefix + body[:insertAt] + "\n\n" + policy + body[insertAt+1:]
 }
 
 func ruleMarkerID(agentID, language, suffix string) string {
@@ -2802,7 +2867,7 @@ func uniqueToolList(values []string) []string {
 	seen := map[string]struct{}{}
 	result := make([]string, 0, len(values))
 	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
+		trimmed := strings.ToLower(strings.TrimSpace(value))
 		if trimmed == "" {
 			continue
 		}

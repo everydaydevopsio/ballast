@@ -200,6 +200,23 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("# Python Linting Rules", content)
         self.assertNotIn("Codex (CLI and app)", content)
 
+    def test_build_content_includes_configured_tools_policy(self) -> None:
+        content = cli.build_content(
+            "testing",
+            "codex",
+            "python",
+            tools={
+                "python": ["uv", "pyenv"],
+                "typescript": ["pnpm", "corepack"],
+            },
+        )
+
+        self.assertIn("## Repository Tool Policy", content)
+        self.assertIn("python=uv,pyenv", content)
+        self.assertIn("typescript=pnpm,corepack", content)
+        self.assertIn("uv run <command>", content)
+        self.assertIn("pnpm exec", content)
+
     def test_build_content_renders_publishing_deployment_model_token(self) -> None:
         content = cli.build_content(
             "publishing", "codex", "python", "apps", deployment_model="kubernetes"
@@ -346,7 +363,7 @@ class PatchInstallTests(unittest.TestCase):
         self.assertEqual(
             cli.normalize_tools(
                 {
-                    " TypeScript ": ["pnpm", "corepack", "pnpm", "", 42],
+                    " TypeScript ": ["PNPM", "corepack", "pnpm", "", 42],
                     "": ["ignored"],
                     "python": "uv",
                     123: ["ignored"],
@@ -358,6 +375,66 @@ class PatchInstallTests(unittest.TestCase):
                 "go": ["go"],
             },
         )
+
+    def test_save_config_defaults_and_preserves_tools(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["codex"],
+                        "agents": ["linting"],
+                        "languages": ["python"],
+                        "paths": {"python": ["."]},
+                        "tools": {"python": ["poetry", "pyenv"]},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            cli.save_config(root, "typescript", "codex", ["linting"])
+            config = cli.load_config(root, "typescript")
+
+            self.assertEqual(config["tools"]["python"], ["poetry", "pyenv"])
+            self.assertEqual(config["tools"]["typescript"], ["pnpm", "corepack"])
+
+    def test_install_writes_configured_tools_into_codex_and_claude_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["codex", "claude"],
+                        "agents": ["testing"],
+                        "languages": ["python"],
+                        "paths": {"python": ["."]},
+                        "tools": {"Python": ["UV", "pyenv"]},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            for target in ["codex", "claude"]:
+                result = cli.install(
+                    root,
+                    target,
+                    ["testing"],
+                    [],
+                    "python",
+                    True,
+                    False,
+                    False,
+                )
+                self.assertEqual(result.errors, [])
+
+            for rule_path in [
+                root / ".codex" / "rules" / "python-testing.md",
+                root / ".claude" / "rules" / "python-testing.md",
+            ]:
+                content = rule_path.read_text(encoding="utf-8")
+                self.assertIn("## Repository Tool Policy", content)
+                self.assertIn("python=uv,pyenv", content)
+                self.assertIn("uv run <command>", content)
 
     def test_load_config_normalizes_publishing_profiles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

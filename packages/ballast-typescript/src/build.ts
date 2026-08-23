@@ -27,6 +27,7 @@ type HookMode = 'pre-commit' | 'husky';
 
 interface BuildOptions {
   hookMode?: HookMode;
+  tools?: Record<string, string[]>;
   variables?: Record<string, string>;
 }
 
@@ -47,6 +48,67 @@ const FRONTMATTER_PATTERN = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 
 function getCreatedByBallastLine(): string {
   return `Created by [Ballast](${BALLAST_REPO_URL}) v${pkg.version}. Do not edit this section.`;
+}
+
+function renderRepositoryToolPolicy(tools?: Record<string, string[]>): string {
+  const entries = Object.entries(tools ?? {})
+    .map(
+      ([language, values]) =>
+        [
+          language.trim().toLowerCase(),
+          values.map((value) => value.trim().toLowerCase()).filter(Boolean)
+        ] as const
+    )
+    .filter(([language, values]) => language.length > 0 && values.length > 0)
+    .sort(([left], [right]) => left.localeCompare(right));
+
+  if (entries.length === 0) return '';
+
+  const lines = [
+    '## Repository Tool Policy',
+    '',
+    '- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.',
+    `- Configured tools: ${entries
+      .map(([language, values]) => `${language}=${values.join(',')}`)
+      .join('; ')}.`
+  ];
+
+  const pythonTools =
+    entries.find(([language]) => language === 'python')?.[1] ?? [];
+  if (pythonTools.includes('uv')) {
+    lines.push(
+      '- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.'
+    );
+  }
+
+  const typescriptTools =
+    entries.find(([language]) => language === 'typescript')?.[1] ?? [];
+  if (typescriptTools.includes('pnpm')) {
+    lines.push(
+      '- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.'
+    );
+  }
+
+  lines.push('');
+  return `${lines.join('\n')}\n`;
+}
+
+function insertRepositoryToolPolicy(
+  content: string,
+  options?: BuildOptions
+): string {
+  const policy = renderRepositoryToolPolicy(options?.tools);
+  if (!policy) return content;
+  if (content.includes('## Repository Tool Policy')) return content;
+
+  const frontmatter = content.match(FRONTMATTER_PATTERN);
+  const prefix = frontmatter ? frontmatter[0] : '';
+  const body = frontmatter ? content.slice(frontmatter[0].length) : content;
+  const insertAt = body.indexOf('\n## ');
+  if (insertAt === -1) {
+    return `${prefix}${policy}${body}`;
+  }
+  return `${prefix}${body.slice(0, insertAt)}\n\n${policy}${body.slice(insertAt + 1)}`;
 }
 
 function getRuleSubdir(): string | null {
@@ -1304,6 +1366,7 @@ export function buildContent(
       result = result.replaceAll(`{{${key}}}`, value);
     }
   }
+  result = insertRepositoryToolPolicy(result, options);
   return addRuleMarker(result, getRuleMarkerId(agentId, language, ruleSuffix));
 }
 

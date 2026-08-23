@@ -1489,6 +1489,64 @@ Keep my custom responsibilities.
       expect(raw.tools).toEqual({ typescript: ['pnpm', 'corepack'] });
     });
 
+    test('writes configured tools into generated codex and claude rules', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, '.rulesrc.json'),
+        JSON.stringify(
+          {
+            targets: ['codex', 'claude'],
+            agents: ['testing'],
+            languages: ['python'],
+            paths: { python: ['.'] },
+            tools: { Python: ['UV', 'pyenv'] }
+          },
+          null,
+          2
+        )
+      );
+
+      for (const target of ['codex', 'claude'] as const) {
+        const result = install({
+          projectRoot: tmpDir,
+          target,
+          language: 'python',
+          agents: ['testing'],
+          force: true
+        });
+        expect(result.errors).toEqual([]);
+      }
+
+      for (const rulePath of [
+        path.join(tmpDir, '.codex', 'rules', 'python-testing.md'),
+        path.join(tmpDir, '.claude', 'rules', 'python-testing.md')
+      ]) {
+        const content = fs.readFileSync(rulePath, 'utf8');
+        expect(content).toContain('## Repository Tool Policy');
+        expect(content).toContain('python=uv,pyenv');
+        expect(content).toContain('uv run <command>');
+      }
+    });
+
+    test('renders default tools on the same run that saves config', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        language: 'python',
+        agents: ['testing'],
+        force: true,
+        saveConfig: true
+      });
+      expect(result.errors).toEqual([]);
+
+      const content = fs.readFileSync(
+        path.join(tmpDir, '.codex', 'rules', 'python-testing.md'),
+        'utf8'
+      );
+      expect(content).toContain('## Repository Tool Policy');
+      expect(content).toContain('python=uv,pyenv');
+      expect(content).toContain('uv run <command>');
+    });
+
     test('saves shared .rulesrc.json for go installs', () => {
       install({
         projectRoot: tmpDir,

@@ -355,7 +355,7 @@ function uniqueToolList(values: unknown[]): string[] {
   const tools: string[] = [];
   for (const value of values) {
     if (typeof value !== 'string') continue;
-    const tool = value.trim();
+    const tool = value.trim().toLowerCase();
     if (!tool || seen.has(tool)) continue;
     seen.add(tool);
     tools.push(tool);
