@@ -1193,20 +1193,26 @@ def render_repository_tool_policy(tools: dict[str, list[str]] | None) -> str:
     lines = [
         "## Repository Tool Policy",
         "",
-        "- Check `.rulesrc.json` `tools` before adding, installing, or running "
-        "language tooling.",
+        "- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.",
         f"- Configured tools: {formatted}.",
     ]
     if "uv" in normalized.get("python", []):
         lines.append(
-            "- For Python commands, prefer `uv run <command>` and `uv add ...` "
-            "over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the "
-            "command is project-scoped."
+            " ".join(
+                [
+                    "- For Python commands, prefer `uv run <command>` and `uv add ...` over bare",
+                    "`python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.",
+                ]
+            )
         )
     if "pnpm" in normalized.get("typescript", []):
         lines.append(
-            "- For TypeScript commands, prefer `pnpm`/`pnpm exec` over "
-            "`npm`/`npx` when the command is project-scoped."
+            " ".join(
+                [
+                    "- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx`",
+                    "when the command is project-scoped.",
+                ]
+            )
         )
     lines.append("")
     return "\n".join(lines) + "\n"
