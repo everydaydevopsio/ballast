@@ -18,12 +18,13 @@
   ],
   "skills": [
     "owasp-security-scan",
-    "github-health-check",
     "aws-health-review",
     "aws-live-health-review",
     "aws-weekly-security-review",
+    "github-health-check",
+    "github-pr-copilot-cycle",
     "ballast-audit",
-    "github-pr-copilot-cycle"
+    "ballast-project-maintenance"
   ],
   "ballastVersion": "5.17.1",
   "languages": [

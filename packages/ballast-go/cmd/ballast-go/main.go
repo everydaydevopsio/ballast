@@ -2078,13 +2078,22 @@ func patchCodexAgentsMDWithOptions(existing, canonical string, replaceUnmanagedS
 			current = strings.TrimRight(current, "\n") + "\n\n" + canonicalSection + "\n"
 			continue
 		}
-		current = strings.TrimRight(current[:existingRange.start], "\n") +
-			"\n\n" +
-			canonicalSection +
-			"\n\n" +
-			strings.TrimLeft(current[existingRange.end:], "\n") + "\n"
+		current = joinSupportSectionParts(
+			current[:existingRange.start],
+			canonicalSection,
+			current[existingRange.end:],
+		)
 	}
 	return current
+}
+
+func joinSupportSectionParts(prefix, section, suffix string) string {
+	return strings.TrimRight(
+		strings.TrimRight(prefix, "\n")+"\n\n"+
+			section+"\n\n"+
+			strings.TrimLeft(suffix, "\n"),
+		"\n",
+	) + "\n"
 }
 
 func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deploymentModel string, options ...buildOptions) (string, error) {

@@ -69,9 +69,10 @@ Created by Ballast. Do not edit this section.
 Read and use these skill files in `.claude/skills/` when they are relevant:
 
 - `.claude/skills/owasp-security-scan.skill` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
-- `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 - `.claude/skills/aws-health-review.skill` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
 - `.claude/skills/aws-live-health-review.skill` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
 - `.claude/skills/aws-weekly-security-review.skill` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
-- `.claude/skills/ballast-audit.skill` — audit AI rule and skill files for context density, duplication, and bloat
+- `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 - `.claude/skills/github-pr-copilot-cycle.skill` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
+- `.claude/skills/ballast-audit.skill` — audit AI rule and skill files for context density, duplication, and bloat
+- `.claude/skills/ballast-project-maintenance.skill` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools

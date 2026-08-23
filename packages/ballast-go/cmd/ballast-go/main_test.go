@@ -2875,3 +2875,19 @@ func TestPatchCodexAgentsMDReplacesLegacyManagedNoticeInManagedOnlyMode(t *testi
 		t.Fatalf("expected managed section to contain canonical rule: %s", merged)
 	}
 }
+
+func TestPatchCodexAgentsMDUsesSingleFinalNewline(t *testing.T) {
+	existing := "# CLAUDE.md\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- old\n"
+	canonical := "# CLAUDE.md\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- new\n"
+
+	merged := patchCodexAgentsMDWithOptions(existing, canonical, false)
+	if !strings.HasSuffix(merged, "\n") {
+		t.Fatalf("expected merged content to end with a newline, got %q", merged)
+	}
+	if strings.HasSuffix(merged, "\n\n") {
+		t.Fatalf("expected merged content not to end with a blank line, got %q", merged)
+	}
+	if !strings.Contains(merged, "- new\n") {
+		t.Fatalf("expected canonical skill section, got %q", merged)
+	}
+}
