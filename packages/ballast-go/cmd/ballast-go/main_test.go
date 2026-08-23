@@ -950,6 +950,51 @@ func TestInstallWritesRulesForMultipleTargets(t *testing.T) {
 	}
 }
 
+func TestInstallWritesConfiguredToolsIntoCodexAndClaudeRules(t *testing.T) {
+	tmpDir := t.TempDir()
+	config := `{
+  "targets": ["codex", "claude"],
+  "agents": ["testing"],
+  "languages": ["python"],
+  "paths": {"python": ["."]},
+  "tools": {"python": ["uv", "pyenv"]}
+}`
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex", "claude"},
+		agents:      []string{"testing"},
+		language:    "python",
+		force:       true,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	for _, rulePath := range []string{
+		filepath.Join(tmpDir, ".codex", "rules", "python-testing.md"),
+		filepath.Join(tmpDir, ".claude", "rules", "python-testing.md"),
+	} {
+		content, err := os.ReadFile(rulePath)
+		if err != nil {
+			t.Fatalf("read %s: %v", rulePath, err)
+		}
+		text := string(content)
+		if !strings.Contains(text, "## Repository Tool Policy") {
+			t.Fatalf("expected tool policy in %s, got %s", rulePath, text)
+		}
+		if !strings.Contains(text, "python=uv,pyenv") {
+			t.Fatalf("expected configured tools in %s, got %s", rulePath, text)
+		}
+		if !strings.Contains(text, "uv run <command>") {
+			t.Fatalf("expected uv guidance in %s, got %s", rulePath, text)
+		}
+	}
+}
+
 func TestBuildCursorSkillFormatIncludesOnDemandFrontmatter(t *testing.T) {
 	content, err := buildCursorSkillFormat("owasp-security-scan", "go")
 	if err != nil {

@@ -609,6 +609,8 @@ export function install(options: InstallOptions): InstallResult {
     DEFAULT_DEPLOYMENT_MODEL;
   const resolvedPublishingProfiles =
     publishingProfiles ?? existingConfig?.publishingProfiles;
+  const effectiveTools =
+    loadConfig(projectRoot, language)?.tools ?? existingConfig?.tools ?? {};
 
   if (persist) {
     saveConfig(
@@ -693,6 +695,7 @@ export function install(options: InstallOptions): InstallResult {
           language,
           {
             hookMode,
+            tools: effectiveTools,
             variables:
               Object.keys(buildVariables).length > 0
                 ? buildVariables

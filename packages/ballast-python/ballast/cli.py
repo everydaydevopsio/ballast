@@ -67,6 +67,14 @@ PUBLISHING_PROFILE_ALIASES = {
     "sdk": "sdks",
 }
 PUBLISHING_PROFILES = ["cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"]
+DEFAULT_LANGUAGE_TOOLS = {
+    "python": ["uv", "pyenv"],
+    "typescript": ["pnpm", "corepack"],
+    "go": ["go", "gofumpt", "golangci-lint"],
+    "terraform": ["tfenv", "tflint", "trivy"],
+    "ansible": ["ansible-lint", "molecule"],
+    "dart": ["flutter", "fvm"],
+}
 
 
 def with_implicit_agents(agents: list[str]) -> list[str]:
@@ -392,6 +400,7 @@ def save_config(
     existing_discovery: dict[str, list[str]] | None = None
     existing_task_system: str | None = None
     existing_deployment_model: str | None = None
+    tools: dict[str, list[str]] = {}
     if file_path.exists():
         try:
             raw = json.loads(file_path.read_text(encoding="utf-8"))
@@ -410,6 +419,7 @@ def save_config(
                             and all(isinstance(item, str) for item in value)
                         ):
                             paths[key] = list(value)
+                tools = normalize_tools(raw.get("tools"))
                 existing_discovery = normalize_discovery(raw.get("discovery"))
                 if isinstance(raw.get("taskSystem"), str):
                     existing_task_system = raw["taskSystem"].strip().lower()
@@ -425,6 +435,11 @@ def save_config(
     for item in languages:
         if item not in paths or not paths[item]:
             paths[item] = ["."]
+        normalized_language = item.strip().lower()
+        if normalized_language and not tools.get(normalized_language):
+            default_tools = DEFAULT_LANGUAGE_TOOLS.get(normalized_language, [])
+            if default_tools:
+                tools[normalized_language] = list(default_tools)
 
     targets = normalize_target_tokens(target)
     normalized_deployment_model = (
@@ -454,6 +469,8 @@ def save_config(
         "languages": languages,
         "paths": paths,
     }
+    if tools:
+        payload["tools"] = tools
     if existing_discovery is not None:
         payload["discovery"] = existing_discovery
     if normalized_task_system:
@@ -1097,6 +1114,7 @@ def build_content(
     root: Path | None = None,
     deployment_model: str | None = None,
     task_system: str | None = None,
+    tools: dict[str, list[str]] | None = None,
 ) -> str:
     body = apply_task_system_guidance(
         apply_deployment_model_guidance(
@@ -1120,10 +1138,16 @@ def build_content(
             + "\n"
             + body
         )
-        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
+        return add_rule_marker(
+            insert_repository_tool_policy(rendered, tools),
+            rule_marker_id(agent, language, suffix),
+        )
     if target == "claude":
         rendered = read_template(agent, language, "claude-header.md", suffix) + body
-        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
+        return add_rule_marker(
+            insert_repository_tool_policy(rendered, tools),
+            rule_marker_id(agent, language, suffix),
+        )
     if target == "gemini":
         try:
             header = read_template(agent, language, "gemini-header.md", suffix)
@@ -1133,20 +1157,75 @@ def build_content(
             except FileNotFoundError:
                 header = read_template(agent, language, "codex-header.md", suffix)
         rendered = header + "\n---\n\n" + render_gemini_mandates() + body
-        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
+        return add_rule_marker(
+            insert_repository_tool_policy(rendered, tools),
+            rule_marker_id(agent, language, suffix),
+        )
     if target == "opencode":
         rendered = (
             read_template(agent, language, "opencode-frontmatter.yaml", suffix)
             + "\n"
             + body
         )
-        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
+        return add_rule_marker(
+            insert_repository_tool_policy(rendered, tools),
+            rule_marker_id(agent, language, suffix),
+        )
     try:
         header = read_template(agent, language, "codex-header.md", suffix)
     except FileNotFoundError:
         header = read_template(agent, language, "claude-header.md", suffix)
     rendered = header + body
-    return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
+    return add_rule_marker(
+        insert_repository_tool_policy(rendered, tools),
+        rule_marker_id(agent, language, suffix),
+    )
+
+
+def render_repository_tool_policy(tools: dict[str, list[str]] | None) -> str:
+    normalized = normalize_tools(tools)
+    if not normalized:
+        return ""
+    entries = sorted(normalized.items())
+    formatted = "; ".join(
+        f"{language}={','.join(values)}" for language, values in entries
+    )
+    lines = [
+        "## Repository Tool Policy",
+        "",
+        "- Check `.rulesrc.json` `tools` before adding, installing, or running "
+        "language tooling.",
+        f"- Configured tools: {formatted}.",
+    ]
+    if "uv" in normalized.get("python", []):
+        lines.append(
+            "- For Python commands, prefer `uv run <command>` and `uv add ...` "
+            "over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the "
+            "command is project-scoped."
+        )
+    if "pnpm" in normalized.get("typescript", []):
+        lines.append(
+            "- For TypeScript commands, prefer `pnpm`/`pnpm exec` over "
+            "`npm`/`npx` when the command is project-scoped."
+        )
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def insert_repository_tool_policy(
+    content: str, tools: dict[str, list[str]] | None
+) -> str:
+    policy = render_repository_tool_policy(tools)
+    if not policy or "## Repository Tool Policy" in content:
+        return content
+
+    frontmatter = re.match(r"^---\r?\n[\s\S]*?\r?\n---\r?\n?", content)
+    prefix = content[: frontmatter.end()] if frontmatter else ""
+    body = content[frontmatter.end() :] if frontmatter else content
+    insert_at = body.find("\n## ")
+    if insert_at == -1:
+        return f"{prefix}{policy}{body}"
+    return f"{prefix}{body[:insert_at]}\n\n{policy}{body[insert_at + 1 :]}"
 
 
 def rule_marker_id(agent: str, language: str, suffix: str = "") -> str:
@@ -2197,6 +2276,12 @@ def install(
         )
 
     config_for_support_files = load_config(root, language)
+    rule_tools = (
+        config_for_support_files.get("tools")
+        if config_for_support_files
+        and isinstance(config_for_support_files.get("tools"), dict)
+        else None
+    )
     support_agents = with_implicit_agents(
         config_for_support_files.get("agents", agents)
         if config_for_support_files
@@ -2244,6 +2329,7 @@ def install(
                     root,
                     deployment_model,
                     task_system if isinstance(task_system, str) else None,
+                    rule_tools,
                 )
                 if (
                     dst.exists()

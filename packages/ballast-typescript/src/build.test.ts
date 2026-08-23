@@ -1222,6 +1222,20 @@ alwaysApply: false
       expect(result).toContain('# TypeScript Linting Rules');
     });
 
+    test('codex includes configured repository tools policy', () => {
+      const result = buildContent('testing', 'codex', undefined, 'python', {
+        tools: {
+          python: ['uv', 'pyenv'],
+          typescript: ['pnpm', 'corepack']
+        }
+      });
+      expect(result).toContain('## Repository Tool Policy');
+      expect(result).toContain('python=uv,pyenv');
+      expect(result).toContain('typescript=pnpm,corepack');
+      expect(result).toContain('uv run <command>');
+      expect(result).toContain('pnpm exec');
+    });
+
     test('throws for unknown target', () => {
       expect(() => buildContent('linting', 'unknown' as 'cursor')).toThrow(
         /Unknown target/
