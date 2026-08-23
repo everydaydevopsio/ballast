@@ -957,7 +957,7 @@ func TestInstallWritesConfiguredToolsIntoCodexAndClaudeRules(t *testing.T) {
   "agents": ["testing"],
   "languages": ["python"],
   "paths": {"python": ["."]},
-  "tools": {"python": ["uv", "pyenv"]}
+  "tools": {"Python": ["UV", "pyenv"]}
 }`
 	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(config), 0o644); err != nil {
 		t.Fatal(err)
@@ -992,6 +992,38 @@ func TestInstallWritesConfiguredToolsIntoCodexAndClaudeRules(t *testing.T) {
 		if !strings.Contains(text, "uv run <command>") {
 			t.Fatalf("expected uv guidance in %s, got %s", rulePath, text)
 		}
+	}
+}
+
+func TestInstallRendersDefaultToolsWhenSavingConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"codex"},
+		agents:      []string{"testing"},
+		language:    "python",
+		force:       true,
+		saveConfig:  true,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	rulePath := filepath.Join(tmpDir, ".codex", "rules", "python-testing.md")
+	content, err := os.ReadFile(rulePath)
+	if err != nil {
+		t.Fatalf("read %s: %v", rulePath, err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "## Repository Tool Policy") {
+		t.Fatalf("expected tool policy in %s, got %s", rulePath, text)
+	}
+	if !strings.Contains(text, "python=uv,pyenv") {
+		t.Fatalf("expected default tools in %s, got %s", rulePath, text)
+	}
+	if !strings.Contains(text, "uv run <command>") {
+		t.Fatalf("expected uv guidance in %s, got %s", rulePath, text)
 	}
 }
 

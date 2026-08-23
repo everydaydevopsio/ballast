@@ -1498,7 +1498,7 @@ Keep my custom responsibilities.
             agents: ['testing'],
             languages: ['python'],
             paths: { python: ['.'] },
-            tools: { python: ['uv', 'pyenv'] }
+            tools: { Python: ['UV', 'pyenv'] }
           },
           null,
           2
@@ -1525,6 +1525,26 @@ Keep my custom responsibilities.
         expect(content).toContain('python=uv,pyenv');
         expect(content).toContain('uv run <command>');
       }
+    });
+
+    test('renders default tools on the same run that saves config', () => {
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'codex',
+        language: 'python',
+        agents: ['testing'],
+        force: true,
+        saveConfig: true
+      });
+      expect(result.errors).toEqual([]);
+
+      const content = fs.readFileSync(
+        path.join(tmpDir, '.codex', 'rules', 'python-testing.md'),
+        'utf8'
+      );
+      expect(content).toContain('## Repository Tool Policy');
+      expect(content).toContain('python=uv,pyenv');
+      expect(content).toContain('uv run <command>');
     });
 
     test('saves shared .rulesrc.json for go installs', () => {

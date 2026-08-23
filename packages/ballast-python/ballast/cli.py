@@ -301,7 +301,7 @@ def normalize_tools(raw: object | None) -> dict[str, list[str]]:
         for item in value:
             if not isinstance(item, str):
                 continue
-            token = item.strip()
+            token = item.strip().lower()
             if token and token not in tools:
                 tools.append(token)
         if tools:

@@ -56,7 +56,7 @@ function renderRepositoryToolPolicy(tools?: Record<string, string[]>): string {
       ([language, values]) =>
         [
           language.trim().toLowerCase(),
-          values.map((value) => value.trim()).filter(Boolean)
+          values.map((value) => value.trim().toLowerCase()).filter(Boolean)
         ] as const
     )
     .filter(([language, values]) => language.length > 0 && values.length > 0)

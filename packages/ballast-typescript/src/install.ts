@@ -609,9 +609,6 @@ export function install(options: InstallOptions): InstallResult {
     DEFAULT_DEPLOYMENT_MODEL;
   const resolvedPublishingProfiles =
     publishingProfiles ?? existingConfig?.publishingProfiles;
-  const effectiveTools =
-    loadConfig(projectRoot, language)?.tools ?? existingConfig?.tools ?? {};
-
   if (persist) {
     saveConfig(
       {
@@ -633,6 +630,10 @@ export function install(options: InstallOptions): InstallResult {
       projectRoot
     );
   }
+  const configForInstall = persist
+    ? (loadConfig(projectRoot, language) ?? existingConfig)
+    : existingConfig;
+  const effectiveTools = configForInstall?.tools ?? {};
   const hookMode = resolveTsHookMode(projectRoot, language);
   const supportSelections = resolveSupportFileSelections(
     projectRoot,

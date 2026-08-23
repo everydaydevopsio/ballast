@@ -934,16 +934,14 @@ func install(opts installOptions) installResult {
 		}
 	}
 
-	effectiveTools := map[string][]string{}
-	if config := loadConfig(opts.projectRoot, opts.language); config != nil {
-		effectiveTools = config.Tools
-	}
-
 	supportAgents := slices.Clone(opts.agents)
 	supportSkills := slices.Clone(opts.skills)
-	if config := loadConfig(opts.projectRoot, opts.language); config != nil {
-		supportAgents = withImplicitAgents(config.Agents)
-		supportSkills = slices.Clone(config.Skills)
+	configForInstall := loadConfig(opts.projectRoot, opts.language)
+	effectiveTools := map[string][]string{}
+	if configForInstall != nil {
+		effectiveTools = configForInstall.Tools
+		supportAgents = withImplicitAgents(configForInstall.Agents)
+		supportSkills = slices.Clone(configForInstall.Skills)
 	}
 	supportAgents = uniqueStrings(supportAgents)
 	supportSkills = uniqueStrings(supportSkills)
@@ -2869,7 +2867,7 @@ func uniqueToolList(values []string) []string {
 	seen := map[string]struct{}{}
 	result := make([]string, 0, len(values))
 	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
+		trimmed := strings.ToLower(strings.TrimSpace(value))
 		if trimmed == "" {
 			continue
 		}

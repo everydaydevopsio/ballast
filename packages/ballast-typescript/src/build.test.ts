@@ -1225,8 +1225,8 @@ alwaysApply: false
     test('codex includes configured repository tools policy', () => {
       const result = buildContent('testing', 'codex', undefined, 'python', {
         tools: {
-          python: ['uv', 'pyenv'],
-          typescript: ['pnpm', 'corepack']
+          Python: ['UV', 'pyenv'],
+          TypeScript: ['Pnpm', 'corepack']
         }
       });
       expect(result).toContain('## Repository Tool Policy');

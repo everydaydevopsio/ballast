@@ -363,7 +363,7 @@ class PatchInstallTests(unittest.TestCase):
         self.assertEqual(
             cli.normalize_tools(
                 {
-                    " TypeScript ": ["pnpm", "corepack", "pnpm", "", 42],
+                    " TypeScript ": ["PNPM", "corepack", "pnpm", "", 42],
                     "": ["ignored"],
                     "python": "uv",
                     123: ["ignored"],
@@ -408,7 +408,7 @@ class PatchInstallTests(unittest.TestCase):
                         "agents": ["testing"],
                         "languages": ["python"],
                         "paths": {"python": ["."]},
-                        "tools": {"python": ["uv", "pyenv"]},
+                        "tools": {"Python": ["UV", "pyenv"]},
                     }
                 ),
                 encoding="utf-8",
