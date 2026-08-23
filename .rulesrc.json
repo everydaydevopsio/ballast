@@ -25,7 +25,7 @@
     "ballast-audit",
     "github-pr-copilot-cycle"
   ],
-  "ballastVersion": "5.16.5",
+  "ballastVersion": "5.17.1",
   "languages": [
     "typescript",
     "python",

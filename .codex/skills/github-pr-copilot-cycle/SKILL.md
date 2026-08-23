@@ -65,6 +65,34 @@ Run at most three Copilot review cycles. A cycle is:
 
 Stop before three cycles if there are no unresolved Copilot comments. Stop immediately and ask the user when any unresolved comment needs human input.
 
+## Wait For Copilot To Settle
+
+Before requesting or re-requesting Copilot, set the PR number and record the current head commit and request time:
+
+```bash
+PR_NUMBER=$(gh pr view --json number --jq .number)
+REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
+gh pr edit "$PR_NUMBER" --add-reviewer "@copilot"
+```
+
+Poll both review request state and review history:
+
+```bash
+gh pr view "$PR_NUMBER" --json headRefOid,reviewRequests,reviews,latestReviews
+```
+
+Use `reviewRequests` to detect a pending Copilot review request. Use `reviews` or `latestReviews` to find the newest Copilot review, preferring known Copilot logins: `copilot-pull-request-reviewer`, `copilot-pull-request-reviewer[bot]`, or `github-copilot[bot]`. If GitHub changes the reviewer login, accept another author login containing `copilot` only when the review body or metadata identifies it as GitHub Copilot code review. A settled Copilot review for the current cycle is one submitted after `$REQUESTED_AT` and preferably attached to `$HEAD_OID`. Some GitHub API responses omit the review commit OID; in that case, accept the timestamp plus a fresh review-thread query as evidence.
+
+If `headRefOid` differs from `$HEAD_OID` during polling, the PR changed while waiting. Stop the current wait, record a new `REQUESTED_AT` and `HEAD_OID` for the new head, re-request Copilot, and restart settle polling for that head.
+
+After each poll, gather review threads again. If new unresolved Copilot threads appear, stop polling and score them. Otherwise, continue polling while any of these are true:
+
+- Copilot is still listed in `reviewRequests`.
+- No Copilot review newer than `$REQUESTED_AT` is visible yet.
+
+Recommended polling cadence: wait 30 seconds, then 60 seconds, then 120 seconds between checks; repeat the 120-second interval until Copilot settles or the timeout is reached. Do not wait forever. If Copilot has not settled after about 10 minutes, report the PR URL, the pending state, and the last observed review request/review timestamps.
+
 ## Gather Copilot Comments
 
 Get the current PR number and review threads:
