@@ -60,6 +60,9 @@ func TestRunWithoutArgsPrintsUsage(t *testing.T) {
 	if !strings.Contains(output, "Flags:") {
 		t.Fatalf("expected flags section, got %q", output)
 	}
+	if !strings.Contains(output, "--all-skills        Install all skills") {
+		t.Fatalf("expected all-skills install flag in usage output, got %q", output)
+	}
 	if strings.Contains(output, "Could not detect repository language") {
 		t.Fatalf("expected no language detection error, got %q", output)
 	}
