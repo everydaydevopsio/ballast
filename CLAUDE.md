@@ -75,4 +75,3 @@ Read and use these skill files in `.claude/skills/` when they are relevant:
 - `.claude/skills/aws-weekly-security-review.skill` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `.claude/skills/ballast-audit.skill` — audit AI rule and skill files for context density, duplication, and bloat
 - `.claude/skills/github-pr-copilot-cycle.skill` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
-
