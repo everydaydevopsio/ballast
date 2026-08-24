@@ -60,6 +60,9 @@ func TestRunWithoutArgsPrintsUsage(t *testing.T) {
 	if !strings.Contains(output, "Flags:") {
 		t.Fatalf("expected flags section, got %q", output)
 	}
+	if !strings.Contains(output, "--all-skills        Install all skills") {
+		t.Fatalf("expected all-skills install flag in usage output, got %q", output)
+	}
 	if strings.Contains(output, "Could not detect repository language") {
 		t.Fatalf("expected no language detection error, got %q", output)
 	}
@@ -3275,6 +3278,23 @@ func TestWithSkillSelectionReplacesExistingFlags(t *testing.T) {
 	}
 	if !strings.Contains(got, "--skill owasp-security-scan") {
 		t.Fatalf("expected normalized skill selection, got %q", got)
+	}
+}
+
+func TestMergeManagedSupportSectionsUsesSingleFinalNewline(t *testing.T) {
+	existing := "# CLAUDE.md\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- old\n"
+	canonical := "# CLAUDE.md\n\n## Installed skills\n\nCreated by Ballast. Do not edit this section.\n\n- new\n"
+
+	merged := mergeManagedSupportSections(existing, canonical, false)
+
+	if !strings.HasSuffix(merged, "\n") {
+		t.Fatalf("expected merged content to end with a newline, got %q", merged)
+	}
+	if strings.HasSuffix(merged, "\n\n") {
+		t.Fatalf("expected merged content not to end with a blank line, got %q", merged)
+	}
+	if !strings.Contains(merged, "- new\n") {
+		t.Fatalf("expected canonical skill section, got %q", merged)
 	}
 }
 

@@ -460,9 +460,18 @@ func printUsage() {
 	fmt.Println("  -h, --help              Show help")
 	fmt.Println("  -v, --version           Print version")
 	fmt.Println()
+	fmt.Println("Common install flags:")
+	fmt.Println("  -t, --target string     AI platform(s): cursor, claude, opencode, codex, gemini")
+	fmt.Println("  -a, --agent string      Agent(s) to install, comma-separated or repeated")
+	fmt.Println("  -s, --skill string      Skill(s) to install, comma-separated or repeated")
+	fmt.Println("      --all               Install all agents")
+	fmt.Println("      --all-skills        Install all skills")
+	fmt.Println("      --yes               Run non-interactively")
+	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  ballast")
 	fmt.Println("  ballast install --target cursor --all")
+	fmt.Println("  ballast install --target codex --all-skills")
 	fmt.Println("  ballast install --target cursor,claude --all")
 	fmt.Println("  ballast install --target gemini --all")
 	fmt.Println("  ballast install --remove-target codex")
@@ -4228,9 +4237,11 @@ func patchInstalledRulesSection(existing string, canonical string) string {
 		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
 	}
 
-	return strings.TrimRight(existing[:existingRange[0]], "\n") + "\n\n" +
-		canonicalSection + "\n\n" +
-		strings.TrimLeft(existing[existingRange[1]:], "\n")
+	return joinSupportSectionParts(
+		existing[:existingRange[0]],
+		canonicalSection,
+		existing[existingRange[1]:],
+	)
 }
 
 const rootPlaceholder = "__BALLAST_ROOT__"
@@ -4274,9 +4285,20 @@ func patchSupportSection(existing string, canonical string, heading string) stri
 		return strings.TrimRight(existing, "\n") + "\n\n" + canonicalSection + "\n"
 	}
 
-	return strings.TrimRight(existing[:existingRange[0]], "\n") + "\n\n" +
-		canonicalSection + "\n\n" +
-		strings.TrimLeft(existing[existingRange[1]:], "\n")
+	return joinSupportSectionParts(
+		existing[:existingRange[0]],
+		canonicalSection,
+		existing[existingRange[1]:],
+	)
+}
+
+func joinSupportSectionParts(prefix string, section string, suffix string) string {
+	return strings.TrimRight(
+		strings.TrimRight(prefix, "\n")+"\n\n"+
+			section+"\n\n"+
+			strings.TrimLeft(suffix, "\n"),
+		"\n",
+	) + "\n"
 }
 
 func mergeManagedSupportSections(existing string, canonical string, allowUnmanaged bool) string {
@@ -4303,9 +4325,11 @@ func mergeSupportSection(existing string, canonical string, heading string, allo
 		return existing
 	}
 
-	return strings.TrimRight(existing[:existingRange[0]], "\n") + "\n\n" +
-		canonicalSection + "\n\n" +
-		strings.TrimLeft(existing[existingRange[1]:], "\n")
+	return joinSupportSectionParts(
+		existing[:existingRange[0]],
+		canonicalSection,
+		existing[existingRange[1]:],
+	)
 }
 
 func supportFileHasUnmanagedManagedSections(existing string) bool {
