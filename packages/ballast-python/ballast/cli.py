@@ -209,7 +209,8 @@ def skill_dir(skill: str, language: str) -> Path:
 
 
 def resolve_project_root(cwd: Path) -> Path:
-    for directory in [cwd, *cwd.parents]:
+    start = cwd.resolve()
+    for directory in [start, *start.parents]:
         has_pkg = (directory / "package.json").exists()
         has_go = (directory / "go.mod").exists()
         has_pyproject = (directory / "pyproject.toml").exists()
@@ -254,10 +255,12 @@ def resolve_project_root(cwd: Path) -> Path:
             or has_dart
             or has_any_cfg
         ):
+            if directory != start and not has_git_boundary(directory):
+                return start
             return directory
         if has_git_boundary(directory):
             return directory
-    return cwd
+    return start
 
 
 def is_ci_mode() -> bool:

@@ -643,6 +643,7 @@ func TestFindProjectRootUsesBallastConfigMarkers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			root := resolvedTempDir(t)
+			makeGitBoundary(t, root)
 			nested := filepath.Join(root, "apps", "child")
 			if err := os.MkdirAll(nested, 0o755); err != nil {
 				t.Fatalf("mkdir nested: %v", err)
@@ -654,6 +655,20 @@ func TestFindProjectRootUsesBallastConfigMarkers(t *testing.T) {
 				t.Fatalf("expected project root %q, got %q", root, resolved)
 			}
 		})
+	}
+}
+
+func TestFindProjectRootReturnsUnmarkedCwdUnderNonGitParent(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), "{}")
+	child := filepath.Join(root, "new-product")
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatalf("mkdir child: %v", err)
+	}
+
+	resolved := findProjectRoot(child)
+	if resolved != child {
+		t.Fatalf("expected project root %q, got %q", child, resolved)
 	}
 }
 
@@ -3852,6 +3867,7 @@ func TestRunMonorepoInstallMergesRequestedTargetsIntoSavedConfig(t *testing.T) {
 func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
 	sourceRoot := resolvedTempDir(t)
 	projectRoot := resolvedTempDir(t)
+	makeGitBoundary(t, projectRoot)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -3936,6 +3952,7 @@ func TestRunMonorepoInstallPrefersRepoLocalBackends(t *testing.T) {
 func TestRunMonorepoInstallSupportsEnvProvidedSourceRoot(t *testing.T) {
 	sourceRoot := resolvedTempDir(t)
 	projectRoot := resolvedTempDir(t)
+	makeGitBoundary(t, projectRoot)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
@@ -3997,6 +4014,7 @@ func TestRunMonorepoInstallSupportsEnvProvidedSourceRoot(t *testing.T) {
 func TestRunMonorepoInstallPrefersSiblingBackendsNextToWrapper(t *testing.T) {
 	sourceRoot := resolvedTempDir(t)
 	projectRoot := resolvedTempDir(t)
+	makeGitBoundary(t, projectRoot)
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "dist", "cli.js"), "console.log('ts')")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), "{\"name\":\"ballast-typescript\"}")
 	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")

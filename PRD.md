@@ -581,7 +581,7 @@ Ballast publishing guidance currently bakes in one Kubernetes deployment shape. 
 
 ### Problem
 
-Running `ballast install` from a directory that is its own git repository but does not contain Ballast project markers can incorrectly install files into a parent directory when the parent does contain recognized markers. Root resolution currently walks upward looking for project markers and must not escape the active git repository.
+Running `ballast install` from a new nested project directory that does not contain Ballast project markers can incorrectly install files into a parent directory when the parent does contain recognized markers. Root resolution currently walks upward looking for project markers and must not escape the active git repository or silently inherit a non-git ancestor for an unmarked current directory.
 
 ### Requirements
 
@@ -589,15 +589,17 @@ Running `ballast install` from a directory that is its own git repository but do
 2. Upward traversal must stop at the first git repository boundary when the current directory does not contain project markers.
 3. The change must apply consistently across the TypeScript, Python, and Go Ballast backends, and the `ballast` wrapper must treat Ballast config files as project-root markers.
 4. Root resolution for nested directories inside a marked repository must continue to work when the traversal has not yet crossed a git boundary.
-5. End-to-end smoke coverage must exercise the case where a child git repo has no project markers and its parent does.
+5. If no git boundary connects the current directory to an ancestor project marker, an unmarked current directory must remain the resolved project root.
+6. End-to-end smoke coverage must exercise the case where an unmarked child directory has no project markers and its parent does.
 
 ### Acceptance Criteria
 
 1. Given a child directory that is its own git repository and contains no recognized project markers, Ballast resolves the project root to that child directory rather than a marked parent directory.
 2. Given a nested directory inside a repository whose root contains recognized project markers, Ballast resolves the project root to the marked repository root.
-3. TypeScript, Python, and Go automated tests cover the git-boundary stop condition.
-4. Wrapper tests cover root resolution when a repo is anchored by `.rulesrc.json` and legacy Ballast config files.
-5. The examples smoke workflow runs an end-to-end git-boundary scenario that fails if install output is written to the parent directory.
+3. Given an unmarked child directory with no git repository boundary and a marked parent directory, Ballast resolves the project root to the child directory and does not write managed files to the parent.
+4. TypeScript, Python, and Go automated tests cover the git-boundary stop condition and the unmarked nested project condition.
+5. Wrapper tests cover root resolution when a repo is anchored by `.rulesrc.json` and legacy Ballast config files.
+6. The examples smoke workflow runs an end-to-end unmarked nested project scenario that fails if install output is written to the parent directory.
 
 ## Repository Facts Auto-Population
 

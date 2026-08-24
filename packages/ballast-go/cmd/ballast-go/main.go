@@ -2588,6 +2588,7 @@ func findProjectRoot(cwd string) (string, error) {
 			return "", err
 		}
 	}
+	start = filepath.Clean(start)
 	dir := start
 	for {
 		if exists(filepath.Join(dir, "package.json")) ||
@@ -2607,6 +2608,9 @@ func findProjectRoot(cwd string) (string, error) {
 			exists(filepath.Join(dir, "analysis_options.yaml")) ||
 			exists(filepath.Join(dir, ".metadata")) ||
 			hasAnyRulesConfig(dir) {
+			if dir != start && !isGitBoundary(dir) {
+				return start, nil
+			}
 			return dir, nil
 		}
 		if isGitBoundary(dir) {

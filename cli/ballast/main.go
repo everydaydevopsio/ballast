@@ -4522,23 +4522,27 @@ func resolveScopedPath(root string, rawPath string) (string, error) {
 }
 
 func findProjectRoot(cwd string) string {
-	dir := cwd
-	if strings.TrimSpace(dir) == "" {
+	start := cwd
+	if strings.TrimSpace(start) == "" {
 		var err error
-		dir, err = os.Getwd()
+		start, err = os.Getwd()
 		if err != nil {
 			return "."
 		}
 	}
-	dir = filepath.Clean(dir)
+	start = filepath.Clean(start)
+	dir := start
 
 	for {
 		if hasRootMarker(dir) {
+			if dir != start && !isGitBoundary(dir) {
+				return start
+			}
 			return dir
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return cwdOrDot(cwd)
+			return start
 		}
 		dir = parent
 	}
@@ -4586,6 +4590,18 @@ func hasRootMarker(dir string) bool {
 		}
 	}
 	return false
+}
+
+func isGitBoundary(dir string) bool {
+	gitPath := filepath.Join(dir, ".git")
+	info, err := os.Stat(gitPath)
+	if err != nil {
+		return false
+	}
+	if !info.IsDir() {
+		return true
+	}
+	return fileExists(filepath.Join(gitPath, "HEAD")) || fileExists(filepath.Join(gitPath, "config"))
 }
 
 func detectLanguage(root string) language {

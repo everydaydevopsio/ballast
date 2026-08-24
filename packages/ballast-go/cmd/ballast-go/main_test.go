@@ -343,6 +343,7 @@ func TestFindProjectRootSupportsAnsibleMarkers(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(tmpDir, "ansible.cfg"), []byte("[defaults]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	makeGitBoundary(t, tmpDir)
 	nested := filepath.Join(tmpDir, "roles", "novnc")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
 		t.Fatal(err)
@@ -362,6 +363,7 @@ func TestFindProjectRootSupportsAnsibleRequirementsYaml(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(tmpDir, "requirements.yaml"), []byte("---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	makeGitBoundary(t, tmpDir)
 	nested := filepath.Join(tmpDir, "roles", "novnc")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
 		t.Fatal(err)
@@ -384,6 +386,7 @@ func TestFindProjectRootSupportsTerraformMarkers(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(tmpDir, "versions.tf"), []byte("terraform {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	makeGitBoundary(t, tmpDir)
 	nested := filepath.Join(tmpDir, "modules", "network")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
 		t.Fatal(err)
@@ -409,6 +412,7 @@ func TestFindProjectRootSupportsDartFlutterMarkers(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(tmpDir, ".metadata"), []byte("project_type: app\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	makeGitBoundary(t, tmpDir)
 	nested := filepath.Join(tmpDir, "lib", "src")
 	if err := os.MkdirAll(nested, 0o755); err != nil {
 		t.Fatal(err)
@@ -437,6 +441,25 @@ func TestFindProjectRootDoesNotCrossGitBoundary(t *testing.T) {
 	}
 	if root != child {
 		t.Fatalf("expected %q (cwd), got %q", child, root)
+	}
+}
+
+func TestFindProjectRootReturnsUnmarkedCwdUnderNonGitParent(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	child := filepath.Join(tmpDir, "new-product")
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(child)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != child {
+		t.Fatalf("expected %q (unmarked cwd), got %q", child, root)
 	}
 }
 
