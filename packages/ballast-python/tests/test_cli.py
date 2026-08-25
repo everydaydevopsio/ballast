@@ -468,6 +468,7 @@ class PatchInstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "ansible.cfg").write_text("[defaults]\n", encoding="utf-8")
+            self.make_git_boundary(root)
             nested = root / "roles" / "novnc"
             nested.mkdir(parents=True)
 
@@ -479,6 +480,7 @@ class PatchInstallTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "requirements.yaml").write_text("---\n", encoding="utf-8")
+            self.make_git_boundary(root)
             nested = root / "roles" / "novnc"
             nested.mkdir(parents=True)
 
@@ -491,12 +493,26 @@ class PatchInstallTests(unittest.TestCase):
             root = Path(tmp)
             (root / ".terraform-version").write_text("1.8.5\n", encoding="utf-8")
             (root / "versions.tf").write_text("terraform {}\n", encoding="utf-8")
+            self.make_git_boundary(root)
             nested = root / "modules" / "network"
             nested.mkdir(parents=True)
 
             resolved = cli.resolve_project_root(nested)
 
             self.assertEqual(resolved, root)
+
+    def test_resolve_project_root_returns_unmarked_cwd_under_non_git_parent(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text("{}", encoding="utf-8")
+            child = root / "new-product"
+            child.mkdir()
+
+            resolved = cli.resolve_project_root(child)
+
+            self.assertEqual(resolved, child)
 
     def test_resolve_project_root_does_not_cross_git_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

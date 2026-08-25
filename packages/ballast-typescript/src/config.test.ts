@@ -46,6 +46,7 @@ describe('config', () => {
 
     test('returns dir containing package.json', () => {
       fs.writeFileSync(path.join(tmpDir, 'package.json'), '{}');
+      makeGitBoundary(tmpDir);
       const sub = path.join(tmpDir, 'sub', 'deep');
       fs.mkdirSync(sub, { recursive: true });
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
@@ -53,6 +54,7 @@ describe('config', () => {
 
     test('returns dir containing ansible project markers', () => {
       fs.writeFileSync(path.join(tmpDir, 'ansible.cfg'), '[defaults]\n');
+      makeGitBoundary(tmpDir);
       const sub = path.join(tmpDir, 'roles', 'novnc');
       fs.mkdirSync(sub, { recursive: true });
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
@@ -60,6 +62,7 @@ describe('config', () => {
 
     test('returns dir containing ansible requirements.yaml marker', () => {
       fs.writeFileSync(path.join(tmpDir, 'requirements.yaml'), '---\n');
+      makeGitBoundary(tmpDir);
       const sub = path.join(tmpDir, 'roles', 'novnc');
       fs.mkdirSync(sub, { recursive: true });
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
@@ -71,6 +74,7 @@ describe('config', () => {
         path.join(tmpDir, 'versions.tf'),
         'terraform { required_version = "~> 1.8.0" }\n'
       );
+      makeGitBoundary(tmpDir);
       const sub = path.join(tmpDir, 'modules', 'network');
       fs.mkdirSync(sub, { recursive: true });
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
@@ -86,6 +90,7 @@ describe('config', () => {
         'include: package:flutter_lints/flutter.yaml\n'
       );
       fs.writeFileSync(path.join(tmpDir, '.metadata'), 'project_type: app\n');
+      makeGitBoundary(tmpDir);
       const sub = path.join(tmpDir, 'lib', 'src');
       fs.mkdirSync(sub, { recursive: true });
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
@@ -96,9 +101,17 @@ describe('config', () => {
         path.join(tmpDir, RULESRC_FILENAME),
         JSON.stringify({ target: 'cursor', agents: ['linting'] })
       );
+      makeGitBoundary(tmpDir);
       const sub = path.join(tmpDir, 'sub');
       fs.mkdirSync(sub, { recursive: true });
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
+    });
+
+    test('returns cwd for an unmarked nested project under a marked non-git parent', () => {
+      fs.writeFileSync(path.join(tmpDir, RULESRC_FILENAME), '{}');
+      const child = path.join(tmpDir, 'new-product');
+      fs.mkdirSync(child, { recursive: true });
+      expect(findProjectRoot(child)).toBe(path.resolve(child));
     });
 
     test('does not cross git repository boundary', () => {

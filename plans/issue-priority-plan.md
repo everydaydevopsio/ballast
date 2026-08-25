@@ -1,6 +1,6 @@
 # Plan: Open Issue Review and Next Priorities
 
-**Status:** Updated 2026-08-19 after the August 17 merge batch and Dependabot cleanup.
+**Status:** Updated 2026-08-24 after live issue review.
 **Created:** 2026-07-09
 **Source:** Live GitHub issue review for `everydaydevopsio/ballast` plus local repository inspection.
 
@@ -8,38 +8,37 @@
 
 The previous near-term plan is complete. The OpenCode, doctor drift, task/TDD, Ansible, Copilot cycle, and Dependabot cleanup workstreams have been merged or otherwise handled.
 
-The current non-Windows backlog should move from completed rule-integrity work into setup and local-environment reliability.
+The current non-Windows backlog should fix the root-selection safety regression before returning to setup and local-environment reliability.
 
 ## Current Recommendation
 
-Implement #175 next, then move to a combined setup/toolchain workstream for #128 and #94.
+Implement #278 next, then move to a combined setup/toolchain workstream for #128 and #94.
 
 | Priority | Issue(s) | Current intent |
 | --- | --- | --- |
-| 1 | #175 | Treat non-TTY stdin as non-interactive for destructive support-file overwrite confirmation. |
+| 1 | #278 | Prevent `ballast install` from writing managed files into an unintended ancestor root when bootstrapping an unmarked nested project. |
 | 2 | #128, #94 | Combine package-manager detection, Node LTS/package-manager guidance, local tool prerequisite checks, and Homebrew remediation guidance. |
 | 3 | #153 | Add a daily repo health check GitHub Action with a structured report. |
 | 4 | #149, #147 | Build interactive GitHub health/setup remediation after the read-only report workflow exists. |
 
 ## Active Workstream
 
-### 1. Implement #175: TTY Detection For Support-File Confirmation
+### 1. Implement #278: Safe Root Selection For Unmarked Nested Projects
 
 Goal:
 
-- Detect non-TTY stdin as non-interactive when `--force` would overwrite an existing support file such as `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`.
-- Preserve the existing behavior for explicit `--yes` and CI environments.
-- Abort instead of prompting when stdin is non-interactive.
-- Keep behavior consistent across TypeScript, Python, and Go backends.
-- Add focused regression tests for non-TTY stdin behavior.
+- When the current working directory has no recognized Ballast/project marker and no git boundary connects it to an ancestor project, treat the current directory as the project root instead of inheriting a marked ancestor.
+- Preserve existing behavior for nested directories inside a marked git repository.
+- Keep root-selection behavior consistent across the wrapper and TypeScript, Python, and Go backends.
+- Add focused regression tests and smoke coverage for the reported unsafe ancestor-write case.
 
 Why first:
 
-- It is narrow and user-facing.
-- It closes a known gap between the PRD definition of non-interactive mode and current implementation.
-- It reduces the chance of blocking or unsafe prompts in piped/redirected command usage.
+- It prevents Ballast-managed files from being written outside the operator's intended project.
+- It affects first-run setup safety, so #128/#94 should build on the corrected root-selection contract.
+- The bug is concrete, reproducible, and newer than the setup/toolchain backlog.
 
-## Up Next After #175
+## Up Next After #278
 
 ### 2. Implement #128 and #94 Together: Setup and Toolchain Reliability
 

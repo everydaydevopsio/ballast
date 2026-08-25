@@ -53,6 +53,60 @@
 - Evidence links/commands: `pnpm --filter @everydaydevopsio/ballast exec jest src/build.test.ts --runInBand`; `BALLAST_ENFORCE_REPO_GENERATED_ARTIFACTS=1 pnpm --filter @everydaydevopsio/ballast exec jest src/repo-generated-artifacts.test.ts --runInBand`; `pnpm --filter @everydaydevopsio/ballast run test`; `pnpm --filter @everydaydevopsio/ballast run lint`; `go test ./...` in `packages/ballast-go`; `uv run python -m unittest discover -s tests` in `packages/ballast-python`; `uv run ruff check .` in `packages/ballast-python`; `scripts/smoke-tasks.sh`; `git diff --check`.
 - PRD updates: Added `Structured Task Templates And TDD Rule Discipline`.
 
+## Current Task: Issue #278 safe root selection for unmarked nested projects
+
+## Context
+- Owner: Codex
+- Date: 2026-08-24
+- Mode: Autonomous
+- PRD Section: Git Repository Boundary Root Resolution
+- Requirement IDs: #278
+
+## Scope
+- In scope: priority plan rewrite, PRD clarification, root-resolution tests, TypeScript/Python/Go backend root resolution, wrapper root resolution, focused smoke coverage.
+- Out of scope: package-manager/toolchain reliability work for #128/#94 and adding a separate explicit `--root` flag.
+
+## Acceptance Criteria
+- AC1: #278 replaces stale #175 as the active priority in `plans/issue-priority-plan.md`.
+- AC2: An unmarked cwd under a marked non-git ancestor resolves to the cwd and does not write managed files to the ancestor.
+- AC3: A nested cwd inside a marked git repository still resolves to the marked repository root.
+- AC4: TypeScript, Python, Go backend, wrapper, and smoke coverage exercise the new root-selection contract.
+
+## Constraints
+- Preserve unrelated generated-output changes.
+- Keep behavior consistent across backends.
+- Do not widen this into #128/#94 setup/toolchain work.
+
+## Risks and Tradeoffs
+- Risk: non-git projects that relied on running Ballast from subdirectories now need to run from the intended project root.
+- Tradeoff: avoiding writes to unintended ancestor workspaces is more important than implicit non-git ancestor discovery.
+
+## Execution Checklist
+- [x] Review current priority plan and live issue state.
+- [x] Confirm operating mode and governing PRD section.
+- [x] Update priority plan and PRD for #278.
+- [x] Add failing regression tests for unmarked nested project root selection.
+- [x] Implement consistent root-resolution behavior across backends and wrapper.
+- [x] Update smoke coverage for the reported ancestor-write scenario.
+- [x] Run focused tests and smoke verification.
+
+## Test Strategy
+- Unit: TypeScript `findProjectRoot`, Python `resolve_project_root`, Go backend `findProjectRoot`, wrapper `findProjectRoot`.
+- Integration: Python install smoke script verifies managed files land in the child and parent is unchanged.
+- E2E: `scripts/smoke-git-boundary.sh`.
+- Failure-path tests: unmarked child under marked non-git parent must not resolve to or write into parent.
+- Requirement-to-test mapping: #278 maps to root-resolution unit tests and the smoke ancestor-write assertion.
+
+## Rollback Strategy
+- Trigger: focused tests show legitimate nested repo workflows break unexpectedly.
+- Rollback steps: revert this task's PRD, plan, test, smoke, and root-resolution changes.
+- Validation after rollback: rerun focused root-resolution tests.
+
+## Outcome
+- Result: Implemented #278 root-selection safety. Unmarked nested projects under marked non-git ancestors now resolve to the current directory instead of inheriting the ancestor, while nested paths inside marked git repositories still resolve to the repo root.
+- Evidence links/commands: `pnpm --filter @everydaydevopsio/ballast exec jest src/config.test.ts --runInBand`; `uv run python -m unittest packages.ballast-python.tests.test_cli`; `go test ./cmd/ballast-go` in `packages/ballast-go`; `go test .` in `cli/ballast`; `scripts/smoke-git-boundary.sh`.
+- PRD updates: Clarified Git Repository Boundary Root Resolution for unmarked nested projects.
+
 ## Previous Tasks
 
 - [x] Confirm issue #166 scope, operating mode, and governing PRD requirements.

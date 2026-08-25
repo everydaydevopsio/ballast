@@ -144,10 +144,14 @@ function isGitBoundary(dir: string): boolean {
 }
 
 export function findProjectRoot(cwd: string = process.cwd()): string {
-  let dir = path.resolve(cwd);
+  const start = path.resolve(cwd);
+  let dir = start;
   const root = path.parse(dir).root;
   while (dir !== root) {
     if (hasConfigFile(dir) || hasProjectMarker(dir)) {
+      if (dir !== start && !isGitBoundary(dir)) {
+        return start;
+      }
       return dir;
     }
     if (isGitBoundary(dir)) {
@@ -155,7 +159,7 @@ export function findProjectRoot(cwd: string = process.cwd()): string {
     }
     dir = path.dirname(dir);
   }
-  return cwd;
+  return start;
 }
 
 export function loadConfig(
