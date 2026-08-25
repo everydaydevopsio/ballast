@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # smoke-git-boundary.sh
 #
-# E2E test for the project-root resolution fix that avoids unsafe ancestor
-# writes. Reproduces the bug from issue #278:
+# Historical name retained for the existing git-boundary-smoke workflow.
+# This now covers project-root resolution fixes that avoid unsafe ancestor
+# writes, including the unmarked nested project bug from issue #278:
 #
 #   - Parent directory contains project markers (playbook.yml, .rulesrc.json)
 #   - Child directory has no project markers and is not yet a git repo
@@ -13,7 +14,7 @@
 # Python language pack.
 #
 # Usage:
-#   ./scripts/smoke-git-boundary.sh [<examples-root>]
+#   ./scripts/smoke-git-boundary.sh [<examples-root>]  # ancestor root-selection smoke
 #
 set -euo pipefail
 
