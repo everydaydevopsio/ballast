@@ -122,7 +122,7 @@ snapshot_parent_state "${PARENT_AFTER}"
 if ! diff -q "${PARENT_BEFORE}" "${PARENT_AFTER}" >/dev/null; then
   echo "    Parent file contents changed:" >&2
   diff "${PARENT_BEFORE}" "${PARENT_AFTER}" >&2 || true
-  fail "parent directory was modified by install (git boundary not respected)"
+  fail "parent directory was modified by install (ancestor marker was inherited)"
 fi
 pass "parent directory untouched (ancestor marker not inherited)"
 
