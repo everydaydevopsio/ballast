@@ -104,6 +104,13 @@ describe('config', () => {
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
     });
 
+    test('ignores Dockerfile marker directories', () => {
+      fs.mkdirSync(path.join(tmpDir, 'Dockerfile.prod'));
+      const sub = path.join(tmpDir, 'docker', 'scripts');
+      fs.mkdirSync(sub, { recursive: true });
+      expect(findProjectRoot(sub)).toBe(path.resolve(sub));
+    });
+
     test('returns dir containing .rulesrc.json', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),

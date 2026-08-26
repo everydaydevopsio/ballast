@@ -3132,6 +3132,17 @@ func TestDetectLanguageSupportsDockerCompose(t *testing.T) {
 	}
 }
 
+func TestDetectLanguageTreatsComposeAsAuxiliaryWhenLanguageMarkersExist(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{"scripts":{}}`)
+	mustWriteFile(t, filepath.Join(root, "compose.yaml"), "services: {}\n")
+
+	got := detectLanguage(root)
+	if got != langTypeScript {
+		t.Fatalf("expected typescript detection for package.json with auxiliary compose file, got %q", got)
+	}
+}
+
 func TestDetectLanguageSupportsDockerRulesConfig(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.docker.json"), `{"target":"codex","agents":["linting"]}`)

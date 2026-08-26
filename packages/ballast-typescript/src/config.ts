@@ -114,15 +114,20 @@ function hasConfigFile(dir: string): boolean {
 }
 
 function hasDockerfileMarker(dir: string): boolean {
-  return fs
-    .readdirSync(dir)
-    .some(
-      (name) =>
-        name === 'Dockerfile' ||
-        name === 'Containerfile' ||
-        name.startsWith('Dockerfile.') ||
-        name.startsWith('Containerfile.')
-    );
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .some(
+        (entry) =>
+          entry.isFile() &&
+          (entry.name === 'Dockerfile' ||
+            entry.name === 'Containerfile' ||
+            entry.name.startsWith('Dockerfile.') ||
+            entry.name.startsWith('Containerfile.'))
+      );
+  } catch {
+    return false;
+  }
 }
 
 function hasProjectMarker(dir: string): boolean {

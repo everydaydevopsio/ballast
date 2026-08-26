@@ -4698,11 +4698,21 @@ func applyMarkerScores(root string, scores map[language]int) {
 	if fileExists(filepath.Join(root, ".metadata")) {
 		scores[langDart] += 4
 	}
-	if hasDockerfileMarker(root) {
+	hasDockerfile := hasDockerfileMarker(root)
+	if hasDockerfile {
 		scores[langDocker] += 5
 	}
 	if fileExists(filepath.Join(root, "compose.yaml")) || fileExists(filepath.Join(root, "compose.yml")) || fileExists(filepath.Join(root, "docker-compose.yaml")) || fileExists(filepath.Join(root, "docker-compose.yml")) {
-		scores[langDocker] += 3
+		hasOtherLanguageScore := false
+		for lang, score := range scores {
+			if lang != langDocker && score > 0 {
+				hasOtherLanguageScore = true
+				break
+			}
+		}
+		if hasDockerfile || !hasOtherLanguageScore {
+			scores[langDocker] += 3
+		}
 	}
 }
 
