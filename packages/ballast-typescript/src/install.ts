@@ -22,7 +22,8 @@ import {
   getSkillDestination,
   getSkillClaudeSettings,
   listRuleSuffixes,
-  listTargets
+  listTargets,
+  shouldEmitRuleForSubdir
 } from './build';
 import { patchCodexAgentsMd, patchRuleContent } from './patch';
 import {
@@ -660,6 +661,9 @@ export function install(options: InstallOptions): InstallResult {
   for (const agentId of effectiveAgents) {
     if (!isValidAgent(agentId, language)) {
       errors.push({ agent: agentId, error: 'Unknown agent' });
+      continue;
+    }
+    if (!shouldEmitRuleForSubdir(agentId)) {
       continue;
     }
     let agentInstalled = false;

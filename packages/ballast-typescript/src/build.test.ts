@@ -25,6 +25,7 @@ import {
   getSkillDestination,
   listTargets,
   parseRuleMarker,
+  shouldEmitRuleForSubdir,
   verifyRuleChecksum
 } from './build';
 import { COMMON_SKILL_IDS } from './agents';
@@ -1362,6 +1363,15 @@ alwaysApply: false
         /Invalid BALLAST_RULE_SUBDIR/
       );
       delete process.env.BALLAST_RULE_SUBDIR;
+    });
+
+    test('emits only language-specific rules in language rule subdirs', () => {
+      expect(shouldEmitRuleForSubdir('cicd', 'typescript')).toBe(false);
+      expect(shouldEmitRuleForSubdir('publishing', 'typescript')).toBe(false);
+      expect(shouldEmitRuleForSubdir('linting', 'typescript')).toBe(true);
+      expect(shouldEmitRuleForSubdir('testing', 'typescript')).toBe(true);
+      expect(shouldEmitRuleForSubdir('cicd', 'common')).toBe(true);
+      expect(shouldEmitRuleForSubdir('linting', 'common')).toBe(false);
     });
   });
 
