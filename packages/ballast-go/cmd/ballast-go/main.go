@@ -2632,8 +2632,7 @@ func findProjectRoot(cwd string) (string, error) {
 			exists(filepath.Join(dir, "pubspec.yaml")) ||
 			exists(filepath.Join(dir, "analysis_options.yaml")) ||
 			exists(filepath.Join(dir, ".metadata")) ||
-			exists(filepath.Join(dir, "Dockerfile")) ||
-			exists(filepath.Join(dir, "Containerfile")) ||
+			hasDockerfileMarker(dir) ||
 			exists(filepath.Join(dir, "compose.yaml")) ||
 			exists(filepath.Join(dir, "compose.yml")) ||
 			exists(filepath.Join(dir, "docker-compose.yaml")) ||
@@ -2654,6 +2653,16 @@ func findProjectRoot(cwd string) (string, error) {
 		dir = next
 	}
 	return start, nil
+}
+
+func hasDockerfileMarker(dir string) bool {
+	for _, pattern := range []string{"Dockerfile*", "Containerfile*"} {
+		matches, err := filepath.Glob(filepath.Join(dir, pattern))
+		if err == nil && len(matches) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func isGitBoundary(dir string) bool {

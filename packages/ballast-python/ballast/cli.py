@@ -169,6 +169,10 @@ def has_git_boundary(directory: Path) -> bool:
     return (git_path / "HEAD").exists() or (git_path / "config").exists()
 
 
+def has_dockerfile_marker(directory: Path) -> bool:
+    return any(directory.glob("Dockerfile*")) or any(directory.glob("Containerfile*"))
+
+
 @lru_cache(maxsize=1)
 def ballast_version() -> str:
     try:
@@ -245,14 +249,12 @@ def resolve_project_root(cwd: Path) -> Path:
         has_docker = any(
             (directory / marker).exists()
             for marker in (
-                "Dockerfile",
-                "Containerfile",
                 "compose.yaml",
                 "compose.yml",
                 "docker-compose.yaml",
                 "docker-compose.yml",
             )
-        )
+        ) or has_dockerfile_marker(directory)
         has_any_cfg = (
             (directory / ".rulesrc.json").exists()
             or (directory / ".rulesrc.ts.json").exists()

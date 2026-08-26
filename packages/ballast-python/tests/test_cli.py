@@ -513,7 +513,7 @@ class PatchInstallTests(unittest.TestCase):
     def test_resolve_project_root_supports_docker_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "Dockerfile").write_text("FROM alpine\n", encoding="utf-8")
+            (root / "Dockerfile.prod").write_text("FROM alpine\n", encoding="utf-8")
             self.make_git_boundary(root)
             nested = root / "docker" / "scripts"
             nested.mkdir(parents=True)

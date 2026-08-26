@@ -430,7 +430,7 @@ func TestFindProjectRootSupportsDartFlutterMarkers(t *testing.T) {
 
 func TestFindProjectRootSupportsDockerMarkers(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "compose.yaml"), []byte("services: {}\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "Dockerfile.prod"), []byte("FROM alpine\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	makeGitBoundary(t, tmpDir)

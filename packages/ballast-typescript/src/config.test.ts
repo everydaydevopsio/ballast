@@ -97,7 +97,7 @@ describe('config', () => {
     });
 
     test('returns dir containing Docker project markers', () => {
-      fs.writeFileSync(path.join(tmpDir, 'Dockerfile'), 'FROM alpine\n');
+      fs.writeFileSync(path.join(tmpDir, 'Dockerfile.prod'), 'FROM alpine\n');
       makeGitBoundary(tmpDir);
       const sub = path.join(tmpDir, 'docker', 'scripts');
       fs.mkdirSync(sub, { recursive: true });

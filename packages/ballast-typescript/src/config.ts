@@ -113,6 +113,18 @@ function hasConfigFile(dir: string): boolean {
   );
 }
 
+function hasDockerfileMarker(dir: string): boolean {
+  return fs
+    .readdirSync(dir)
+    .some(
+      (name) =>
+        name === 'Dockerfile' ||
+        name === 'Containerfile' ||
+        name.startsWith('Dockerfile.') ||
+        name.startsWith('Containerfile.')
+    );
+}
+
 function hasProjectMarker(dir: string): boolean {
   return (
     fs.existsSync(path.join(dir, 'package.json')) ||
@@ -131,8 +143,7 @@ function hasProjectMarker(dir: string): boolean {
     fs.existsSync(path.join(dir, 'pubspec.yaml')) ||
     fs.existsSync(path.join(dir, 'analysis_options.yaml')) ||
     fs.existsSync(path.join(dir, '.metadata')) ||
-    fs.existsSync(path.join(dir, 'Dockerfile')) ||
-    fs.existsSync(path.join(dir, 'Containerfile')) ||
+    hasDockerfileMarker(dir) ||
     fs.existsSync(path.join(dir, 'compose.yaml')) ||
     fs.existsSync(path.join(dir, 'compose.yml')) ||
     fs.existsSync(path.join(dir, 'docker-compose.yaml')) ||
