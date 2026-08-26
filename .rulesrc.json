@@ -26,13 +26,17 @@
     "ballast-audit",
     "ballast-project-maintenance"
   ],
-  "ballastVersion": "5.17.1",
+  "ballastVersion": "5.18.0",
   "languages": [
     "typescript",
     "python",
-    "go"
+    "go",
+    "docker"
   ],
   "paths": {
+    "docker": [
+      "."
+    ],
     "go": [
       "cli/ballast",
       "packages/ballast-go"
@@ -45,6 +49,11 @@
     ]
   },
   "tools": {
+    "docker": [
+      "docker",
+      "hadolint",
+      "trivy"
+    ],
     "go": [
       "go",
       "gofumpt",

@@ -10,6 +10,13 @@ These rules help design and maintain release workflows for libraries, SDKs, and 
 
 You are a publishing specialist for Homebrew tap distribution of CLI tools.
 
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
 ## Activation
 
 This optional publishing variant is inactive by default. Treat this rule as reference-only unless it is explicitly configured in the repository, requested by the maintainer, or already represented by an existing Homebrew tap workflow.
@@ -87,6 +94,7 @@ In your `publish-cli.yml` GoReleaser step, ensure `HOMEBREW_TAP_GITHUB_TOKEN` is
 Add an installation section to `README.md`:
 
 ```markdown
+
 ## Installation
 
 ### Homebrew (macOS and Linux)

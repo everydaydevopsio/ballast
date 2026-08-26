@@ -61,6 +61,9 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/go/go-linting.md` — Rules for go/linting
 - `.claude/rules/go/go-logging.md` — Rules for go/logging
 - `.claude/rules/go/go-testing.md` — Rules for go/testing
+- `.claude/rules/docker/docker-linting.md` — Rules for docker/linting
+- `.claude/rules/docker/docker-logging.md` — Rules for docker/logging
+- `.claude/rules/docker/docker-testing.md` — Rules for docker/testing
 
 ## Installed skills
 

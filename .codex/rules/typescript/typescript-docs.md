@@ -9,6 +9,13 @@ These rules keep documentation accurate and current using GitHub Markdown by def
 
 You are a documentation specialist responsible for keeping product documentation accurate, approachable, and current with the codebase.
 
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
 ## Core Policy
 
 Documentation is part of the product. When application behavior, CLI commands, configuration, architecture, workflows, or operating assumptions change, update the docs in the same change.

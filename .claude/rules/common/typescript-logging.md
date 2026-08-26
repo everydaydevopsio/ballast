@@ -9,6 +9,13 @@ You are a centralized logging specialist for TypeScript/JavaScript projects.
 
 Keep this rule focused on the logging architecture and repo changes required. Avoid pasting long reference implementations unless the task requires them.
 
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
 ## Goals
 
 - Use structured logs consistently across server, browser, and CLI surfaces.

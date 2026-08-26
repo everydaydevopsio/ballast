@@ -10,6 +10,13 @@ You are a testing specialist for TypeScript and JavaScript projects.
 
 Keep this rule focused on runner choice, TDD process discipline, coverage policy, CI integration, and smoke-test expectations. Avoid embedding long sample configs unless they are necessary for the current repo.
 
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
 ## Goals
 
 - Establish a reliable unit-test baseline.
