@@ -522,6 +522,17 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(resolved, root)
 
+    def test_resolve_project_root_ignores_docker_marker_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Dockerfile.prod").mkdir()
+            nested = root / "docker" / "scripts"
+            nested.mkdir(parents=True)
+
+            resolved = cli.resolve_project_root(nested)
+
+            self.assertEqual(resolved, nested.resolve())
+
     def test_resolve_project_root_returns_unmarked_cwd_under_non_git_parent(
         self,
     ) -> None:

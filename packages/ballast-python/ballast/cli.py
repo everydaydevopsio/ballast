@@ -170,7 +170,19 @@ def has_git_boundary(directory: Path) -> bool:
 
 
 def has_dockerfile_marker(directory: Path) -> bool:
-    return any(directory.glob("Dockerfile*")) or any(directory.glob("Containerfile*"))
+    try:
+        return any(
+            entry.is_file()
+            and (
+                entry.name == "Dockerfile"
+                or entry.name == "Containerfile"
+                or entry.name.startswith("Dockerfile.")
+                or entry.name.startswith("Containerfile.")
+            )
+            for entry in directory.iterdir()
+        )
+    except OSError:
+        return False
 
 
 @lru_cache(maxsize=1)
