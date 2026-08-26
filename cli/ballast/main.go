@@ -3186,7 +3186,8 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 		}
 
 		dir := filepath.Dir(path)
-		switch d.Name() {
+		name := d.Name()
+		switch name {
 		case "tsconfig.json":
 			pathsByLanguage[langTypeScript] = append(pathsByLanguage[langTypeScript], dir)
 		case "pyproject.toml", "requirements.txt":
@@ -3201,8 +3202,12 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 			if isFlutterDartProfileDir(dir) {
 				pathsByLanguage[langDart] = append(pathsByLanguage[langDart], dir)
 			}
-		case "Dockerfile", "Containerfile", "compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml":
+		case "compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml":
 			pathsByLanguage[langDocker] = append(pathsByLanguage[langDocker], dir)
+		default:
+			if isDockerfileMarkerName(name) {
+				pathsByLanguage[langDocker] = append(pathsByLanguage[langDocker], dir)
+			}
 		}
 		return nil
 	}); err != nil {
@@ -4693,12 +4698,35 @@ func applyMarkerScores(root string, scores map[language]int) {
 	if fileExists(filepath.Join(root, ".metadata")) {
 		scores[langDart] += 4
 	}
-	if fileExists(filepath.Join(root, "Dockerfile")) || fileExists(filepath.Join(root, "Containerfile")) {
+	if hasDockerfileMarker(root) {
 		scores[langDocker] += 5
 	}
 	if fileExists(filepath.Join(root, "compose.yaml")) || fileExists(filepath.Join(root, "compose.yml")) || fileExists(filepath.Join(root, "docker-compose.yaml")) || fileExists(filepath.Join(root, "docker-compose.yml")) {
 		scores[langDocker] += 3
 	}
+}
+
+func hasDockerfileMarker(root string) bool {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if isDockerfileMarkerName(entry.Name()) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDockerfileMarkerName(name string) bool {
+	return name == "Dockerfile" ||
+		name == "Containerfile" ||
+		strings.HasPrefix(name, "Dockerfile.") ||
+		strings.HasPrefix(name, "Containerfile.")
 }
 
 func applyConfigScores(root string, scores map[language]int) {

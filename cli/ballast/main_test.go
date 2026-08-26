@@ -2968,6 +2968,23 @@ func TestDetectRepoProfilesFindsDockerProfile(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesFindsDockerfileVariantProfile(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "docker", "Dockerfile.prod"), "FROM alpine\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langDocker, Paths: []string{filepath.Join(root, "docker")}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected docker profile %#v, got %#v", want, profiles)
+	}
+}
+
 func TestDetectRepoProfilesIgnoresNonFlutterDartPackage(t *testing.T) {
 	root := resolvedTempDir(t)
 	pkg := filepath.Join(root, "packages", "cli")
@@ -3092,6 +3109,16 @@ func TestDetectLanguageSupportsDockerfile(t *testing.T) {
 	got := detectLanguage(root)
 	if got != langDocker {
 		t.Fatalf("expected docker detection, got %q", got)
+	}
+}
+
+func TestDetectLanguageSupportsDockerfileVariant(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "Dockerfile.dev"), "FROM alpine\n")
+
+	got := detectLanguage(root)
+	if got != langDocker {
+		t.Fatalf("expected docker variant detection, got %q", got)
 	}
 }
 
