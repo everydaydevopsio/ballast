@@ -239,6 +239,15 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("Deployment is inactive", content)
         self.assertIn("do not create deploy-on-main workflows", content)
 
+    def test_build_content_renders_docker_deployment_model(self) -> None:
+        content = cli.build_content(
+            "publishing", "codex", "python", "web", deployment_model="docker"
+        )
+
+        self.assertIn("deploymentModel: docker", content)
+        self.assertIn("GHCR and Docker Hub", content)
+        self.assertIn("image vulnerability scans", content)
+
     def test_build_content_marks_optional_publishing_variants(self) -> None:
         for suffix in ["apt", "brew"]:
             content = cli.build_content("publishing", "codex", "python", suffix)
@@ -500,6 +509,29 @@ class PatchInstallTests(unittest.TestCase):
             resolved = cli.resolve_project_root(nested)
 
             self.assertEqual(resolved, root)
+
+    def test_resolve_project_root_supports_docker_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Dockerfile.prod").write_text("FROM alpine\n", encoding="utf-8")
+            self.make_git_boundary(root)
+            nested = root / "docker" / "scripts"
+            nested.mkdir(parents=True)
+
+            resolved = cli.resolve_project_root(nested)
+
+            self.assertEqual(resolved, root)
+
+    def test_resolve_project_root_ignores_docker_marker_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Dockerfile.prod").mkdir()
+            nested = root / "docker" / "scripts"
+            nested.mkdir(parents=True)
+
+            resolved = cli.resolve_project_root(nested)
+
+            self.assertEqual(resolved, nested.resolve())
 
     def test_resolve_project_root_returns_unmarked_cwd_under_non_git_parent(
         self,
@@ -897,6 +929,37 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("flutter analyze", git_hooks_content)
             self.assertIn("flutter test", git_hooks_content)
 
+    def test_install_supports_docker_language_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "codex",
+                ["linting", "logging", "testing"],
+                [],
+                "docker",
+                False,
+                False,
+                False,
+            )
+
+            self.assertIn("linting", result.installed)
+            linting = root / ".codex" / "rules" / "docker-linting.md"
+            logging = root / ".codex" / "rules" / "docker-logging.md"
+            testing = root / ".codex" / "rules" / "docker-testing.md"
+            git_hooks = root / ".codex" / "rules" / "git-hooks.md"
+            self.assertTrue(linting.exists())
+            self.assertTrue(logging.exists())
+            self.assertTrue(testing.exists())
+            self.assertTrue(git_hooks.exists())
+            self.assertIn("hadolint", linting.read_text(encoding="utf-8"))
+            self.assertIn("container logs", logging.read_text(encoding="utf-8"))
+            self.assertIn("docker build", testing.read_text(encoding="utf-8"))
+            git_hooks_content = git_hooks.read_text(encoding="utf-8")
+            self.assertIn("docker compose config", git_hooks_content)
+            self.assertIn("image vulnerability scans", git_hooks_content)
+
     def test_install_creates_skill_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1090,6 +1153,7 @@ class PatchInstallTests(unittest.TestCase):
                 "github-pr-copilot-cycle",
                 "ballast-audit",
                 "ballast-project-maintenance",
+                "docker-registry-publish",
             ],
         )
         self.assertEqual(

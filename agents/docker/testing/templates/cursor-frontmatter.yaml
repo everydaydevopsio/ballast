@@ -1,0 +1,9 @@
+description: 'Docker testing specialist - image build, smoke test, Compose validation, and vulnerability scan gates'
+globs:
+  - 'Dockerfile*'
+  - 'Containerfile*'
+  - 'compose.y*ml'
+  - 'docker-compose.y*ml'
+  - '.github/workflows/*.yml'
+  - '.github/workflows/*.yaml'
+alwaysApply: false

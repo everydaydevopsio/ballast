@@ -27,7 +27,7 @@ import (
 )
 
 var targets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
-var languages = []string{"typescript", "python", "go", "ansible", "terraform", "dart"}
+var languages = []string{"typescript", "python", "go", "ansible", "terraform", "dart", "docker"}
 
 var isStdinInteractiveFunc = isStdinInteractive
 
@@ -42,6 +42,7 @@ var commonSkills = []string{
 	"github-pr-copilot-cycle",
 	"ballast-audit",
 	"ballast-project-maintenance",
+	"docker-registry-publish",
 }
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
@@ -54,7 +55,7 @@ var deploymentModelGuidanceToken = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
 var taskSystemGuidanceToken = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
 var taskSystemToken = "{{taskSystem}}"
 var taskSystems = []string{"github", "jira", "linear", "none"}
-var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
+var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
 var publishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
 var publishingProfileAliases = map[string]string{
 	"app":     "apps",
@@ -77,6 +78,7 @@ var defaultLanguageTools = map[string][]string{
 	"terraform":  {"tfenv", "tflint", "trivy"},
 	"ansible":    {"ansible-lint", "molecule"},
 	"dart":       {"flutter", "fvm"},
+	"docker":     {"docker", "hadolint", "trivy"},
 }
 
 func withImplicitAgents(agents []string) []string {
@@ -261,7 +263,7 @@ func runInstall(args []string) int {
 	patch := fs.Bool("patch", false, "merge upstream rule and skill updates into existing files")
 	fs.BoolVar(patch, "p", false, "merge upstream rule and skill updates into existing files")
 	taskSystemFlag := fs.String("task-system", "", "task system for tasks: github|jira|linear|none")
-	deploymentModelFlag := fs.String("deployment-model", "", "app/service deployment model for publishing; use none for CLI/library/SDK-only projects: none|kubernetes|serverless|server|hosted")
+	deploymentModelFlag := fs.String("deployment-model", "", "app/service deployment model for publishing; use none for CLI/library/SDK-only projects: none|kubernetes|serverless|server|docker|hosted")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	repositoryFactsFile := fs.String("repository-facts-file", "", "optional path to wrapper-generated repository facts JSON")
@@ -2320,6 +2322,17 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 			"- Keep systemd, process manager, reverse proxy, secrets, and rollback instructions aligned with the runtime environment.",
 			"- CI should build immutable artifacts and deployment automation should perform health checks before traffic cutover.",
 		}, "\n")
+	case "docker":
+		return strings.Join([]string{
+			"Deployment guidance is active (`deploymentModel: docker`). Apply container image publishing and runtime handoff guidance for repositories that own Docker images.",
+			"",
+			"Docker deployment model:",
+			"- Treat the Docker or OCI image as the primary deployable artifact.",
+			"- Build images in CI from release tags or protected branches, publish immutable tags, and capture the digest for deployment handoff.",
+			"- Support GHCR and Docker Hub explicitly; choose public or private visibility from repo policy and the image audience.",
+			"- Run Dockerfile linting, image build smoke tests, and image vulnerability scans before publishing.",
+			"- Do not assume systemd, SSH, Kubernetes, hosted-platform, or serverless rollout ownership unless repo docs explicitly add that layer.",
+		}, "\n")
 	case "hosted":
 		return strings.Join([]string{
 			"Deployment guidance is active (`deploymentModel: hosted`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
@@ -2330,7 +2343,7 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 			"- CI should validate builds and let the hosted platform own rollout mechanics unless the repo defines a separate release gate.",
 		}, "\n")
 	default:
-		return "No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`."
+		return "No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, Docker registry, or self-managed server deployment ownership until the repository sets an active `deploymentModel`."
 	}
 }
 
@@ -2551,6 +2564,18 @@ func renderGitHooksGuidance(language, hookMode string) string {
 			gitleaksHookGuidance,
 			"- Keep the configuration current with `pre-commit autoupdate`.",
 		}, "\n")
+	case "docker":
+		return strings.Join([]string{
+			"- Use `pre-commit` for Dockerfile and container configuration repositories.",
+			"- Create or update `.pre-commit-config.yaml` at the repo root.",
+			"- Install hooks with `pre-commit install`.",
+			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			"- Run `hadolint` for Dockerfiles and `docker compose config` for Compose files from the pre-commit stage.",
+			"- Run image build and smoke checks from the pre-push stage only when they are deterministic and do not require registry credentials.",
+			gitleaksHookGuidance,
+			"- Keep image vulnerability scans in CI or pre-push when local Docker availability is reliable.",
+			"- Keep the configuration current with `pre-commit autoupdate`.",
+		}, "\n")
 	default:
 		return ""
 	}
@@ -2607,6 +2632,11 @@ func findProjectRoot(cwd string) (string, error) {
 			exists(filepath.Join(dir, "pubspec.yaml")) ||
 			exists(filepath.Join(dir, "analysis_options.yaml")) ||
 			exists(filepath.Join(dir, ".metadata")) ||
+			hasDockerfileMarker(dir) ||
+			exists(filepath.Join(dir, "compose.yaml")) ||
+			exists(filepath.Join(dir, "compose.yml")) ||
+			exists(filepath.Join(dir, "docker-compose.yaml")) ||
+			exists(filepath.Join(dir, "docker-compose.yml")) ||
 			hasAnyRulesConfig(dir) {
 			if dir != start && !isGitBoundary(dir) {
 				return start, nil
@@ -2623,6 +2653,16 @@ func findProjectRoot(cwd string) (string, error) {
 		dir = next
 	}
 	return start, nil
+}
+
+func hasDockerfileMarker(dir string) bool {
+	for _, pattern := range []string{"Dockerfile*", "Containerfile*"} {
+		matches, err := filepath.Glob(filepath.Join(dir, pattern))
+		if err == nil && len(matches) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func isGitBoundary(dir string) bool {

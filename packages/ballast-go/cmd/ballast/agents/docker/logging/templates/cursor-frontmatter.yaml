@@ -1,0 +1,8 @@
+description: 'Docker logging specialist - stdout/stderr logs, runtime metadata, and container log collection'
+globs:
+  - 'Dockerfile*'
+  - 'Containerfile*'
+  - 'compose.y*ml'
+  - 'docker-compose.y*ml'
+  - '.env.example'
+alwaysApply: false

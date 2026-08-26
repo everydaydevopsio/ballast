@@ -40,7 +40,7 @@ Before modifying files, check the current branch with `git branch --show-current
 ## Core Responsibilities
 
 1. Establish the local runtime baseline.
-   - Check `.rulesrc.json` `tools` first. Defaults: Python `uv, pyenv`; TypeScript `pnpm, corepack`; Go `go, gofumpt, golangci-lint`; Terraform `tfenv, tflint, trivy`; Ansible `ansible-lint, molecule`; Dart `flutter, fvm`.
+   - Check `.rulesrc.json` `tools` first. Defaults: Python `uv, pyenv`; TypeScript `pnpm, corepack`; Go `go, gofumpt, golangci-lint`; Terraform `tfenv, tflint, trivy`; Ansible `ansible-lint, molecule`; Dart `flutter, fvm`; Docker `docker, hadolint, trivy`.
    - Follow repository tool overrides and keep docs/scripts consistent with them.
    - Add or update `.nvmrc` when the repo is Node-based.
    - Keep `package.json` `engines` aligned with the supported Node range.

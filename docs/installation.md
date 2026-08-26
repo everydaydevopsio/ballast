@@ -166,14 +166,16 @@ Example root config:
     "testing"
   ],
   "skills": ["owasp-security-scan", "aws-health-review"],
-  "deploymentModel": "kubernetes",
-  "languages": ["typescript", "python", "go", "ansible", "terraform"],
+  "deploymentModel": "docker",
+  "languages": ["typescript", "python", "go", "ansible", "terraform", "dart", "docker"],
   "paths": {
     "typescript": ["apps/frontend"],
     "python": ["services/api"],
     "go": ["tools/worker"],
     "ansible": ["infra/ansible"],
-    "terraform": ["infra/terraform"]
+    "terraform": ["infra/terraform"],
+    "dart": ["apps/mobile"],
+    "docker": ["images/hatch"]
   }
 }
 ```
@@ -209,7 +211,7 @@ For single-language TypeScript installs, the `git-hooks` rules should use Husky 
 - `--all`: install all available agents
 - `--all-skills`: install all available skills
 - `--task-system`: task system for the tasks agent: `github`, `jira`, or `linear`
-- `--deployment-model`: app/service deployment model for publishing: `none`, `kubernetes`, `serverless`, `server`, or `hosted`; use `none` for CLI, library, or SDK-only projects
+- `--deployment-model`: app/service deployment model for publishing: `none`, `kubernetes`, `serverless`, `server`, `docker`, or `hosted`; use `none` for CLI, library, or SDK-only projects
 - `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files
 - `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode
@@ -233,7 +235,7 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
   - Python CLI (legacy): `.rulesrc.python.json`
   - Go CLI (legacy): `.rulesrc.go.json`
 
-Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVersion`, `languages`, `paths`, `tools`, `discovery.excludePaths`, `taskSystem`, `deploymentModel`, and `publishingProfiles`. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
+Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVersion`, `languages`, `paths`, `tools`, `discovery.excludePaths`, `taskSystem`, `deploymentModel`, and `publishingProfiles`. Use `deploymentModel: docker` for repos whose deployable artifact is a Docker/OCI image published to GHCR or Docker Hub without Ballast assuming server, Kubernetes, hosted-platform, or serverless rollout ownership. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
 
 ## Install Paths
 

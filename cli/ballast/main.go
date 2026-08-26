@@ -30,9 +30,10 @@ const (
 	langAnsible    language = "ansible"
 	langTerraform  language = "terraform"
 	langDart       language = "dart"
+	langDocker     language = "docker"
 )
 
-var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible, langTerraform, langDart}
+var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible, langTerraform, langDart, langDocker}
 var installableBackendLanguages = []language{langTypeScript, langPython, langGo}
 var supportedTargets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
 
@@ -123,6 +124,7 @@ var toolsByLanguage = map[language]toolConfig{
 	langAnsible:    goTool,
 	langTerraform:  goTool,
 	langDart:       goTool,
+	langDocker:     goTool,
 }
 
 var version = "dev"
@@ -138,7 +140,7 @@ var resolveInstalledVersionFunc = resolveInstalledVersion
 var collectDoctorBackendsFunc = collectDoctorBackends
 
 var supportedTaskSystems = []string{"github", "jira", "linear"}
-var supportedDeploymentModels = []string{"none", "kubernetes", "serverless", "server", "hosted"}
+var supportedDeploymentModels = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
 var supportedPublishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
 var publishingProfileAliases = map[string]string{
 	"app":     "apps",
@@ -152,6 +154,7 @@ var defaultLanguageTools = map[string][]string{
 	"terraform":  {"tfenv", "tflint", "trivy"},
 	"ansible":    {"ansible-lint", "molecule"},
 	"dart":       {"flutter", "fvm"},
+	"docker":     {"docker", "hadolint", "trivy"},
 }
 
 type monorepoConfig struct {
@@ -488,7 +491,7 @@ func printUsage() {
 	fmt.Println("  ballast upgrade --patch")
 	fmt.Println("  ballast upgrade --force")
 	fmt.Println("  ballast install-cli --language go --version 5.0.2")
-	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go/Ansible/Terraform/Dart repo")
+	fmt.Println("  ballast install --target cursor --all --yes   # auto-detect and install across a TypeScript/Python/Go/Ansible/Terraform/Dart/Docker repo")
 	fmt.Println("  ballast --language python install --target codex --agent linting")
 	fmt.Println("  ballast --language ansible install --target cursor --all")
 	fmt.Println("  ballast --language terraform install --target cursor --all")
@@ -497,7 +500,7 @@ func printUsage() {
 	fmt.Println("When --language is omitted, ballast detects the repository layout.")
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Install language behavior: `--remove-language` removes languages from `.rulesrc.json`, removes their `paths`, and prunes stale Ballast-managed rule files.")
-	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app/service deployment guidance as one of none, kubernetes, serverless, server, or hosted. Use `none` for CLI, library, or SDK-only projects.")
+	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app/service deployment guidance as one of none, kubernetes, serverless, server, docker, or hosted. Use `none` for CLI, library, or SDK-only projects.")
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
 	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform/Dart repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/dart/`).")
 }
@@ -1939,7 +1942,7 @@ func backendLanguageForConfiguredLanguage(lang language) language {
 	switch lang {
 	case langTypeScript, langPython, langGo:
 		return lang
-	case langAnsible, langTerraform, langDart:
+	case langAnsible, langTerraform, langDart, langDocker:
 		return langGo
 	default:
 		return ""
@@ -2107,7 +2110,7 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 
 func backendArgs(lang language, args []string) []string {
 	dispatched := append([]string(nil), args...)
-	if lang != langAnsible && lang != langTerraform && lang != langDart {
+	if lang != langAnsible && lang != langTerraform && lang != langDart && lang != langDocker {
 		return dispatched
 	}
 	languageName := string(lang)
@@ -2231,7 +2234,7 @@ func resolveLocalBackendCommand(repoRoot string, lang language) resolvedBackendC
 				Binary: binaryPath,
 			}
 		}
-	case langTerraform, langDart:
+	case langTerraform, langDart, langDocker:
 		binaryPath := filepath.Join(repoRoot, "packages", "ballast-go", "ballast-go")
 		if fileExists(binaryPath) {
 			return resolvedBackendCommand{
@@ -2264,7 +2267,7 @@ func projectLocalBackendCommand(projectRoot string, lang language) resolvedBacke
 		if fileExists(binary) {
 			return resolvedBackendCommand{Binary: binary}
 		}
-	case langTerraform, langDart:
+	case langTerraform, langDart, langDocker:
 		binary := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
 		if fileExists(binary) {
 			return resolvedBackendCommand{Binary: binary}
@@ -3160,6 +3163,7 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 		langAnsible:    {},
 		langTerraform:  {},
 		langDart:       {},
+		langDocker:     {},
 	}
 	discovery := discoveryConfigFromConfig(config)
 
@@ -3182,7 +3186,8 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 		}
 
 		dir := filepath.Dir(path)
-		switch d.Name() {
+		name := d.Name()
+		switch name {
 		case "tsconfig.json":
 			pathsByLanguage[langTypeScript] = append(pathsByLanguage[langTypeScript], dir)
 		case "pyproject.toml", "requirements.txt":
@@ -3196,6 +3201,12 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 		case "pubspec.yaml", "analysis_options.yaml", ".metadata":
 			if isFlutterDartProfileDir(dir) {
 				pathsByLanguage[langDart] = append(pathsByLanguage[langDart], dir)
+			}
+		case "compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml":
+			pathsByLanguage[langDocker] = append(pathsByLanguage[langDocker], dir)
+		default:
+			if isDockerfileMarkerName(name) {
+				pathsByLanguage[langDocker] = append(pathsByLanguage[langDocker], dir)
 			}
 		}
 		return nil
@@ -4616,6 +4627,7 @@ func detectLanguage(root string) language {
 		langAnsible:    0,
 		langTerraform:  0,
 		langDart:       0,
+		langDocker:     0,
 	}
 
 	applyMarkerScores(root, scores)
@@ -4686,6 +4698,45 @@ func applyMarkerScores(root string, scores map[language]int) {
 	if fileExists(filepath.Join(root, ".metadata")) {
 		scores[langDart] += 4
 	}
+	hasDockerfile := hasDockerfileMarker(root)
+	if hasDockerfile {
+		scores[langDocker] += 5
+	}
+	if fileExists(filepath.Join(root, "compose.yaml")) || fileExists(filepath.Join(root, "compose.yml")) || fileExists(filepath.Join(root, "docker-compose.yaml")) || fileExists(filepath.Join(root, "docker-compose.yml")) {
+		hasOtherLanguageScore := false
+		for lang, score := range scores {
+			if lang != langDocker && score > 0 {
+				hasOtherLanguageScore = true
+				break
+			}
+		}
+		if hasDockerfile || !hasOtherLanguageScore {
+			scores[langDocker] += 3
+		}
+	}
+}
+
+func hasDockerfileMarker(root string) bool {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if isDockerfileMarkerName(entry.Name()) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDockerfileMarkerName(name string) bool {
+	return name == "Dockerfile" ||
+		name == "Containerfile" ||
+		strings.HasPrefix(name, "Dockerfile.") ||
+		strings.HasPrefix(name, "Containerfile.")
 }
 
 func applyConfigScores(root string, scores map[language]int) {
@@ -4700,6 +4751,9 @@ func applyConfigScores(root string, scores map[language]int) {
 	}
 	if fileExists(filepath.Join(root, ".rulesrc.dart.json")) {
 		scores[langDart] += 20
+	}
+	if fileExists(filepath.Join(root, ".rulesrc.docker.json")) {
+		scores[langDocker] += 20
 	}
 	if fileExists(filepath.Join(root, ".rulesrc.python.json")) {
 		scores[langPython] += 20

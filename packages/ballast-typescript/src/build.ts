@@ -348,6 +348,21 @@ function renderGitHooksGuidance(
     ].join('\n');
   }
 
+  if (language === 'docker') {
+    return [
+      'Use `pre-commit` for Dockerfile and container configuration repositories.',
+      '',
+      '- Create or update `.pre-commit-config.yaml` at the repo root.',
+      '- Install hooks with `pre-commit install`.',
+      '- Install the pre-push hook with `pre-commit install --hook-type pre-push`.',
+      '- Run `hadolint` for Dockerfiles and `docker compose config` for Compose files from the pre-commit stage.',
+      '- Run image build and smoke checks from the pre-push stage only when they are deterministic and do not require registry credentials.',
+      gitleaksHookGuidance,
+      '- Keep image vulnerability scans in CI or pre-push when local Docker availability is reliable.',
+      '- Keep the configuration current with `pre-commit autoupdate`.'
+    ].join('\n');
+  }
+
   return '';
 }
 
@@ -450,6 +465,19 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
         '- Include health checks and rollback steps for the previous artifact or image digest.',
         '- Avoid SSH commands that mutate production without logging the artifact version and result.'
       ].join('\n');
+    case 'docker':
+      return [
+        'Deployment guidance is active (`deploymentModel: docker`). Apply container image publishing and runtime handoff guidance for repositories that own Docker images.',
+        '',
+        'Docker deployment model for repositories whose primary deployable artifact is a Docker or OCI image.',
+        '',
+        '- Build images in CI from the release tag or protected branch, not manually on a server.',
+        '- Publish immutable tags and capture the image digest for deployment handoff.',
+        '- Support GHCR and Docker Hub explicitly; choose public or private visibility based on repository policy and audience.',
+        '- Keep registry credentials scoped to the publish job. Prefer `GITHUB_TOKEN` packages permissions for GHCR and repository secrets for Docker Hub tokens.',
+        '- Run Dockerfile linting, image build smoke tests, and an image vulnerability scan before publishing.',
+        '- Do not assume systemd, SSH, Kubernetes, hosted-platform, or serverless rollout ownership unless another deployment model or repo docs explicitly add that layer.'
+      ].join('\n');
     case 'hosted':
       return [
         'Deployment guidance is active (`deploymentModel: hosted`). Apply web/API deployment workflow guidance for repositories that own this deployment model.',
@@ -465,7 +493,7 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
       ].join('\n');
     case 'none':
     default:
-      return 'No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.';
+      return 'No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, Docker registry, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.';
   }
 }
 

@@ -29,9 +29,10 @@ When the publishing agent is installed, Ballast records `deploymentModel` in `.r
 - `kubernetes` — app repo owns `charts/<app>/`; a separate GitOps repo owns ArgoCD `Application` or `ApplicationSet` configuration and environment-specific deployment state.
 - `serverless` — managed function or container platforms such as AWS Lambda, Cloud Run, or Azure Functions.
 - `server` — self-managed VM, VPS, or bare-metal deployment with a repeatable artifact transfer, service restart, health check, and rollback path.
+- `docker` — Docker/OCI image publishing to GHCR or Docker Hub, with registry visibility and digest handoff but no assumed runtime rollout ownership.
 - `hosted` — app platforms such as Vercel, Netlify, Render, Railway, or Fly.io.
 
-Use `ballast install --agent publishing --deployment-model kubernetes` for non-interactive app/service setup. Interactive installs prompt for the app deployment model only when the publishing agent is selected; choose `none` for CLI, library, or SDK-only projects.
+Use `ballast install --agent publishing --deployment-model docker` for registry-only container image publishing, or choose `kubernetes`, `serverless`, `server`, or `hosted` when the repo owns that runtime deployment model. Interactive installs prompt for the app deployment model only when the publishing agent is selected; choose `none` for CLI, library, or SDK-only projects.
 
 ## CLI Smoke Placement
 
