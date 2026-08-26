@@ -100,6 +100,8 @@ After each poll, gather review threads again. If new unresolved Copilot threads 
 - Copilot is still listed in `reviewRequests`.
 - No Copilot review newer than `$REQUESTED_AT` is visible yet.
 
+Also inspect the newest Copilot review body after each poll. If the review body says Copilot generated comments, includes a `Suppressed comments` section, or contains file-and-line feedback that is not represented as an unresolved review thread, treat those body comments as Copilot feedback for the current cycle. Score and handle them the same way as review-thread comments. If a body comment has no thread id, make the code/doc change, then reply on the PR with a short audit note that quotes the file/line summary and validation command; do not try to resolve a non-thread comment.
+
 Recommended polling cadence: wait 30 seconds, then 60 seconds, then 120 seconds between checks; repeat the 120-second interval until Copilot settles or the timeout is reached. Do not wait forever. If Copilot has not settled after about 10 minutes, report the PR URL, the pending state, and the last observed review request/review timestamps.
 
 ## Gather Copilot Comments
@@ -122,7 +124,6 @@ query($owner:String!, $repo:String!, $number:Int!, $endCursor:String) {
           isResolved
           path
           line
-          url
           comments(first:100) {
             pageInfo { hasNextPage endCursor }
             nodes {
@@ -163,6 +164,8 @@ query($threadId:ID!, $endCursor:String) {
 ```
 
 Treat comments from `copilot-pull-request-reviewer`, `copilot-pull-request-reviewer[bot]`, or `github-copilot[bot]` as Copilot comments. If GitHub changes the comment author login, accept another author login containing `copilot` only when the surrounding review metadata identifies it as GitHub Copilot code review. Only act on unresolved threads unless the user explicitly asks to revisit resolved history.
+
+For review-body feedback, inspect Copilot-authored reviews from the current cycle in addition to review threads. Treat bullets under `Suppressed comments`, `Previously missed`, or any Copilot review body that says it generated comments as actionable unless the text is clearly obsolete after later commits. Preserve the file path and line number from the review body in your notes and PR reply because these comments may not have a resolvable thread id.
 
 Copilot does not read replies added to its review comments. Replies are for human auditability, not for continuing a conversation with Copilot.
 
@@ -222,6 +225,12 @@ mutation($threadId:ID!) {
     thread { id isResolved }
   }
 }'
+```
+
+For Copilot review-body feedback that has no review thread, reply on the PR instead of a thread:
+
+```bash
+gh pr comment "$PR_NUMBER" --body 'Handled Copilot review-body feedback for PATH:LINE. Validation: COMMAND.'
 ```
 
 ## Check CI After Each Push
