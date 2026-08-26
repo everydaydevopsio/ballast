@@ -121,6 +121,7 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"github-pr-copilot-cycle",
 		"ballast-audit",
 		"ballast-project-maintenance",
+		"docker-registry-publish",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
@@ -424,6 +425,26 @@ func TestFindProjectRootSupportsDartFlutterMarkers(t *testing.T) {
 	}
 	if root != tmpDir {
 		t.Fatalf("expected dart flutter project root %q, got %q", tmpDir, root)
+	}
+}
+
+func TestFindProjectRootSupportsDockerMarkers(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "compose.yaml"), []byte("services: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	makeGitBoundary(t, tmpDir)
+	nested := filepath.Join(tmpDir, "docker", "scripts")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := findProjectRoot(nested)
+	if err != nil {
+		t.Fatalf("findProjectRoot returned error: %v", err)
+	}
+	if root != tmpDir {
+		t.Fatalf("expected docker project root %q, got %q", tmpDir, root)
 	}
 }
 
@@ -763,6 +784,27 @@ func TestRenderGitHooksContentSupportsDartFlutter(t *testing.T) {
 	}
 	if !strings.Contains(got, "gitleaks") || strings.Contains(got, "scripts/check-no-secrets.sh") {
 		t.Fatalf("expected dart git-hooks content to use gitleaks guidance, got %q", got)
+	}
+}
+
+func TestRenderGitHooksContentSupportsDocker(t *testing.T) {
+	got, err := readContent("git-hooks", "docker", "", "standalone", "github", "none")
+	if err != nil {
+		t.Fatalf("read docker git-hooks content: %v", err)
+	}
+	for _, want := range []string{
+		"Dockerfile and container configuration",
+		"hadolint",
+		"docker compose config",
+		"pre-commit install --hook-type pre-push",
+		"image vulnerability scans",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected docker git-hooks content to mention %q, got %q", want, got)
+		}
+	}
+	if !strings.Contains(got, "gitleaks") || strings.Contains(got, "scripts/check-no-secrets.sh") {
+		t.Fatalf("expected docker git-hooks content to use gitleaks guidance, got %q", got)
 	}
 }
 
@@ -1242,6 +1284,23 @@ func TestBuildContentRendersInactiveDeploymentModel(t *testing.T) {
 	}
 	if !strings.Contains(content, "do not create deploy-on-main workflows") {
 		t.Fatalf("expected deploy-on-main guardrail, got %q", content)
+	}
+}
+
+func TestBuildContentRendersDockerDeploymentModel(t *testing.T) {
+	content, err := buildContent("publishing", "codex", "go", "web", "standalone", "github", "docker")
+	if err != nil {
+		t.Fatalf("buildContent(publishing): %v", err)
+	}
+
+	if strings.Contains(content, deploymentModelGuidanceToken) {
+		t.Fatalf("expected deployment model token to be replaced, got %q", content)
+	}
+	if !strings.Contains(content, "Deployment guidance is active (`deploymentModel: docker`).") {
+		t.Fatalf("expected docker deployment activation guidance, got %q", content)
+	}
+	if !strings.Contains(content, "GHCR and Docker Hub") {
+		t.Fatalf("expected registry guidance, got %q", content)
 	}
 }
 

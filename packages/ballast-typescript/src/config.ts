@@ -12,6 +12,7 @@ export const DEPLOYMENT_MODELS = [
   'kubernetes',
   'serverless',
   'server',
+  'docker',
   'hosted'
 ] as const;
 export const DEFAULT_DEPLOYMENT_MODEL = 'none' as const;
@@ -31,7 +32,8 @@ export const DEFAULT_LANGUAGE_TOOLS: Record<string, string[]> = {
   go: ['go', 'gofumpt', 'golangci-lint'],
   terraform: ['tfenv', 'tflint', 'trivy'],
   ansible: ['ansible-lint', 'molecule'],
-  dart: ['flutter', 'fvm']
+  dart: ['flutter', 'fvm'],
+  docker: ['docker', 'hadolint', 'trivy']
 };
 
 export type Target = (typeof TARGETS)[number];
@@ -128,7 +130,13 @@ function hasProjectMarker(dir: string): boolean {
     fs.existsSync(path.join(dir, 'terraform.tf')) ||
     fs.existsSync(path.join(dir, 'pubspec.yaml')) ||
     fs.existsSync(path.join(dir, 'analysis_options.yaml')) ||
-    fs.existsSync(path.join(dir, '.metadata'))
+    fs.existsSync(path.join(dir, '.metadata')) ||
+    fs.existsSync(path.join(dir, 'Dockerfile')) ||
+    fs.existsSync(path.join(dir, 'Containerfile')) ||
+    fs.existsSync(path.join(dir, 'compose.yaml')) ||
+    fs.existsSync(path.join(dir, 'compose.yml')) ||
+    fs.existsSync(path.join(dir, 'docker-compose.yaml')) ||
+    fs.existsSync(path.join(dir, 'docker-compose.yml'))
   );
 }
 

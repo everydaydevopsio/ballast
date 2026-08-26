@@ -1,0 +1,9 @@
+---
+description: Docker linting specialist - Dockerfile, Compose, image config, and .dockerignore checks
+globs:
+  - Dockerfile*
+  - Containerfile*
+  - compose.y*ml
+  - docker-compose.y*ml
+  - .dockerignore
+---

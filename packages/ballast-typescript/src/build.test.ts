@@ -397,6 +397,16 @@ describe('build', () => {
       expect(content).toContain('preview deployments');
     });
 
+    test('returns docker deployment guidance when deploymentModel is docker', () => {
+      const content = buildContent('publishing', 'codex', 'web', 'typescript', {
+        variables: { deploymentModel: 'docker' }
+      });
+
+      expect(content).toContain('deploymentModel: docker');
+      expect(content).toContain('GHCR and Docker Hub');
+      expect(content).toContain('image vulnerability scan');
+    });
+
     test('returns compact Kubernetes GitOps web deployment guidance', () => {
       const content = getContent('publishing', 'web', 'typescript');
       expect(content).toContain('deploymentModel: none');
@@ -681,6 +691,17 @@ describe('build', () => {
       expect(content).toContain('flutter test');
       expect(content).toContain('flutter test integration_test');
       expect(content).toContain('.dart_tool/');
+      expect(content).toContain('gitleaks');
+      expect(content).not.toContain('scripts/check-no-secrets.sh');
+    });
+
+    test('returns docker git-hooks command guidance', () => {
+      const content = getContent('git-hooks', undefined, 'docker');
+      expect(content).toContain('Dockerfile and container configuration');
+      expect(content).toContain('hadolint');
+      expect(content).toContain('docker compose config');
+      expect(content).toContain('pre-commit install --hook-type pre-push');
+      expect(content).toContain('image vulnerability scans');
       expect(content).toContain('gitleaks');
       expect(content).not.toContain('scripts/check-no-secrets.sh');
     });

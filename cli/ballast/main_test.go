@@ -2951,6 +2951,23 @@ func TestDetectRepoProfilesFindsDartFlutterProfile(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesFindsDockerProfile(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "Dockerfile"), "FROM alpine\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langDocker, Paths: []string{root}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected docker profile %#v, got %#v", want, profiles)
+	}
+}
+
 func TestDetectRepoProfilesIgnoresNonFlutterDartPackage(t *testing.T) {
 	root := resolvedTempDir(t)
 	pkg := filepath.Join(root, "packages", "cli")
@@ -3068,6 +3085,36 @@ func TestDetectLanguageSupportsDartRulesConfig(t *testing.T) {
 	}
 }
 
+func TestDetectLanguageSupportsDockerfile(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "Dockerfile"), "FROM alpine\n")
+
+	got := detectLanguage(root)
+	if got != langDocker {
+		t.Fatalf("expected docker detection, got %q", got)
+	}
+}
+
+func TestDetectLanguageSupportsDockerCompose(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "compose.yaml"), "services: {}\n")
+
+	got := detectLanguage(root)
+	if got != langDocker {
+		t.Fatalf("expected docker compose detection, got %q", got)
+	}
+}
+
+func TestDetectLanguageSupportsDockerRulesConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.docker.json"), `{"target":"codex","agents":["linting"]}`)
+
+	got := detectLanguage(root)
+	if got != langDocker {
+		t.Fatalf("expected docker detection from legacy config, got %q", got)
+	}
+}
+
 func TestDetectLanguageWarnsForJavaScriptPackageWithoutTsconfig(t *testing.T) {
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), `{
@@ -3154,6 +3201,23 @@ func TestResolveBackendCommandAddsTerraformLanguageFlag(t *testing.T) {
 		got := strings.Join(resolved.Args, " ")
 		if !strings.Contains(got, "install --language terraform --target cursor --all") {
 			t.Fatalf("expected terraform language forwarding, got %q", got)
+		}
+	})
+}
+
+func TestResolveBackendCommandAddsDockerLanguageFlag(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "Dockerfile"), "FROM alpine\n")
+	mustWriteFile(t, filepath.Join(root, ".ballast", "bin", "ballast-go"), "")
+
+	withWorkingDir(t, root, func() {
+		resolved := resolveBackendCommand(langDocker, toolsByLanguage[langDocker], []string{"install", "--target", "cursor", "--all"}, nil)
+		if resolved.Binary != filepath.Join(root, ".ballast", "bin", "ballast-go") {
+			t.Fatalf("expected project-local ballast-go backend, got %#v", resolved)
+		}
+		got := strings.Join(resolved.Args, " ")
+		if !strings.Contains(got, "install --language docker --target cursor --all") {
+			t.Fatalf("expected docker language forwarding, got %q", got)
 		}
 	})
 }

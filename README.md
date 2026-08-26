@@ -9,13 +9,15 @@
 
 Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, Codex, and Gemini.
 
-This repository supports five first-class language profiles:
+This repository supports seven first-class language profiles:
 
 - TypeScript
 - Python
 - Go
 - Ansible
 - Terraform
+- Dart
+- Docker
 
 ## Prerequisites
 
@@ -279,7 +281,7 @@ ballast-go install --language terraform --target codex --agent linting
 
 ## Monorepo: Install and Use by Language
 
-In a repo that contains TypeScript, Python, Go, Ansible, or Terraform projects, run Ballast once per language profile. The `ballast` wrapper can auto-detect single-language repos for all five profiles and mixed repos that include them.
+In a repo that contains TypeScript, Python, Go, Ansible, Terraform, Dart, or Docker projects, run Ballast once per language profile. The `ballast` wrapper can auto-detect single-language repos for all seven profiles and mixed repos that include them.
 
 ### 1. TypeScript rules in a monorepo
 
@@ -300,13 +302,14 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 ballast-go install --target cursor --all
 ```
 
-Recommended order for one repository that uses all five language profiles:
+Recommended order for one repository that uses multiple language profiles:
 
 1. Run the TypeScript command.
 2. Run the Python command.
 3. Run the Go command.
 4. If the repo also contains Ansible, run `ballast-go install --language ansible --target cursor --all`.
 5. If the repo also contains Terraform, run `ballast-go install --language terraform --target cursor --all`.
+6. If the repo also contains Dart or Docker profiles, run `ballast-go install --language dart --target cursor --all` or `ballast-go install --language docker --target cursor --all`.
 
 Ballast only installs shipped agents and skills and follows the single overwrite policy: existing rule and skill files are preserved unless you explicitly choose `--patch` or `--force`. Existing support files (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) are patched by default when `--force` is not set, updating only installed-rule and installed-skill sections that include the Ballast-managed notice. Older or customized support-file sections without that notice are preserved unless you use `--patch` or confirm the interactive patch prompt.
 
@@ -324,7 +327,7 @@ Use `--force` when you want to reset a managed rule or skill file to canonical B
 - `--all`: install all agents for the selected language
 - `--all-skills`: install all available skills for the selected language
 - `--task-system`: task system for the tasks agent: `github`, `jira`, or `linear`
-- `--deployment-model`: app/service deployment model for publishing: `none`, `kubernetes`, `serverless`, `server`, or `hosted`; use `none` for CLI, library, or SDK-only projects
+- `--deployment-model`: app/service deployment model for publishing: `none`, `kubernetes`, `serverless`, `server`, `docker`, or `hosted`; use `none` for CLI, library, or SDK-only projects
 - `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`
 - `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
 - `--yes, -y`: non-interactive mode

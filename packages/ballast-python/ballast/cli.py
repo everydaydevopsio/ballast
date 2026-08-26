@@ -16,7 +16,7 @@ from importlib import metadata
 from pathlib import Path
 
 TARGETS = ["cursor", "claude", "opencode", "codex", "gemini"]
-LANGUAGES = ["typescript", "python", "go", "ansible", "terraform", "dart"]
+LANGUAGES = ["typescript", "python", "go", "ansible", "terraform", "dart", "docker"]
 COMMON_AGENTS = [
     "local-dev",
     "docs",
@@ -34,6 +34,7 @@ AGENTS_BY_LANGUAGE = {
     "ansible": COMMON_AGENTS + LANGUAGE_AGENTS,
     "terraform": COMMON_AGENTS + LANGUAGE_AGENTS,
     "dart": COMMON_AGENTS + LANGUAGE_AGENTS,
+    "docker": COMMON_AGENTS + LANGUAGE_AGENTS,
 }
 COMMON_SKILLS = [
     "owasp-security-scan",
@@ -44,6 +45,7 @@ COMMON_SKILLS = [
     "github-pr-copilot-cycle",
     "ballast-audit",
     "ballast-project-maintenance",
+    "docker-registry-publish",
 ]
 SKILLS_BY_LANGUAGE = {
     "typescript": COMMON_SKILLS,
@@ -52,6 +54,7 @@ SKILLS_BY_LANGUAGE = {
     "ansible": COMMON_SKILLS,
     "terraform": COMMON_SKILLS,
     "dart": COMMON_SKILLS,
+    "docker": COMMON_SKILLS,
 }
 GIT_HOOKS_GUIDANCE_TOKEN = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
 GIT_HOOKS_PRE_COMMIT_GLOB_TOKEN = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
@@ -60,7 +63,7 @@ TASK_SYSTEM_GUIDANCE_TOKEN = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
 TASK_SYSTEM_TOKEN = "{{taskSystem}}"
 DEFAULT_TASK_SYSTEM = "github"
 TASK_SYSTEMS = ["github", "jira", "linear", "none"]
-DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "hosted"]
+DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "docker", "hosted"]
 PUBLISHING_PROFILE_ALIASES = {
     "app": "apps",
     "library": "libraries",
@@ -74,6 +77,7 @@ DEFAULT_LANGUAGE_TOOLS = {
     "terraform": ["tfenv", "tflint", "trivy"],
     "ansible": ["ansible-lint", "molecule"],
     "dart": ["flutter", "fvm"],
+    "docker": ["docker", "hadolint", "trivy"],
 }
 
 
@@ -238,6 +242,17 @@ def resolve_project_root(cwd: Path) -> Path:
             (directory / marker).exists()
             for marker in ("pubspec.yaml", "analysis_options.yaml", ".metadata")
         )
+        has_docker = any(
+            (directory / marker).exists()
+            for marker in (
+                "Dockerfile",
+                "Containerfile",
+                "compose.yaml",
+                "compose.yml",
+                "docker-compose.yaml",
+                "docker-compose.yml",
+            )
+        )
         has_any_cfg = (
             (directory / ".rulesrc.json").exists()
             or (directory / ".rulesrc.ts.json").exists()
@@ -253,6 +268,7 @@ def resolve_project_root(cwd: Path) -> Path:
             or has_ansible
             or has_terraform
             or has_dart
+            or has_docker
             or has_any_cfg
         ):
             if directory != start and not has_git_boundary(directory):
@@ -886,6 +902,20 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
                 "- Keep the configuration current with `pre-commit autoupdate`.",
             ]
         )
+    if language == "docker":
+        return "\n".join(
+            [
+                "- Use `pre-commit` for Dockerfile and container configuration repositories.",
+                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                "- Install hooks with `pre-commit install`.",
+                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                "- Run `hadolint` for Dockerfiles and `docker compose config` for Compose files from the pre-commit stage.",
+                "- Run image build and smoke checks from the pre-push stage only when they are deterministic and do not require registry credentials.",
+                gitleaks_hook_guidance,
+                "- Keep image vulnerability scans in CI or pre-push when local Docker availability is reliable.",
+                "- Keep the configuration current with `pre-commit autoupdate`.",
+            ]
+        )
     return ""
 
 
@@ -983,6 +1013,17 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
                 "- Keep systemd, process manager, reverse proxy, secrets, and rollback instructions aligned with the runtime environment.",
                 "- CI should build immutable artifacts and deployment automation should perform health checks before traffic cutover.",
             ]
+        case "docker":
+            lines = [
+                "Deployment guidance is active (`deploymentModel: docker`). Apply container image publishing and runtime handoff guidance for repositories that own Docker images.",
+                "",
+                "Docker deployment model:",
+                "- Treat the Docker or OCI image as the primary deployable artifact.",
+                "- Build images in CI from release tags or protected branches, publish immutable tags, and capture the digest for deployment handoff.",
+                "- Support GHCR and Docker Hub explicitly; choose public or private visibility from repo policy and the image audience.",
+                "- Run Dockerfile linting, image build smoke tests, and image vulnerability scans before publishing.",
+                "- Do not assume systemd, SSH, Kubernetes, hosted-platform, or serverless rollout ownership unless repo docs explicitly add that layer.",
+            ]
         case "hosted":
             lines = [
                 "Deployment guidance is active (`deploymentModel: hosted`). Apply web/API deployment workflow guidance for repositories that own this deployment model.",
@@ -994,7 +1035,7 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
             ]
         case _:
             lines = [
-                "No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.",
+                "No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, Docker registry, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.",
             ]
     return "\n".join(lines)
 

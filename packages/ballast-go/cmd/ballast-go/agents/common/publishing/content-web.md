@@ -39,6 +39,7 @@ Keep this rule focused on release decisions, quality gates, artifact identity, a
 
 - For `deploymentModel: none`, keep deployment-state changes inactive unless the user explicitly asks to add deployment ownership.
 - For `deploymentModel: kubernetes`, prefer a GitOps handoff: publish the image, then update the environment repository or chart values watched by Argo CD or the repo’s existing GitOps controller.
+- For `deploymentModel: docker`, stop at a registry handoff unless repo docs define a separate runtime owner: publish the image to GHCR or Docker Hub, expose the digest, and document pull credentials and visibility.
 - For hosted platforms, use the platform’s native deploy action or CLI only after build artifacts are immutable and traceable to the release tag.
 - Keep deployment credentials scoped to the deploy job and avoid exposing them to pull request workflows.
 
