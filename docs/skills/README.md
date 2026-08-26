@@ -7,46 +7,53 @@ Ballast ships reusable skill guides alongside its agent rules.
 `owasp-security-scan`
 
 - Type: common skill
-- Supported language profiles: TypeScript, Python, Go
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
 - Installed by: `--skill owasp-security-scan` or `--all-skills`
 
 `aws-health-review`
 
 - Type: common skill
-- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
 - Installed by: `--skill aws-health-review` or `--all-skills`
 
 `aws-live-health-review`
 
 - Type: common skill
-- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
 - Installed by: `--skill aws-live-health-review` or `--all-skills`
 
 `aws-weekly-security-review`
 
 - Type: common skill
-- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
 - Installed by: `--skill aws-weekly-security-review` or `--all-skills`
 
 `github-health-check`
 
 - Type: common skill
-- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
 - Installed by: `--skill github-health-check` or `--all-skills`
 - Focus: CI status, pull requests, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
 
 `ballast-audit`
 
 - Type: common skill
-- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
 - Installed by: `--skill ballast-audit` or `--all-skills`
 
 `ballast-project-maintenance`
 
 - Type: common skill
-- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
 - Installed by: `--skill ballast-project-maintenance` or `--all-skills`
 - Focus: Ballast-managed repository status, `.ballast/` local tool repair, config refresh, and generated rule/skill maintenance
+
+`docker-registry-publish`
+
+- Type: common skill
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
+- Installed by: `--skill docker-registry-publish` or `--all-skills`
+- Focus: GHCR and Docker Hub image publishing, public/private visibility, registry credentials, image tags, and digest handoff
 
 ## Installation Targets
 
@@ -69,3 +76,4 @@ Codex also records installed skills in the root `AGENTS.md`. Claude records them
 - [github-health-check.md](github-health-check.md)
 - [ballast-audit.md](ballast-audit.md)
 - [ballast-project-maintenance.md](ballast-project-maintenance.md)
+- [docker-registry-publish.md](docker-registry-publish.md)

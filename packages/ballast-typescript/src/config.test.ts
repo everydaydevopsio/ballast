@@ -96,6 +96,14 @@ describe('config', () => {
       expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
     });
 
+    test('returns dir containing Docker project markers', () => {
+      fs.writeFileSync(path.join(tmpDir, 'Dockerfile'), 'FROM alpine\n');
+      makeGitBoundary(tmpDir);
+      const sub = path.join(tmpDir, 'docker', 'scripts');
+      fs.mkdirSync(sub, { recursive: true });
+      expect(findProjectRoot(sub)).toBe(path.resolve(tmpDir));
+    });
+
     test('returns dir containing .rulesrc.json', () => {
       fs.writeFileSync(
         path.join(tmpDir, RULESRC_FILENAME),
@@ -192,6 +200,23 @@ describe('config', () => {
         discovery: {
           excludePaths: ['examples', 'tmp']
         }
+      });
+    });
+
+    test('returns normalized docker deployment model when present', () => {
+      const config = {
+        targets: ['codex'] as const,
+        agents: ['publishing'],
+        deploymentModel: 'DOCKER'
+      };
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify(config)
+      );
+      expect(loadConfig(tmpDir)).toEqual({
+        targets: ['codex'],
+        agents: ['publishing'],
+        deploymentModel: 'docker'
       });
     });
 
@@ -507,6 +532,7 @@ describe('config', () => {
         'kubernetes',
         'serverless',
         'server',
+        'docker',
         'hosted'
       ]);
     });

@@ -7,6 +7,7 @@ You are a publishing specialist for REST API services deployed as Docker contain
 - Use the same container publishing and deployment model as web apps.
 - Ensure the API exposes health and readiness endpoints that the configured runtime can use for rollout safety.
 - Scope Kubernetes probes and Helm chart templates to repositories with `deploymentModel: kubernetes`.
+- Scope registry-only image publishing to repositories with `deploymentModel: docker`.
 - Distinguish private (GHCR) vs public (Docker Hub) image publishing based on the API's audience.
 
 ## Activation
@@ -30,6 +31,8 @@ Use the same Kubernetes `deploy.yml` and `gitops-deploy.yml` templates as the we
 - Update the GitOps repository only after the tagged image is pushed, and include the image digest when the chart supports digest pinning.
 
 Name the workflow file `deploy-api.yml` (or keep `deploy.yml` if there is only one service).
+
+If `deploymentModel` is `docker`, publish the API image to GHCR or Docker Hub and expose the digest, but do not add Kubernetes, SSH, systemd, hosted-platform, or serverless deployment-state jobs unless the repository already owns that runtime layer.
 
 If `deploymentModel` is `none`, do not add deployment-state update jobs unless the user explicitly asks to introduce API deployment ownership. Container publishing may still be valid for installable or local runtime images, but deployment-state updates are inactive.
 

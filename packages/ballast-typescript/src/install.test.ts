@@ -2490,7 +2490,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
 
       expect(exitCode).toBe(1);
       expect(errorSpy).toHaveBeenCalledWith(
-        'Invalid --deployment-model value: "kuberntes". Valid values: none, kubernetes, serverless, server, hosted'
+        'Invalid --deployment-model value: "kuberntes". Valid values: none, kubernetes, serverless, server, docker, hosted'
       );
     });
 

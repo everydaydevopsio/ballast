@@ -24,8 +24,8 @@ Suggested facts to record:
 Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.
 
 - Root `.rulesrc.json` targets are repo policy. Keep them aligned with every checked-in Ballast-managed target surface.
-- Do not edit checked-in `.claude/` or `.codex/` generated rule outputs directly. Change the source templates/content under repo-root `agents/` and `skills/`, then regenerate the local Ballast-managed outputs.
-- When repo-root `agents/`, `skills/`, Ballast sync/build scripts, or root target config change, regenerate and commit the corresponding local Ballast-managed `.claude/` and `.codex/` outputs in the same PR.
+- Do not edit checked-in `.claude/` or `.codex/` generated rule outputs directly. Change the source templates/content under repo-root `agents/` and `skills/` instead.
+- Checked-in `.claude/` and `.codex/` generated outputs are created by running `ballast upgrade --patch`; use that command to regenerate them after repo-root `agents/`, `skills/`, Ballast sync/build scripts, or root target config change.
 
 ## Installed agent rules
 

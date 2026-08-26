@@ -397,6 +397,16 @@ describe('build', () => {
       expect(content).toContain('preview deployments');
     });
 
+    test('returns docker deployment guidance when deploymentModel is docker', () => {
+      const content = buildContent('publishing', 'codex', 'web', 'typescript', {
+        variables: { deploymentModel: 'docker' }
+      });
+
+      expect(content).toContain('deploymentModel: docker');
+      expect(content).toContain('GHCR and Docker Hub');
+      expect(content).toContain('image vulnerability scan');
+    });
+
     test('returns compact Kubernetes GitOps web deployment guidance', () => {
       const content = getContent('publishing', 'web', 'typescript');
       expect(content).toContain('deploymentModel: none');

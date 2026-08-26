@@ -2951,6 +2951,23 @@ func TestDetectRepoProfilesFindsDartFlutterProfile(t *testing.T) {
 	}
 }
 
+func TestDetectRepoProfilesFindsDockerProfile(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "Dockerfile"), "FROM alpine\n")
+
+	profiles, err := detectRepoProfiles(root)
+	if err != nil {
+		t.Fatalf("detectRepoProfiles returned error: %v", err)
+	}
+
+	want := []repoProfile{
+		{Language: langDocker, Paths: []string{root}},
+	}
+	if !reflect.DeepEqual(profiles, want) {
+		t.Fatalf("expected docker profile %#v, got %#v", want, profiles)
+	}
+}
+
 func TestDetectRepoProfilesIgnoresNonFlutterDartPackage(t *testing.T) {
 	root := resolvedTempDir(t)
 	pkg := filepath.Join(root, "packages", "cli")
@@ -3065,6 +3082,16 @@ func TestDetectLanguageSupportsDartRulesConfig(t *testing.T) {
 	got := detectLanguage(root)
 	if got != langDart {
 		t.Fatalf("expected dart detection from legacy config, got %q", got)
+	}
+}
+
+func TestDetectLanguageSupportsDockerfile(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "Dockerfile"), "FROM alpine\n")
+
+	got := detectLanguage(root)
+	if got != langDocker {
+		t.Fatalf("expected docker detection, got %q", got)
 	}
 }
 

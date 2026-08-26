@@ -239,6 +239,15 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("Deployment is inactive", content)
         self.assertIn("do not create deploy-on-main workflows", content)
 
+    def test_build_content_renders_docker_deployment_model(self) -> None:
+        content = cli.build_content(
+            "publishing", "codex", "python", "web", deployment_model="docker"
+        )
+
+        self.assertIn("deploymentModel: docker", content)
+        self.assertIn("GHCR and Docker Hub", content)
+        self.assertIn("image vulnerability scans", content)
+
     def test_build_content_marks_optional_publishing_variants(self) -> None:
         for suffix in ["apt", "brew"]:
             content = cli.build_content("publishing", "codex", "python", suffix)
@@ -495,6 +504,18 @@ class PatchInstallTests(unittest.TestCase):
             (root / "versions.tf").write_text("terraform {}\n", encoding="utf-8")
             self.make_git_boundary(root)
             nested = root / "modules" / "network"
+            nested.mkdir(parents=True)
+
+            resolved = cli.resolve_project_root(nested)
+
+            self.assertEqual(resolved, root)
+
+    def test_resolve_project_root_supports_docker_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Dockerfile").write_text("FROM alpine\n", encoding="utf-8")
+            self.make_git_boundary(root)
+            nested = root / "docker" / "scripts"
             nested.mkdir(parents=True)
 
             resolved = cli.resolve_project_root(nested)
@@ -1090,6 +1111,7 @@ class PatchInstallTests(unittest.TestCase):
                 "github-pr-copilot-cycle",
                 "ballast-audit",
                 "ballast-project-maintenance",
+                "docker-registry-publish",
             ],
         )
         self.assertEqual(

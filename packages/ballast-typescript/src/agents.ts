@@ -44,7 +44,8 @@ export const LANGUAGES = [
   'go',
   'ansible',
   'terraform',
-  'dart'
+  'dart',
+  'docker'
 ] as const;
 export type Language = (typeof LANGUAGES)[number];
 
@@ -73,7 +74,8 @@ export const COMMON_SKILL_IDS = [
   'github-health-check',
   'github-pr-copilot-cycle',
   'ballast-audit',
-  'ballast-project-maintenance'
+  'ballast-project-maintenance',
+  'docker-registry-publish'
 ] as const;
 export const SKILL_IDS = [...COMMON_SKILL_IDS] as const;
 export type SkillId = (typeof SKILL_IDS)[number];

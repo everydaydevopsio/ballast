@@ -121,6 +121,7 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"github-pr-copilot-cycle",
 		"ballast-audit",
 		"ballast-project-maintenance",
+		"docker-registry-publish",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
@@ -1242,6 +1243,23 @@ func TestBuildContentRendersInactiveDeploymentModel(t *testing.T) {
 	}
 	if !strings.Contains(content, "do not create deploy-on-main workflows") {
 		t.Fatalf("expected deploy-on-main guardrail, got %q", content)
+	}
+}
+
+func TestBuildContentRendersDockerDeploymentModel(t *testing.T) {
+	content, err := buildContent("publishing", "codex", "go", "web", "standalone", "github", "docker")
+	if err != nil {
+		t.Fatalf("buildContent(publishing): %v", err)
+	}
+
+	if strings.Contains(content, deploymentModelGuidanceToken) {
+		t.Fatalf("expected deployment model token to be replaced, got %q", content)
+	}
+	if !strings.Contains(content, "Deployment guidance is active (`deploymentModel: docker`).") {
+		t.Fatalf("expected docker deployment activation guidance, got %q", content)
+	}
+	if !strings.Contains(content, "GHCR and Docker Hub") {
+		t.Fatalf("expected registry guidance, got %q", content)
 	}
 }
 

@@ -112,6 +112,11 @@ var skillRegistry = []skillEntry{
 		Description: "inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools",
 		Status:      statusActive,
 	},
+	{
+		ID:          "docker-registry-publish",
+		Description: "set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility",
+		Status:      statusActive,
+	},
 }
 
 // — Agent registry helpers —————————————————————————————————————————————————
