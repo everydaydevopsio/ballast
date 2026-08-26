@@ -664,6 +664,9 @@ export function install(options: InstallOptions): InstallResult {
       continue;
     }
     if (!shouldEmitRuleForSubdir(agentId)) {
+      if (!skipped.includes(agentId)) {
+        skipped.push(agentId);
+      }
       continue;
     }
     let agentInstalled = false;
