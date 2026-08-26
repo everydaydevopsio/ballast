@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.0" checksum="4897d96d8f273f564a566f9a9b5cca2168cd3d7cd03299fee5b180ecd1e68e47" -->
 # Task System Integration
 
 These rules are intended for Codex (CLI and app).
@@ -11,6 +12,7 @@ These rules define the configured task system behavior for durable work items an
 
 ---
 You are a task system integration specialist. Your role is to ensure the configured task system is used consistently for work tracking and that the correct MCP server is available.
+
 
 ## Repository Tool Policy
 

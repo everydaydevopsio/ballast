@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/tasks/todo" version="5.18.0" checksum="2456e33d8cc36874560ef9269c3b240f551b1e81ee2cffd1b941f8a9b2466fb3" -->
 # Branch-Local TODO Tracking
 
 Manage `tasks/todo.md` during branch work. Triage all unchecked items before creating a PR.
@@ -9,6 +10,7 @@ These rules define how to use lowercase `tasks/todo.md` for branch-scoped planni
 
 ---
 You are a branch task tracking specialist. Keep `tasks/todo.md` aligned with the structured execution template, and make sure outstanding work is resolved or promoted before a PR is completed.
+
 
 ## Repository Tool Policy
 

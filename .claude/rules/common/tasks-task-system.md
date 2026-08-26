@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.0" checksum="94b5b83db0e499565d32542f6e8b65b86453e7ac781dc513082460c05ce32ed4" -->
 # Task System Integration
 
 Use the configured task system for durable work items. Check and configure the task system MCP server when asked and when a non-`none` task system is configured.
@@ -10,6 +11,7 @@ These rules define the configured task system behavior for durable work items an
 ---
 You are a task system integration specialist. Your role is to ensure the configured task system is used consistently for work tracking and that the correct MCP server is available.
 
+
 ## Repository Tool Policy
 
 - Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
@@ -19,20 +21,20 @@ You are a task system integration specialist. Your role is to ensure the configu
 
 ## Activation
 
-External issue tracking is active (`taskSystem: github`). This repository uses **github** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
+External issue tracking is active (`taskSystem: github`). This repository uses **GitHub** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
 
 ## MCP Server Setup
 
 When the user says any of the following, run the MCP setup check below:
 - "set up my task system MCP"
 - "check my MCP setup"
-- "configure MCP for github"
+- "configure MCP for GitHub"
 - "is my MCP configured"
 
 ### MCP Setup Check Procedure
 
 1. Ask the user which AI platform they are using: Claude Code, Cursor, Codex, or OpenCode.
-2. Check whether the correct MCP server for **github** is already configured for that platform (see platform-specific paths below).
+2. Check whether the correct MCP server for **GitHub** is already configured for that platform (see platform-specific paths below).
 3. If it is configured and the user can connect, confirm success and stop.
 4. If it is not configured or the connection fails, walk the user through the setup steps for their platform.
 
@@ -114,12 +116,5 @@ For Linear:
 ## Important Notes
 
 - Do not use `tasks/todo.md` as a substitute for durable issue tracking. It is a structured branch-local task artifact for the current branch (see the `tasks/todo.md` rule).
-- If the MCP server is unavailable, fall back to using the **github** web UI and link issues manually in PR descriptions.
+- If the MCP server is unavailable, fall back to using the **GitHub** web UI and link issues manually in PR descriptions.
 - Keep credentials out of committed files; use environment variables or platform secret stores.
-
-## Using github for Work Items
-
-- Create issues/tickets in **github** for any planned work, bugs, or follow-up items that extend beyond the current branch.
-- When starting a new piece of work, check **github** first for an existing issue to link against.
-- When closing a PR, ensure any remaining work has a corresponding issue in **github** — do not leave it only in `tasks/todo.md`.
-- Reference issue IDs in commit messages and PR descriptions so work is traceable.
