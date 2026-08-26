@@ -6,7 +6,8 @@ import {
   buildContent,
   getDestination,
   getSkillDestination,
-  listRuleSuffixes
+  listRuleSuffixes,
+  shouldEmitRuleForSubdir
 } from './build';
 import {
   LANGUAGES,
@@ -133,6 +134,9 @@ describe('repo generated artifacts', () => {
         for (const language of configuredLanguages) {
           const resolvedAgents = resolveAgents(configuredAgents, language);
           for (const agentId of resolvedAgents) {
+            if (!shouldEmitRuleForSubdir(agentId, subdir)) {
+              continue;
+            }
             for (const suffix of listRuleSuffixes(agentId, language)) {
               const destination = getDestination(
                 agentId,

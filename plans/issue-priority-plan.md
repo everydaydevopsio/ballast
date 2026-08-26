@@ -76,7 +76,7 @@ Recommendation:
 ### Platform and Agent Expansion
 
 - #133: Create MCP server so AI agents can configure and use Ballast directly.
-- #10: Add agent validation tests with Dockerfiles and rule validation per AI platform.
+- #10: Add agent validation tests with Dockerfiles and rule validation per AI platform. Start from the generated artifact inventory gate in `.github/workflows/generated-agent-artifacts.yml`, which runs `src/repo-generated-artifacts.test.ts` so stale common-rule copies under language-specific rule directories fail in CI; promote it to strict `BALLAST_ENFORCE_REPO_GENERATED_ARTIFACTS=1` byte-for-byte drift enforcement after version-stamp drift is cleaned up.
 - #99: Add Next.js-specific TypeScript rules.
 - #124: Enhance Ballast toward a robust Agentic SDLC framework.
 

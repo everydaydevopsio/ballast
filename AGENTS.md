@@ -61,6 +61,9 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/go/go-linting.md` — Rules for go/linting
 - `.codex/rules/go/go-logging.md` — Rules for go/logging
 - `.codex/rules/go/go-testing.md` — Rules for go/testing
+- `.codex/rules/docker/docker-linting.md` — Rules for docker/linting
+- `.codex/rules/docker/docker-logging.md` — Rules for docker/logging
+- `.codex/rules/docker/docker-testing.md` — Rules for docker/testing
 
 ## Installed skills
 

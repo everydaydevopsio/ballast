@@ -124,6 +124,22 @@ function getRuleSubdir(): string | null {
   return value;
 }
 
+export function shouldEmitRuleForSubdir(
+  agentId: string,
+  ruleSubdir: string | null = getRuleSubdir()
+): boolean {
+  if (!ruleSubdir) {
+    return true;
+  }
+  const isCommonAgent = (COMMON_AGENT_IDS as readonly string[]).includes(
+    agentId
+  );
+  if (ruleSubdir === 'common') {
+    return isCommonAgent;
+  }
+  return !isCommonAgent;
+}
+
 function getScopedBasename(
   ruleSubdir: string | null,
   basename: string

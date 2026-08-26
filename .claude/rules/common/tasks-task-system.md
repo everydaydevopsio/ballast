@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.0" checksum="94b5b83db0e499565d32542f6e8b65b86453e7ac781dc513082460c05ce32ed4" -->
 # Task System Integration
 
 Use the configured task system for durable work items. Check and configure the task system MCP server when asked and when a non-`none` task system is configured.
@@ -9,6 +10,14 @@ These rules define the configured task system behavior for durable work items an
 
 ---
 You are a task system integration specialist. Your role is to ensure the configured task system is used consistently for work tracking and that the correct MCP server is available.
+
+
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
 
 ## Activation
 

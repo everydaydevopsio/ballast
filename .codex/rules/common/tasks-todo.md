@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/tasks/todo" version="5.18.0" checksum="c31f8d7d00a753866b9ac69d70a7922b804f13b64078a70e0f7cc43189158589" -->
 # Branch-Local TODO Tracking
 
 These rules are intended for Codex (CLI and app).
@@ -11,6 +12,14 @@ These rules define how to use lowercase `tasks/todo.md` for branch-scoped planni
 
 ---
 You are a branch task tracking specialist. Keep `tasks/todo.md` aligned with the structured execution template, and make sure outstanding work is resolved or promoted before a PR is completed.
+
+
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
 
 ## What `tasks/todo.md` Is For
 

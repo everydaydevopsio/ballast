@@ -7,6 +7,13 @@ Ensure proper license configuration (LICENSE file, package.json, README referenc
 
 When setting up or working on projects, ensure proper license configuration for legal clarity and reuse.
 
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
 ## Default Behavior
 
 **If no license is specified**, use the **MIT License**. Projects can override this in `AGENTS.md` or `CLAUDE.md` (see Configuration below).

@@ -2259,6 +2259,57 @@ Read and follow these rule files in \`.gemini/rules/\` when they apply:
         );
       });
 
+      test('codex: language rule subdir skips common agents', () => {
+        const previousRuleSubdir = process.env.BALLAST_RULE_SUBDIR;
+
+        try {
+          process.env.BALLAST_RULE_SUBDIR = 'typescript';
+
+          const result = install({
+            projectRoot: tmpDir,
+            target: 'codex',
+            agents: ['cicd', 'linting'],
+            force: false,
+            saveConfig: false
+          });
+
+          expect(result.skipped).toContain('cicd');
+          expect(
+            fs.existsSync(
+              path.join(tmpDir, '.codex', 'rules', 'typescript', 'cicd.md')
+            )
+          ).toBe(false);
+          expect(
+            fs.existsSync(
+              path.join(
+                tmpDir,
+                '.codex',
+                'rules',
+                'typescript',
+                'typescript-cicd.md'
+              )
+            )
+          ).toBe(false);
+          expect(
+            fs.existsSync(
+              path.join(
+                tmpDir,
+                '.codex',
+                'rules',
+                'typescript',
+                'typescript-linting.md'
+              )
+            )
+          ).toBe(true);
+        } finally {
+          if (previousRuleSubdir === undefined) {
+            delete process.env.BALLAST_RULE_SUBDIR;
+          } else {
+            process.env.BALLAST_RULE_SUBDIR = previousRuleSubdir;
+          }
+        }
+      });
+
       test('codex patch updates installed rules section without removing user notes', () => {
         const codexDir = path.join(tmpDir, '.codex', 'rules');
         fs.mkdirSync(codexDir, { recursive: true });
