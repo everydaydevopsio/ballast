@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -101,12 +102,45 @@ func TestListAgentsIncludesAllRegistryAgents(t *testing.T) {
 		"publishing",
 		"git-hooks",
 		"tasks",
+		"plan-lifecycle",
 		"linting",
 		"logging",
 		"testing",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestCommonAgentsMatchEmbeddedContentDirs(t *testing.T) {
+	entries, err := embeddedAgentsFS.ReadDir("agents/common")
+	if err != nil {
+		t.Fatalf("read embedded common agents: %v", err)
+	}
+
+	expected := []string{}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		contentEntries, err := embeddedAgentsFS.ReadDir("agents/common/" + entry.Name())
+		if err != nil {
+			t.Fatalf("read embedded common agent %q: %v", entry.Name(), err)
+		}
+		for _, contentEntry := range contentEntries {
+			name := contentEntry.Name()
+			if name == "content.md" || (strings.HasPrefix(name, "content-") && strings.HasSuffix(name, ".md")) {
+				expected = append(expected, entry.Name())
+				break
+			}
+		}
+	}
+
+	got := append([]string{}, commonAgents...)
+	sort.Strings(expected)
+	sort.Strings(got)
+	if !slices.Equal(got, expected) {
+		t.Fatalf("commonAgents must match embedded agents/common content dirs: expected %v, got %v", expected, got)
 	}
 }
 
