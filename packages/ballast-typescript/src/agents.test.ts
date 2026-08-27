@@ -47,9 +47,8 @@ describe('agents', () => {
         })
         .map((entry) => entry.name)
         .sort();
-      const languageAgents = ['linting', 'logging', 'testing'];
       const actual = [...AGENT_IDS]
-        .filter((id) => !languageAgents.includes(id))
+        .filter((id) => path.dirname(getAgentDir(id)) === commonRoot)
         .sort();
 
       expect(actual).toEqual(expected);
