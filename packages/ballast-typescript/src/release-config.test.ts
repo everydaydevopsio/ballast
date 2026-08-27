@@ -50,4 +50,24 @@ describe('release config', () => {
       expect(pinnedVersions.length).toBe(goreleaserUses.length);
     }
   });
+
+  test('Python GitHub release uploads tolerate existing releases', () => {
+    const helper = readRepoFile('scripts/upload-github-release-assets.sh');
+
+    expect(helper).toContain('gh release view "$release_tag"');
+    expect(helper).toContain('gh release create "$release_tag"');
+    expect(helper).toContain('gh release upload "$release_tag" "$@" --clobber');
+
+    for (const workflowPath of [
+      '.github/workflows/publish.yml',
+      '.github/workflows/publish-python.yml'
+    ]) {
+      const workflow = readRepoFile(workflowPath);
+
+      expect(workflow).not.toContain('softprops/action-gh-release');
+      expect(workflow).toContain(
+        'scripts/upload-github-release-assets.sh "$RELEASE_TAG" "$RELEASE_NAME"'
+      );
+    }
+  });
 });

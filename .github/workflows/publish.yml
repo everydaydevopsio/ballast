@@ -162,13 +162,13 @@ jobs:
         run: env UV_CACHE_DIR=/tmp/uv-cache uv build packages/ballast-python --sdist --wheel
 
       - name: Publish Python artifacts to GitHub release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.bump_and_tag.outputs.version) || github.ref_name }}
-          name: ${{ github.event_name == 'workflow_dispatch' && format('ballast-python v{0}', needs.bump_and_tag.outputs.version) || format('ballast-python {0}', github.ref_name) }}
-          overwrite_files: true
-          files: |
-            packages/ballast-python/dist/*.whl
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.bump_and_tag.outputs.version) || github.ref_name }}
+          RELEASE_NAME: ${{ github.event_name == 'workflow_dispatch' && format('ballast-python v{0}', needs.bump_and_tag.outputs.version) || format('ballast-python {0}', github.ref_name) }}
+        run: |
+          scripts/upload-github-release-assets.sh "$RELEASE_TAG" "$RELEASE_NAME" \
+            packages/ballast-python/dist/*.whl \
             packages/ballast-python/dist/*.tar.gz
 
   publish_go:

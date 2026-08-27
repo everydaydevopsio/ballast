@@ -52,13 +52,13 @@ jobs:
         run: env UV_CACHE_DIR=/tmp/uv-cache uv build packages/ballast-python --sdist --wheel
 
       - name: Publish Python artifacts to GitHub release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ inputs.version }}
-          name: ballast-python v${{ inputs.version }}
-          overwrite_files: true
-          files: |
-            packages/ballast-python/dist/*.whl
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: v${{ inputs.version }}
+          RELEASE_NAME: ballast-python v${{ inputs.version }}
+        run: |
+          scripts/upload-github-release-assets.sh "$RELEASE_TAG" "$RELEASE_NAME" \
+            packages/ballast-python/dist/*.whl \
             packages/ballast-python/dist/*.tar.gz
 
   publish_from_version:
@@ -86,11 +86,11 @@ jobs:
         run: env UV_CACHE_DIR=/tmp/uv-cache uv build packages/ballast-python --sdist --wheel
 
       - name: Publish Python artifacts to GitHub release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ inputs.version }}
-          name: ballast-python v${{ inputs.version }}
-          overwrite_files: true
-          files: |
-            packages/ballast-python/dist/*.whl
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: v${{ inputs.version }}
+          RELEASE_NAME: ballast-python v${{ inputs.version }}
+        run: |
+          scripts/upload-github-release-assets.sh "$RELEASE_TAG" "$RELEASE_NAME" \
+            packages/ballast-python/dist/*.whl \
             packages/ballast-python/dist/*.tar.gz
