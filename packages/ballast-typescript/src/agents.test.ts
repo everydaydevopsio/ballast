@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import {
   listAgents,
@@ -25,6 +26,32 @@ describe('agents', () => {
       expect(listAgents()).toContain('tasks');
       expect(listAgents()).toContain('plan-lifecycle');
       expect(listAgents()).toContain('testing');
+    });
+
+    test('common agent ids match packaged content directories', () => {
+      const commonRoot = path.dirname(getAgentDir('local-dev'));
+      const expected = fs
+        .readdirSync(commonRoot, { withFileTypes: true })
+        .filter((entry) => {
+          if (!entry.isDirectory()) {
+            return false;
+          }
+          const agentDir = path.join(commonRoot, entry.name);
+          return fs
+            .readdirSync(agentDir)
+            .some(
+              (name) =>
+                name === 'content.md' ||
+                (name.startsWith('content-') && name.endsWith('.md'))
+            );
+        })
+        .map((entry) => entry.name)
+        .sort();
+      const actual = [...AGENT_IDS]
+        .filter((id) => path.dirname(getAgentDir(id)) === commonRoot)
+        .sort();
+
+      expect(actual).toEqual(expected);
     });
   });
 
