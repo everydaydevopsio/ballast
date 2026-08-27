@@ -100,6 +100,36 @@ class PatchInstallTests(unittest.TestCase):
         self.assertTrue(cli.verify_rule_checksum(content))
         self.assertFalse(cli.verify_rule_checksum(content + "\nManual edit\n"))
 
+    def test_common_agents_match_packaged_content_dirs(self) -> None:
+        common_root = Path(cli.__file__).resolve().parent / "agents" / "common"
+        expected = sorted(
+            entry.name
+            for entry in common_root.iterdir()
+            if entry.is_dir()
+            and ((entry / "content.md").exists() or any(entry.glob("content-*.md")))
+        )
+
+        self.assertEqual(sorted(cli.COMMON_AGENTS), expected)
+
+    def test_install_supports_plan_lifecycle_agent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            result = cli.install(
+                root,
+                "codex",
+                ["plan-lifecycle"],
+                [],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertEqual(result.errors, [])
+            self.assertIn("plan-lifecycle", result.installed)
+            self.assertTrue((root / ".codex" / "rules" / "plan-lifecycle.md").exists())
+
     def test_rule_marker_requires_generated_header_position(self) -> None:
         marker = (
             '<!-- ballast:rule id="python/linting" version="dev" '
@@ -600,6 +630,8 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn('"languages": [', content)
             self.assertIn('"python"', content)
             self.assertIn('"paths": {', content)
+            self.assertIn('"plan-lifecycle"', content)
+            self.assertTrue((root / ".codex" / "rules" / "plan-lifecycle.md").exists())
 
     def test_run_install_writes_deployment_model_for_publishing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

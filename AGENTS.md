@@ -24,6 +24,7 @@ Suggested facts to record:
 Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.
 
 - Root `.rulesrc.json` targets are repo policy. Keep them aligned with every checked-in Ballast-managed target surface.
+- Agent and skill registries are duplicated across generated backend packages. When adding, renaming, or removing `agents/common/*`, language agent directories, or `skills/common/*`, update every backend registry and keep parity tests that compare registries to packaged content directories passing.
 - Do not edit checked-in `.claude/` or `.codex/` generated rule outputs directly. Change the source templates/content under repo-root `agents/` and `skills/` instead.
 - Checked-in `.claude/` and `.codex/` generated outputs are created by running `ballast upgrade --patch`; use that command to regenerate them after repo-root `agents/`, `skills/`, Ballast sync/build scripts, or root target config change.
 

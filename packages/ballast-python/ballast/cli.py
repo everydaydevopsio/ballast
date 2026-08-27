@@ -25,6 +25,7 @@ COMMON_AGENTS = [
     "publishing",
     "git-hooks",
     "tasks",
+    "plan-lifecycle",
 ]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {

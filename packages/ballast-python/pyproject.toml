@@ -25,6 +25,7 @@ ballast-python = "ballast.cli:main"
 
 [dependency-groups]
 dev = [
+  "pytest>=9.1.1",
   "ruff>=0.15.10,<0.17",
 ]
 

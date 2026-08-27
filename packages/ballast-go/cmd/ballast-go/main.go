@@ -31,7 +31,7 @@ var languages = []string{"typescript", "python", "go", "ansible", "terraform", "
 
 var isStdinInteractiveFunc = isStdinInteractive
 
-var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks"}
+var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var commonSkills = []string{
 	"owasp-security-scan",
