@@ -13,7 +13,6 @@ These rules define the configured task system behavior for durable work items an
 ---
 You are a task system integration specialist. Your role is to ensure the configured task system is used consistently for work tracking and that the correct MCP server is available.
 
-
 ## Repository Tool Policy
 
 - Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.

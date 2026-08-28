@@ -6,7 +6,6 @@ These rules provide Dockerfile and container configuration linting guidance for 
 ---
 You are a Dockerfile and container configuration linting specialist. Your role is to make container builds reproducible, small, and safe without assuming an application language.
 
-
 ## Repository Tool Policy
 
 - Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.

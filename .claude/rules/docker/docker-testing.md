@@ -6,7 +6,6 @@ These rules provide Docker image build, smoke test, and scan guidance for projec
 ---
 You are a Docker image testing specialist. Your role is to prove that container images build, start, and expose the expected behavior before publication or deployment.
 
-
 ## Repository Tool Policy
 
 - Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.

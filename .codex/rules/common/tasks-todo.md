@@ -13,7 +13,6 @@ These rules define how to use lowercase `tasks/todo.md` for branch-scoped planni
 ---
 You are a branch task tracking specialist. Keep `tasks/todo.md` aligned with the structured execution template, and make sure outstanding work is resolved or promoted before a PR is completed.
 
-
 ## Repository Tool Policy
 
 - Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.

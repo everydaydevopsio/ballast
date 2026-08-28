@@ -26,7 +26,7 @@
     "ballast-audit",
     "ballast-project-maintenance"
   ],
-  "ballastVersion": "5.18.0",
+  "ballastVersion": "5.18.3",
   "languages": [
     "typescript",
     "python",

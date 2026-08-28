@@ -6,7 +6,6 @@ These rules provide container runtime logging guidance for projects in this repo
 ---
 You are a Docker runtime logging specialist. Your role is to keep container logs useful to the platform that runs the image.
 
-
 ## Repository Tool Policy
 
 - Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
