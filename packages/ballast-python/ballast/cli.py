@@ -1988,8 +1988,13 @@ def merge_markdown_bodies(existing: str, canonical: str) -> str:
             continue
         # The tool policy is Ballast-generated; when canonical output no longer
         # carries it (it moved to the target manifest), drop the stale copy
-        # instead of preserving it like a user-authored section.
-        if heading == "## Repository Tool Policy":
+        # instead of preserving it like a user-authored section. Match on the
+        # generated body signature so a user-authored section that merely
+        # reuses the heading is preserved.
+        if heading == "## Repository Tool Policy" and (
+            "Check `.rulesrc.json` `tools` before adding, installing, or running language tooling."
+            in text
+        ):
             continue
         parts.append(text)
 

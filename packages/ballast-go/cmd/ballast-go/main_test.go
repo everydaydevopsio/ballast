@@ -1156,7 +1156,7 @@ func TestInstallRendersDefaultToolsWhenSavingConfig(t *testing.T) {
 }
 
 func TestPatchDropsStaleToolPolicyWhenCanonicalOmitsIt(t *testing.T) {
-	existing := "# Rules\n\nIntro.\n\n## Repository Tool Policy\n\n- Check `.rulesrc.json` `tools` before adding tooling.\n\n## Keep\n\nBody.\n"
+	existing := "# Rules\n\nIntro.\n\n## Repository Tool Policy\n\n- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.\n\n## Keep\n\nBody.\n"
 	canonical := "# Rules\n\nIntro.\n\n## Keep\n\nBody.\n"
 
 	merged := patchRuleContent(existing, canonical, "claude")
@@ -1166,6 +1166,17 @@ func TestPatchDropsStaleToolPolicyWhenCanonicalOmitsIt(t *testing.T) {
 	}
 	if !strings.Contains(merged, "## Keep") {
 		t.Fatalf("expected other sections preserved, got %q", merged)
+	}
+}
+
+func TestPatchPreservesUserSectionReusingPolicyHeading(t *testing.T) {
+	existing := "# Rules\n\n## Repository Tool Policy\n\nOur team's own notes about tooling, not Ballast-generated.\n"
+	canonical := "# Rules\n\nIntro.\n"
+
+	merged := patchRuleContent(existing, canonical, "claude")
+
+	if !strings.Contains(merged, "Our team's own notes about tooling") {
+		t.Fatalf("expected user-authored section preserved, got %q", merged)
 	}
 }
 

@@ -283,7 +283,7 @@ class PatchInstallTests(unittest.TestCase):
     def test_patch_drops_stale_tool_policy_when_canonical_omits_it(self) -> None:
         existing = (
             "# Rules\n\nIntro.\n\n## Repository Tool Policy\n\n"
-            "- Check `.rulesrc.json` `tools` before adding tooling.\n\n"
+            "- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.\n\n"
             "## Keep\n\nBody.\n"
         )
         canonical = "# Rules\n\nIntro.\n\n## Keep\n\nBody.\n"
@@ -292,6 +292,17 @@ class PatchInstallTests(unittest.TestCase):
 
         self.assertNotIn("Repository Tool Policy", merged)
         self.assertIn("## Keep", merged)
+
+    def test_patch_preserves_user_section_reusing_policy_heading(self) -> None:
+        existing = (
+            "# Rules\n\n## Repository Tool Policy\n\n"
+            "Our team's own notes about tooling, not Ballast-generated.\n"
+        )
+        canonical = "# Rules\n\nIntro.\n"
+
+        merged = cli.patch_rule_content(existing, canonical, "claude")
+
+        self.assertIn("Our team's own notes about tooling", merged)
 
     def test_patch_keeps_tool_policy_when_canonical_includes_it(self) -> None:
         existing = "# Rules\n\n## Repository Tool Policy\n\n- Existing bullets.\n"

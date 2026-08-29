@@ -45,7 +45,7 @@ Intro.
 
 ## Repository Tool Policy
 
-- Check \`.rulesrc.json\` \`tools\` before adding tooling.
+- Check \`.rulesrc.json\` \`tools\` before adding, installing, or running language tooling.
 
 ## Keep
 
@@ -62,6 +62,21 @@ Body.
       const merged = patchRuleContent(existing, canonical, 'claude');
       expect(merged).not.toContain('Repository Tool Policy');
       expect(merged).toContain('## Keep');
+    });
+
+    test('preserves a user-authored section that reuses the policy heading', () => {
+      const existing = `# Rules
+
+## Repository Tool Policy
+
+Our team's own notes about tooling, not Ballast-generated.
+`;
+      const canonical = `# Rules
+
+Intro.
+`;
+      const merged = patchRuleContent(existing, canonical, 'claude');
+      expect(merged).toContain("Our team's own notes about tooling");
     });
 
     test('keeps repository tool policy section when canonical still includes it', () => {
