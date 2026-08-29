@@ -6,8 +6,6 @@ description: >
   clarification, planning, tasks, implementation, and convergence.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.18.0. Do not edit this section. -->
-
 # Spec Kit Delivery
 
 Use GitHub Spec Kit's native skills as the implementation lifecycle. Ballast coordinates the sequence but does not duplicate their internal prompts.
@@ -42,7 +40,13 @@ speckit-implement
 speckit-converge
 ```
 
-If `speckit-converge` appends remaining tasks, repeat `speckit-implement → speckit-converge` until the feature converges or a real product/technical decision requires human input.
+If `speckit-converge` appends remaining tasks, repeat:
+
+```text
+speckit-implement → speckit-converge
+```
+
+until the feature converges or a real product/technical decision requires human input.
 
 ## Existing Feature Change
 
@@ -52,13 +56,20 @@ Regenerate or reconcile downstream plan/tasks for the bounded change according t
 
 ## Requirements Before Implementation
 
-Before implementation begins, confirm user stories describe real outcomes, functional requirements are testable, acceptance scenarios are observable, assumptions and open questions are explicit, technical design lives in the plan rather than the requirement specification, and tasks trace back to the specification and plan.
+Before implementation begins, confirm:
+
+- user stories describe real user/business outcomes
+- functional requirements are testable
+- acceptance scenarios are observable
+- assumptions and open questions are explicit
+- technical design lives in the plan rather than the requirement specification
+- tasks trace back to the specification and plan
 
 ## Runtime Verification
 
 After implementation and automated tests, use runtime tooling when available. For web applications, use Pilot to exercise the implemented acceptance scenarios against the running app.
 
-Runtime validation supplements `speckit-converge`; it does not replace it.
+Runtime validation supplements `speckit-converge`; it does not replace it. Converge checks code against spec/plan/tasks, while Pilot demonstrates user-visible behavior.
 
 ## GitHub Issues
 
@@ -66,4 +77,10 @@ Use `speckit-taskstoissues` only when the team wants generated implementation ta
 
 ## Completion
 
-A change is complete when implementation and automated tests pass, user-visible acceptance scenarios are verified where practical, `speckit-converge` reports no actionable gaps, affected documentation is current, and remaining intentional follow-up work is explicitly tracked.
+A change is complete when:
+
+- implementation and automated tests pass
+- user-visible acceptance scenarios are verified where practical
+- `speckit-converge` reports no actionable gaps
+- documentation affected by the feature is current
+- remaining intentional follow-up work is explicitly tracked

@@ -1,0 +1,5 @@
+---
+description: Rules for common/spec-kit
+globs:
+alwaysApply: false
+---

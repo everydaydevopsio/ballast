@@ -6,15 +6,21 @@ description: >
   configured, or preparing a repository for spec-driven development.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.18.0. Do not edit this section. -->
-
 # Spec Kit Bootstrap
 
 Set up GitHub Spec Kit without duplicating its native workflow inside Ballast.
 
 ## Inspect
 
-From the repository root, check for `.specify/`, `.specify/memory/constitution.md`, `.specify/integration.json`, `.specify/init-options.json`, `specs/`, the `specify` CLI, and native `speckit-*` skills for the active coding agent.
+From the repository root, check for:
+
+- `.specify/`
+- `.specify/memory/constitution.md`
+- `.specify/integration.json`
+- `.specify/init-options.json`
+- `specs/`
+- the `specify` CLI
+- native `speckit-*` skills for the active coding agent
 
 Run `specify version` when the CLI is available.
 
@@ -34,12 +40,40 @@ If the repository already contains `.specify/`, preserve its configuration and u
 
 If the constitution is missing or still an unfilled template, use the native `speckit-constitution` skill to establish concise project-wide principles. Keep feature requirements out of the constitution.
 
-Good constitution content includes security and privacy constraints, testing expectations, compatibility requirements, accessibility requirements, and architecture principles that apply across features.
+Good constitution content includes:
+
+- security and privacy constraints
+- testing expectations
+- compatibility requirements
+- accessibility requirements
+- architecture principles that apply across features
+
+Do not use the constitution as a general project requirements document.
 
 ## Verify
 
-Confirm the active integration exposes the core native skills: `speckit-constitution`, `speckit-specify`, `speckit-plan`, `speckit-tasks`, `speckit-implement`, and `speckit-converge`, plus optional quality skills such as `speckit-clarify`, `speckit-checklist`, `speckit-analyze`, and `speckit-taskstoissues` when installed.
+Confirm the active integration exposes native skills including the core workflow:
+
+```text
+speckit-constitution
+speckit-specify
+speckit-plan
+speckit-tasks
+speckit-implement
+speckit-converge
+```
+
+and optional quality skills when installed:
+
+```text
+speckit-clarify
+speckit-checklist
+speckit-analyze
+speckit-taskstoissues
+```
 
 ## Handoff
 
-For a brownfield application with no reliable specifications, use `speckit-reverse-engineer` next. For a new feature or intentional change, use `speckit-delivery`.
+For a brownfield application with no reliable specifications, use `speckit-reverse-engineer` next.
+
+For a new feature or intentional change, use `speckit-delivery`.
