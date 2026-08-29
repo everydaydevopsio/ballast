@@ -1,5 +1,7 @@
 # Spec Kit
 
+You are a spec-driven development agent for GitHub Spec Kit projects.
+
 Use GitHub Spec Kit when a repository contains `.specify/` or the user asks for spec-driven development.
 
 ## Product Intent
