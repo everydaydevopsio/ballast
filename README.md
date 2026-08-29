@@ -57,6 +57,9 @@ Common agents (all languages):
 - `observability`
 - `publishing`
 - `git-hooks`
+- `tasks`
+- `plan-lifecycle`
+- `spec-kit`
 
 Language-specific agents:
 
@@ -65,6 +68,8 @@ Language-specific agents:
 - Go: `linting`, `logging`, `testing`
 - Ansible: `linting`, `logging`, `testing`
 - Terraform: `linting`, `logging`, `testing`
+- Dart: `linting`, `logging`, `testing`
+- Docker: `linting`, `logging`, `testing`
 
 Agent sources in this repo:
 
@@ -74,6 +79,8 @@ Agent sources in this repo:
 - `agents/go/*`
 - `agents/ansible/*`
 - `agents/terraform/*`
+- `agents/dart/*`
+- `agents/docker/*`
 
 ## Skill Model
 
@@ -84,8 +91,13 @@ Common skills (all languages):
 - `aws-live-health-review`
 - `aws-weekly-security-review`
 - `github-health-check`
+- `github-pr-copilot-cycle`
 - `ballast-audit`
 - `ballast-project-maintenance`
+- `docker-registry-publish`
+- `speckit-bootstrap`
+- `speckit-reverse-engineer`
+- `speckit-delivery`
 
 Skill sources in this repo:
 
@@ -100,8 +112,13 @@ Skills are reusable task guides that Ballast installs for the target AI tool alo
 - `aws-live-health-review`: generate a current-state AWS operational snapshot for EC2, RDS, ALB, alarms, and logs
 - `aws-weekly-security-review`: run a weekly read-only AWS security baseline review with prioritized findings
 - `github-health-check`: run a comprehensive GitHub repository health check covering CI status, open PRs, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
+- `github-pr-copilot-cycle`: create or update a GitHub PR, request Copilot review, fix actionable feedback, check CI, and repeat the review cycle
 - `ballast-audit`: audit AI rule and skill files for context density, duplication, and bloat
 - `ballast-project-maintenance`: inspect, bootstrap, and repair Ballast-managed repository state, including generated `.ballast/` local tools
+- `docker-registry-publish`: publish Docker/OCI images to GHCR or Docker Hub with tags, credentials, visibility, and digest handoff
+- `speckit-bootstrap`: initialize or repair GitHub Spec Kit in an existing repository using native Spec Kit skills
+- `speckit-reverse-engineer`: create a brownfield Spec Kit baseline from runtime behavior, source, tests, and existing docs
+- `speckit-delivery`: orchestrate the native Spec Kit lifecycle for a bounded product change
 
 ### Install a skill
 
@@ -142,6 +159,8 @@ Typical prompts:
 Run owasp-security-scan on this repository.
 Use owasp-security-scan to audit dependencies and code security.
 Use aws-live-health-review with PROFILE=prod-readonly to summarize AWS health right now.
+Use speckit-bootstrap to prepare this repository for spec-driven development.
+Use speckit-delivery for this product change.
 ```
 
 ### Where skills are installed
@@ -149,6 +168,7 @@ Use aws-live-health-review with PROFILE=prod-readonly to summarize AWS health ri
 - Cursor: `.cursor/rules/<skill>.mdc`
 - Claude: `.claude/skills/<skill>.skill`
 - OpenCode: `.opencode/skills/<skill>.md`
+- Gemini: `.gemini/rules/<skill>.md`
 - Codex: `.codex/skills/<skill>/SKILL.md`, with root `AGENTS.md` listing installed skills
 
 ## Install and Use (Single Language)
@@ -339,7 +359,7 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
 - `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, `--remove-language` removes language surfaces plus saved `paths` with cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings
 - `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically, and add `--patch` to merge backend file updates during that refresh
 - `ballast upgrade [--patch] [--force]`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it; `--patch` and `--force` forward to the backend refresh
-- `ballast install-cli [--language <typescript|python|go|ansible|terraform>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible` and `terraform` selections reuse the `ballast-go` backend.
+- `ballast install-cli [--language <typescript|python|go|ansible|terraform|dart|docker>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible`, `terraform`, `dart`, and `docker` selections reuse the `ballast-go` backend.
 
 `.ballast/` is generated local tool state, is ignored by git, and is safe to recreate. Run `ballast doctor` to inspect it; run `ballast doctor --fix` or `ballast install-cli` if `.ballast/`, `.ballast/bin`, or `.ballast/tools` is missing.
 

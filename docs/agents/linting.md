@@ -1,6 +1,6 @@
 # Linting Agent
 
-The **linting** agent provides language-appropriate linting, formatting, and CI checks for TypeScript, Python, Go, Ansible, and Terraform projects.
+The **linting** agent provides language-appropriate linting, formatting, and CI checks for TypeScript, Python, Go, Ansible, Terraform, Dart, and Docker projects.
 
 ## What It Sets Up by Language
 
@@ -25,6 +25,12 @@ The **linting** agent provides language-appropriate linting, formatting, and CI 
   - `trivy config` security checks, with `tfsec` only for legacy-compatible pipelines
   - `tfenv` guidance with `.terraform-version`, or the repo's established `asdf`/`mise` standard
   - OpenTofu equivalents such as `tofu fmt`, `tofu init -backend=false`, and `tofu validate` when the repo standardizes on `tofu`
+- **Dart**
+  - `dart format` and `dart analyze`
+  - Flutter-aware linting when `pubspec.yaml` declares Flutter
+- **Docker**
+  - Dockerfile/Containerfile linting with Hadolint
+  - image and configuration scanning with Trivy
 
 ## What It Provides
 
@@ -34,7 +40,7 @@ The **linting** agent provides language-appropriate linting, formatting, and CI 
 
 ## Monorepo Usage
 
-In a TypeScript + Python + Go monorepo, apply linting standards per language area and keep each tool scoped to its files. Use the separate `git-hooks` agent for hook orchestration.
+In a multi-language monorepo, apply linting standards per language area and keep each tool scoped to its files. Use the separate `git-hooks` agent for hook orchestration.
 
 Recommended command set:
 
@@ -43,12 +49,14 @@ Recommended command set:
 - Go: `gofmt -w .` and `golangci-lint run`
 - Ansible: `ansible-lint`, `yamllint .`, and `ansible-playbook --syntax-check site.yml`
 - Terraform: `tfenv install && tfenv use`, `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .`
+- Dart: `dart format .`, `dart analyze`, or the equivalent `flutter` commands for Flutter projects
+- Docker: `hadolint Dockerfile` and `trivy config .`
 
 ## Prompts to Improve Your App
 
-- **"Set up linting for all three languages in this monorepo"** — Multi-language baseline
+- **"Set up linting for every language profile in this monorepo"** — Multi-language baseline
 - **"Set up linting for our Ansible playbooks and roles"** — Playbook baseline
 - **"Set up linting, formatting, tfenv, and security checks for our Terraform repo"** — Terraform baseline
 - **"Fix lint errors in this package according to its language rules"** — Targeted cleanup
-- **"Add CI jobs so TypeScript, Python, Go, Ansible, and Terraform lint checks run independently"** — Monorepo CI
+- **"Add CI jobs so each language lint check runs independently"** — Monorepo CI
 - **"Add ignore patterns for generated code in each language"** — Noise reduction

@@ -1,6 +1,6 @@
 # Testing Agent
 
-The **testing** agent sets up and maintains test workflows for TypeScript, Python, Go, Ansible, and Terraform projects with sensible defaults and CI integration.
+The **testing** agent sets up and maintains test workflows for TypeScript, Python, Go, Ansible, Terraform, Dart, and Docker projects with sensible defaults and CI integration.
 
 ## What It Sets Up by Language
 
@@ -26,6 +26,12 @@ The **testing** agent sets up and maintains test workflows for TypeScript, Pytho
   - `terraform init -backend=false` smoke setup plus plan-review guidance
   - Native `terraform test` for Terraform 1.6+ module assertions and Terratest for Go-backed/live integration coverage
   - OpenTofu equivalents such as `tofu test` when the repo standardizes on `tofu`
+- **Dart**
+  - `dart test` for Dart packages
+  - Flutter test commands when the project declares Flutter
+- **Docker**
+  - Docker image build smoke tests
+  - Container startup or health-check smoke tests when the image is runnable
 
 ## What It Provides
 
@@ -78,10 +84,12 @@ Recommended baseline commands:
 - Go: `go test ./...`
 - Ansible: `ansible-playbook --syntax-check site.yml` and `ansible-playbook --check --diff site.yml`
 - Terraform: `tfenv install && tfenv use`, `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, `trivy config .`, and `terraform test`
+- Dart: `dart test`, or `flutter test` for Flutter projects
+- Docker: `docker build .` plus a project-specific container smoke check
 
 ## Prompts to Improve Your App
 
-- **"Set up tests for TypeScript, Python, Go, and Ansible packages in this monorepo"** — Full multi-language setup
+- **"Set up tests for every language profile in this monorepo"** — Full multi-language setup
 - **"Add separate CI jobs for each language test suite"** — Better isolation
 - **"Raise coverage thresholds and make CI fail when they drop"** — Quality gate
 - **"Find and fix flaky tests in this package"** — Stability
