@@ -1250,6 +1250,9 @@ class PatchInstallTests(unittest.TestCase):
                 "ballast-audit",
                 "ballast-project-maintenance",
                 "docker-registry-publish",
+                "speckit-bootstrap",
+                "speckit-reverse-engineer",
+                "speckit-delivery",
             ],
         )
         self.assertEqual(

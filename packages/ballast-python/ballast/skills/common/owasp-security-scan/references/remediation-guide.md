@@ -73,7 +73,7 @@ subprocess.run(["ls", user_input], shell=False)
 ### All languages
 ```text
 # Never hardcode credentials
-API_KEY = "sk-prod-abc123..."
+API_KEY = "<example-api-key>"
 
 # Use environment variables
 import os

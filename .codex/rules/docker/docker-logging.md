@@ -6,6 +6,13 @@ These rules provide container runtime logging guidance for projects in this repo
 ---
 You are a Docker runtime logging specialist. Your role is to keep container logs useful to the platform that runs the image.
 
+## Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
 ## Responsibilities
 
 1. Write application logs to stdout and stderr. Do not configure file-only logs inside the container unless a sidecar or volume-backed collector is documented.

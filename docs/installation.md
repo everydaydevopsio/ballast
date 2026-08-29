@@ -9,6 +9,8 @@ This guide is for AI coding agents setting up Ballast in a repository.
 - Go: `ballast-go`
 - Ansible: supported through `--language ansible`, including the `ballast` wrapper
 - Terraform: supported through `--language terraform`, including the `ballast` wrapper
+- Dart: supported through `--language dart`, including the `ballast` wrapper
+- Docker: supported through `--language docker`, including the `ballast` wrapper
 
 Wrapper command:
 
@@ -76,6 +78,8 @@ pnpm exec ballast-typescript install --language python --target cursor --all
 pnpm exec ballast-typescript install --language go --target codex --agent linting
 pnpm exec ballast-typescript install --language ansible --target codex --agent linting
 pnpm exec ballast-typescript install --language terraform --target codex --agent linting
+pnpm exec ballast-typescript install --language dart --target codex --agent linting
+pnpm exec ballast-typescript install --language docker --target codex --agent linting
 ```
 
 ### Python Package (`ballast-python`)
@@ -94,6 +98,10 @@ uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VER
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --language ansible --target cursor --agent linting
 # or
 uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --language terraform --target cursor --agent linting
+# or
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --language dart --target cursor --agent linting
+# or
+uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --language docker --target cursor --agent linting
 ```
 
 ### Go Package (`ballast-go`)
@@ -118,11 +126,15 @@ ballast-go install --target codex --skill aws-live-health-review
 ballast-go install --language ansible --target codex --agent testing
 # or
 ballast-go install --language terraform --target codex --agent linting
+# or
+ballast-go install --language dart --target codex --agent linting
+# or
+ballast-go install --language docker --target codex --agent linting
 ```
 
-## Monorepo Setup: TypeScript + Python + Go + Ansible + Terraform
+## Monorepo Setup: TypeScript + Python + Go + Ansible + Terraform + Dart + Docker
 
-For mixed-language monorepos, prefer the unified `ballast` wrapper from the repository root for TypeScript, Python, Go, Ansible, and Terraform subprojects.
+For mixed-language monorepos, prefer the unified `ballast` wrapper from the repository root for TypeScript, Python, Go, Ansible, Terraform, Dart, and Docker subprojects.
 
 ```bash
 ballast install --target cursor --all --yes
@@ -167,7 +179,15 @@ Example root config:
   ],
   "skills": ["owasp-security-scan", "aws-health-review"],
   "deploymentModel": "docker",
-  "languages": ["typescript", "python", "go", "ansible", "terraform", "dart", "docker"],
+  "languages": [
+    "typescript",
+    "python",
+    "go",
+    "ansible",
+    "terraform",
+    "dart",
+    "docker"
+  ],
   "paths": {
     "typescript": ["apps/frontend"],
     "python": ["services/api"],
@@ -223,7 +243,7 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
 - `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, `--remove-language` removes language surfaces plus saved `paths` with cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings
 - `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically, and add `--patch` to merge backend file updates during that refresh
 - `ballast upgrade [--patch] [--force]`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it; `--patch` and `--force` forward to the backend refresh
-- `ballast install-cli [--language <typescript|python|go|ansible|terraform>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible` and `terraform` selections reuse the `ballast-go` backend.
+- `ballast install-cli [--language <typescript|python|go|ansible|terraform|dart|docker>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible`, `terraform`, `dart`, and `docker` selections reuse the `ballast-go` backend.
 
 `.ballast/` is generated repository-local tool state for backend CLIs. It is safe to recreate and should remain ignored by git. `ballast install` does not require `.ballast/` to exist before installing rules or skills. Use `ballast doctor` to inspect `.ballast/`, `.ballast/bin`, and `.ballast/tools`; use `ballast doctor --fix` or `ballast install-cli` to recreate missing or incomplete local tool state.
 
@@ -239,12 +259,12 @@ Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVers
 
 ## Install Paths
 
-| Platform | Rules path       | Skills path         | File pattern                                                                   |
-| -------- | ---------------- | ------------------- | ------------------------------------------------------------------------------ |
-| Cursor   | `.cursor/rules/` | `.cursor/rules/`    | agents use `<agent>.mdc` or `<language>-<agent>.mdc`; skills use `<skill>.mdc` |
-| Claude   | `.claude/rules/` | `.claude/skills/`   | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.skill` |
-| Gemini   | `.gemini/rules/` | `.gemini/rules/`    | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`    |
-| OpenCode | `.opencode/`     | `.opencode/skills/` | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`    |
-| Codex    | `.codex/rules/`  | `.codex/rules/`     | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`    |
+| Platform | Rules path       | Skills path         | File pattern                                                                      |
+| -------- | ---------------- | ------------------- | --------------------------------------------------------------------------------- |
+| Cursor   | `.cursor/rules/` | `.cursor/rules/`    | agents use `<agent>.mdc` or `<language>-<agent>.mdc`; skills use `<skill>.mdc`    |
+| Claude   | `.claude/rules/` | `.claude/skills/`   | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.skill`    |
+| Gemini   | `.gemini/rules/` | `.gemini/rules/`    | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`       |
+| OpenCode | `.opencode/`     | `.opencode/skills/` | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>.md`       |
+| Codex    | `.codex/rules/`  | `.codex/skills/`    | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>/SKILL.md` |
 
 Codex installs root `AGENTS.md` when missing (or always with `--force`), records installed skills there, and scaffolds a `Repository Facts` section for durable repo metadata that agents should consult before re-deriving stable facts from the checkout. Gemini installs a thin `GEMINI.md` that imports `AGENTS.md` for shared guidance.

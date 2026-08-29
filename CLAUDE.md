@@ -59,6 +59,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/common/plan-lifecycle.md` — Rules for common/plan-lifecycle
 - `.claude/rules/common/tasks-task-system.md` — Rules for common/tasks-task-system
 - `.claude/rules/common/tasks-todo.md` — Rules for common/tasks-todo
+- `.claude/rules/common/spec-kit.md` — Rules for common/spec-kit
 - `.claude/rules/typescript/typescript-linting.md` — Rules for typescript/linting
 - `.claude/rules/typescript/typescript-logging.md` — Rules for typescript/logging
 - `.claude/rules/typescript/typescript-testing.md` — Rules for typescript/testing
@@ -86,3 +87,6 @@ Read and use these skill files in `.claude/skills/` when they are relevant:
 - `.claude/skills/github-pr-copilot-cycle.skill` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
 - `.claude/skills/ballast-audit.skill` — audit AI rule and skill files for context density, duplication, and bloat
 - `.claude/skills/ballast-project-maintenance.skill` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
+- `.claude/skills/speckit-bootstrap.skill` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
+- `.claude/skills/speckit-reverse-engineer.skill` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
+- `.claude/skills/speckit-delivery.skill` — orchestrate GitHub Spec Kit's native skills for a bounded product change

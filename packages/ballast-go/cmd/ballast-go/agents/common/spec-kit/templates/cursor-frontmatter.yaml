@@ -1,0 +1,7 @@
+---
+description: Rules for common/spec-kit
+globs:
+  - '.specify/**'
+  - 'specs/**'
+alwaysApply: false
+---

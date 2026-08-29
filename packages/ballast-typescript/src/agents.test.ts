@@ -25,6 +25,7 @@ describe('agents', () => {
       expect(listAgents()).toContain('git-hooks');
       expect(listAgents()).toContain('tasks');
       expect(listAgents()).toContain('plan-lifecycle');
+      expect(listAgents()).toContain('spec-kit');
       expect(listAgents()).toContain('testing');
     });
 

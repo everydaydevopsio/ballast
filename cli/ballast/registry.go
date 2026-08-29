@@ -61,6 +61,7 @@ var agentRegistry = []agentEntry{
 	{ID: "git-hooks", Kind: kindCommon, Status: statusActive},
 	{ID: "tasks", Kind: kindCommon, Status: statusActive},
 	{ID: "plan-lifecycle", Kind: kindCommon, Status: statusActive},
+	{ID: "spec-kit", Kind: kindCommon, Status: statusActive},
 
 	// Language agents — installed once per language sub-project.
 	{ID: "linting", Kind: kindLanguage, Status: statusActive},
@@ -110,6 +111,21 @@ var skillRegistry = []skillEntry{
 	{
 		ID:          "ballast-project-maintenance",
 		Description: "inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools",
+		Status:      statusActive,
+	},
+	{
+		ID:          "speckit-bootstrap",
+		Description: "initialize or repair GitHub Spec Kit in an existing repository using native agent skills",
+		Status:      statusActive,
+	},
+	{
+		ID:          "speckit-reverse-engineer",
+		Description: "reverse-engineer an existing application into a high-level GitHub Spec Kit baseline",
+		Status:      statusActive,
+	},
+	{
+		ID:          "speckit-delivery",
+		Description: "orchestrate GitHub Spec Kit's native skills for a bounded product change",
 		Status:      statusActive,
 	},
 	{

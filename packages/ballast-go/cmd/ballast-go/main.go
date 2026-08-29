@@ -34,7 +34,7 @@ var (
 var isStdinInteractiveFunc = isStdinInteractive
 
 var (
-	commonAgents   = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle"}
+	commonAgents   = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle", "spec-kit"}
 	languageAgents = []string{"linting", "logging", "testing"}
 	commonSkills   = []string{
 		"owasp-security-scan",
@@ -46,6 +46,9 @@ var (
 		"ballast-audit",
 		"ballast-project-maintenance",
 		"docker-registry-publish",
+		"speckit-bootstrap",
+		"speckit-reverse-engineer",
+		"speckit-delivery",
 	}
 )
 

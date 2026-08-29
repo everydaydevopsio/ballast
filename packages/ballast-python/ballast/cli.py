@@ -26,6 +26,7 @@ COMMON_AGENTS = [
     "git-hooks",
     "tasks",
     "plan-lifecycle",
+    "spec-kit",
 ]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
@@ -47,6 +48,9 @@ COMMON_SKILLS = [
     "ballast-audit",
     "ballast-project-maintenance",
     "docker-registry-publish",
+    "speckit-bootstrap",
+    "speckit-reverse-engineer",
+    "speckit-delivery",
 ]
 SKILLS_BY_LANGUAGE = {
     "typescript": COMMON_SKILLS,
