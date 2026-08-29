@@ -53,6 +53,7 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/common/plan-lifecycle.md` — Rules for common/plan-lifecycle
 - `.codex/rules/common/tasks-task-system.md` — Rules for common/tasks-task-system
 - `.codex/rules/common/tasks-todo.md` — Rules for common/tasks-todo
+- `.codex/rules/common/spec-kit.md` — Rules for common/spec-kit
 - `.codex/rules/typescript/typescript-linting.md` — Rules for typescript/linting
 - `.codex/rules/typescript/typescript-logging.md` — Rules for typescript/logging
 - `.codex/rules/typescript/typescript-testing.md` — Rules for typescript/testing
@@ -80,6 +81,9 @@ Read and use these skill files in `.codex/skills/` when they are relevant:
 - `.codex/skills/github-pr-copilot-cycle/SKILL.md` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
 - `.codex/skills/ballast-audit/SKILL.md` — audit AI rule and skill files for context density, duplication, and bloat
 - `.codex/skills/ballast-project-maintenance/SKILL.md` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
+- `.codex/skills/speckit-bootstrap/SKILL.md` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
+- `.codex/skills/speckit-reverse-engineer/SKILL.md` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
+- `.codex/skills/speckit-delivery/SKILL.md` — orchestrate GitHub Spec Kit's native skills for a bounded product change
 
 ## Codex code review expectations
 
