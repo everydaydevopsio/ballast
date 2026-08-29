@@ -25,6 +25,12 @@ Implement the context-hygiene phases in order (#286/#287/#288 first), then retur
 
 ## Active Workstream: Context Hygiene (#286–#297)
 
+### Status (2026-08-29)
+
+- **#286 implemented** (PR #305): tool policy renders once in each target manifest's managed section; per-rule injection remains only for cursor/opencode (no manifest); the wrapper's monorepo support files render it from merged language tools; and the `--patch` upgrade path now drops the stale per-rule policy sections so existing repos converge. Rule payload in this repo dropped from 133.3 KB to 119.2 KB even after absorbing the Spec Kit rule.
+- **Spec Kit review (merged via #302)**: the new surfaces follow the context-hygiene rules and do not re-bloat the payload. The always-loaded `spec-kit` rule is ~1.1 KB post-#286 with a one-line activation trigger (`.specify/` presence); the heavy content lives in three on-demand skills (speckit-bootstrap 2.2 KB, speckit-delivery 3.0 KB, speckit-reverse-engineer 4.5 KB) — the skill-first shape Phases 2–3 push the rest of the catalog toward. Its cursor rule is the first path-scoped rule (`globs: ['.specify/**', 'specs/**']`, `alwaysApply: false`) and is the template for #297. Residual nits are already covered by open issues: duplicated H1/persona framing (#294) and three new manifest skill lines (#295 minimal profile).
+- Treat spec-kit as the reference shape for future agents: small always-on trigger rule, skills for procedure, scoped cursor globs. The #296 CI gate should lock this in.
+
 Goal: reduce the always-loaded rule payload from ~33k tokens to ~10k (standard) or ~1–2k (minimal profile) per session with zero loss of actual policy, and prevent regression.
 
 ### Phase 1 — Quick wins in the build pipeline (do first)
@@ -143,5 +149,5 @@ Excluded from this plan:
 
 - If implementation changes repo-root `agents/`, `skills/`, Ballast sync/build scripts, or root target config, regenerate and commit the corresponding local Ballast-managed `.claude/` and `.codex/` outputs in the same PR.
 - Do not edit checked-in generated `.claude/` or `.codex/` rule outputs directly. Change source templates/content under repo-root `agents/` and `skills/`, then regenerate.
-- Context-hygiene baseline measured 2026-08-26: `.claude/rules/` = 133,310 bytes across 32 files; largest offenders publishing-cli (8.9 KB), publishing-apps (8.3 KB), publishing-api (7.9 KB), cicd (7.6 KB); "Repository Tool Policy" duplicated 31 times. Use this as the before-number when validating #286–#296.
+- Context-hygiene baseline measured 2026-08-26: `.claude/rules/` = 133,310 bytes across 32 files; largest offenders publishing-cli (8.9 KB), publishing-apps (8.3 KB), publishing-api (7.9 KB), cicd (7.6 KB); "Repository Tool Policy" duplicated 31 times. After #286 (PR #305, includes the Spec Kit rule): 119,243 bytes across 33 files, policy rendered once per manifest. Next checkpoints: #287 should remove ~23 KB more (inactive publishing variants + tombstone), then Phase 2 dedupe.
 - Keep the `windows` issue #61 out of this non-Windows priority plan unless the user explicitly asks to include Windows work.
