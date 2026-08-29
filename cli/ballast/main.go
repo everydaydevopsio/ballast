@@ -4096,9 +4096,33 @@ func supportFilePath(root string, target string) string {
 // (### heading so managed-section merging keeps it inside that section). The
 // policy is emitted once per support file instead of once per rule.
 func renderRepositoryToolPolicyManifestLines(tools map[string][]string) []string {
-	if len(tools) == 0 {
+	normalized := map[string][]string{}
+	for language, values := range tools {
+		languageKey := strings.ToLower(strings.TrimSpace(language))
+		if languageKey == "" {
+			continue
+		}
+		seen := map[string]struct{}{}
+		cleaned := make([]string, 0, len(values))
+		for _, value := range values {
+			tool := strings.ToLower(strings.TrimSpace(value))
+			if tool == "" {
+				continue
+			}
+			if _, ok := seen[tool]; ok {
+				continue
+			}
+			seen[tool] = struct{}{}
+			cleaned = append(cleaned, tool)
+		}
+		if len(cleaned) > 0 {
+			normalized[languageKey] = cleaned
+		}
+	}
+	if len(normalized) == 0 {
 		return nil
 	}
+	tools = normalized
 	languages := make([]string, 0, len(tools))
 	for language := range tools {
 		languages = append(languages, language)

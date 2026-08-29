@@ -5503,7 +5503,7 @@ func TestBuildMonorepoSupportFileIncludesRepositoryToolPolicyOnce(t *testing.T) 
 		Common: []string{"local-dev"},
 		Config: monorepoConfig{
 			Languages: []string{"python"},
-			Tools:     map[string][]string{"python": {"uv", "pyenv"}},
+			Tools:     map[string][]string{"python": {"UV", " pyenv "}},
 		},
 	}
 
