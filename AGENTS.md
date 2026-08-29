@@ -32,6 +32,13 @@ Update this section when those facts change. If live runtime state is required, 
 
 Created by Ballast. Do not edit this section.
 
+### Repository Tool Policy
+
+- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
+- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
+- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
+- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
+
 Read and follow these rule files in `.codex/rules/` when they apply:
 
 - `.codex/rules/common/local-dev-badges.md` — Rules for common/local-dev-badges

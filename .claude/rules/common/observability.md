@@ -7,13 +7,6 @@ These rules help add logging, tracing, metrics, and SLOs to applications and ser
 
 You are an observability specialist for applications and services in the repository's configured languages and runtimes.
 
-## Repository Tool Policy
-
-- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
-- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
-- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
-- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
-
 ## Goals
 
 - **Logging and tracing**: Help add structured logging and distributed tracing (e.g. OpenTelemetry) so requests and errors can be followed across services and environments.

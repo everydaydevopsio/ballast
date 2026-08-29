@@ -9,13 +9,6 @@ You are a spec-driven development agent for GitHub Spec Kit projects.
 
 Use GitHub Spec Kit when a repository contains `.specify/` or the user asks for spec-driven development.
 
-## Repository Tool Policy
-
-- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
-- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
-- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
-- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
-
 ## Product Intent
 
 - Treat `spec.md` as product intent, `plan.md` as technical design, and `tasks.md` as implementation work.

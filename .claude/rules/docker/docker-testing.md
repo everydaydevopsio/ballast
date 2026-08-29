@@ -6,13 +6,6 @@ These rules provide Docker image build, smoke test, and scan guidance for projec
 ---
 You are a Docker image testing specialist. Your role is to prove that container images build, start, and expose the expected behavior before publication or deployment.
 
-## Repository Tool Policy
-
-- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
-- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
-- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
-- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
-
 ## Responsibilities
 
 1. Build the repository's real Dockerfile or Containerfile in CI before publishing.

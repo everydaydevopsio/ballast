@@ -1132,6 +1132,33 @@ alwaysApply: false
       expect(content).not.toContain('`.codex/rules/publishing-apt.md`');
       expect(content).not.toContain('`.codex/rules/publishing-brew.md`');
     });
+
+    test('includes repository tool policy once inside installed agent rules section', () => {
+      const content = buildCodexAgentsMd(
+        ['linting'],
+        [],
+        'typescript',
+        undefined,
+        {
+          Python: ['UV', 'pyenv'],
+          TypeScript: ['Pnpm', 'corepack']
+        }
+      );
+      expect(content).toContain('### Repository Tool Policy');
+      expect(content).toContain('python=uv,pyenv');
+      expect(content).toContain('typescript=pnpm,corepack');
+      expect(content).toContain('uv run <command>');
+      expect(content).toContain('pnpm exec');
+      const rulesIndex = content.indexOf('## Installed agent rules');
+      const policyIndex = content.indexOf('### Repository Tool Policy');
+      expect(policyIndex).toBeGreaterThan(rulesIndex);
+      expect(content.match(/Repository Tool Policy/g)).toHaveLength(1);
+    });
+
+    test('omits repository tool policy when no tools configured', () => {
+      const content = buildCodexAgentsMd(['linting'], [], 'typescript');
+      expect(content).not.toContain('Repository Tool Policy');
+    });
   });
 
   describe('buildClaudeMd', () => {
@@ -1165,6 +1192,18 @@ alwaysApply: false
       expect(content).not.toContain('`.claude/rules/publishing-cli.md`');
       expect(content).not.toContain('`.claude/rules/publishing-apps.md`');
     });
+
+    test('includes repository tool policy once inside installed agent rules section', () => {
+      const content = buildClaudeMd(['linting'], [], 'typescript', undefined, {
+        python: ['uv', 'pyenv']
+      });
+      expect(content).toContain('### Repository Tool Policy');
+      expect(content).toContain('python=uv,pyenv');
+      expect(content.indexOf('### Repository Tool Policy')).toBeGreaterThan(
+        content.indexOf('## Installed agent rules')
+      );
+      expect(content.match(/Repository Tool Policy/g)).toHaveLength(1);
+    });
   });
 
   describe('buildGeminiMd', () => {
@@ -1181,6 +1220,18 @@ alwaysApply: false
       expect(content).toContain('TypeScript linting specialist');
       expect(content).toContain('## Installed skills');
       expect(content).toContain('`.gemini/rules/owasp-security-scan.md`');
+    });
+
+    test('includes repository tool policy once inside installed agent rules section', () => {
+      const content = buildGeminiMd(['linting'], [], 'typescript', undefined, {
+        python: ['uv', 'pyenv']
+      });
+      expect(content).toContain('### Repository Tool Policy');
+      expect(content).toContain('python=uv,pyenv');
+      expect(content.indexOf('### Repository Tool Policy')).toBeGreaterThan(
+        content.indexOf('## Installed agent rules')
+      );
+      expect(content.match(/Repository Tool Policy/g)).toHaveLength(1);
     });
   });
 
@@ -1244,18 +1295,32 @@ alwaysApply: false
       expect(result).toContain('# TypeScript Linting Rules');
     });
 
-    test('codex includes configured repository tools policy', () => {
-      const result = buildContent('testing', 'codex', undefined, 'python', {
-        tools: {
-          Python: ['UV', 'pyenv'],
-          TypeScript: ['Pnpm', 'corepack']
-        }
-      });
-      expect(result).toContain('## Repository Tool Policy');
-      expect(result).toContain('python=uv,pyenv');
-      expect(result).toContain('typescript=pnpm,corepack');
-      expect(result).toContain('uv run <command>');
-      expect(result).toContain('pnpm exec');
+    test('manifest-bearing targets omit the repository tool policy from rules', () => {
+      for (const target of ['claude', 'codex', 'gemini'] as const) {
+        const result = buildContent('testing', target, undefined, 'python', {
+          tools: {
+            Python: ['UV', 'pyenv'],
+            TypeScript: ['Pnpm', 'corepack']
+          }
+        });
+        expect(result).not.toContain('Repository Tool Policy');
+      }
+    });
+
+    test('cursor and opencode rules keep the configured repository tools policy', () => {
+      for (const target of ['cursor', 'opencode'] as const) {
+        const result = buildContent('testing', target, undefined, 'python', {
+          tools: {
+            Python: ['UV', 'pyenv'],
+            TypeScript: ['Pnpm', 'corepack']
+          }
+        });
+        expect(result).toContain('## Repository Tool Policy');
+        expect(result).toContain('python=uv,pyenv');
+        expect(result).toContain('typescript=pnpm,corepack');
+        expect(result).toContain('uv run <command>');
+        expect(result).toContain('pnpm exec');
+      }
     });
 
     test('throws for unknown target', () => {
