@@ -12,6 +12,7 @@
     "git-hooks",
     "plan-lifecycle",
     "tasks",
+    "spec-kit",
     "linting",
     "logging",
     "testing"
@@ -24,7 +25,10 @@
     "github-health-check",
     "github-pr-copilot-cycle",
     "ballast-audit",
-    "ballast-project-maintenance"
+    "ballast-project-maintenance",
+    "speckit-bootstrap",
+    "speckit-reverse-engineer",
+    "speckit-delivery"
   ],
   "ballastVersion": "5.18.3",
   "languages": [

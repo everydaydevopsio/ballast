@@ -1,6 +1,6 @@
 # Logging Agent
 
-The **logging** agent sets up structured, production-safe logging patterns for TypeScript, Python, Go, Ansible, and Terraform automation.
+The **logging** agent sets up structured, production-safe logging patterns for TypeScript, Python, Go, Ansible, Terraform, Dart, and Docker automation.
 
 ## What It Sets Up by Language
 
@@ -22,6 +22,12 @@ The **logging** agent sets up structured, production-safe logging patterns for T
   - Reviewable `plan` and `apply` output conventions
   - Sensitive output and variable handling to keep secrets out of logs
   - Guidance for plan artifacts, `TF_LOG`, and environment-safe operator messaging
+- **Dart**
+  - Structured application logs for CLI, server, or Flutter project conventions
+  - Guidance for keeping user data and tokens out of logs
+- **Docker**
+  - Container log conventions for build, runtime, and CI output
+  - Guidance for avoiding secret leakage in image build logs
 
 ## What It Provides
 
@@ -44,7 +50,7 @@ Common baseline fields:
 
 ## Prompts to Improve Your App
 
-- **"Standardize logging fields across TypeScript, Python, Go, Ansible, and Terraform automation"** — Cross-language schema
+- **"Standardize logging fields across all language profiles in this monorepo"** — Cross-language schema
 - **"Set log levels so development is verbose and production is noise-controlled"** — Environment policy
 - **"Add request/trace propagation to logs in this service"** — Correlation
 - **"Review our logs for secrets and high-cardinality fields"** — Safety check

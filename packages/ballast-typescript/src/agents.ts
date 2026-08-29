@@ -61,7 +61,8 @@ export const COMMON_AGENT_IDS = [
   'publishing',
   'git-hooks',
   'tasks',
-  'plan-lifecycle'
+  'plan-lifecycle',
+  'spec-kit'
 ] as const;
 export const LANGUAGE_AGENT_IDS = ['linting', 'logging', 'testing'] as const;
 export const AGENT_IDS = [...COMMON_AGENT_IDS, ...LANGUAGE_AGENT_IDS] as const;
@@ -75,7 +76,10 @@ export const COMMON_SKILL_IDS = [
   'github-pr-copilot-cycle',
   'ballast-audit',
   'ballast-project-maintenance',
-  'docker-registry-publish'
+  'docker-registry-publish',
+  'speckit-bootstrap',
+  'speckit-reverse-engineer',
+  'speckit-delivery'
 ] as const;
 export const SKILL_IDS = [...COMMON_SKILL_IDS] as const;
 export type SkillId = (typeof SKILL_IDS)[number];

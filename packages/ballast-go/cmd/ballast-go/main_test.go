@@ -103,6 +103,7 @@ func TestListAgentsIncludesAllRegistryAgents(t *testing.T) {
 		"git-hooks",
 		"tasks",
 		"plan-lifecycle",
+		"spec-kit",
 		"linting",
 		"logging",
 		"testing",
@@ -156,6 +157,9 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"ballast-audit",
 		"ballast-project-maintenance",
 		"docker-registry-publish",
+		"speckit-bootstrap",
+		"speckit-reverse-engineer",
+		"speckit-delivery",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)

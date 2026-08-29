@@ -31,7 +31,7 @@ var languages = []string{"typescript", "python", "go", "ansible", "terraform", "
 
 var isStdinInteractiveFunc = isStdinInteractive
 
-var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle"}
+var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle", "spec-kit"}
 var languageAgents = []string{"linting", "logging", "testing"}
 var commonSkills = []string{
 	"owasp-security-scan",
@@ -43,6 +43,9 @@ var commonSkills = []string{
 	"ballast-audit",
 	"ballast-project-maintenance",
 	"docker-registry-publish",
+	"speckit-bootstrap",
+	"speckit-reverse-engineer",
+	"speckit-delivery",
 }
 
 var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
