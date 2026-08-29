@@ -33,9 +33,11 @@ const (
 	langDocker     language = "docker"
 )
 
-var supportedLanguages = []language{langTypeScript, langPython, langGo, langAnsible, langTerraform, langDart, langDocker}
-var installableBackendLanguages = []language{langTypeScript, langPython, langGo}
-var supportedTargets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
+var (
+	supportedLanguages          = []language{langTypeScript, langPython, langGo, langAnsible, langTerraform, langDart, langDocker}
+	installableBackendLanguages = []language{langTypeScript, langPython, langGo}
+	supportedTargets            = []string{"cursor", "claude", "opencode", "codex", "gemini"}
+)
 
 type toolConfig struct {
 	binary         string
@@ -129,24 +131,29 @@ var toolsByLanguage = map[language]toolConfig{
 
 var version = "dev"
 
-var ensureInstalledFunc = ensureInstalled
-var execToolFunc = execTool
-var walkDirFunc = filepath.WalkDir
-var osExecutableFunc = os.Executable
-var execLookPathFunc = exec.LookPath
-var runCommandFunc = runCommand
-var runCommandOutputFunc = runCommandOutput
-var resolveInstalledVersionFunc = resolveInstalledVersion
-var collectDoctorBackendsFunc = collectDoctorBackends
+var (
+	ensureInstalledFunc         = ensureInstalled
+	execToolFunc                = execTool
+	walkDirFunc                 = filepath.WalkDir
+	osExecutableFunc            = os.Executable
+	execLookPathFunc            = exec.LookPath
+	runCommandFunc              = runCommand
+	runCommandOutputFunc        = runCommandOutput
+	resolveInstalledVersionFunc = resolveInstalledVersion
+	collectDoctorBackendsFunc   = collectDoctorBackends
+)
 
-var supportedTaskSystems = []string{"github", "jira", "linear"}
-var supportedDeploymentModels = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
-var supportedPublishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
-var publishingProfileAliases = map[string]string{
-	"app":     "apps",
-	"library": "libraries",
-	"sdk":     "sdks",
-}
+var (
+	supportedTaskSystems        = []string{"github", "jira", "linear"}
+	supportedDeploymentModels   = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
+	supportedPublishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
+	publishingProfileAliases    = map[string]string{
+		"app":     "apps",
+		"library": "libraries",
+		"sdk":     "sdks",
+	}
+)
+
 var defaultLanguageTools = map[string][]string{
 	"python":     {"uv", "pyenv"},
 	"typescript": {"pnpm", "corepack"},
@@ -4084,6 +4091,41 @@ func supportFilePath(root string, target string) string {
 	return filepath.Join(root, "AGENTS.md")
 }
 
+// renderRepositoryToolPolicyManifestLines renders the repository tool policy
+// as manifest lines nested under the managed "Installed agent rules" section
+// (### heading so managed-section merging keeps it inside that section). The
+// policy is emitted once per support file instead of once per rule.
+func renderRepositoryToolPolicyManifestLines(tools map[string][]string) []string {
+	if len(tools) == 0 {
+		return nil
+	}
+	languages := make([]string, 0, len(tools))
+	for language := range tools {
+		languages = append(languages, language)
+	}
+	sort.Strings(languages)
+
+	formatted := make([]string, 0, len(languages))
+	for _, language := range languages {
+		formatted = append(formatted, language+"="+strings.Join(tools[language], ","))
+	}
+
+	lines := []string{
+		"### Repository Tool Policy",
+		"",
+		"- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.",
+		"- Configured tools: " + strings.Join(formatted, "; ") + ".",
+	}
+	if slices.Contains(tools["python"], "uv") {
+		lines = append(lines, "- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.")
+	}
+	if slices.Contains(tools["typescript"], "pnpm") {
+		lines = append(lines, "- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.")
+	}
+	lines = append(lines, "")
+	return lines
+}
+
 func buildMonorepoSupportFile(root string, plan *monorepoPlan, target string) string {
 	title := "# AGENTS.md"
 	intro := "This file provides shared repository guidance for agent tools that read AGENTS.md."
@@ -4119,6 +4161,9 @@ func buildMonorepoSupportFile(root string, plan *monorepoPlan, target string) st
 		"",
 		"Created by Ballast. Do not edit this section.",
 		"",
+	)
+	lines = append(lines, renderRepositoryToolPolicyManifestLines(mergeLanguageTools(&plan.Config, plan.Config.Languages))...)
+	lines = append(lines,
 		fmt.Sprintf("Read and follow these rule files in `%s/` when they apply:", rulesDir),
 		"",
 	)
@@ -4255,10 +4300,12 @@ func patchInstalledRulesSection(existing string, canonical string) string {
 	)
 }
 
-const rootPlaceholder = "__BALLAST_ROOT__"
-const ballastManagedMarker = "Created by [Ballast]"
-const ballastManagedSectionNotice = "Created by Ballast. Do not edit this section."
-const ballastRuleMarkerPrefix = "<!-- ballast:rule "
+const (
+	rootPlaceholder             = "__BALLAST_ROOT__"
+	ballastManagedMarker        = "Created by [Ballast]"
+	ballastManagedSectionNotice = "Created by Ballast. Do not edit this section."
+	ballastRuleMarkerPrefix     = "<!-- ballast:rule "
+)
 
 func containsBallastManagedMarker(content string) bool {
 	return strings.Contains(content, ballastManagedMarker) ||

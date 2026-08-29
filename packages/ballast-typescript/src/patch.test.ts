@@ -38,6 +38,49 @@ Canonical completion checklist.
       expect(merged).toContain('Keep this section.');
     });
 
+    test('drops stale repository tool policy section when canonical omits it', () => {
+      const existing = `# Rules
+
+Intro.
+
+## Repository Tool Policy
+
+- Check \`.rulesrc.json\` \`tools\` before adding tooling.
+
+## Keep
+
+Body.
+`;
+      const canonical = `# Rules
+
+Intro.
+
+## Keep
+
+Body.
+`;
+      const merged = patchRuleContent(existing, canonical, 'claude');
+      expect(merged).not.toContain('Repository Tool Policy');
+      expect(merged).toContain('## Keep');
+    });
+
+    test('keeps repository tool policy section when canonical still includes it', () => {
+      const existing = `# Rules
+
+## Repository Tool Policy
+
+- Existing policy bullets.
+`;
+      const canonical = `# Rules
+
+## Repository Tool Policy
+
+- Canonical policy bullets.
+`;
+      const merged = patchRuleContent(existing, canonical, 'claude');
+      expect(merged).toContain('## Repository Tool Policy');
+    });
+
     test('preserves existing markdown sections for gemini rules', () => {
       const existing = `# TypeScript Linting Rules
 

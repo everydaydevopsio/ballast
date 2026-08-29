@@ -230,22 +230,81 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("# Python Linting Rules", content)
         self.assertNotIn("Codex (CLI and app)", content)
 
-    def test_build_content_includes_configured_tools_policy(self) -> None:
-        content = cli.build_content(
-            "testing",
-            "codex",
-            "python",
-            tools={
-                "python": ["uv", "pyenv"],
-                "typescript": ["pnpm", "corepack"],
-            },
-        )
+    def test_manifest_targets_omit_tools_policy_in_rules(self) -> None:
+        for target in ["codex", "claude", "gemini"]:
+            content = cli.build_content(
+                "testing",
+                target,
+                "python",
+                tools={
+                    "python": ["uv", "pyenv"],
+                    "typescript": ["pnpm", "corepack"],
+                },
+            )
 
-        self.assertIn("## Repository Tool Policy", content)
-        self.assertIn("python=uv,pyenv", content)
-        self.assertIn("typescript=pnpm,corepack", content)
-        self.assertIn("uv run <command>", content)
-        self.assertIn("pnpm exec", content)
+            self.assertNotIn("Repository Tool Policy", content)
+
+    def test_cursor_and_opencode_rules_keep_tools_policy(self) -> None:
+        for target in ["cursor", "opencode"]:
+            content = cli.build_content(
+                "testing",
+                target,
+                "python",
+                tools={
+                    "python": ["uv", "pyenv"],
+                    "typescript": ["pnpm", "corepack"],
+                },
+            )
+
+            self.assertIn("## Repository Tool Policy", content)
+            self.assertIn("python=uv,pyenv", content)
+            self.assertIn("typescript=pnpm,corepack", content)
+            self.assertIn("uv run <command>", content)
+            self.assertIn("pnpm exec", content)
+
+    def test_manifests_include_tools_policy_once(self) -> None:
+        tools = {"python": ["uv", "pyenv"]}
+        for builder in [
+            cli.build_codex_agents_md,
+            cli.build_claude_md,
+            cli.build_gemini_md,
+        ]:
+            content = builder(["testing"], [], "python", tools=tools)
+
+            self.assertIn("### Repository Tool Policy", content)
+            self.assertIn("python=uv,pyenv", content)
+            self.assertIn("uv run <command>", content)
+            self.assertGreater(
+                content.index("### Repository Tool Policy"),
+                content.index("## Installed agent rules"),
+            )
+            self.assertEqual(content.count("Repository Tool Policy"), 1)
+
+    def test_patch_drops_stale_tool_policy_when_canonical_omits_it(self) -> None:
+        existing = (
+            "# Rules\n\nIntro.\n\n## Repository Tool Policy\n\n"
+            "- Check `.rulesrc.json` `tools` before adding tooling.\n\n"
+            "## Keep\n\nBody.\n"
+        )
+        canonical = "# Rules\n\nIntro.\n\n## Keep\n\nBody.\n"
+
+        merged = cli.patch_rule_content(existing, canonical, "claude")
+
+        self.assertNotIn("Repository Tool Policy", merged)
+        self.assertIn("## Keep", merged)
+
+    def test_patch_keeps_tool_policy_when_canonical_includes_it(self) -> None:
+        existing = "# Rules\n\n## Repository Tool Policy\n\n- Existing bullets.\n"
+        canonical = "# Rules\n\n## Repository Tool Policy\n\n- Canonical bullets.\n"
+
+        merged = cli.patch_rule_content(existing, canonical, "claude")
+
+        self.assertIn("## Repository Tool Policy", merged)
+
+    def test_manifests_omit_tools_policy_without_tools(self) -> None:
+        content = cli.build_codex_agents_md(["testing"], [], "python")
+
+        self.assertNotIn("Repository Tool Policy", content)
 
     def test_build_content_renders_publishing_deployment_model_token(self) -> None:
         content = cli.build_content(
@@ -471,9 +530,14 @@ class PatchInstallTests(unittest.TestCase):
                 root / ".claude" / "rules" / "python-testing.md",
             ]:
                 content = rule_path.read_text(encoding="utf-8")
-                self.assertIn("## Repository Tool Policy", content)
+                self.assertNotIn("Repository Tool Policy", content)
+
+            for manifest_path in [root / "AGENTS.md", root / "CLAUDE.md"]:
+                content = manifest_path.read_text(encoding="utf-8")
+                self.assertIn("### Repository Tool Policy", content)
                 self.assertIn("python=uv,pyenv", content)
                 self.assertIn("uv run <command>", content)
+                self.assertEqual(content.count("Repository Tool Policy"), 1)
 
     def test_load_config_normalizes_publishing_profiles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

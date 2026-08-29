@@ -161,9 +161,16 @@ function mergeMarkdownBodies(existing: string, canonical: string): string {
   }
 
   for (const section of existingParsed.sections) {
-    if (!canonicalHeadings.has(section.heading)) {
-      parts.push(section.text);
+    if (canonicalHeadings.has(section.heading)) {
+      continue;
     }
+    // The tool policy is Ballast-generated; when canonical output no longer
+    // carries it (it moved to the target manifest), drop the stale copy
+    // instead of preserving it like a user-authored section.
+    if (section.heading === '## Repository Tool Policy') {
+      continue;
+    }
+    parts.push(section.text);
   }
 
   return parts.join('\n\n').trimEnd() + '\n';

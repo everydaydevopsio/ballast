@@ -6,13 +6,6 @@ These rules provide Python Testing Rules guidance for projects in this repositor
 ---
 You are a Python testing specialist. Your role is to set up reliable automated testing.
 
-## Repository Tool Policy
-
-- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
-- Configured tools: go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
-- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
-- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
-
 ## TDD Process Discipline
 
 Tooling setup and process discipline are separate responsibilities: configure pytest and coverage, and also use TDD for behavioral changes.

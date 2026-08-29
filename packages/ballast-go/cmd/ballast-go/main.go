@@ -26,42 +26,48 @@ import (
 	"golang.org/x/term"
 )
 
-var targets = []string{"cursor", "claude", "opencode", "codex", "gemini"}
-var languages = []string{"typescript", "python", "go", "ansible", "terraform", "dart", "docker"}
+var (
+	targets   = []string{"cursor", "claude", "opencode", "codex", "gemini"}
+	languages = []string{"typescript", "python", "go", "ansible", "terraform", "dart", "docker"}
+)
 
 var isStdinInteractiveFunc = isStdinInteractive
 
-var commonAgents = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle"}
-var languageAgents = []string{"linting", "logging", "testing"}
-var commonSkills = []string{
-	"owasp-security-scan",
-	"aws-health-review",
-	"aws-live-health-review",
-	"aws-weekly-security-review",
-	"github-health-check",
-	"github-pr-copilot-cycle",
-	"ballast-audit",
-	"ballast-project-maintenance",
-	"docker-registry-publish",
-}
+var (
+	commonAgents   = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle"}
+	languageAgents = []string{"linting", "logging", "testing"}
+	commonSkills   = []string{
+		"owasp-security-scan",
+		"aws-health-review",
+		"aws-live-health-review",
+		"aws-weekly-security-review",
+		"github-health-check",
+		"github-pr-copilot-cycle",
+		"ballast-audit",
+		"ballast-project-maintenance",
+		"docker-registry-publish",
+	}
+)
 
-var descriptionRegex = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
-var ballastVersion = "dev"
-var frontmatterRegex = regexp.MustCompile(`(?s)^\s*---\n(.*?)\n---\n?`)
-var topLevelYAMLKeyRegex = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
-var gitHooksGuidanceToken = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
-var gitHooksPreCommitGlobToken = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
-var deploymentModelGuidanceToken = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
-var taskSystemGuidanceToken = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
-var taskSystemToken = "{{taskSystem}}"
-var taskSystems = []string{"github", "jira", "linear", "none"}
-var deploymentModels = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
-var publishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
-var publishingProfileAliases = map[string]string{
-	"app":     "apps",
-	"library": "libraries",
-	"sdk":     "sdks",
-}
+var (
+	descriptionRegex             = regexp.MustCompile(`(?m)^description:\s*['\"]?(.+?)['\"]?\s*$`)
+	ballastVersion               = "dev"
+	frontmatterRegex             = regexp.MustCompile(`(?s)^\s*---\n(.*?)\n---\n?`)
+	topLevelYAMLKeyRegex         = regexp.MustCompile(`^([A-Za-z0-9_-]+):(.*)$`)
+	gitHooksGuidanceToken        = "{{BALLAST_GIT_HOOKS_GUIDANCE}}"
+	gitHooksPreCommitGlobToken   = "{{BALLAST_GIT_HOOKS_PRE_COMMIT_GLOB}}"
+	deploymentModelGuidanceToken = "{{BALLAST_DEPLOYMENT_MODEL_GUIDANCE}}"
+	taskSystemGuidanceToken      = "{{BALLAST_TASK_SYSTEM_GUIDANCE}}"
+	taskSystemToken              = "{{taskSystem}}"
+	taskSystems                  = []string{"github", "jira", "linear", "none"}
+	deploymentModels             = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
+	publishingProfiles           = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
+	publishingProfileAliases     = map[string]string{
+		"app":     "apps",
+		"library": "libraries",
+		"sdk":     "sdks",
+	}
+)
 
 var ruleMarkerRegex = regexp.MustCompile(`^<!-- ballast:rule\s+id="([^"]+)"\s+version="([^"]+)"\s+checksum="([a-fA-F0-9]{64})"\s*-->\r?\n?`)
 
@@ -1138,7 +1144,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, agentsPath)
 				}
 			} else {
-				content, err := buildCodexAgentsMD(supportAgents, supportSkills, opts.language)
+				content, err := buildCodexAgentsMD(supportAgents, supportSkills, opts.language, effectiveTools)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 				} else {
@@ -1172,7 +1178,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, claudePath)
 				}
 			} else {
-				content, err := buildClaudeMD(supportAgents, supportSkills, opts.language)
+				content, err := buildClaudeMD(supportAgents, supportSkills, opts.language, effectiveTools)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
 				} else {
@@ -1206,7 +1212,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, geminiPath)
 				}
 			} else {
-				content, err := buildGeminiMD(supportAgents, supportSkills, opts.language)
+				content, err := buildGeminiMD(supportAgents, supportSkills, opts.language, effectiveTools)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
 				} else {
@@ -1236,7 +1242,7 @@ func install(opts installOptions) installResult {
 	return result
 }
 
-func buildCodexAgentsMD(agents []string, skills []string, language string) (string, error) {
+func buildCodexAgentsMD(agents []string, skills []string, language string, tools map[string][]string) (string, error) {
 	lines := []string{
 		"# AGENTS.md",
 		"",
@@ -1250,6 +1256,9 @@ func buildCodexAgentsMD(agents []string, skills []string, language string) (stri
 		"",
 		ballastNotice(),
 		"",
+	)
+	lines = append(lines, renderRepositoryToolPolicyManifestLines(tools)...)
+	lines = append(lines,
 		"Read and follow these rule files in `.codex/rules/` when they apply:",
 		"",
 	)
@@ -1304,7 +1313,7 @@ func renderGeminiMandates() string {
 	}, "\n")
 }
 
-func buildGeminiMD(agents []string, skills []string, language string) (string, error) {
+func buildGeminiMD(agents []string, skills []string, language string, tools map[string][]string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("# GEMINI.md\n\n")
 	sb.WriteString("This file provides guidance to Gemini CLI for working in this repository.\n\n")
@@ -1323,6 +1332,9 @@ func buildGeminiMD(agents []string, skills []string, language string) (string, e
 	sb.WriteString("---\n\n")
 	sb.WriteString("## Installed agent rules\n\n")
 	sb.WriteString(ballastNotice() + "\n\n")
+	for _, line := range renderRepositoryToolPolicyManifestLines(tools) {
+		sb.WriteString(line + "\n")
+	}
 	sb.WriteString("Read and follow these rule files in `.gemini/rules/` when they apply:\n\n")
 
 	for _, agent := range agents {
@@ -1355,7 +1367,7 @@ func buildGeminiMD(agents []string, skills []string, language string) (string, e
 	return sb.String(), nil
 }
 
-func buildClaudeMD(agents []string, skills []string, language string) (string, error) {
+func buildClaudeMD(agents []string, skills []string, language string, tools map[string][]string) (string, error) {
 	lines := []string{
 		"# CLAUDE.md",
 		"",
@@ -1369,6 +1381,9 @@ func buildClaudeMD(agents []string, skills []string, language string) (string, e
 		"",
 		ballastNotice(),
 		"",
+	)
+	lines = append(lines, renderRepositoryToolPolicyManifestLines(tools)...)
+	lines = append(lines,
 		"Read and follow these rule files in `.claude/rules/` when they apply:",
 		"",
 	)
@@ -1969,9 +1984,16 @@ func mergeMarkdownBodies(existing, canonical string) string {
 		}
 	}
 	for _, section := range existingSections {
-		if _, ok := canonicalHeadings[section.heading]; !ok {
-			parts = append(parts, section.text)
+		if _, ok := canonicalHeadings[section.heading]; ok {
+			continue
 		}
+		// The tool policy is Ballast-generated; when canonical output no longer
+		// carries it (it moved to the target manifest), drop the stale copy
+		// instead of preserving it like a user-authored section.
+		if section.heading == "## Repository Tool Policy" {
+			continue
+		}
+		parts = append(parts, section.text)
 	}
 	return strings.TrimRight(strings.Join(parts, "\n\n"), "\n") + "\n"
 }
@@ -2107,6 +2129,8 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 	if len(options) > 0 {
 		buildOpts = options[0]
 	}
+	// Manifest-bearing targets (claude, codex, gemini) get the tool policy once
+	// in their manifest's "Installed agent rules" section instead of per rule.
 	withToolPolicy := func(rendered string) string {
 		return insertRepositoryToolPolicy(rendered, buildOpts.tools)
 	}
@@ -2125,7 +2149,7 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 			return "", err
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return addRuleMarker(withToolPolicy(header+content), ruleMarkerID(agentID, language, suffix)), nil
+		return addRuleMarker(header+content, ruleMarkerID(agentID, language, suffix)), nil
 	case "gemini":
 		header, err := readTemplate(agentID, language, "gemini-header.md", suffix)
 		if err != nil {
@@ -2138,7 +2162,7 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 			}
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return addRuleMarker(withToolPolicy(header+"\n---\n\n"+renderGeminiMandates()+content), ruleMarkerID(agentID, language, suffix)), nil
+		return addRuleMarker(header+"\n---\n\n"+renderGeminiMandates()+content, ruleMarkerID(agentID, language, suffix)), nil
 	case "opencode":
 		front, err := readTemplate(agentID, language, "opencode-frontmatter.yaml", suffix)
 		if err != nil {
@@ -2155,7 +2179,7 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 			}
 		}
 		header = applyTaskSystemVariables(header, agentID, taskSystem)
-		return addRuleMarker(withToolPolicy(header+content), ruleMarkerID(agentID, language, suffix)), nil
+		return addRuleMarker(header+content, ruleMarkerID(agentID, language, suffix)), nil
 	default:
 		return "", fmt.Errorf("unknown target: %s", target)
 	}
@@ -2210,6 +2234,19 @@ func insertRepositoryToolPolicy(content string, tools map[string][]string) strin
 		return prefix + policy + body
 	}
 	return prefix + body[:insertAt] + "\n\n" + policy + body[insertAt+1:]
+}
+
+// renderRepositoryToolPolicyManifestLines renders the tool policy as manifest
+// lines nested under the managed "Installed agent rules" section (### heading
+// so section patching keeps treating it as part of that section).
+func renderRepositoryToolPolicyManifestLines(tools map[string][]string) []string {
+	policy := renderRepositoryToolPolicy(tools)
+	if policy == "" {
+		return nil
+	}
+	lines := strings.Split(strings.TrimRight(policy, "\n"), "\n")
+	lines[0] = "### Repository Tool Policy"
+	return append(lines, "")
 }
 
 func ruleMarkerID(agentID, language, suffix string) string {

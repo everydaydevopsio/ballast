@@ -93,6 +93,21 @@ function renderRepositoryToolPolicy(tools?: Record<string, string[]>): string {
   return `${lines.join('\n')}\n`;
 }
 
+/**
+ * Render the tool policy as manifest lines nested under the managed
+ * "Installed agent rules" section (### heading so section patching keeps
+ * treating it as part of that section).
+ */
+function renderRepositoryToolPolicyManifestLines(
+  tools?: Record<string, string[]>
+): string[] {
+  const policy = renderRepositoryToolPolicy(tools);
+  if (!policy) return [];
+  const lines = policy.trimEnd().split('\n');
+  lines[0] = '### Repository Tool Policy';
+  return [...lines, ''];
+}
+
 function insertRepositoryToolPolicy(
   content: string,
   options?: BuildOptions
@@ -1188,7 +1203,8 @@ export function buildCodexAgentsMd(
   agents: string[],
   skills: string[] = [],
   language: Language = 'typescript',
-  publishingProfiles?: readonly PublishingProfile[]
+  publishingProfiles?: readonly PublishingProfile[],
+  tools?: Record<string, string[]>
 ): string {
   const lines: string[] = [];
   lines.push('# AGENTS.md');
@@ -1203,6 +1219,7 @@ export function buildCodexAgentsMd(
   lines.push('');
   lines.push(getCreatedByBallastLine());
   lines.push('');
+  lines.push(...renderRepositoryToolPolicyManifestLines(tools));
   lines.push(
     'Read and follow these rule files in `.codex/rules/` when they apply:'
   );
@@ -1241,7 +1258,8 @@ export function buildClaudeMd(
   agents: string[],
   skills: string[] = [],
   language: Language = 'typescript',
-  publishingProfiles?: readonly PublishingProfile[]
+  publishingProfiles?: readonly PublishingProfile[],
+  tools?: Record<string, string[]>
 ): string {
   const lines: string[] = [];
   lines.push('# CLAUDE.md');
@@ -1256,6 +1274,7 @@ export function buildClaudeMd(
   lines.push('');
   lines.push(getCreatedByBallastLine());
   lines.push('');
+  lines.push(...renderRepositoryToolPolicyManifestLines(tools));
   lines.push(
     'Read and follow these rule files in `.claude/rules/` when they apply:'
   );
@@ -1308,7 +1327,8 @@ export function buildGeminiMd(
   agents: string[],
   skills: string[] = [],
   language: Language = 'typescript',
-  publishingProfiles?: readonly PublishingProfile[]
+  publishingProfiles?: readonly PublishingProfile[],
+  tools?: Record<string, string[]>
 ): string {
   const lines: string[] = [];
   lines.push('# GEMINI.md');
@@ -1341,6 +1361,7 @@ export function buildGeminiMd(
   lines.push('');
   lines.push(getCreatedByBallastLine());
   lines.push('');
+  lines.push(...renderRepositoryToolPolicyManifestLines(tools));
   lines.push(
     'Read and follow these rule files in `.gemini/rules/` when they apply:'
   );
@@ -1410,7 +1431,11 @@ export function buildContent(
       result = result.replaceAll(`{{${key}}}`, value);
     }
   }
-  result = insertRepositoryToolPolicy(result, options);
+  // Manifest-bearing targets (claude, codex, gemini) get the tool policy once
+  // in their manifest's "Installed agent rules" section instead of per rule.
+  if (target === 'cursor' || target === 'opencode') {
+    result = insertRepositoryToolPolicy(result, options);
+  }
   return addRuleMarker(result, getRuleMarkerId(agentId, language, ruleSuffix));
 }
 

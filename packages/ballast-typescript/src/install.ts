@@ -829,7 +829,8 @@ export function install(options: InstallOptions): InstallResult {
           supportSelections.agents,
           supportSelections.skills,
           language,
-          supportSelections.publishingProfiles
+          supportSelections.publishingProfiles,
+          effectiveTools
         );
         const nextContent =
           fs.existsSync(claudeMdPath) && !force && shouldPatchClaudeMd
@@ -864,7 +865,8 @@ export function install(options: InstallOptions): InstallResult {
           supportSelections.agents,
           supportSelections.skills,
           language,
-          supportSelections.publishingProfiles
+          supportSelections.publishingProfiles,
+          effectiveTools
         );
         const nextContent =
           fs.existsSync(geminiMdPath) && !force && shouldPatchGeminiMd
@@ -897,7 +899,8 @@ export function install(options: InstallOptions): InstallResult {
           supportSelections.agents,
           supportSelections.skills,
           language,
-          supportSelections.publishingProfiles
+          supportSelections.publishingProfiles,
+          effectiveTools
         );
         const nextContent =
           fs.existsSync(agentsMdPath) && !force

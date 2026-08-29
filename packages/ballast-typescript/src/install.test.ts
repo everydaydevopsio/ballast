@@ -1521,9 +1521,18 @@ Keep my custom responsibilities.
         path.join(tmpDir, '.claude', 'rules', 'python-testing.md')
       ]) {
         const content = fs.readFileSync(rulePath, 'utf8');
-        expect(content).toContain('## Repository Tool Policy');
+        expect(content).not.toContain('Repository Tool Policy');
+      }
+
+      for (const manifestPath of [
+        path.join(tmpDir, 'AGENTS.md'),
+        path.join(tmpDir, 'CLAUDE.md')
+      ]) {
+        const content = fs.readFileSync(manifestPath, 'utf8');
+        expect(content).toContain('### Repository Tool Policy');
         expect(content).toContain('python=uv,pyenv');
         expect(content).toContain('uv run <command>');
+        expect(content.match(/Repository Tool Policy/g)).toHaveLength(1);
       }
     });
 
@@ -1538,13 +1547,19 @@ Keep my custom responsibilities.
       });
       expect(result.errors).toEqual([]);
 
-      const content = fs.readFileSync(
+      const ruleContent = fs.readFileSync(
         path.join(tmpDir, '.codex', 'rules', 'python-testing.md'),
         'utf8'
       );
-      expect(content).toContain('## Repository Tool Policy');
-      expect(content).toContain('python=uv,pyenv');
-      expect(content).toContain('uv run <command>');
+      expect(ruleContent).not.toContain('Repository Tool Policy');
+
+      const manifestContent = fs.readFileSync(
+        path.join(tmpDir, 'AGENTS.md'),
+        'utf8'
+      );
+      expect(manifestContent).toContain('### Repository Tool Policy');
+      expect(manifestContent).toContain('python=uv,pyenv');
+      expect(manifestContent).toContain('uv run <command>');
     });
 
     test('saves shared .rulesrc.json for go installs', () => {

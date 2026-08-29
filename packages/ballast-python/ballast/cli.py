@@ -1203,10 +1203,7 @@ def build_content(
         )
     if target == "claude":
         rendered = read_template(agent, language, "claude-header.md", suffix) + body
-        return add_rule_marker(
-            insert_repository_tool_policy(rendered, tools),
-            rule_marker_id(agent, language, suffix),
-        )
+        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
     if target == "gemini":
         try:
             header = read_template(agent, language, "gemini-header.md", suffix)
@@ -1216,10 +1213,7 @@ def build_content(
             except FileNotFoundError:
                 header = read_template(agent, language, "codex-header.md", suffix)
         rendered = header + "\n---\n\n" + render_gemini_mandates() + body
-        return add_rule_marker(
-            insert_repository_tool_policy(rendered, tools),
-            rule_marker_id(agent, language, suffix),
-        )
+        return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
     if target == "opencode":
         rendered = (
             read_template(agent, language, "opencode-frontmatter.yaml", suffix)
@@ -1230,15 +1224,14 @@ def build_content(
             insert_repository_tool_policy(rendered, tools),
             rule_marker_id(agent, language, suffix),
         )
+    # Manifest-bearing targets (claude, codex, gemini) get the tool policy once
+    # in their manifest's "Installed agent rules" section instead of per rule.
     try:
         header = read_template(agent, language, "codex-header.md", suffix)
     except FileNotFoundError:
         header = read_template(agent, language, "claude-header.md", suffix)
     rendered = header + body
-    return add_rule_marker(
-        insert_repository_tool_policy(rendered, tools),
-        rule_marker_id(agent, language, suffix),
-    )
+    return add_rule_marker(rendered, rule_marker_id(agent, language, suffix))
 
 
 def render_repository_tool_policy(tools: dict[str, list[str]] | None) -> str:
@@ -1291,6 +1284,20 @@ def insert_repository_tool_policy(
     if insert_at == -1:
         return f"{prefix}{policy}{body}"
     return f"{prefix}{body[:insert_at]}\n\n{policy}{body[insert_at + 1 :]}"
+
+
+def render_repository_tool_policy_manifest_lines(
+    tools: dict[str, list[str]] | None,
+) -> list[str]:
+    """Render the tool policy as manifest lines nested under the managed
+    "Installed agent rules" section (### heading so section patching keeps
+    treating it as part of that section)."""
+    policy = render_repository_tool_policy(tools)
+    if not policy:
+        return []
+    lines = policy.rstrip("\n").split("\n")
+    lines[0] = "### Repository Tool Policy"
+    return [*lines, ""]
 
 
 def rule_marker_id(agent: str, language: str, suffix: str = "") -> str:
@@ -1632,7 +1639,12 @@ def support_rule_reference(target: str, basename: str) -> str:
     return f"{root}/{scoped_basename}.md"
 
 
-def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -> str:
+def build_codex_agents_md(
+    agents: list[str],
+    skills: list[str],
+    language: str,
+    tools: dict[str, list[str]] | None = None,
+) -> str:
     lines = [
         "# AGENTS.md",
         "",
@@ -1644,6 +1656,7 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
         "",
         ballast_notice(),
         "",
+        *render_repository_tool_policy_manifest_lines(tools),
         "Read and follow these rule files in `.codex/rules/` when they apply:",
         "",
     ]
@@ -1677,7 +1690,12 @@ def build_codex_agents_md(agents: list[str], skills: list[str], language: str) -
     return "\n".join(lines)
 
 
-def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
+def build_claude_md(
+    agents: list[str],
+    skills: list[str],
+    language: str,
+    tools: dict[str, list[str]] | None = None,
+) -> str:
     lines = [
         "# CLAUDE.md",
         "",
@@ -1689,6 +1707,7 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
         "",
         ballast_notice(),
         "",
+        *render_repository_tool_policy_manifest_lines(tools),
         "Read and follow these rule files in `.claude/rules/` when they apply:",
         "",
     ]
@@ -1722,7 +1741,12 @@ def build_claude_md(agents: list[str], skills: list[str], language: str) -> str:
     return "\n".join(lines)
 
 
-def build_gemini_md(agents: list[str], skills: list[str], language: str) -> str:
+def build_gemini_md(
+    agents: list[str],
+    skills: list[str],
+    language: str,
+    tools: dict[str, list[str]] | None = None,
+) -> str:
     lines = [
         "# GEMINI.md",
         "",
@@ -1747,6 +1771,7 @@ def build_gemini_md(agents: list[str], skills: list[str], language: str) -> str:
             "",
             ballast_notice(),
             "",
+            *render_repository_tool_policy_manifest_lines(tools),
             "Read and follow these rule files in `.gemini/rules/` when they apply:",
             "",
         ]
@@ -1955,8 +1980,14 @@ def merge_markdown_bodies(existing: str, canonical: str) -> str:
         parts.append(existing_by_heading.get(heading, text))
 
     for heading, text in existing_sections:
-        if heading not in canonical_headings:
-            parts.append(text)
+        if heading in canonical_headings:
+            continue
+        # The tool policy is Ballast-generated; when canonical output no longer
+        # carries it (it moved to the target manifest), drop the stale copy
+        # instead of preserving it like a user-authored section.
+        if heading == "## Repository Tool Policy":
+            continue
+        parts.append(text)
 
     return "\n\n".join(parts).rstrip() + "\n"
 
@@ -2481,7 +2512,9 @@ def install(
             result.declined_support_files.append(str(claude_md))
         else:
             try:
-                content = build_claude_md(support_agents, support_skills, language)
+                content = build_claude_md(
+                    support_agents, support_skills, language, tools=rule_tools
+                )
                 next_content = (
                     patch_codex_agents_md(
                         claude_md.read_text(encoding="utf-8"),
@@ -2505,7 +2538,9 @@ def install(
             result.declined_support_files.append(str(gemini_md))
         else:
             try:
-                content = build_gemini_md(support_agents, support_skills, language)
+                content = build_gemini_md(
+                    support_agents, support_skills, language, tools=rule_tools
+                )
                 next_content = (
                     patch_codex_agents_md(
                         gemini_md.read_text(encoding="utf-8"),
@@ -2527,7 +2562,7 @@ def install(
         else:
             try:
                 content = build_codex_agents_md(
-                    support_agents, support_skills, language
+                    support_agents, support_skills, language, tools=rule_tools
                 )
                 next_content = (
                     patch_codex_agents_md(

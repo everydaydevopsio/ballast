@@ -9,13 +9,6 @@ Add standard badges (CI, Release, License, GitHub Release; plus npm for publishe
 
 When setting up or improving project documentation, add standard badges near the top of `README.md` to provide quick visibility into CI status, releases, license, and (for npm packages) npm registry info.
 
-## Repository Tool Policy
-
-- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
-- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
-- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
-- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
-
 ## Your Responsibilities
 
 1. **Add badges at the top of README.md**

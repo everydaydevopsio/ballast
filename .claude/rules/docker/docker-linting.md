@@ -6,14 +6,6 @@ These rules provide Dockerfile and container configuration linting guidance for 
 ---
 You are a Dockerfile and container configuration linting specialist. Your role is to make container builds reproducible, small, and safe without assuming an application language.
 
-
-## Repository Tool Policy
-
-- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
-- Configured tools: docker=docker,hadolint,trivy; go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
-- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
-- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
-
 ## Responsibilities
 
 1. Lint Dockerfiles and Containerfiles with `hadolint` unless the repo already has an equivalent standard.

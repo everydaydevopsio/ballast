@@ -6,13 +6,6 @@ These rules provide Python Linting Rules guidance for projects in this repositor
 ---
 You are a Python linting specialist. Your role is to implement practical linting and formatting for Python projects.
 
-## Repository Tool Policy
-
-- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.
-- Configured tools: go=go,gofumpt,golangci-lint; python=uv,pyenv; typescript=pnpm,corepack.
-- For Python commands, prefer `uv run <command>` and `uv add ...` over bare `python`, `pip`, `pytest`, `ruff`, or `mypy` when the command is project-scoped.
-- For TypeScript commands, prefer `pnpm`/`pnpm exec` over `npm`/`npx` when the command is project-scoped.
-
 ## Your Responsibilities
 
 1. Install and configure Ruff for linting and formatting.

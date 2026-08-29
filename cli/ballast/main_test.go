@@ -5498,6 +5498,54 @@ func TestBuildMonorepoSupportFileIncludesSkillsForClaude(t *testing.T) {
 	}
 }
 
+func TestBuildMonorepoSupportFileIncludesRepositoryToolPolicyOnce(t *testing.T) {
+	plan := &monorepoPlan{
+		Common: []string{"local-dev"},
+		Config: monorepoConfig{
+			Languages: []string{"python"},
+			Tools:     map[string][]string{"python": {"uv", "pyenv"}},
+		},
+	}
+
+	root := resolvedTempDir(t)
+	content := buildMonorepoSupportFile(root, plan, "claude")
+
+	if !strings.Contains(content, "### Repository Tool Policy") {
+		t.Fatalf("expected repository tool policy in claude support file, got %q", content)
+	}
+	if !strings.Contains(content, "python=uv,pyenv") {
+		t.Fatalf("expected configured tools in claude support file, got %q", content)
+	}
+	if !strings.Contains(content, "uv run <command>") {
+		t.Fatalf("expected uv guidance in claude support file, got %q", content)
+	}
+	if strings.Count(content, "Repository Tool Policy") != 1 {
+		t.Fatalf("expected exactly one repository tool policy, got %q", content)
+	}
+	if strings.Index(content, "### Repository Tool Policy") < strings.Index(content, "## Installed agent rules") {
+		t.Fatalf("expected tool policy inside installed agent rules section, got %q", content)
+	}
+}
+
+func TestBuildMonorepoSupportFileUsesDefaultToolsWhenUnconfigured(t *testing.T) {
+	plan := &monorepoPlan{
+		Common: []string{"local-dev"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+		},
+	}
+
+	root := resolvedTempDir(t)
+	content := buildMonorepoSupportFile(root, plan, "codex")
+
+	if !strings.Contains(content, "### Repository Tool Policy") {
+		t.Fatalf("expected repository tool policy in codex support file, got %q", content)
+	}
+	if !strings.Contains(content, "typescript=pnpm,corepack") {
+		t.Fatalf("expected default typescript tools in codex support file, got %q", content)
+	}
+}
+
 func TestBuildMonorepoSupportFileIncludesDocsForCodex(t *testing.T) {
 	plan := &monorepoPlan{
 		Common:   []string{"docs"},

@@ -1081,15 +1081,31 @@ func TestInstallWritesConfiguredToolsIntoCodexAndClaudeRules(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read %s: %v", rulePath, err)
 		}
+		if strings.Contains(string(content), "Repository Tool Policy") {
+			t.Fatalf("expected no per-rule tool policy in %s, got %s", rulePath, string(content))
+		}
+	}
+
+	for _, manifestPath := range []string{
+		filepath.Join(tmpDir, "AGENTS.md"),
+		filepath.Join(tmpDir, "CLAUDE.md"),
+	} {
+		content, err := os.ReadFile(manifestPath)
+		if err != nil {
+			t.Fatalf("read %s: %v", manifestPath, err)
+		}
 		text := string(content)
-		if !strings.Contains(text, "## Repository Tool Policy") {
-			t.Fatalf("expected tool policy in %s, got %s", rulePath, text)
+		if !strings.Contains(text, "### Repository Tool Policy") {
+			t.Fatalf("expected tool policy in %s, got %s", manifestPath, text)
 		}
 		if !strings.Contains(text, "python=uv,pyenv") {
-			t.Fatalf("expected configured tools in %s, got %s", rulePath, text)
+			t.Fatalf("expected configured tools in %s, got %s", manifestPath, text)
 		}
 		if !strings.Contains(text, "uv run <command>") {
-			t.Fatalf("expected uv guidance in %s, got %s", rulePath, text)
+			t.Fatalf("expected uv guidance in %s, got %s", manifestPath, text)
+		}
+		if strings.Count(text, "Repository Tool Policy") != 1 {
+			t.Fatalf("expected exactly one tool policy in %s, got %s", manifestPath, text)
 		}
 	}
 }
@@ -1114,15 +1130,49 @@ func TestInstallRendersDefaultToolsWhenSavingConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read %s: %v", rulePath, err)
 	}
-	text := string(content)
-	if !strings.Contains(text, "## Repository Tool Policy") {
-		t.Fatalf("expected tool policy in %s, got %s", rulePath, text)
+	if strings.Contains(string(content), "Repository Tool Policy") {
+		t.Fatalf("expected no per-rule tool policy in %s, got %s", rulePath, string(content))
+	}
+
+	manifestPath := filepath.Join(tmpDir, "AGENTS.md")
+	manifest, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", manifestPath, err)
+	}
+	text := string(manifest)
+	if !strings.Contains(text, "### Repository Tool Policy") {
+		t.Fatalf("expected tool policy in %s, got %s", manifestPath, text)
 	}
 	if !strings.Contains(text, "python=uv,pyenv") {
-		t.Fatalf("expected default tools in %s, got %s", rulePath, text)
+		t.Fatalf("expected default tools in %s, got %s", manifestPath, text)
 	}
 	if !strings.Contains(text, "uv run <command>") {
-		t.Fatalf("expected uv guidance in %s, got %s", rulePath, text)
+		t.Fatalf("expected uv guidance in %s, got %s", manifestPath, text)
+	}
+}
+
+func TestPatchDropsStaleToolPolicyWhenCanonicalOmitsIt(t *testing.T) {
+	existing := "# Rules\n\nIntro.\n\n## Repository Tool Policy\n\n- Check `.rulesrc.json` `tools` before adding tooling.\n\n## Keep\n\nBody.\n"
+	canonical := "# Rules\n\nIntro.\n\n## Keep\n\nBody.\n"
+
+	merged := patchRuleContent(existing, canonical, "claude")
+
+	if strings.Contains(merged, "Repository Tool Policy") {
+		t.Fatalf("expected stale tool policy to be dropped, got %q", merged)
+	}
+	if !strings.Contains(merged, "## Keep") {
+		t.Fatalf("expected other sections preserved, got %q", merged)
+	}
+}
+
+func TestPatchKeepsToolPolicyWhenCanonicalIncludesIt(t *testing.T) {
+	existing := "# Rules\n\n## Repository Tool Policy\n\n- Existing bullets.\n"
+	canonical := "# Rules\n\n## Repository Tool Policy\n\n- Canonical bullets.\n"
+
+	merged := patchRuleContent(existing, canonical, "claude")
+
+	if !strings.Contains(merged, "## Repository Tool Policy") {
+		t.Fatalf("expected tool policy preserved, got %q", merged)
 	}
 }
 
@@ -1242,7 +1292,7 @@ func TestDestinationReturnsGeminiRulePath(t *testing.T) {
 }
 
 func TestBuildGeminiMDIncludesRepositoryFactsAndSkills(t *testing.T) {
-	content, err := buildGeminiMD([]string{"linting"}, []string{"owasp-security-scan"}, "go")
+	content, err := buildGeminiMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil)
 	if err != nil {
 		t.Fatalf("buildGeminiMD: %v", err)
 	}
@@ -2861,7 +2911,7 @@ func TestSkillOnlyPatchKeepsCodexRuleReferencesFromRulesrc(t *testing.T) {
 	}
 
 	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
-	initial, err := buildCodexAgentsMD([]string{"linting"}, []string{"owasp-security-scan"}, "go")
+	initial, err := buildCodexAgentsMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil)
 	if err != nil {
 		t.Fatalf("build AGENTS.md: %v", err)
 	}
