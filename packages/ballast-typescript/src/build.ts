@@ -663,6 +663,7 @@ export function listRuleSuffixes(
     suffixes.push('');
   }
   const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const namedSuffixes: string[] = [];
   for (const e of entries) {
     if (
       !e.isFile() ||
@@ -672,8 +673,11 @@ export function listRuleSuffixes(
       continue;
     const stem = e.name.slice(0, -3);
     const suffix = stem.slice(CONTENT_PREFIX.length + 1);
-    if (suffix) suffixes.push(suffix);
+    if (suffix) namedSuffixes.push(suffix);
   }
+  // Sort for deterministic output across filesystems, matching the Go and
+  // Python backends.
+  suffixes.push(...namedSuffixes.sort());
   if (suffixes.length === 0) {
     throw new Error(`Agent "${agentId}" has no content.md or content-*.md`);
   }

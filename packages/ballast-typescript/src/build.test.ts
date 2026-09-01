@@ -101,12 +101,18 @@ describe('build', () => {
       expect(listRuleSuffixes('testing')).toEqual(['']);
     });
 
-    test('returns env, license, and badges for local-dev', () => {
-      expect(listRuleSuffixes('local-dev')).toContain('env');
-      expect(listRuleSuffixes('local-dev')).toContain('license');
-      expect(listRuleSuffixes('local-dev')).toContain('badges');
-      expect(listRuleSuffixes('local-dev')).not.toContain('mcp');
-      expect(listRuleSuffixes('local-dev').length).toBe(3);
+    test('returns env, license, and badges for local-dev in sorted order', () => {
+      expect(listRuleSuffixes('local-dev')).toEqual([
+        'badges',
+        'env',
+        'license'
+      ]);
+    });
+
+    test('returns suffixes in deterministic sorted order', () => {
+      expect(listRuleSuffixes('tasks')).toEqual(['task-system', 'todo']);
+      const publishing = listRuleSuffixes('publishing');
+      expect(publishing).toEqual([...publishing].sort());
     });
 
     test('returns only main rule for docs', () => {
