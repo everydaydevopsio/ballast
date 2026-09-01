@@ -3859,10 +3859,10 @@ func allManagedRulePaths(root string, target string) []string {
 	for _, lang := range supportedLanguages {
 		languages = append(languages, string(lang))
 	}
-	paths := managedRulePaths(root, target, &monorepoConfig{
+	paths := managedRulePathsWithSuffixes(root, target, &monorepoConfig{
 		Agents:    supportedAgentIDs(),
 		Languages: languages,
-	})
+	}, allRuleSuffixesForAgent)
 	paths = append(paths, legacyRootManagedRulePaths(root, target, supportedAgentIDs(), languages)...)
 	return uniqueStrings(paths)
 }
@@ -3874,14 +3874,14 @@ func legacyRootManagedRulePaths(root string, target string, agents []string, lan
 	commonSelection := filterAgents(agents, commonAgentIDs())
 	languageSelection := filterAgents(agents, languageAgentIDs())
 	for _, agent := range commonSelection {
-		for _, suffix := range ruleSuffixesForAgent(agent) {
+		for _, suffix := range allRuleSuffixesForAgent(agent) {
 			base := agentBaseName(agent, suffix)
 			paths = append(paths, filepath.Join(rulesRoot, base+ext))
 		}
 	}
 	for _, lang := range languages {
 		for _, agent := range languageSelection {
-			for _, suffix := range ruleSuffixesForAgent(agent) {
+			for _, suffix := range allRuleSuffixesForAgent(agent) {
 				base := agentBaseName(agent, suffix)
 				paths = append(paths, filepath.Join(rulesRoot, lang+"-"+base+ext))
 			}
@@ -3917,20 +3917,26 @@ func removeManagedTargetFiles(root string, target string, config *monorepoConfig
 }
 
 func managedRulePaths(root string, target string, config *monorepoConfig) []string {
+	return managedRulePathsWithSuffixes(root, target, config, func(agent string) []string {
+		return configuredRuleSuffixesForAgent(agent, config)
+	})
+}
+
+func managedRulePathsWithSuffixes(root string, target string, config *monorepoConfig, suffixesFor func(string) []string) []string {
 	paths := []string{}
 	ext := targetRuleExtension(target)
 	rulesRoot := targetRulesRoot(root, target)
 	commonSelection := filterAgents(config.Agents, commonAgentIDs())
 	languageSelection := filterAgents(config.Agents, languageAgentIDs())
 	for _, agent := range commonSelection {
-		for _, suffix := range ruleSuffixesForAgent(agent) {
+		for _, suffix := range suffixesFor(agent) {
 			base := agentBaseName(agent, suffix)
 			paths = append(paths, filepath.Join(rulesRoot, "common", base+ext))
 		}
 	}
 	for _, lang := range config.Languages {
 		for _, agent := range languageSelection {
-			for _, suffix := range ruleSuffixesForAgent(agent) {
+			for _, suffix := range suffixesFor(agent) {
 				base := agentBaseName(agent, suffix)
 				paths = append(paths, filepath.Join(rulesRoot, lang, lang+"-"+base+ext))
 			}
@@ -3945,14 +3951,14 @@ func legacyOpenCodeRulePaths(root string, agents []string, languages []string) [
 	commonSelection := filterAgents(agents, commonAgentIDs())
 	languageSelection := filterAgents(agents, languageAgentIDs())
 	for _, agent := range commonSelection {
-		for _, suffix := range ruleSuffixesForAgent(agent) {
+		for _, suffix := range allRuleSuffixesForAgent(agent) {
 			base := agentBaseName(agent, suffix)
 			paths = append(paths, filepath.Join(rulesRoot, "common", base+".md"))
 		}
 	}
 	for _, lang := range languages {
 		for _, agent := range languageSelection {
-			for _, suffix := range ruleSuffixesForAgent(agent) {
+			for _, suffix := range allRuleSuffixesForAgent(agent) {
 				base := agentBaseName(agent, suffix)
 				paths = append(paths, filepath.Join(rulesRoot, lang, lang+"-"+base+".md"))
 			}
@@ -4193,14 +4199,14 @@ func buildMonorepoSupportFile(root string, plan *monorepoPlan, target string) st
 	)
 
 	for _, agent := range plan.Common {
-		for _, suffix := range ruleSuffixesForAgent(agent) {
+		for _, suffix := range configuredRuleSuffixesForAgent(agent, &plan.Config) {
 			base := agentBaseName(agent, suffix)
 			lines = append(lines, fmt.Sprintf("- `.%s/common/%s%s` — Rules for common/%s", strings.TrimPrefix(rulesDir, "."), base, extension, base))
 		}
 	}
 	for _, lang := range plan.Config.Languages {
 		for _, agent := range plan.Language {
-			for _, suffix := range ruleSuffixesForAgent(agent) {
+			for _, suffix := range configuredRuleSuffixesForAgent(agent, &plan.Config) {
 				base := agentBaseName(agent, suffix)
 				lines = append(lines, fmt.Sprintf("- `.%s/%s/%s-%s%s` — Rules for %s/%s", strings.TrimPrefix(rulesDir, "."), lang, lang, base, extension, lang, base))
 			}
@@ -4229,17 +4235,46 @@ func buildMonorepoSupportFile(root string, plan *monorepoPlan, target string) st
 	return strings.Join(lines, "\n")
 }
 
+// ruleSuffixesForAgent returns the default active rule suffixes for an agent.
+// Opt-in publishing variants (apt, brew) and removed rules (local-dev mcp) are
+// excluded; use allRuleSuffixesForAgent for cleanup path computation and
+// configuredRuleSuffixesForAgent to honor configured publishing profiles.
 func ruleSuffixesForAgent(agent string) []string {
+	if agent == "local-dev" {
+		return []string{"badges", "env", "license"}
+	}
+	if agent == "publishing" {
+		return []string{"api", "apps", "cli", "libraries", "sdks", "web"}
+	}
+	if agent == "tasks" {
+		return []string{"task-system", "todo"}
+	}
+	return []string{""}
+}
+
+// allRuleSuffixesForAgent returns every suffix Ballast has ever emitted for an
+// agent, including opt-in variants and removed rules, so stale files can be
+// located and cleaned up.
+func allRuleSuffixesForAgent(agent string) []string {
 	if agent == "local-dev" {
 		return []string{"badges", "env", "license", "mcp"}
 	}
 	if agent == "publishing" {
 		return []string{"api", "apps", "apt", "brew", "cli", "libraries", "sdks", "web"}
 	}
-	if agent == "tasks" {
-		return []string{"task-system", "todo"}
+	return ruleSuffixesForAgent(agent)
+}
+
+// configuredRuleSuffixesForAgent returns the rule suffixes selected by the
+// repository configuration: explicit publishing profiles when set, otherwise
+// the default active suffixes.
+func configuredRuleSuffixesForAgent(agent string, config *monorepoConfig) []string {
+	if agent == "publishing" && config != nil {
+		if profiles := normalizePublishingProfiles(config.PublishingProfiles); len(profiles) > 0 {
+			return profiles
+		}
 	}
-	return []string{""}
+	return ruleSuffixesForAgent(agent)
 }
 
 func agentBaseName(agent string, suffix string) string {

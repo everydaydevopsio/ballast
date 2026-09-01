@@ -800,7 +800,12 @@ def is_valid_skill(skill: str, language: str) -> bool:
     return skill in SKILLS_BY_LANGUAGE[language]
 
 
-def list_rule_suffixes(agent: str, language: str) -> list[str]:
+OPT_IN_PUBLISHING_PROFILES = ("apt", "brew")
+
+
+def list_rule_suffixes(
+    agent: str, language: str, publishing_profiles: list[str] | None = None
+) -> list[str]:
     directory = agent_dir(agent, language)
     suffixes: list[str] = []
     if (directory / "content.md").exists():
@@ -811,6 +816,15 @@ def list_rule_suffixes(agent: str, language: str) -> list[str]:
             suffixes.append(suffix)
     if not suffixes:
         raise FileNotFoundError(f"Agent {agent} has no content files")
+    if agent == "publishing":
+        if publishing_profiles:
+            available = set(suffixes)
+            return [profile for profile in publishing_profiles if profile in available]
+        # Opt-in variants are reference-only unless explicitly configured; do
+        # not emit them into the always-loaded rule set by default.
+        return [
+            suffix for suffix in suffixes if suffix not in OPT_IN_PUBLISHING_PROFILES
+        ]
     return suffixes
 
 
@@ -1059,9 +1073,36 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
     return "\n".join(lines)
 
 
+DEPLOYMENT_CONDITIONAL_RE = re.compile(
+    r"\{\{BALLAST_IF_DEPLOYMENT:([a-z, -]+)\}\}\r?\n?"
+    r"([\s\S]*?)\{\{BALLAST_END_IF_DEPLOYMENT\}\}\r?\n?"
+)
+
+
+def apply_deployment_conditional_blocks(
+    content: str, deployment_model: str | None
+) -> str:
+    """Strip {{BALLAST_IF_DEPLOYMENT:<models>}} blocks whose model list does
+    not match the configured deployment model. The special name ``active``
+    matches any model except ``none``."""
+    if "{{BALLAST_IF_DEPLOYMENT:" not in content:
+        return content
+    model = (deployment_model or "none").strip().lower() or "none"
+
+    def replace(match: re.Match[str]) -> str:
+        names = [name.strip() for name in match.group(1).split(",") if name.strip()]
+        keep = any(
+            name == model or (name == "active" and model != "none") for name in names
+        )
+        return match.group(2) if keep else ""
+
+    return DEPLOYMENT_CONDITIONAL_RE.sub(replace, content)
+
+
 def apply_deployment_model_guidance(
     content: str, agent: str, deployment_model: str | None
 ) -> str:
+    content = apply_deployment_conditional_blocks(content, deployment_model)
     if agent != "publishing" or DEPLOYMENT_MODEL_GUIDANCE_TOKEN not in content:
         return content
     return content.replace(
@@ -1648,6 +1689,7 @@ def build_codex_agents_md(
     skills: list[str],
     language: str,
     tools: dict[str, list[str]] | None = None,
+    publishing_profiles: list[str] | None = None,
 ) -> str:
     lines = [
         "# AGENTS.md",
@@ -1665,7 +1707,7 @@ def build_codex_agents_md(
         "",
     ]
     for agent in agents:
-        for suffix in list_rule_suffixes(agent, language):
+        for suffix in list_rule_suffixes(agent, language, publishing_profiles):
             basename = rule_basename(agent, language, suffix)
             description = (
                 get_codex_rule_description(agent, language, suffix)
@@ -1699,6 +1741,7 @@ def build_claude_md(
     skills: list[str],
     language: str,
     tools: dict[str, list[str]] | None = None,
+    publishing_profiles: list[str] | None = None,
 ) -> str:
     lines = [
         "# CLAUDE.md",
@@ -1716,7 +1759,7 @@ def build_claude_md(
         "",
     ]
     for agent in agents:
-        for suffix in list_rule_suffixes(agent, language):
+        for suffix in list_rule_suffixes(agent, language, publishing_profiles):
             basename = rule_basename(agent, language, suffix)
             description = (
                 get_codex_rule_description(agent, language, suffix)
@@ -1750,6 +1793,7 @@ def build_gemini_md(
     skills: list[str],
     language: str,
     tools: dict[str, list[str]] | None = None,
+    publishing_profiles: list[str] | None = None,
 ) -> str:
     lines = [
         "# GEMINI.md",
@@ -1781,7 +1825,7 @@ def build_gemini_md(
         ]
     )
     for agent in agents:
-        for suffix in list_rule_suffixes(agent, language):
+        for suffix in list_rule_suffixes(agent, language, publishing_profiles):
             basename = rule_basename(agent, language, suffix)
             description = (
                 get_codex_rule_description(agent, language, suffix)
@@ -2387,6 +2431,13 @@ def install(
         and isinstance(config_for_support_files.get("tools"), dict)
         else None
     )
+    rule_publishing_profiles = (
+        normalize_publishing_profiles(
+            config_for_support_files.get("publishingProfiles")
+        )
+        if config_for_support_files
+        else []
+    )
     support_agents = with_implicit_agents(
         config_for_support_files.get("agents", agents)
         if config_for_support_files
@@ -2423,7 +2474,7 @@ def install(
         agent_processed = False
 
         try:
-            for suffix in list_rule_suffixes(agent, language):
+            for suffix in list_rule_suffixes(agent, language, rule_publishing_profiles):
                 basename = rule_basename(agent, language, suffix)
                 dst = destination(root, target, basename)
                 content = build_content(
@@ -2522,7 +2573,11 @@ def install(
         else:
             try:
                 content = build_claude_md(
-                    support_agents, support_skills, language, tools=rule_tools
+                    support_agents,
+                    support_skills,
+                    language,
+                    tools=rule_tools,
+                    publishing_profiles=rule_publishing_profiles,
                 )
                 next_content = (
                     patch_codex_agents_md(
@@ -2548,7 +2603,11 @@ def install(
         else:
             try:
                 content = build_gemini_md(
-                    support_agents, support_skills, language, tools=rule_tools
+                    support_agents,
+                    support_skills,
+                    language,
+                    tools=rule_tools,
+                    publishing_profiles=rule_publishing_profiles,
                 )
                 next_content = (
                     patch_codex_agents_md(
@@ -2571,7 +2630,11 @@ def install(
         else:
             try:
                 content = build_codex_agents_md(
-                    support_agents, support_skills, language, tools=rule_tools
+                    support_agents,
+                    support_skills,
+                    language,
+                    tools=rule_tools,
+                    publishing_profiles=rule_publishing_profiles,
                 )
                 next_content = (
                     patch_codex_agents_md(

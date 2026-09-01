@@ -1155,6 +1155,75 @@ func TestInstallRendersDefaultToolsWhenSavingConfig(t *testing.T) {
 	}
 }
 
+func TestPublishingSuffixesExcludeOptInVariantsByDefault(t *testing.T) {
+	suffixes, err := listRuleSuffixes("publishing", "go")
+	if err != nil {
+		t.Fatalf("listRuleSuffixes: %v", err)
+	}
+	suffixes = filterPublishingSuffixes("publishing", suffixes, nil)
+
+	if contains(suffixes, "apt") || contains(suffixes, "brew") {
+		t.Fatalf("expected opt-in variants excluded by default, got %v", suffixes)
+	}
+	if len(suffixes) != 6 {
+		t.Fatalf("expected 6 default publishing suffixes, got %v", suffixes)
+	}
+}
+
+func TestPublishingSuffixesHonorExplicitProfiles(t *testing.T) {
+	suffixes, err := listRuleSuffixes("publishing", "go")
+	if err != nil {
+		t.Fatalf("listRuleSuffixes: %v", err)
+	}
+	selected := filterPublishingSuffixes("publishing", suffixes, []string{"cli", "apt", "brew"})
+
+	if len(selected) != 3 || !contains(selected, "apt") || !contains(selected, "brew") {
+		t.Fatalf("expected explicit opt-in profiles honored, got %v", selected)
+	}
+}
+
+func TestPublishingAPIOmitsKubernetesSectionsForNone(t *testing.T) {
+	content, err := buildContent("publishing", "codex", "go", "api", "pre-commit", "github", "none")
+	if err != nil {
+		t.Fatalf("buildContent: %v", err)
+	}
+	if strings.Contains(content, "Kubernetes Helm Chart: Probes Configuration") {
+		t.Fatalf("expected kubernetes section stripped for deploymentModel none, got %q", content)
+	}
+	if strings.Contains(content, "Minimal Go Implementation") {
+		t.Fatalf("expected health endpoint code stripped for deploymentModel none, got %q", content)
+	}
+	if strings.Contains(content, "BALLAST_IF_DEPLOYMENT") {
+		t.Fatalf("expected conditional markers removed, got %q", content)
+	}
+}
+
+func TestPublishingAPIKeepsKubernetesSectionsForKubernetes(t *testing.T) {
+	content, err := buildContent("publishing", "codex", "go", "api", "pre-commit", "github", "kubernetes")
+	if err != nil {
+		t.Fatalf("buildContent: %v", err)
+	}
+	if !strings.Contains(content, "Kubernetes Helm Chart: Probes Configuration") {
+		t.Fatalf("expected kubernetes section kept, got %q", content)
+	}
+	if !strings.Contains(content, "Minimal Go Implementation") {
+		t.Fatalf("expected health endpoint code kept, got %q", content)
+	}
+	if strings.Contains(content, "BALLAST_IF_DEPLOYMENT") {
+		t.Fatalf("expected conditional markers removed, got %q", content)
+	}
+}
+
+func TestLocalDevHasNoMcpSuffix(t *testing.T) {
+	suffixes, err := listRuleSuffixes("local-dev", "go")
+	if err != nil {
+		t.Fatalf("listRuleSuffixes: %v", err)
+	}
+	if contains(suffixes, "mcp") {
+		t.Fatalf("expected mcp rule removed from local-dev, got %v", suffixes)
+	}
+}
+
 func TestPatchDropsStaleToolPolicyWhenCanonicalOmitsIt(t *testing.T) {
 	existing := "# Rules\n\nIntro.\n\n## Repository Tool Policy\n\n- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.\n\n## Keep\n\nBody.\n"
 	canonical := "# Rules\n\nIntro.\n\n## Keep\n\nBody.\n"
@@ -1307,7 +1376,7 @@ func TestDestinationReturnsGeminiRulePath(t *testing.T) {
 }
 
 func TestBuildGeminiMDIncludesRepositoryFactsAndSkills(t *testing.T) {
-	content, err := buildGeminiMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil)
+	content, err := buildGeminiMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil, nil)
 	if err != nil {
 		t.Fatalf("buildGeminiMD: %v", err)
 	}
@@ -2926,7 +2995,7 @@ func TestSkillOnlyPatchKeepsCodexRuleReferencesFromRulesrc(t *testing.T) {
 	}
 
 	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
-	initial, err := buildCodexAgentsMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil)
+	initial, err := buildCodexAgentsMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil, nil)
 	if err != nil {
 		t.Fatalf("build AGENTS.md: %v", err)
 	}

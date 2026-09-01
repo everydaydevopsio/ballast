@@ -1747,7 +1747,7 @@ Keep my custom responsibilities.
         saveConfig: false
       });
       expect(result.installed).toEqual(['local-dev']);
-      expect(result.installedRules.length).toBe(4);
+      expect(result.installedRules.length).toBe(3);
       const envFile = path.join(
         tmpDir,
         '.cursor',
@@ -1773,18 +1773,17 @@ Keep my custom responsibilities.
         'local-dev-badges.mdc'
       );
       expect(fs.existsSync(envFile)).toBe(true);
-      expect(fs.existsSync(mcpFile)).toBe(true);
+      expect(fs.existsSync(mcpFile)).toBe(false);
       expect(fs.existsSync(licenseFile)).toBe(true);
       expect(fs.existsSync(badgesFile)).toBe(true);
       expect(fs.readFileSync(envFile, 'utf8')).toContain(
         'Local Development Environment Agent'
       );
-      expect(fs.readFileSync(mcpFile, 'utf8')).toContain('GitHub MCP');
       expect(fs.readFileSync(licenseFile, 'utf8')).toContain('LICENSE');
       expect(fs.readFileSync(badgesFile, 'utf8')).toContain('README Badges');
     });
 
-    test('installs all rules for agent with multiple rules (publishing)', () => {
+    test('installs default rules for agent with multiple rules (publishing)', () => {
       const result = install({
         projectRoot: tmpDir,
         target: 'cursor',
@@ -1793,7 +1792,17 @@ Keep my custom responsibilities.
         saveConfig: false
       });
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules.length).toBe(8);
+      expect(result.installedRules.length).toBe(6);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'publishing-apt.mdc')
+        )
+      ).toBe(false);
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'publishing-brew.mdc')
+        )
+      ).toBe(false);
       const librariesFile = path.join(
         tmpDir,
         '.cursor',
@@ -1901,7 +1910,7 @@ Keep my custom responsibilities.
       expect(agentsMd).not.toContain('`.codex/rules/publishing-libraries.md`');
     });
 
-    test('treats empty publishingProfiles as unfiltered during install', () => {
+    test('treats empty publishingProfiles as default profiles during install', () => {
       saveConfig(
         {
           targets: ['codex'],
@@ -1920,22 +1929,20 @@ Keep my custom responsibilities.
       });
 
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules).toHaveLength(8);
-      for (const suffix of [
-        'api',
-        'apps',
-        'apt',
-        'brew',
-        'cli',
-        'libraries',
-        'sdks',
-        'web'
-      ]) {
+      expect(result.installedRules).toHaveLength(6);
+      for (const suffix of ['api', 'apps', 'cli', 'libraries', 'sdks', 'web']) {
         expect(
           fs.existsSync(
             path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
           )
         ).toBe(true);
+      }
+      for (const suffix of ['apt', 'brew']) {
+        expect(
+          fs.existsSync(
+            path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
+          )
+        ).toBe(false);
       }
 
       const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
@@ -2560,7 +2567,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       );
     });
 
-    test('installs all publishing profiles when no publishingProfiles are configured', async () => {
+    test('installs default publishing profiles without opt-in variants when none are configured', async () => {
       const exitCode = await runInstall({
         projectRoot: tmpDir,
         target: 'codex',
@@ -2569,16 +2576,43 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       });
 
       expect(exitCode).toBe(0);
-      for (const suffix of [
-        'cli',
-        'apps',
-        'web',
-        'api',
-        'libraries',
-        'sdks',
-        'apt',
-        'brew'
-      ]) {
+      for (const suffix of ['cli', 'apps', 'web', 'api', 'libraries', 'sdks']) {
+        expect(
+          fs.existsSync(
+            path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
+          )
+        ).toBe(true);
+      }
+      for (const suffix of ['apt', 'brew']) {
+        expect(
+          fs.existsSync(
+            path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
+          )
+        ).toBe(false);
+      }
+      const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
+      expect(agentsMd).toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-brew.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-apt.md`');
+    });
+
+    test('installs opt-in publishing variants when explicitly configured', async () => {
+      saveConfig(
+        {
+          targets: ['codex'],
+          agents: ['publishing'],
+          publishingProfiles: ['cli', 'apt', 'brew']
+        },
+        tmpDir
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      for (const suffix of ['cli', 'apt', 'brew']) {
         expect(
           fs.existsSync(
             path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
@@ -2586,7 +2620,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         ).toBe(true);
       }
       const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
-      expect(agentsMd).toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-apt.md`');
       expect(agentsMd).toContain('`.codex/rules/publishing-brew.md`');
     });
 

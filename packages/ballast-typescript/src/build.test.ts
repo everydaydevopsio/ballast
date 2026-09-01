@@ -101,28 +101,48 @@ describe('build', () => {
       expect(listRuleSuffixes('testing')).toEqual(['']);
     });
 
-    test('returns env, mcp, license, and badges for local-dev', () => {
-      expect(listRuleSuffixes('local-dev')).toContain('env');
-      expect(listRuleSuffixes('local-dev')).toContain('mcp');
-      expect(listRuleSuffixes('local-dev')).toContain('license');
-      expect(listRuleSuffixes('local-dev')).toContain('badges');
-      expect(listRuleSuffixes('local-dev').length).toBe(4);
+    test('returns env, license, and badges for local-dev in sorted order', () => {
+      expect(listRuleSuffixes('local-dev')).toEqual([
+        'badges',
+        'env',
+        'license'
+      ]);
+    });
+
+    test('returns suffixes in deterministic sorted order', () => {
+      expect(listRuleSuffixes('tasks')).toEqual(['task-system', 'todo']);
+      const publishing = listRuleSuffixes('publishing');
+      expect(publishing).toEqual([...publishing].sort());
     });
 
     test('returns only main rule for docs', () => {
       expect(listRuleSuffixes('docs')).toEqual(['']);
     });
 
-    test('returns libraries, sdks, and apps for publishing by default', () => {
-      expect(listRuleSuffixes('publishing')).toContain('libraries');
-      expect(listRuleSuffixes('publishing')).toContain('sdks');
-      expect(listRuleSuffixes('publishing')).toContain('apps');
-      expect(listRuleSuffixes('publishing')).toContain('cli');
-      expect(listRuleSuffixes('publishing')).toContain('brew');
-      expect(listRuleSuffixes('publishing')).toContain('apt');
-      expect(listRuleSuffixes('publishing')).toContain('web');
-      expect(listRuleSuffixes('publishing')).toContain('api');
-      expect(listRuleSuffixes('publishing').length).toBe(8);
+    test('returns default publishing profiles without opt-in variants', () => {
+      const suffixes = listRuleSuffixes('publishing');
+      expect(suffixes).toEqual(
+        expect.arrayContaining([
+          'libraries',
+          'sdks',
+          'apps',
+          'cli',
+          'web',
+          'api'
+        ])
+      );
+      expect(suffixes).not.toContain('apt');
+      expect(suffixes).not.toContain('brew');
+      expect(suffixes.length).toBe(6);
+    });
+
+    test('returns opt-in publishing variants when explicitly configured', () => {
+      const suffixes = listRuleSuffixes('publishing', 'typescript', [
+        'apt',
+        'brew'
+      ]);
+      expect(suffixes).toEqual(expect.arrayContaining(['apt', 'brew']));
+      expect(suffixes).toHaveLength(2);
     });
 
     test('returns selected publishing profiles when configured', () => {
@@ -135,22 +155,22 @@ describe('build', () => {
       expect(suffixes).toEqual(expect.arrayContaining(['cli', 'apps']));
     });
 
-    test('treats empty publishingProfiles as unfiltered', () => {
+    test('treats empty publishingProfiles as default profiles', () => {
       const suffixes = listRuleSuffixes('publishing', 'typescript', []);
 
-      expect(suffixes).toHaveLength(8);
+      expect(suffixes).toHaveLength(6);
       expect(suffixes).toEqual(
         expect.arrayContaining([
           'libraries',
           'sdks',
           'apps',
           'cli',
-          'brew',
-          'apt',
           'web',
           'api'
         ])
       );
+      expect(suffixes).not.toContain('apt');
+      expect(suffixes).not.toContain('brew');
     });
 
     test('returns only main rule for plan-lifecycle', () => {
@@ -208,12 +228,6 @@ describe('build', () => {
       expect(content).toContain('gh pr checks');
       expect(content).toContain('gh pr view');
       expect(content).toContain('GitHub MCP');
-    });
-
-    test('returns mcp content for local-dev with ruleSuffix mcp', () => {
-      const content = getContent('local-dev', 'mcp');
-      expect(content).toContain('tasks');
-      expect(content).toContain('ballast install');
     });
 
     test('returns language-neutral common rule content', () => {
@@ -436,8 +450,8 @@ describe('build', () => {
       expect(content).toContain(
         'Scope Kubernetes probes and Helm chart templates to repositories with `deploymentModel: kubernetes`.'
       );
-      expect(content).toContain(
-        'Apply this section only when `deploymentModel` is `kubernetes`.'
+      expect(content).not.toContain(
+        'Kubernetes Helm Chart: Probes Configuration'
       );
       expect(content).not.toContain(
         'Ensure the API exposes a health endpoint that Kubernetes probes can use.'
@@ -893,12 +907,6 @@ describe('build', () => {
       expect(t).toContain('globs:');
     });
 
-    test('reads rule-specific cursor frontmatter for local-dev mcp', () => {
-      const t = getTemplate('local-dev', 'cursor-frontmatter.yaml', 'mcp');
-      expect(t).toContain('GitHub MCP');
-      expect(t).toContain('Jira/Linear/GitHub');
-    });
-
     test('reads rule-specific cursor frontmatter for publishing sdks', () => {
       const t = getTemplate('publishing', 'cursor-frontmatter.yaml', 'sdks');
       expect(t).toContain('SDK publishing specialist');
@@ -1327,6 +1335,38 @@ alwaysApply: false
       expect(() => buildContent('linting', 'unknown' as 'cursor')).toThrow(
         /Unknown target/
       );
+    });
+
+    test('publishing api omits kubernetes and code sections when deploymentModel is none', () => {
+      const result = buildContent('publishing', 'codex', 'api', 'typescript', {
+        variables: { deploymentModel: 'none', taskSystem: 'github' }
+      });
+      expect(result).not.toContain(
+        'Kubernetes Helm Chart: Probes Configuration'
+      );
+      expect(result).not.toContain('Minimal Go Implementation');
+      expect(result).not.toContain('livenessProbe');
+      expect(result).not.toContain('BALLAST_IF_DEPLOYMENT');
+    });
+
+    test('publishing api keeps kubernetes sections when deploymentModel is kubernetes', () => {
+      const result = buildContent('publishing', 'codex', 'api', 'typescript', {
+        variables: { deploymentModel: 'kubernetes', taskSystem: 'github' }
+      });
+      expect(result).toContain('Kubernetes Helm Chart: Probes Configuration');
+      expect(result).toContain('Minimal Go Implementation');
+      expect(result).not.toContain('BALLAST_IF_DEPLOYMENT');
+    });
+
+    test('publishing api keeps health endpoint code for active non-kubernetes models', () => {
+      const result = buildContent('publishing', 'codex', 'api', 'typescript', {
+        variables: { deploymentModel: 'hosted', taskSystem: 'github' }
+      });
+      expect(result).toContain('Minimal Go Implementation');
+      expect(result).not.toContain(
+        'Kubernetes Helm Chart: Probes Configuration'
+      );
+      expect(result).not.toContain('BALLAST_IF_DEPLOYMENT');
     });
 
     test('tasks task-system with variables resolves {{taskSystem}} in templates', () => {

@@ -131,7 +131,8 @@ def check_root_mfa(profile: str, region: str) -> dict[str, Any]:
     enabled = summary.get("SummaryMap", {}).get("AccountMFAEnabled", 0) == 1
     users = run_aws_json(profile, region, ["iam", "list-users"]).get("Users", [])
     credential_report = {
-        str(row.get("user", "")).strip(): row for row in _get_credential_report_rows(profile, region)
+        str(row.get("user", "")).strip(): row
+        for row in _get_credential_report_rows(profile, region)
     }
 
     users_without_mfa: list[str] = []
@@ -293,7 +294,9 @@ def _parse_aws_timestamp(ts: str) -> dt.datetime:
     try:
         parsed = dt.datetime.fromisoformat(ts)
     except ValueError:
-        parsed = dt.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=dt.timezone.utc)
+        parsed = dt.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S").replace(
+            tzinfo=dt.timezone.utc
+        )
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=dt.timezone.utc)
     return parsed
@@ -391,7 +394,9 @@ def check_iam_user_admin_policy(profile: str, region: str) -> dict[str, Any]:
         for policy in attached_user:
             arn = str(policy.get("PolicyArn", ""))
             name = str(policy.get("PolicyName", ""))
-            if name == admin_access_name or arn.endswith(f":policy/{admin_access_name}"):
+            if name == admin_access_name or arn.endswith(
+                f":policy/{admin_access_name}"
+            ):
                 direct_admin = True
                 break
 
@@ -413,7 +418,9 @@ def check_iam_user_admin_policy(profile: str, region: str) -> dict[str, Any]:
             ).get("AttachedPolicies", [])
             has_group_admin = any(
                 str(policy.get("PolicyName", "")) == admin_access_name
-                or str(policy.get("PolicyArn", "")).endswith(f":policy/{admin_access_name}")
+                or str(policy.get("PolicyArn", "")).endswith(
+                    f":policy/{admin_access_name}"
+                )
                 for policy in attached_group
             )
             if has_group_admin:
@@ -434,7 +441,9 @@ def check_iam_user_admin_policy(profile: str, region: str) -> dict[str, Any]:
             "title": "IAM users with AdministratorAccess (direct or indirect)",
             "status": "PASS",
             "findings": [],
-            "evidence": ["No IAM users have AdministratorAccess (directly or through groups)"],
+            "evidence": [
+                "No IAM users have AdministratorAccess (directly or through groups)"
+            ],
         }
 
     unauthorized = [m for m in matches if m["user"] not in approved_admin_users]
@@ -735,7 +744,9 @@ def check_iam_password_policy(profile: str, region: str) -> dict[str, Any]:
         f"minLength={min_length} requireUpper={require_upper} requireLower={require_lower} "
         f"requireNumbers={require_numbers} requireSymbols={require_symbols}"
     )
-    evidence.append(f"maxPasswordAge={max_age} passwordReusePrevention={reuse_prevention}")
+    evidence.append(
+        f"maxPasswordAge={max_age} passwordReusePrevention={reuse_prevention}"
+    )
 
     if min_length < 14:
         findings.append(
@@ -788,18 +799,26 @@ def check_iam_password_policy(profile: str, region: str) -> dict[str, Any]:
 
 
 def check_s3_bucket_public_access(profile: str, region: str) -> dict[str, Any]:
-    buckets = run_aws_json(profile, region, ["s3api", "list-buckets"]).get("Buckets", [])
+    buckets = run_aws_json(profile, region, ["s3api", "list-buckets"]).get(
+        "Buckets", []
+    )
 
     findings: list[dict[str, Any]] = []
     evidence: list[str] = []
 
-    required_flags = ["BlockPublicAcls", "IgnorePublicAcls", "BlockPublicPolicy", "RestrictPublicBuckets"]
+    required_flags = [
+        "BlockPublicAcls",
+        "IgnorePublicAcls",
+        "BlockPublicPolicy",
+        "RestrictPublicBuckets",
+    ]
 
     for bucket in buckets:
         name = str(bucket.get("Name", "unknown"))
         try:
             block = run_aws_json(
-                profile, region,
+                profile,
+                region,
                 ["s3api", "get-public-access-block", "--bucket", name],
             ).get("PublicAccessBlockConfiguration", {})
         except AwsCommandError as exc:
@@ -850,9 +869,9 @@ def check_s3_bucket_public_access(profile: str, region: str) -> dict[str, Any]:
 
 
 def check_guardduty_enabled(profile: str, region: str) -> dict[str, Any]:
-    detector_ids = run_aws_json(
-        profile, region, ["guardduty", "list-detectors"]
-    ).get("DetectorIds", [])
+    detector_ids = run_aws_json(profile, region, ["guardduty", "list-detectors"]).get(
+        "DetectorIds", []
+    )
 
     if not detector_ids:
         return {
@@ -987,13 +1006,18 @@ def first_price_dimension(item: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def targeted_service_price_samples(profile: str, service_code: str) -> list[dict[str, str]]:
+def targeted_service_price_samples(
+    profile: str, service_code: str
+) -> list[dict[str, str]]:
     samples: list[dict[str, str]] = []
 
     if service_code == "AWSCloudTrail":
         cloudtrail_usagetypes = [
             ("USE1-FreeEventsRecorded", "CloudTrail management events (first copy)"),
-            ("USE1-PaidEventsRecorded", "CloudTrail management events (additional copies)"),
+            (
+                "USE1-PaidEventsRecorded",
+                "CloudTrail management events (additional copies)",
+            ),
             ("USE1-DataEventsRecorded", "CloudTrail data events"),
             ("USE1-NetworkEventsRecorded", "CloudTrail network events"),
             ("USE1-InsightsEvents", "CloudTrail Insights analyzed events"),
@@ -1143,7 +1167,9 @@ def extract_price_samples(
     def score(sample: dict[str, str]) -> tuple[int, int]:
         usagetype = sample["usagetype"].lower()
         unit = sample["unit"].lower()
-        keyword_hits = sum(1 for keyword in keywords if keyword in usagetype or keyword in unit)
+        keyword_hits = sum(
+            1 for keyword in keywords if keyword in usagetype or keyword in unit
+        )
         usefulness = 0
         if "event" in unit or "request" in unit:
             usefulness += 1
@@ -1183,7 +1209,9 @@ def scenario_cost_hint(usd: str, unit: str) -> str:
     )
 
 
-def pricing_products_for_service(profile: str, service_code: str) -> list[dict[str, Any]]:
+def pricing_products_for_service(
+    profile: str, service_code: str
+) -> list[dict[str, Any]]:
     with_location = run_aws_json(
         profile,
         "us-east-1",
@@ -1205,19 +1233,30 @@ def pricing_products_for_service(profile: str, service_code: str) -> list[dict[s
     fallback = run_aws_json(
         profile,
         "us-east-1",
-        ["pricing", "get-products", "--service-code", service_code, "--max-results", "100"],
+        [
+            "pricing",
+            "get-products",
+            "--service-code",
+            service_code,
+            "--max-results",
+            "100",
+        ],
     ).get("PriceList", [])
     return parse_pricing_items(fallback)
 
 
-def enrich_results_with_cost_reviews(profile: str, results: list[dict[str, Any]]) -> None:
+def enrich_results_with_cost_reviews(
+    profile: str, results: list[dict[str, Any]]
+) -> None:
     for result in results:
         for finding in result.get("findings", []):
             services = finding.get("cost_scope_services", [])
             if not isinstance(services, list) or not services:
                 continue
 
-            change_summary = str(finding.get("cost_change_summary", "")).strip() or "Not specified"
+            change_summary = (
+                str(finding.get("cost_change_summary", "")).strip() or "Not specified"
+            )
             reviews: list[dict[str, Any]] = []
             for service_code in services:
                 service = str(service_code).strip()
@@ -1311,7 +1350,9 @@ def render_report(
         lines.append(f"### {result['title']}")
         lines.append("")
         status = result["status"]
-        status_emoji = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌", "ERROR": "🔴"}.get(status, "❓")
+        status_emoji = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌", "ERROR": "🔴"}.get(
+            status, "❓"
+        )
         lines.append(f"- Status: {status_emoji} {status}")
 
         findings = result.get("findings", [])
@@ -1361,20 +1402,31 @@ def render_report(
     lines.append("## Notes")
     lines.append("")
     lines.append("- This baseline is read-only and intended for weekly trend tracking.")
-    lines.append("- Expand with additional checks over time as your environment matures.")
+    lines.append(
+        "- Expand with additional checks over time as your environment matures."
+    )
     lines.append("")
     return "\n".join(lines)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate a weekly AWS security baseline report.")
+    parser = argparse.ArgumentParser(
+        description="Generate a weekly AWS security baseline report."
+    )
     parser.add_argument(
         "--profile",
-        default=os.environ.get("PROFILE") or os.environ.get("AWS_PROFILE") or "wepro-readonly",
+        default=os.environ.get("PROFILE")
+        or os.environ.get("AWS_PROFILE")
+        or "wepro-readonly",
         help="AWS profile to use (default: PROFILE, AWS_PROFILE, or wepro-readonly).",
     )
-    parser.add_argument("--region", default="us-east-1", help="AWS region to scope regional checks.")
-    parser.add_argument("--output", help="Output Markdown path. Defaults to reports/aws-security-weekly-YYYYMMDD.md")
+    parser.add_argument(
+        "--region", default="us-east-1", help="AWS region to scope regional checks."
+    )
+    parser.add_argument(
+        "--output",
+        help="Output Markdown path. Defaults to reports/aws-security-weekly-YYYYMMDD.md",
+    )
     args = parser.parse_args()
 
     now = utc_now()
