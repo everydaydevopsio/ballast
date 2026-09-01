@@ -25,7 +25,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--profile",
-        default=os.environ.get("PROFILE") or os.environ.get("AWS_PROFILE") or "wepro-readonly",
+        default=os.environ.get("PROFILE")
+        or os.environ.get("AWS_PROFILE")
+        or "wepro-readonly",
     )
     parser.add_argument("--region", default="us-east-1")
     parser.add_argument("--logs-hours", type=int, default=24)
@@ -41,7 +43,9 @@ def iso_z(value: dt.datetime) -> str:
     return value.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def run_aws(profile: str, region: str, args: list[str], expect_json: bool = True) -> Any:
+def run_aws(
+    profile: str, region: str, args: list[str], expect_json: bool = True
+) -> Any:
     cmd = ["aws", "--profile", profile, "--region", region, *args]
     if expect_json:
         cmd.extend(["--output", "json"])
@@ -56,7 +60,9 @@ def run_aws(profile: str, region: str, args: list[str], expect_json: bool = True
     return json.loads(payload)
 
 
-def run_aws_safe(profile: str, region: str, args: list[str], expect_json: bool = True) -> Any | None:
+def run_aws_safe(
+    profile: str, region: str, args: list[str], expect_json: bool = True
+) -> Any | None:
     try:
         return run_aws(profile, region, args, expect_json=expect_json)
     except (AwsCommandError, json.JSONDecodeError):
@@ -71,7 +77,9 @@ def default_output_path(now: dt.datetime) -> Path:
 def format_ts_ms(value: int | None) -> str:
     if value is None:
         return "n/a"
-    return dt.datetime.fromtimestamp(value / 1000, tz=dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+    return dt.datetime.fromtimestamp(value / 1000, tz=dt.timezone.utc).strftime(
+        "%Y-%m-%d %H:%M:%SZ"
+    )
 
 
 def find_name_tag(tags: list[dict[str, Any]]) -> str:
@@ -203,7 +211,9 @@ def summarize_alb(profile: str, region: str) -> dict[str, Any]:
             ["elbv2", "describe-load-balancer-attributes", "--load-balancer-arn", arn],
         )
         if attrs:
-            attr_map = {item["Key"]: item["Value"] for item in attrs.get("Attributes", [])}
+            attr_map = {
+                item["Key"]: item["Value"] for item in attrs.get("Attributes", [])
+            }
             if attr_map.get("access_logs.s3.enabled", "false").lower() != "true":
                 no_access_logs.append(name)
 
@@ -211,7 +221,9 @@ def summarize_alb(profile: str, region: str) -> dict[str, Any]:
         arn = tg.get("TargetGroupArn", "")
         name = tg.get("TargetGroupName", "unknown")
         health = run_aws_safe(
-            profile, region, ["elbv2", "describe-target-health", "--target-group-arn", arn]
+            profile,
+            region,
+            ["elbv2", "describe-target-health", "--target-group-arn", arn],
         )
         if not health:
             tg_lines.append(f"- `{name}` health=unknown")
@@ -363,9 +375,15 @@ def run_logs_insights_query(
         )
         query_id = payload["queryId"]
 
-        chunk_result: dict[str, Any] = {"status": "Timeout", "results": [], "statistics": {}}
+        chunk_result: dict[str, Any] = {
+            "status": "Timeout",
+            "results": [],
+            "statistics": {},
+        }
         for _ in range(30):
-            result = run_aws(profile, region, ["logs", "get-query-results", "--query-id", query_id])
+            result = run_aws(
+                profile, region, ["logs", "get-query-results", "--query-id", query_id]
+            )
             status = result.get("status")
             if status in {"Complete", "Failed", "Cancelled", "Timeout", "Unknown"}:
                 chunk_result = result
@@ -379,7 +397,9 @@ def run_logs_insights_query(
         combined_results.extend(chunk_result.get("results", []))
         for key, value in chunk_result.get("statistics", {}).items():
             try:
-                combined_statistics[key] = combined_statistics.get(key, 0.0) + float(value)
+                combined_statistics[key] = combined_statistics.get(key, 0.0) + float(
+                    value
+                )
             except (TypeError, ValueError):
                 continue
 
@@ -396,22 +416,27 @@ def summarize_logs(profile: str, region: str, logs_hours: int) -> dict[str, Any]
     start_ms = int(start.timestamp() * 1000)
 
     groups = list_log_groups(profile, region)
-    no_retention = [g["logGroupName"] for g in groups if g.get("retentionInDays") is None]
+    no_retention = [
+        g["logGroupName"] for g in groups if g.get("retentionInDays") is None
+    ]
 
     app_candidates = [
         g["logGroupName"]
         for g in groups
-        if g["logGroupName"].startswith("/aws/apprunner/") and g["logGroupName"].endswith("/application")
+        if g["logGroupName"].startswith("/aws/apprunner/")
+        and g["logGroupName"].endswith("/application")
     ]
     rds_error_groups = [
         g["logGroupName"]
         for g in groups
-        if g["logGroupName"].startswith("/aws/rds/instance/") and g["logGroupName"].endswith("/error")
+        if g["logGroupName"].startswith("/aws/rds/instance/")
+        and g["logGroupName"].endswith("/error")
     ]
     rds_slow_groups = [
         g["logGroupName"]
         for g in groups
-        if g["logGroupName"].startswith("/aws/rds/instance/") and g["logGroupName"].endswith("/slowquery")
+        if g["logGroupName"].startswith("/aws/rds/instance/")
+        and g["logGroupName"].endswith("/slowquery")
     ]
 
     active_app_groups: list[str] = []
@@ -425,7 +450,9 @@ def summarize_logs(profile: str, region: str, logs_hours: int) -> dict[str, Any]
         "| filter @message like /ERROR|Error|Exception|Traceback|FATAL|panic/ "
         "| sort @timestamp desc | limit 20"
     )
-    app_result = run_logs_insights_query(profile, region, active_app_groups, start, now, app_query)
+    app_result = run_logs_insights_query(
+        profile, region, active_app_groups, start, now, app_query
+    )
     app_error_count = int(app_result.get("statistics", {}).get("recordsMatched", 0.0))
 
     rds_auth_lines: list[str] = []
@@ -504,7 +531,12 @@ def overall_status(
     alarms: dict[str, Any],
     logs: dict[str, Any],
 ) -> str:
-    if ec2["impaired"] or rds["unavailable"] or alb["inactive"] or alb["unhealthy_targets"]:
+    if (
+        ec2["impaired"]
+        or rds["unavailable"]
+        or alb["inactive"]
+        or alb["unhealthy_targets"]
+    ):
         return "DEGRADED"
     if alarms["count"] > alarms["low_traffic_target_tracking"]:
         return "ATTENTION"
@@ -526,7 +558,9 @@ def build_report(
     ec2_status_lines = (
         [f"- {line}" for line in ec2["impaired"]]
         if ec2["impaired"]
-        else ["- All running instances are passing instance, system, and attached EBS checks."]
+        else [
+            "- All running instances are passing instance, system, and attached EBS checks."
+        ]
     )
     alarm_lines = alarms["lines"] or ["- No alarms currently in `ALARM` state."]
     app_error_lines = (
@@ -537,7 +571,9 @@ def build_report(
     rds_auth_lines = (
         logs["rds_auth_lines"]
         if logs["rds_auth_lines"]
-        else ["- No RDS access-denied or aborted-connection samples found in the review window."]
+        else [
+            "- No RDS access-denied or aborted-connection samples found in the review window."
+        ]
     )
     slow_query_lines = (
         logs["slow_query_lines"]
@@ -576,11 +612,17 @@ def build_report(
             f"- Stopped EC2 instances: {', '.join(f'`{item}`' for item in ec2['stopped_names'])}"
         )
     if logs["rds_auth_lines"]:
-        current_risks.append("- RDS error logs show unauthenticated or denied connection attempts in the review window.")
+        current_risks.append(
+            "- RDS error logs show unauthenticated or denied connection attempts in the review window."
+        )
     if logs["slow_query_lines"]:
-        current_risks.append("- RDS slow-query logging is active; review counts below for tuning pressure.")
+        current_risks.append(
+            "- RDS slow-query logging is active; review counts below for tuning pressure."
+        )
     if not current_risks:
-        current_risks.append("- No immediate risk flags beyond routine operational noise.")
+        current_risks.append(
+            "- No immediate risk flags beyond routine operational noise."
+        )
 
     report = [
         f"# AWS Live Health Review — {now.strftime('%Y-%m-%d %H:%M:%SZ')}",
@@ -664,7 +706,9 @@ def main() -> int:
     output_path.write_text(report, encoding="utf-8")
 
     print(f"[aws-live-health-review] Report written to: {output_path}")
-    print(f"[aws-live-health-review] Overall status: {overall_status(ec2, rds, alb, alarms, logs)}")
+    print(
+        f"[aws-live-health-review] Overall status: {overall_status(ec2, rds, alb, alarms, logs)}"
+    )
     return 0
 
 

@@ -41,6 +41,9 @@ export type TaskSystem = (typeof TASK_SYSTEMS)[number];
 export type DeploymentModel = (typeof DEPLOYMENT_MODELS)[number];
 export type PublishingProfile = (typeof PUBLISHING_PROFILES)[number];
 
+/** Reference-only variants that are emitted only when explicitly configured. */
+export const OPT_IN_PUBLISHING_PROFILES = ['apt', 'brew'] as const;
+
 export interface DiscoveryConfig {
   excludePaths?: string[];
 }

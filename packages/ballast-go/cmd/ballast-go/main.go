@@ -956,6 +956,10 @@ func install(opts installOptions) installResult {
 	}
 	supportAgents = uniqueStrings(supportAgents)
 	supportSkills = uniqueStrings(supportSkills)
+	rulePublishingProfiles := []string{}
+	if configForInstall != nil {
+		rulePublishingProfiles = normalizePublishingProfiles(configForInstall.PublishingProfiles)
+	}
 
 	for _, target := range targets {
 		processed := map[string]struct{}{}
@@ -985,6 +989,7 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 				continue
 			}
+			suffixes = filterPublishingSuffixes(agentID, suffixes, rulePublishingProfiles)
 
 			agentInstalled := false
 			agentSkipped := false
@@ -1147,7 +1152,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, agentsPath)
 				}
 			} else {
-				content, err := buildCodexAgentsMD(supportAgents, supportSkills, opts.language, effectiveTools)
+				content, err := buildCodexAgentsMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 				} else {
@@ -1181,7 +1186,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, claudePath)
 				}
 			} else {
-				content, err := buildClaudeMD(supportAgents, supportSkills, opts.language, effectiveTools)
+				content, err := buildClaudeMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
 				} else {
@@ -1215,7 +1220,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, geminiPath)
 				}
 			} else {
-				content, err := buildGeminiMD(supportAgents, supportSkills, opts.language, effectiveTools)
+				content, err := buildGeminiMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
 				} else {
@@ -1245,7 +1250,7 @@ func install(opts installOptions) installResult {
 	return result
 }
 
-func buildCodexAgentsMD(agents []string, skills []string, language string, tools map[string][]string) (string, error) {
+func buildCodexAgentsMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string) (string, error) {
 	lines := []string{
 		"# AGENTS.md",
 		"",
@@ -1270,6 +1275,7 @@ func buildCodexAgentsMD(agents []string, skills []string, language string, tools
 		if err != nil {
 			return "", err
 		}
+		suffixes = filterPublishingSuffixes(agentID, suffixes, publishingProfiles)
 		for _, suffix := range suffixes {
 			base := ruleBaseName(agentID, language, suffix)
 			description, _ := codexRuleDescription(agentID, language, suffix)
@@ -1316,7 +1322,7 @@ func renderGeminiMandates() string {
 	}, "\n")
 }
 
-func buildGeminiMD(agents []string, skills []string, language string, tools map[string][]string) (string, error) {
+func buildGeminiMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("# GEMINI.md\n\n")
 	sb.WriteString("This file provides guidance to Gemini CLI for working in this repository.\n\n")
@@ -1345,6 +1351,7 @@ func buildGeminiMD(agents []string, skills []string, language string, tools map[
 		if err != nil {
 			return "", err
 		}
+		suffixes = filterPublishingSuffixes(agent, suffixes, publishingProfiles)
 		for _, suffix := range suffixes {
 			basename := ruleBaseName(agent, language, suffix)
 			description, _ := codexRuleDescription(agent, language, suffix)
@@ -1370,7 +1377,7 @@ func buildGeminiMD(agents []string, skills []string, language string, tools map[
 	return sb.String(), nil
 }
 
-func buildClaudeMD(agents []string, skills []string, language string, tools map[string][]string) (string, error) {
+func buildClaudeMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string) (string, error) {
 	lines := []string{
 		"# CLAUDE.md",
 		"",
@@ -1395,6 +1402,7 @@ func buildClaudeMD(agents []string, skills []string, language string, tools map[
 		if err != nil {
 			return "", err
 		}
+		suffixes = filterPublishingSuffixes(agentID, suffixes, publishingProfiles)
 		for _, suffix := range suffixes {
 			base := ruleBaseName(agentID, language, suffix)
 			description, _ := codexRuleDescription(agentID, language, suffix)
@@ -2390,7 +2398,36 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 	}
 }
 
+var deploymentConditionalRegex = regexp.MustCompile(`\{\{BALLAST_IF_DEPLOYMENT:([a-z, -]+)\}\}\r?\n?([\s\S]*?)\{\{BALLAST_END_IF_DEPLOYMENT\}\}\r?\n?`)
+
+// applyDeploymentConditionalBlocks strips {{BALLAST_IF_DEPLOYMENT:<models>}}
+// blocks whose model list does not match the configured deployment model. The
+// special name "active" matches any model except "none".
+func applyDeploymentConditionalBlocks(content, deploymentModel string) string {
+	if !strings.Contains(content, "{{BALLAST_IF_DEPLOYMENT:") {
+		return content
+	}
+	model := strings.ToLower(strings.TrimSpace(deploymentModel))
+	if model == "" {
+		model = "none"
+	}
+	return deploymentConditionalRegex.ReplaceAllStringFunc(content, func(match string) string {
+		parts := deploymentConditionalRegex.FindStringSubmatch(match)
+		if len(parts) != 3 {
+			return match
+		}
+		for _, name := range strings.Split(parts[1], ",") {
+			name = strings.TrimSpace(name)
+			if name == model || (name == "active" && model != "none") {
+				return parts[2]
+			}
+		}
+		return ""
+	})
+}
+
 func applyDeploymentModelGuidance(content, agentID, deploymentModel string) string {
+	content = applyDeploymentConditionalBlocks(content, deploymentModel)
 	if agentID != "publishing" || !strings.Contains(content, deploymentModelGuidanceToken) {
 		return content
 	}
@@ -2452,6 +2489,38 @@ func applyHookTemplateVariables(content, agentID, language, hookMode string) str
 		return content
 	}
 	return strings.ReplaceAll(content, gitHooksPreCommitGlobToken, renderGitHooksPreCommitGlob(agentID, language, hookMode))
+}
+
+var optInPublishingProfiles = []string{"apt", "brew"}
+
+// filterPublishingSuffixes narrows publishing rule suffixes to the configured
+// profiles, or excludes reference-only opt-in variants when no profiles are
+// configured.
+func filterPublishingSuffixes(agentID string, suffixes, profiles []string) []string {
+	if agentID != "publishing" {
+		return suffixes
+	}
+	if len(profiles) > 0 {
+		available := map[string]struct{}{}
+		for _, suffix := range suffixes {
+			available[suffix] = struct{}{}
+		}
+		selected := make([]string, 0, len(profiles))
+		for _, profile := range profiles {
+			if _, ok := available[profile]; ok {
+				selected = append(selected, profile)
+			}
+		}
+		return selected
+	}
+	filtered := make([]string, 0, len(suffixes))
+	for _, suffix := range suffixes {
+		if contains(optInPublishingProfiles, suffix) {
+			continue
+		}
+		filtered = append(filtered, suffix)
+	}
+	return filtered
 }
 
 func listRuleSuffixes(agentID, language string) ([]string, error) {

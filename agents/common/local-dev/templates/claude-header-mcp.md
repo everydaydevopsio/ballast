@@ -1,3 +1,0 @@
-# Local Development: MCP Configuration
-
----

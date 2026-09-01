@@ -5498,6 +5498,28 @@ func TestBuildMonorepoSupportFileIncludesSkillsForClaude(t *testing.T) {
 	}
 }
 
+func TestBuildMonorepoSupportFileExcludesOptInAndRemovedRulesByDefault(t *testing.T) {
+	plan := &monorepoPlan{
+		Common: []string{"local-dev", "publishing"},
+		Config: monorepoConfig{
+			Languages: []string{"typescript"},
+		},
+	}
+
+	root := resolvedTempDir(t)
+	content := buildMonorepoSupportFile(root, plan, "claude")
+
+	if strings.Contains(content, "publishing-apt.md") || strings.Contains(content, "publishing-brew.md") {
+		t.Fatalf("did not expect opt-in publishing variants in support file, got %q", content)
+	}
+	if strings.Contains(content, "local-dev-mcp.md") {
+		t.Fatalf("did not expect removed local-dev mcp rule in support file, got %q", content)
+	}
+	if !strings.Contains(content, "publishing-cli.md") {
+		t.Fatalf("expected default publishing rules in support file, got %q", content)
+	}
+}
+
 func TestBuildMonorepoSupportFileIncludesRepositoryToolPolicyOnce(t *testing.T) {
 	plan := &monorepoPlan{
 		Common: []string{"local-dev"},
@@ -5585,7 +5607,7 @@ func TestBuildMonorepoSupportFileIncludesSplitTaskRules(t *testing.T) {
 	}
 }
 
-func TestManagedRulePathsIncludeAllPublishingVariants(t *testing.T) {
+func TestManagedRulePathsExcludeOptInPublishingVariantsByDefault(t *testing.T) {
 	root := resolvedTempDir(t)
 	config := &monorepoConfig{
 		Agents:    []string{"publishing"},
@@ -5593,10 +5615,53 @@ func TestManagedRulePathsIncludeAllPublishingVariants(t *testing.T) {
 	}
 
 	paths := managedRulePaths(root, "claude", config)
-	for _, suffix := range []string{"api", "apps", "apt", "brew", "cli", "libraries", "sdks", "web"} {
+	for _, suffix := range []string{"api", "apps", "cli", "libraries", "sdks", "web"} {
 		want := filepath.Join(root, ".claude", "rules", "common", "publishing-"+suffix+".md")
 		if !slices.Contains(paths, want) {
 			t.Fatalf("expected publishing variant %q in managed paths: %#v", want, paths)
+		}
+	}
+	for _, suffix := range []string{"apt", "brew"} {
+		unwanted := filepath.Join(root, ".claude", "rules", "common", "publishing-"+suffix+".md")
+		if slices.Contains(paths, unwanted) {
+			t.Fatalf("did not expect opt-in variant %q in managed paths: %#v", unwanted, paths)
+		}
+	}
+	mcp := filepath.Join(root, ".claude", "rules", "common", "local-dev-mcp.md")
+	if slices.Contains(paths, mcp) {
+		t.Fatalf("did not expect removed local-dev mcp rule in managed paths: %#v", paths)
+	}
+}
+
+func TestManagedRulePathsHonorConfiguredPublishingProfiles(t *testing.T) {
+	root := resolvedTempDir(t)
+	config := &monorepoConfig{
+		Agents:             []string{"publishing"},
+		Languages:          []string{"typescript"},
+		PublishingProfiles: []string{"cli", "apt", "brew"},
+	}
+
+	paths := managedRulePaths(root, "claude", config)
+	for _, suffix := range []string{"cli", "apt", "brew"} {
+		want := filepath.Join(root, ".claude", "rules", "common", "publishing-"+suffix+".md")
+		if !slices.Contains(paths, want) {
+			t.Fatalf("expected configured profile %q in managed paths: %#v", want, paths)
+		}
+	}
+	unwanted := filepath.Join(root, ".claude", "rules", "common", "publishing-web.md")
+	if slices.Contains(paths, unwanted) {
+		t.Fatalf("did not expect unselected profile %q in managed paths: %#v", unwanted, paths)
+	}
+}
+
+func TestAllManagedRulePathsIncludeOptInAndRemovedVariantsForCleanup(t *testing.T) {
+	root := resolvedTempDir(t)
+
+	paths := allManagedRulePaths(root, "claude")
+	for _, base := range []string{"publishing-apt", "publishing-brew", "local-dev-mcp"} {
+		want := filepath.Join(root, ".claude", "rules", "common", base+".md")
+		if !slices.Contains(paths, want) {
+			t.Fatalf("expected cleanup universe to include %q: too narrow", want)
 		}
 	}
 }

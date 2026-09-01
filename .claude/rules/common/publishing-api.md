@@ -87,6 +87,45 @@ app.get('/readyz', async (_req, res) => {
 });
 ```
 
+## Private vs Public Image Registries
+
+| Use case | Registry | Auth |
+|---------|---------|------|
+| Internal API, org-only access | GHCR (`ghcr.io`) | `GITHUB_TOKEN` |
+| Public API, open source | Docker Hub (`docker.io`) | `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` secrets |
+
+Grant `packages: write` to the build job for GHCR. Remove it for Docker Hub.
+
+## Required Secrets and Permissions
+
+| Secret | Required for |
+|--------|-------------|
+| `GITHUB_TOKEN` | GHCR push (automatic) |
+| `DOCKERHUB_USERNAME` | Docker Hub push |
+| `DOCKERHUB_TOKEN` | Docker Hub push |
+| `DEPLOYMENT_STATE_REPO_TOKEN` | External deployment state or GitOps repo write access |
+
+## README Badge
+
+```markdown
+[![Deploy API](https://github.com/OWNER/REPO/actions/workflows/deploy-api.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/deploy-api.yml)
+```
+
+## Important Notes
+
+- Liveness and readiness endpoints should have different semantics. Do not reuse the same handler for both unless the runtime only supports a single health check.
+- For Kubernetes, set `initialDelaySeconds` long enough that the API finishes startup before the first probe fires; misconfigured probes cause restart loops.
+- For Kubernetes HTTP services, prefer `httpGet` probes over `exec` probes.
+- Readiness checks should cover critical dependencies; liveness checks should only verify process health.
+- Never create unprefixed Git release tags. Normalize action outputs to `version=<major>.<minor>.<patch>` and `release_tag=v<major>.<minor>.<patch>`.
+- For Kubernetes, use `digest` not `tag` in the container spec so the cluster pulls the exact image version, even if a mutable tag is updated.
+
+## When to Apply
+
+- When a REST API service is deployed from a container image or platform-native service artifact.
+- When `deploymentModel` is `kubernetes` and Argo CD deploys the API from a GitOps repository.
+- When the API needs health and readiness checks for safe runtime lifecycle management.
+
 ## Kubernetes Helm Chart: Probes Configuration
 
 Apply this section only when `deploymentModel` is `kubernetes`. Add `livenessProbe` and `readinessProbe` to the deployment template in your Helm chart:
@@ -127,42 +166,3 @@ image:
 service:
   port: 8080
 ```
-
-## Private vs Public Image Registries
-
-| Use case | Registry | Auth |
-|---------|---------|------|
-| Internal API, org-only access | GHCR (`ghcr.io`) | `GITHUB_TOKEN` |
-| Public API, open source | Docker Hub (`docker.io`) | `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` secrets |
-
-Grant `packages: write` to the build job for GHCR. Remove it for Docker Hub.
-
-## Required Secrets and Permissions
-
-| Secret | Required for |
-|--------|-------------|
-| `GITHUB_TOKEN` | GHCR push (automatic) |
-| `DOCKERHUB_USERNAME` | Docker Hub push |
-| `DOCKERHUB_TOKEN` | Docker Hub push |
-| `DEPLOYMENT_STATE_REPO_TOKEN` | External deployment state or GitOps repo write access |
-
-## README Badge
-
-```markdown
-[![Deploy API](https://github.com/OWNER/REPO/actions/workflows/deploy-api.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/deploy-api.yml)
-```
-
-## Important Notes
-
-- Liveness and readiness endpoints should have different semantics. Do not reuse the same handler for both unless the runtime only supports a single health check.
-- For Kubernetes, set `initialDelaySeconds` long enough that the API finishes startup before the first probe fires; misconfigured probes cause restart loops.
-- For Kubernetes HTTP services, prefer `httpGet` probes over `exec` probes.
-- Readiness checks should cover critical dependencies; liveness checks should only verify process health.
-- Never create unprefixed Git release tags. Normalize action outputs to `version=<major>.<minor>.<patch>` and `release_tag=v<major>.<minor>.<patch>`.
-- For Kubernetes, use `digest` not `tag` in the container spec so the cluster pulls the exact image version, even if a mutable tag is updated.
-
-## When to Apply
-
-- When a REST API service is deployed from a container image or platform-native service artifact.
-- When `deploymentModel` is `kubernetes` and Argo CD deploys the API from a GitOps repository.
-- When the API needs health and readiness checks for safe runtime lifecycle management.

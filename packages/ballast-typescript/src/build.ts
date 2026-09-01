@@ -9,6 +9,7 @@ import {
   getSkillDir,
   SKILL_IDS
 } from './agents';
+import { OPT_IN_PUBLISHING_PROFILES } from './config';
 import type { PublishingProfile, Target } from './config';
 import type { Language } from './agents';
 import pkg from '../package.json';
@@ -528,6 +529,38 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
   }
 }
 
+const DEPLOYMENT_CONDITIONAL_PATTERN =
+  /\{\{BALLAST_IF_DEPLOYMENT:([a-z, -]+)\}\}\r?\n?([\s\S]*?)\{\{BALLAST_END_IF_DEPLOYMENT\}\}\r?\n?/g;
+
+/**
+ * Strip {{BALLAST_IF_DEPLOYMENT:<models>}}...{{BALLAST_END_IF_DEPLOYMENT}}
+ * blocks whose model list does not match the configured deployment model.
+ * The special name `active` matches any model except `none`.
+ */
+function applyDeploymentConditionalBlocks(
+  content: string,
+  deploymentModel: string
+): string {
+  if (!content.includes('{{BALLAST_IF_DEPLOYMENT:')) {
+    return content;
+  }
+  return content.replace(
+    DEPLOYMENT_CONDITIONAL_PATTERN,
+    (_match, models: string, inner: string) => {
+      const names = models
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+      const keep = names.some(
+        (name) =>
+          name === deploymentModel ||
+          (name === 'active' && deploymentModel !== 'none')
+      );
+      return keep ? inner : '';
+    }
+  );
+}
+
 function applyDeploymentModelGuidance(
   content: string,
   agentId: string,
@@ -644,13 +677,17 @@ export function listRuleSuffixes(
   if (suffixes.length === 0) {
     throw new Error(`Agent "${agentId}" has no content.md or content-*.md`);
   }
-  if (
-    agentId === 'publishing' &&
-    publishingProfiles !== undefined &&
-    publishingProfiles.length > 0
-  ) {
-    const available = new Set(suffixes);
-    return publishingProfiles.filter((profile) => available.has(profile));
+  if (agentId === 'publishing') {
+    if (publishingProfiles !== undefined && publishingProfiles.length > 0) {
+      const available = new Set(suffixes);
+      return publishingProfiles.filter((profile) => available.has(profile));
+    }
+    // Opt-in variants are reference-only unless explicitly configured; do not
+    // emit them into the always-loaded rule set by default.
+    return suffixes.filter(
+      (suffix) =>
+        !(OPT_IN_PUBLISHING_PROFILES as readonly string[]).includes(suffix)
+    );
   }
   return suffixes;
 }
@@ -682,7 +719,10 @@ export function getContent(
   }
   return applyTaskSystemGuidance(
     applyDeploymentModelGuidance(
-      applyHookGuidance(raw, agentId, language, options),
+      applyDeploymentConditionalBlocks(
+        applyHookGuidance(raw, agentId, language, options),
+        options?.variables?.deploymentModel ?? 'none'
+      ),
       agentId,
       options
     ),

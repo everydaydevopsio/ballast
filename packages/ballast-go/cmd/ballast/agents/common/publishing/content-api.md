@@ -49,6 +49,7 @@ Before enabling automated rollout health checks, ensure the API exposes at least
 
 Separate liveness and readiness checks when the runtime supports both. In Kubernetes, a liveness failure triggers a pod restart and a readiness failure removes the pod from service without restarting it. In hosted, serverless, or server models, map these endpoints to the platform's health check and traffic cutover controls.
 
+{{BALLAST_IF_DEPLOYMENT:active}}
 ### Minimal Go Implementation
 
 ```go
@@ -84,6 +85,8 @@ app.get('/readyz', async (_req, res) => {
 });
 ```
 
+{{BALLAST_END_IF_DEPLOYMENT}}
+{{BALLAST_IF_DEPLOYMENT:kubernetes}}
 ## Kubernetes Helm Chart: Probes Configuration
 
 Apply this section only when `deploymentModel` is `kubernetes`. Add `livenessProbe` and `readinessProbe` to the deployment template in your Helm chart:
@@ -125,6 +128,7 @@ service:
   port: 8080
 ```
 
+{{BALLAST_END_IF_DEPLOYMENT}}
 ## Private vs Public Image Registries
 
 | Use case | Registry | Auth |

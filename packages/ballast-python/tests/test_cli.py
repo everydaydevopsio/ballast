@@ -262,6 +262,43 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("uv run <command>", content)
             self.assertIn("pnpm exec", content)
 
+    def test_publishing_suffixes_exclude_opt_in_variants_by_default(self) -> None:
+        suffixes = cli.list_rule_suffixes("publishing", "python")
+
+        self.assertNotIn("apt", suffixes)
+        self.assertNotIn("brew", suffixes)
+        self.assertEqual(len(suffixes), 6)
+
+    def test_publishing_suffixes_honor_explicit_profiles(self) -> None:
+        suffixes = cli.list_rule_suffixes(
+            "publishing", "python", ["cli", "apt", "brew"]
+        )
+
+        self.assertEqual(suffixes, ["cli", "apt", "brew"])
+
+    def test_publishing_api_omits_kubernetes_sections_for_none(self) -> None:
+        content = cli.build_content(
+            "publishing", "codex", "python", "api", deployment_model="none"
+        )
+
+        self.assertNotIn("Kubernetes Helm Chart: Probes Configuration", content)
+        self.assertNotIn("Minimal Go Implementation", content)
+        self.assertNotIn("BALLAST_IF_DEPLOYMENT", content)
+
+    def test_publishing_api_keeps_kubernetes_sections_for_kubernetes(self) -> None:
+        content = cli.build_content(
+            "publishing", "codex", "python", "api", deployment_model="kubernetes"
+        )
+
+        self.assertIn("Kubernetes Helm Chart: Probes Configuration", content)
+        self.assertIn("Minimal Go Implementation", content)
+        self.assertNotIn("BALLAST_IF_DEPLOYMENT", content)
+
+    def test_local_dev_has_no_mcp_suffix(self) -> None:
+        suffixes = cli.list_rule_suffixes("local-dev", "python")
+
+        self.assertEqual(suffixes, ["badges", "env", "license"])
+
     def test_manifests_include_tools_policy_once(self) -> None:
         tools = {"python": ["uv", "pyenv"]}
         for builder in [
