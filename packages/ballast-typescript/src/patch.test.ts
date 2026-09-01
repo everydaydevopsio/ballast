@@ -224,6 +224,46 @@ Canonical content.
   });
 
   describe('patchCodexAgentsMd', () => {
+    test('fills placeholder repository facts from canonical values', () => {
+      const existing = [
+        '# CLAUDE.md',
+        '',
+        '## Repository Facts',
+        '',
+        '- Canonical GitHub repo: `<OWNER/REPO>`',
+        '- Primary package manager: `bun`',
+        '- Coverage threshold: `<value>`',
+        '',
+        '## Installed agent rules',
+        '',
+        'Created by Ballast. Do not edit this section.',
+        '',
+        '- `.claude/rules/common/docs.md` — Rules for common/docs',
+        ''
+      ].join('\n');
+      const canonical = [
+        '# CLAUDE.md',
+        '',
+        '## Repository Facts',
+        '',
+        '- Canonical GitHub repo: `acme/widgets`',
+        '- Primary package manager: `pnpm`',
+        '- Coverage threshold: `<value>`',
+        '',
+        '## Installed agent rules',
+        '',
+        'Created by Ballast. Do not edit this section.',
+        '',
+        '- `.claude/rules/common/docs.md` — Rules for common/docs',
+        ''
+      ].join('\n');
+
+      const merged = patchCodexAgentsMd(existing, canonical);
+      expect(merged).toContain('- Canonical GitHub repo: `acme/widgets`');
+      expect(merged).toContain('- Primary package manager: `bun`');
+      expect(merged).toContain('- Coverage threshold: `<value>`');
+    });
+
     test('replaces the installed rules section and preserves user content outside it', () => {
       const existing = `# AGENTS.md
 

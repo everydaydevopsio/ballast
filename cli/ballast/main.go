@@ -4419,11 +4419,58 @@ func joinSupportSectionParts(prefix string, section string, suffix string) strin
 }
 
 func mergeManagedSupportSections(existing string, canonical string, allowUnmanaged bool) string {
-	next := existing
+	next := fillPlaceholderRepositoryFacts(existing, canonical)
 	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
 		next = mergeSupportSection(next, canonical, heading, allowUnmanaged)
 	}
 	return next
+}
+
+var repositoryFactLineRegex = regexp.MustCompile("^- ([^:`]+): `([^`]*)`$")
+
+// fillPlaceholderRepositoryFacts fills still-unfilled `<placeholder>` fact
+// lines in the existing Repository Facts section with discovered values from
+// the canonical section. Lines a user has populated are never touched, and
+// facts discovery could not resolve stay as placeholders.
+func fillPlaceholderRepositoryFacts(existing string, canonical string) string {
+	existingRange := findSectionRange(existing, "Repository Facts")
+	canonicalRange := findSectionRange(canonical, "Repository Facts")
+	if existingRange == nil || canonicalRange == nil {
+		return existing
+	}
+
+	discovered := map[string]string{}
+	for _, line := range strings.Split(canonical[canonicalRange[0]:canonicalRange[1]], "\n") {
+		parts := repositoryFactLineRegex.FindStringSubmatch(line)
+		if len(parts) != 3 {
+			continue
+		}
+		value := parts[2]
+		if strings.HasPrefix(value, "<") && strings.HasSuffix(value, ">") {
+			continue
+		}
+		discovered[parts[1]] = line
+	}
+	if len(discovered) == 0 {
+		return existing
+	}
+
+	section := existing[existingRange[0]:existingRange[1]]
+	lines := strings.Split(section, "\n")
+	for i, line := range lines {
+		parts := repositoryFactLineRegex.FindStringSubmatch(line)
+		if len(parts) != 3 {
+			continue
+		}
+		value := parts[2]
+		if !strings.HasPrefix(value, "<") || !strings.HasSuffix(value, ">") {
+			continue
+		}
+		if replacement, ok := discovered[parts[1]]; ok {
+			lines[i] = replacement
+		}
+	}
+	return existing[:existingRange[0]] + strings.Join(lines, "\n") + existing[existingRange[1]:]
 }
 
 func mergeSupportSection(existing string, canonical string, heading string, allowUnmanaged bool) string {

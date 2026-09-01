@@ -10,16 +10,16 @@ Keep only stable, reviewable metadata here. Do not store secrets, credentials, o
 
 Suggested facts to record:
 
-- Canonical GitHub repo: `<OWNER/REPO>`
-- Default branch: `<main>`
-- Primary package manager: `<pnpm | npm | yarn | uv | go>`
-- Version-file locations agents should check first: `<.nvmrc, packageManager, pyproject.toml, go.mod, etc.>`
-- Canonical config files: `<paths agents should read before falling back to discovery>`
-- Primary CI workflows: `<workflow filenames>`
-- Primary release/publish workflows: `<workflow filenames>`
-- Preferred build/test/lint/format/coverage commands: `<commands>`
+- Canonical GitHub repo: `everydaydevopsio/ballast`
+- Default branch: `main`
+- Primary package manager: `pnpm`
+- Version-file locations agents should check first: `.nvmrc, package.json`
+- Canonical config files: `.prettierrc`
+- Primary CI workflows: `ci.yml`
+- Primary release/publish workflows: `publish-cli.yml, publish-go.yml, publish-python.yml, publish.typescript.yml, publish.yml`
+- Preferred build/test/lint/format/coverage commands: `make build, package.json:test, package.json:lint, package.json:build`
 - Coverage threshold: `<value>`
-- Generated or protected paths agents should avoid editing directly: `<paths>`
+- Generated or protected paths agents should avoid editing directly: `dist/, coverage/`
 
 Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.
 

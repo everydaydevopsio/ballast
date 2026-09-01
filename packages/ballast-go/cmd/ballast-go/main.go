@@ -2090,13 +2090,55 @@ func hasBallastManagedNotice(section string) bool {
 		strings.Contains(section, "Do not edit this section.")
 }
 
+var repositoryFactLineRegex = regexp.MustCompile("^- ([^:`]+): `([^`]*)`$")
+
+func isPlaceholderFactValue(value string) bool {
+	return strings.HasPrefix(value, "<") && strings.HasSuffix(value, ">")
+}
+
+// fillPlaceholderRepositoryFacts fills still-unfilled `<placeholder>` fact
+// lines in the existing Repository Facts section with discovered values from
+// the canonical section. Lines a user has populated are never touched, and
+// facts discovery could not resolve stay as placeholders.
+func fillPlaceholderRepositoryFacts(existing, canonical string) string {
+	existingStart, existingEnd, existingOK := findSectionRange(existing, "Repository Facts")
+	canonicalStart, canonicalEnd, canonicalOK := findSectionRange(canonical, "Repository Facts")
+	if !existingOK || !canonicalOK {
+		return existing
+	}
+
+	discovered := map[string]string{}
+	for _, line := range strings.Split(canonical[canonicalStart:canonicalEnd], "\n") {
+		parts := repositoryFactLineRegex.FindStringSubmatch(line)
+		if len(parts) != 3 || isPlaceholderFactValue(parts[2]) {
+			continue
+		}
+		discovered[parts[1]] = line
+	}
+	if len(discovered) == 0 {
+		return existing
+	}
+
+	lines := strings.Split(existing[existingStart:existingEnd], "\n")
+	for i, line := range lines {
+		parts := repositoryFactLineRegex.FindStringSubmatch(line)
+		if len(parts) != 3 || !isPlaceholderFactValue(parts[2]) {
+			continue
+		}
+		if replacement, ok := discovered[parts[1]]; ok {
+			lines[i] = replacement
+		}
+	}
+	return existing[:existingStart] + strings.Join(lines, "\n") + existing[existingEnd:]
+}
+
 func patchCodexAgentsMDWithOptions(existing, canonical string, replaceUnmanagedSections bool) string {
 	if strings.TrimSpace(existing) == "" {
 		return normalizeLineEndings(canonical)
 	}
 	existing = normalizeLineEndings(existing)
 	canonical = normalizeLineEndings(canonical)
-	current := existing
+	current := fillPlaceholderRepositoryFacts(existing, canonical)
 	for _, heading := range []string{"Installed agent rules", "Installed skills"} {
 		canonicalStart, canonicalEnd, ok := findSectionRange(canonical, heading)
 		if !ok {

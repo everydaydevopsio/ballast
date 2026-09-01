@@ -259,6 +259,62 @@ function hasBallastManagedNotice(section: string): boolean {
   );
 }
 
+const REPOSITORY_FACT_LINE_PATTERN = /^- ([^:`]+): `([^`]*)`$/;
+
+function isPlaceholderFactValue(value: string): boolean {
+  return value.startsWith('<') && value.endsWith('>');
+}
+
+/**
+ * Fill still-unfilled `<placeholder>` fact lines in the existing Repository
+ * Facts section with discovered values from the canonical section. Lines a
+ * user has populated are never touched, and facts discovery could not resolve
+ * stay as placeholders.
+ */
+function fillPlaceholderRepositoryFacts(
+  existing: string,
+  canonical: string
+): string {
+  const existingRange = findMarkdownSectionRange(existing, 'Repository Facts');
+  const canonicalRange = findMarkdownSectionRange(
+    canonical,
+    'Repository Facts'
+  );
+  if (!existingRange || !canonicalRange) {
+    return existing;
+  }
+
+  const discovered = new Map<string, string>();
+  for (const line of canonical
+    .slice(canonicalRange.start, canonicalRange.end)
+    .split('\n')) {
+    const match = line.match(REPOSITORY_FACT_LINE_PATTERN);
+    if (!match || isPlaceholderFactValue(match[2])) {
+      continue;
+    }
+    discovered.set(match[1], line);
+  }
+  if (discovered.size === 0) {
+    return existing;
+  }
+
+  const lines = existing
+    .slice(existingRange.start, existingRange.end)
+    .split('\n')
+    .map((line) => {
+      const match = line.match(REPOSITORY_FACT_LINE_PATTERN);
+      if (!match || !isPlaceholderFactValue(match[2])) {
+        return line;
+      }
+      return discovered.get(match[1]) ?? line;
+    });
+  return (
+    existing.slice(0, existingRange.start) +
+    lines.join('\n') +
+    existing.slice(existingRange.end)
+  );
+}
+
 export function patchCodexAgentsMd(
   existing: string,
   canonical: string,
@@ -271,7 +327,7 @@ export function patchCodexAgentsMd(
   existing = normalizeLineEndings(existing);
   canonical = normalizeLineEndings(canonical);
   const replaceUnmanagedSections = options.replaceUnmanagedSections ?? true;
-  let next = existing;
+  let next = fillPlaceholderRepositoryFacts(existing, canonical);
   for (const heading of ['Installed agent rules', 'Installed skills']) {
     const canonicalRange = findMarkdownSectionRange(canonical, heading);
     if (!canonicalRange) {
