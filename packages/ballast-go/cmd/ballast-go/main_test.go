@@ -1224,6 +1224,49 @@ func TestLocalDevHasNoMcpSuffix(t *testing.T) {
 	}
 }
 
+func TestPatchFillsPlaceholderRepositoryFacts(t *testing.T) {
+	existing := strings.Join([]string{
+		"# CLAUDE.md",
+		"",
+		"## Repository Facts",
+		"",
+		"- Canonical GitHub repo: `<OWNER/REPO>`",
+		"- Primary package manager: `bun`",
+		"- Coverage threshold: `<value>`",
+		"",
+		"## Installed agent rules",
+		"",
+		"Created by Ballast. Do not edit this section.",
+		"",
+	}, "\n")
+	canonical := strings.Join([]string{
+		"# CLAUDE.md",
+		"",
+		"## Repository Facts",
+		"",
+		"- Canonical GitHub repo: `acme/widgets`",
+		"- Primary package manager: `pnpm`",
+		"- Coverage threshold: `<value>`",
+		"",
+		"## Installed agent rules",
+		"",
+		"Created by Ballast. Do not edit this section.",
+		"",
+	}, "\n")
+
+	merged := patchCodexAgentsMD(existing, canonical)
+
+	if !strings.Contains(merged, "- Canonical GitHub repo: `acme/widgets`") {
+		t.Fatalf("expected placeholder fact filled, got %q", merged)
+	}
+	if !strings.Contains(merged, "- Primary package manager: `bun`") {
+		t.Fatalf("expected user-edited fact preserved, got %q", merged)
+	}
+	if !strings.Contains(merged, "- Coverage threshold: `<value>`") {
+		t.Fatalf("expected unresolved placeholder kept, got %q", merged)
+	}
+}
+
 func TestPatchDropsStaleToolPolicyWhenCanonicalOmitsIt(t *testing.T) {
 	existing := "# Rules\n\nIntro.\n\n## Repository Tool Policy\n\n- Check `.rulesrc.json` `tools` before adding, installing, or running language tooling.\n\n## Keep\n\nBody.\n"
 	canonical := "# Rules\n\nIntro.\n\n## Keep\n\nBody.\n"

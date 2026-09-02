@@ -317,6 +317,87 @@ class PatchInstallTests(unittest.TestCase):
             )
             self.assertEqual(content.count("Repository Tool Policy"), 1)
 
+    def test_patch_handles_crlf_support_files(self) -> None:
+        existing = "\r\n".join(
+            [
+                "# CLAUDE.md",
+                "",
+                "## Repository Facts",
+                "",
+                "- Canonical GitHub repo: `<OWNER/REPO>`",
+                "",
+                "## Installed agent rules",
+                "",
+                "Created by Ballast. Do not edit this section.",
+                "",
+                "- `.claude/rules/common/docs.md` — old entry",
+                "",
+            ]
+        )
+        canonical = "\n".join(
+            [
+                "# CLAUDE.md",
+                "",
+                "## Repository Facts",
+                "",
+                "- Canonical GitHub repo: `acme/widgets`",
+                "",
+                "## Installed agent rules",
+                "",
+                "Created by Ballast. Do not edit this section.",
+                "",
+                "- `.claude/rules/common/docs.md` — new entry",
+                "",
+            ]
+        )
+
+        merged = cli.patch_codex_agents_md(existing, canonical)
+
+        self.assertIn("- Canonical GitHub repo: `acme/widgets`", merged)
+        self.assertIn("new entry", merged)
+        self.assertNotIn("old entry", merged)
+        self.assertIn("# CLAUDE.md", merged)
+
+    def test_patch_fills_placeholder_repository_facts(self) -> None:
+        existing = "\n".join(
+            [
+                "# CLAUDE.md",
+                "",
+                "## Repository Facts",
+                "",
+                "- Canonical GitHub repo: `<OWNER/REPO>`",
+                "- Primary package manager: `bun`",
+                "- Coverage threshold: `<value>`",
+                "",
+                "## Installed agent rules",
+                "",
+                "Created by Ballast. Do not edit this section.",
+                "",
+            ]
+        )
+        canonical = "\n".join(
+            [
+                "# CLAUDE.md",
+                "",
+                "## Repository Facts",
+                "",
+                "- Canonical GitHub repo: `acme/widgets`",
+                "- Primary package manager: `pnpm`",
+                "- Coverage threshold: `<value>`",
+                "",
+                "## Installed agent rules",
+                "",
+                "Created by Ballast. Do not edit this section.",
+                "",
+            ]
+        )
+
+        merged = cli.patch_codex_agents_md(existing, canonical)
+
+        self.assertIn("- Canonical GitHub repo: `acme/widgets`", merged)
+        self.assertIn("- Primary package manager: `bun`", merged)
+        self.assertIn("- Coverage threshold: `<value>`", merged)
+
     def test_patch_drops_stale_tool_policy_when_canonical_omits_it(self) -> None:
         existing = (
             "# Rules\n\nIntro.\n\n## Repository Tool Policy\n\n"

@@ -5498,6 +5498,66 @@ func TestBuildMonorepoSupportFileIncludesSkillsForClaude(t *testing.T) {
 	}
 }
 
+func TestMergeManagedSupportSectionsFillsPlaceholderRepositoryFacts(t *testing.T) {
+	existing := strings.Join([]string{
+		"# CLAUDE.md",
+		"",
+		"Intro.",
+		"",
+		"## Repository Facts",
+		"",
+		"Suggested facts to record:",
+		"",
+		"- Canonical GitHub repo: `<OWNER/REPO>`",
+		"- Default branch: `<main>`",
+		"- Primary package manager: `bun`",
+		"- Coverage threshold: `<value>`",
+		"",
+		"## Installed agent rules",
+		"",
+		"Created by Ballast. Do not edit this section.",
+		"",
+		"- `.claude/rules/common/docs.md` — Rules for common/docs",
+		"",
+	}, "\n")
+	canonical := strings.Join([]string{
+		"# CLAUDE.md",
+		"",
+		"Intro.",
+		"",
+		"## Repository Facts",
+		"",
+		"Suggested facts to record:",
+		"",
+		"- Canonical GitHub repo: `acme/widgets`",
+		"- Default branch: `main`",
+		"- Primary package manager: `pnpm`",
+		"- Coverage threshold: `<value>`",
+		"",
+		"## Installed agent rules",
+		"",
+		"Created by Ballast. Do not edit this section.",
+		"",
+		"- `.claude/rules/common/docs.md` — Rules for common/docs",
+		"",
+	}, "\n")
+
+	merged := mergeManagedSupportSections(existing, canonical, false)
+
+	if !strings.Contains(merged, "- Canonical GitHub repo: `acme/widgets`") {
+		t.Fatalf("expected placeholder repo fact filled from canonical, got %q", merged)
+	}
+	if !strings.Contains(merged, "- Default branch: `main`") {
+		t.Fatalf("expected placeholder branch fact filled from canonical, got %q", merged)
+	}
+	if !strings.Contains(merged, "- Primary package manager: `bun`") {
+		t.Fatalf("expected user-edited fact preserved, got %q", merged)
+	}
+	if !strings.Contains(merged, "- Coverage threshold: `<value>`") {
+		t.Fatalf("expected placeholder to stay when canonical has no real value, got %q", merged)
+	}
+}
+
 func TestBuildMonorepoSupportFileExcludesOptInAndRemovedRulesByDefault(t *testing.T) {
 	plan := &monorepoPlan{
 		Common: []string{"local-dev", "publishing"},

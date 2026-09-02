@@ -2096,13 +2096,54 @@ def has_ballast_managed_notice(section: str) -> bool:
     ) and "Do not edit this section." in section
 
 
+REPOSITORY_FACT_LINE_RE = re.compile(r"^- ([^:`]+): `([^`]*)`$")
+
+
+def _is_placeholder_fact_value(value: str) -> bool:
+    return value.startswith("<") and value.endswith(">")
+
+
+def fill_placeholder_repository_facts(existing: str, canonical: str) -> str:
+    """Fill still-unfilled ``<placeholder>`` fact lines in the existing
+    Repository Facts section with discovered values from the canonical
+    section. Lines a user has populated are never touched, and facts
+    discovery could not resolve stay as placeholders."""
+    existing_range = find_markdown_section_range(existing, "Repository Facts")
+    canonical_range = find_markdown_section_range(canonical, "Repository Facts")
+    if existing_range is None or canonical_range is None:
+        return existing
+
+    discovered: dict[str, str] = {}
+    for line in canonical[canonical_range[0] : canonical_range[1]].split("\n"):
+        match = REPOSITORY_FACT_LINE_RE.match(line)
+        if not match or _is_placeholder_fact_value(match.group(2)):
+            continue
+        discovered[match.group(1)] = line
+    if not discovered:
+        return existing
+
+    lines = existing[existing_range[0] : existing_range[1]].split("\n")
+    for index, line in enumerate(lines):
+        match = REPOSITORY_FACT_LINE_RE.match(line)
+        if not match or not _is_placeholder_fact_value(match.group(2)):
+            continue
+        lines[index] = discovered.get(match.group(1), line)
+    return (
+        existing[: existing_range[0]] + "\n".join(lines) + existing[existing_range[1] :]
+    )
+
+
 def patch_codex_agents_md(
     existing: str, canonical: str, replace_unmanaged_sections: bool = True
 ) -> str:
     if not existing.strip():
-        return canonical
+        return normalize_line_endings(canonical)
 
-    next_content = existing
+    # Normalize up-front so section offsets computed on normalized content are
+    # applied to identical strings (matches the TS and Go implementations).
+    existing = normalize_line_endings(existing)
+    canonical = normalize_line_endings(canonical)
+    next_content = fill_placeholder_repository_facts(existing, canonical)
     for heading in ("Installed agent rules", "Installed skills"):
         canonical_range = find_markdown_section_range(canonical, heading)
         if not canonical_range:
