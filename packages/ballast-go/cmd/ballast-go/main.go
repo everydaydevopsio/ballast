@@ -2592,6 +2592,23 @@ func listRuleSuffixes(agentID, language string) ([]string, error) {
 	return suffixes, nil
 }
 
+var includeSegmentRegex = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// isValidIncludePath accepts only relative, forward-slash-separated .md paths
+// whose segments contain only safe characters — rejecting absolute paths,
+// Windows drive or rooted paths, and traversal on every platform.
+func isValidIncludePath(includePath string) bool {
+	if !strings.HasSuffix(includePath, ".md") {
+		return false
+	}
+	for _, segment := range strings.Split(includePath, "/") {
+		if !includeSegmentRegex.MatchString(segment) || segment == "." || segment == ".." {
+			return false
+		}
+	}
+	return true
+}
+
 var includeTokenRegex = regexp.MustCompile(`\{\{include:([^}]+)\}\}`)
 
 const maxIncludeDepth = 10
@@ -2612,8 +2629,8 @@ func resolveContentIncludes(content string, stack []string) (string, error) {
 		}
 		parts := includeTokenRegex.FindStringSubmatch(match)
 		includePath := strings.TrimSpace(parts[1])
-		if !strings.HasSuffix(includePath, ".md") || strings.Contains(includePath, "..") || strings.HasPrefix(includePath, "/") {
-			resolveErr = fmt.Errorf("invalid include path %q: must be a relative .md path under agents/", includePath)
+		if !isValidIncludePath(includePath) {
+			resolveErr = fmt.Errorf("invalid include path %q: must be a relative, forward-slash .md path under agents/", includePath)
 			return match
 		}
 		chain := strings.Join(append(slices.Clone(stack), includePath), " -> ")

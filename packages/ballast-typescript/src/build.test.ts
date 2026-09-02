@@ -1360,9 +1360,18 @@ alwaysApply: false
     });
 
     test('rejects fragment paths that escape the agents root', () => {
-      expect(() => resolveContentIncludes('{{include:../secrets.md}}')).toThrow(
-        /invalid include path/i
-      );
+      for (const bad of [
+        '../secrets.md',
+        '/etc/passwd.md',
+        'C:/windows/system.md',
+        'C:\\windows.md',
+        '\\server\\share.md',
+        'common\\fragments\\tdd-process.md'
+      ]) {
+        expect(() => resolveContentIncludes(`{{include:${bad}}}`)).toThrow(
+          /invalid include path/i
+        );
+      }
     });
 
     test('throws on recursive fragment includes', () => {

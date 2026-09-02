@@ -279,8 +279,16 @@ class PatchInstallTests(unittest.TestCase):
             )
 
     def test_include_path_escape_rejected(self) -> None:
-        with self.assertRaisesRegex(ValueError, "Invalid include path"):
-            cli.resolve_content_includes("{{include:../secrets.md}}")
+        for bad in [
+            "../secrets.md",
+            "/etc/passwd.md",
+            "C:/windows/system.md",
+            "C:\\windows.md",
+            "\\\\server\\share.md",
+            "common\\fragments\\tdd-process.md",
+        ]:
+            with self.assertRaisesRegex(ValueError, "Invalid include path"):
+                cli.resolve_content_includes("{{include:" + bad + "}}")
 
     def test_recursive_fragment_include_raises(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

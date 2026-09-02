@@ -1178,9 +1178,18 @@ func TestMissingFragmentIncludeFails(t *testing.T) {
 }
 
 func TestIncludePathEscapeRejected(t *testing.T) {
-	_, err := resolveContentIncludes("{{include:../secrets.md}}", nil)
-	if err == nil || !strings.Contains(err.Error(), "invalid include path") {
-		t.Fatalf("expected invalid path error, got %v", err)
+	for _, bad := range []string{
+		"../secrets.md",
+		"/etc/passwd.md",
+		"C:/windows/system.md",
+		`C:\windows.md`,
+		`\\server\share.md`,
+		`common\fragments\tdd-process.md`,
+	} {
+		_, err := resolveContentIncludes("{{include:"+bad+"}}", nil)
+		if err == nil || !strings.Contains(err.Error(), "invalid include path") {
+			t.Fatalf("expected invalid path error for %q, got %v", bad, err)
+		}
 	}
 }
 

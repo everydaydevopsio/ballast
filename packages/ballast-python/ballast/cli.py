@@ -828,6 +828,22 @@ def list_rule_suffixes(
     return suffixes
 
 
+INCLUDE_SEGMENT_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _is_valid_include_path(include_path: str) -> bool:
+    """Includes must be relative, forward-slash-separated .md paths whose
+    segments contain only safe characters -- rejecting absolute paths,
+    Windows drive or rooted paths, and traversal on every platform."""
+    if not include_path.endswith(".md"):
+        return False
+    segments = include_path.split("/")
+    return all(
+        INCLUDE_SEGMENT_RE.match(segment) and segment not in (".", "..")
+        for segment in segments
+    )
+
+
 INCLUDE_TOKEN_RE = re.compile(r"\{\{include:([^}]+)\}\}")
 MAX_INCLUDE_DEPTH = 10
 
@@ -849,14 +865,10 @@ def resolve_content_includes(
 
     def replace(match: re.Match[str]) -> str:
         include_path = match.group(1).strip()
-        if (
-            not include_path.endswith(".md")
-            or ".." in include_path
-            or include_path.startswith("/")
-        ):
+        if not _is_valid_include_path(include_path):
             raise ValueError(
                 f"Invalid include path {include_path!r}: "
-                "must be a relative .md path under agents/"
+                "must be a relative, forward-slash .md path under agents/"
             )
         chain = " -> ".join([*stack, include_path])
         if include_path in stack:

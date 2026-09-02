@@ -697,6 +697,24 @@ export function listRuleSuffixes(
   return suffixes;
 }
 
+const INCLUDE_SEGMENT_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * Includes must be relative, forward-slash-separated .md paths whose segments
+ * contain only safe characters — rejecting absolute paths, Windows drive or
+ * rooted paths, and traversal on every platform.
+ */
+function isValidIncludePath(includePath: string): boolean {
+  if (!includePath.endsWith('.md')) return false;
+  const segments = includePath.split('/');
+  return segments.every(
+    (segment) =>
+      INCLUDE_SEGMENT_PATTERN.test(segment) &&
+      segment !== '.' &&
+      segment !== '..'
+  );
+}
+
 const INCLUDE_PATTERN = /\{\{include:([^}]+)\}\}/g;
 const MAX_INCLUDE_DEPTH = 10;
 
@@ -716,13 +734,9 @@ export function resolveContentIncludes(
   }
   return content.replace(INCLUDE_PATTERN, (_match, rawPath: string) => {
     const includePath = rawPath.trim();
-    if (
-      !includePath.endsWith('.md') ||
-      includePath.includes('..') ||
-      path.isAbsolute(includePath)
-    ) {
+    if (!isValidIncludePath(includePath)) {
       throw new Error(
-        `Invalid include path "${includePath}": must be a relative .md path under agents/`
+        `Invalid include path "${includePath}": must be a relative, forward-slash .md path under agents/`
       );
     }
     if (stack.includes(includePath)) {
