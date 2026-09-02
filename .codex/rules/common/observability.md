@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/observability" version="5.18.3" checksum="31598c4217e942e6888d1b6d23191b2b05e647ad027d5fb39e3b58120630e509" -->
 # Observability Rules
 
 These rules are intended for Codex (CLI and app).

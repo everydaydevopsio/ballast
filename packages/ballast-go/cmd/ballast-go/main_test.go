@@ -104,6 +104,7 @@ func TestListAgentsIncludesAllRegistryAgents(t *testing.T) {
 		"tasks",
 		"plan-lifecycle",
 		"spec-kit",
+		"testing-process",
 		"linting",
 		"logging",
 		"testing",
@@ -1156,16 +1157,29 @@ func TestInstallRendersDefaultToolsWhenSavingConfig(t *testing.T) {
 }
 
 func TestResolvesContentFragmentIncludes(t *testing.T) {
+	content, err := readContent("testing-process", "go", "", "pre-commit", "github", "none")
+	if err != nil {
+		t.Fatalf("readContent(testing-process): %v", err)
+	}
+	if !strings.Contains(content, "1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.") {
+		t.Fatalf("expected TDD fragment expanded, got %q", content)
+	}
+	if strings.Contains(content, "{{include:") {
+		t.Fatalf("expected include tokens resolved, got %q", content)
+	}
+}
+
+func TestLanguageTestingRulesPointAtTestingProcess(t *testing.T) {
 	for _, language := range []string{"go", "python", "typescript"} {
 		content, err := readContent("testing", language, "", "pre-commit", "github", "none")
 		if err != nil {
 			t.Fatalf("readContent(%s): %v", language, err)
 		}
-		if !strings.Contains(content, "1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.") {
-			t.Fatalf("expected TDD fragment expanded for %s, got %q", language, content)
+		if !strings.Contains(content, "testing-process") {
+			t.Fatalf("expected pointer to testing-process for %s, got %q", language, content)
 		}
-		if strings.Contains(content, "{{include:") {
-			t.Fatalf("expected include tokens resolved for %s, got %q", language, content)
+		if strings.Contains(content, "## TDD Process Discipline") {
+			t.Fatalf("expected TDD section removed for %s, got %q", language, content)
 		}
 	}
 }
@@ -1319,6 +1333,34 @@ func TestPatchFillsPlaceholderRepositoryFacts(t *testing.T) {
 	}
 	if !strings.Contains(merged, "- Coverage threshold: `<value>`") {
 		t.Fatalf("expected unresolved placeholder kept, got %q", merged)
+	}
+}
+
+func TestPatchReplacesPristineRulesWholesale(t *testing.T) {
+	canonicalOld, err := buildContent("testing", "claude", "go", "", "pre-commit", "github", "none")
+	if err != nil {
+		t.Fatalf("buildContent: %v", err)
+	}
+	canonicalNew := strings.ReplaceAll(canonicalOld, "## Framework Markers", "## Renamed Markers")
+
+	merged := patchRuleContent(canonicalOld, canonicalNew, "claude")
+
+	if merged != normalizeLineEndings(canonicalNew) {
+		t.Fatalf("expected pristine rule replaced wholesale, got %q", merged)
+	}
+}
+
+func TestPatchMergesWhenRuleWasUserEdited(t *testing.T) {
+	canonical, err := buildContent("testing", "claude", "go", "", "pre-commit", "github", "none")
+	if err != nil {
+		t.Fatalf("buildContent: %v", err)
+	}
+	edited := canonical + "\n## Team Notes\n\nKeep this.\n"
+
+	merged := patchRuleContent(edited, canonical, "claude")
+
+	if !strings.Contains(merged, "## Team Notes") || !strings.Contains(merged, "Keep this.") {
+		t.Fatalf("expected user-edited section preserved, got %q", merged)
 	}
 }
 

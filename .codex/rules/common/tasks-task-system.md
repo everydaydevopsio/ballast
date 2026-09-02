@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.0" checksum="4897d96d8f273f564a566f9a9b5cca2168cd3d7cd03299fee5b180ecd1e68e47" -->
+<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.3" checksum="2fc676356dc4599a69cd423c985b0df5e237930a0fd815f19dab60564f580eed" -->
 # Task System Integration
 
 These rules are intended for Codex (CLI and app).

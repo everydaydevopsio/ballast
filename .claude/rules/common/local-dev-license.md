@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/local-dev/license" version="5.18.3" checksum="a0540581565d726119d5d5a49b03c105a654f3caad87cac607575e9bd1c72a14" -->
 # Local Development: License Setup
 
 Ensure proper license configuration (LICENSE file, package.json, README reference). Default: MIT. Overridable in AGENTS.md or CLAUDE.md.
@@ -58,13 +59,10 @@ Replace `<YEAR>` with the current year and `<COPYRIGHT HOLDER>` with the author/
 ## Example README Addition
 
 ```markdown
-
 ## License
 
-Default license for this project: Apache-2.0 (or ISC, BSD-3-Clause, etc.)
+MIT License - see [LICENSE](LICENSE) file for details.
 ```
-
-When such a section exists, use the specified license instead of MIT. If both files define a license, prefer `AGENTS.md` (it is agent-facing and typically more authoritative for automation).
 
 ## Example package.json Addition
 
@@ -79,7 +77,6 @@ When such a section exists, use the specified license instead of MIT. If both fi
 Projects may specify a non-MIT license in `AGENTS.md` or `CLAUDE.md`:
 
 ```markdown
-
 ## License
 
 Default license for this project: Apache-2.0 (or ISC, BSD-3-Clause, etc.)

@@ -62,7 +62,8 @@ export const COMMON_AGENT_IDS = [
   'git-hooks',
   'tasks',
   'plan-lifecycle',
-  'spec-kit'
+  'spec-kit',
+  'testing-process'
 ] as const;
 export const LANGUAGE_AGENT_IDS = ['linting', 'logging', 'testing'] as const;
 export const AGENT_IDS = [...COMMON_AGENT_IDS, ...LANGUAGE_AGENT_IDS] as const;

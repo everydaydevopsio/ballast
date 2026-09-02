@@ -1,4 +1,4 @@
-<!-- ballast:rule id="docker/linting" version="dev" checksum="3a91acf0f3b05dfdcd0b3aeeeaa6ef827b38aaf7f1dcd439cacc9844dac99ac0" -->
+<!-- ballast:rule id="docker/linting" version="5.18.3" checksum="ad0ae9377a4b2d9488c8b56139cc1423bf023c30b67229e5be8a5c3b071711d2" -->
 # Docker Linting Rules
 
 These rules provide Dockerfile and container configuration linting guidance for projects in this repository.

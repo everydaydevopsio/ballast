@@ -4,6 +4,7 @@
 These rules help design and maintain release workflows for libraries, SDKs, and apps.
 
 ---
+<!-- ballast:rule id="typescript/publishing/apps" version="5.18.3" checksum="bb5bd40434a6e02ad8f15bbe54af4ac1dfe7483ea4f3fb2e10bb27a1a5cbe534" -->
 # Publishing Apps Agent
 
 You are a publishing specialist for installable apps and CLIs.
@@ -66,7 +67,7 @@ For TypeScript or Node CLI apps distributed through npmjs:
 
 ## App Deployment Model
 
-No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
+No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, Docker registry, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
 
 ### Container Registry Targets
 

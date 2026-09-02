@@ -58,6 +58,7 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/common/tasks-task-system.md` — Rules for common/tasks-task-system
 - `.codex/rules/common/tasks-todo.md` — Rules for common/tasks-todo
 - `.codex/rules/common/spec-kit.md` — Rules for common/spec-kit
+- `.codex/rules/common/testing-process.md` — Rules for common/testing-process
 - `.codex/rules/typescript/typescript-linting.md` — Rules for typescript/linting
 - `.codex/rules/typescript/typescript-logging.md` — Rules for typescript/logging
 - `.codex/rules/typescript/typescript-testing.md` — Rules for typescript/testing

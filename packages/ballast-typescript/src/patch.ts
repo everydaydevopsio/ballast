@@ -1,4 +1,5 @@
 import YAML from 'yaml';
+import { verifyRuleChecksum } from './build';
 import type { Target } from './config';
 
 interface ParsedFrontmatterDocument {
@@ -189,6 +190,13 @@ export function patchRuleContent(
   target: Target
 ): string {
   if (!existing.trim()) {
+    return canonical;
+  }
+
+  // A rule whose checksum marker still verifies has never been user-edited;
+  // replace it wholesale so removed Ballast-generated sections do not linger
+  // as preserved "user" sections. Only edited files get the section merge.
+  if (verifyRuleChecksum(existing)) {
     return canonical;
   }
 

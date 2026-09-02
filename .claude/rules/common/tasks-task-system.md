@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.0" checksum="94b5b83db0e499565d32542f6e8b65b86453e7ac781dc513082460c05ce32ed4" -->
+<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.3" checksum="68c658309370aa39e9489d93833c1482d87c89335c7177dcdb9c0f3c62a78fa2" -->
 # Task System Integration
 
 Use the configured task system for durable work items. Check and configure the task system MCP server when asked and when a non-`none` task system is configured.

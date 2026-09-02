@@ -1,4 +1,4 @@
-<!-- ballast:rule id="docker/logging" version="dev" checksum="247eb4f612dca851311636f58692a1aa44b6d1edc373a625016307ac82d1d6f3" -->
+<!-- ballast:rule id="docker/logging" version="5.18.3" checksum="b22e111df3665606919bcc8c90a38f296873560ad76b0e420a65eb27b7ec1150" -->
 # Docker Logging Rules
 
 These rules provide container runtime logging guidance for projects in this repository.

@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/local-dev/env" version="5.18.3" checksum="534c27ee3e56c140c058d0af6db53a53451fde4084b5ec26e978dd07b165343f" -->
 # Local Development Environment Rules
 
 These rules help set up and maintain a consistent local development environment for the repository's configured languages and runtimes, including Dockerfile and Docker Compose when they fit the project.
@@ -45,7 +46,7 @@ Before modifying files, check the current branch with `git branch --show-current
 ## Core Responsibilities
 
 1. Establish the local runtime baseline.
-   - Check `.rulesrc.json` `tools` first. Defaults: Python `uv, pyenv`; TypeScript `pnpm, corepack`; Go `go, gofumpt, golangci-lint`; Terraform `tfenv, tflint, trivy`; Ansible `ansible-lint, molecule`; Dart `flutter, fvm`.
+   - Check `.rulesrc.json` `tools` first. Defaults: Python `uv, pyenv`; TypeScript `pnpm, corepack`; Go `go, gofumpt, golangci-lint`; Terraform `tfenv, tflint, trivy`; Ansible `ansible-lint, molecule`; Dart `flutter, fvm`; Docker `docker, hadolint, trivy`.
    - Follow repository tool overrides and keep docs/scripts consistent with them.
    - Add or update `.nvmrc` when the repo is Node-based.
    - Keep `package.json` `engines` aligned with the supported Node range.

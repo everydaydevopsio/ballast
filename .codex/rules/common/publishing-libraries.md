@@ -6,6 +6,7 @@ These rules are intended for Codex (CLI and app).
 These rules help design and maintain release workflows for libraries, SDKs, and apps.
 
 ---
+<!-- ballast:rule id="typescript/publishing/libraries" version="5.18.3" checksum="dccb53ed65a8464173342e3efabf3bfdb2eb2526375171f61963c69df2f0d1f3" -->
 # Publishing Libraries Agent
 
 You are a publishing specialist for versioned libraries.

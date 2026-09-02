@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/local-dev/badges" version="5.18.3" checksum="570c456f9b1ca30746fcd1a81e1106313e55a76aff0011478238afb7c41a12a7" -->
 # Local Development: README Badges
 
 These rules are intended for Codex (CLI and app).

@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/plan-lifecycle" version="5.18.3" checksum="1c806d1446a0a14ad4b7deb46e23c86e653dd0d7be322f44937e9e66bfd04eb2" -->
 # Plan Lifecycle
 
 These rules are intended for Codex (CLI and app).
@@ -82,7 +83,7 @@ The chosen solution in plain language. What will change and how.
 
 ## Verification
 
-How the decision was validated.
+How will we know this works? Commands, tests, or checks to run.
 
 ## Alternatives Rejected
 

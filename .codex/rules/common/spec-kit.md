@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/spec-kit" version="5.18.3" checksum="fea52527bfdd6a02cc26e4bad194ae550c3d959f5ab70b9212d6f4176276b2b2" -->
 # Spec Kit Rules
 
 These rules are intended for Codex (CLI and app).

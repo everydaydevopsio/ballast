@@ -6,6 +6,7 @@ These rules are intended for Codex (CLI and app).
 These rules help design and maintain release workflows for libraries, SDKs, and apps.
 
 ---
+<!-- ballast:rule id="typescript/publishing/api" version="5.18.3" checksum="8630779d1a1c659d42b2ac5f50ecf393ca5151e7a49a93d5f799c7f0ddfdac71" -->
 # REST API Publishing Agent
 
 You are a publishing specialist for REST API services deployed as Docker containers or platform-native service artifacts.
@@ -15,11 +16,12 @@ You are a publishing specialist for REST API services deployed as Docker contain
 - Use the same container publishing and deployment model as web apps.
 - Ensure the API exposes health and readiness endpoints that the configured runtime can use for rollout safety.
 - Scope Kubernetes probes and Helm chart templates to repositories with `deploymentModel: kubernetes`.
+- Scope registry-only image publishing to repositories with `deploymentModel: docker`.
 - Distinguish private (GHCR) vs public (Docker Hub) image publishing based on the API's audience.
 
 ## Activation
 
-No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
+No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, Docker registry, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
 
 ## Release Model
 
@@ -39,6 +41,8 @@ Use the same Kubernetes `deploy.yml` and `gitops-deploy.yml` templates as the we
 
 Name the workflow file `deploy-api.yml` (or keep `deploy.yml` if there is only one service).
 
+If `deploymentModel` is `docker`, publish the API image to GHCR or Docker Hub and expose the digest, but do not add Kubernetes, SSH, systemd, hosted-platform, or serverless deployment-state jobs unless the repository already owns that runtime layer.
+
 If `deploymentModel` is `none`, do not add deployment-state update jobs unless the user explicitly asks to introduce API deployment ownership. Container publishing may still be valid for installable or local runtime images, but deployment-state updates are inactive.
 
 ## Health Endpoint Requirements
@@ -53,41 +57,6 @@ Before enabling automated rollout health checks, ensure the API exposes at least
 | `/ready` or `/readyz` | Readiness — is the service ready for traffic? | Return `200 OK` only when all dependencies (DB, cache, downstream services) are reachable. Return `503` during startup or when a dependency is down. |
 
 Separate liveness and readiness checks when the runtime supports both. In Kubernetes, a liveness failure triggers a pod restart and a readiness failure removes the pod from service without restarting it. In hosted, serverless, or server models, map these endpoints to the platform's health check and traffic cutover controls.
-
-### Minimal Go Implementation
-
-```go
-http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusOK)
-    _, _ = w.Write([]byte(`{"status":"ok"}`))
-})
-
-http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
-    if err := db.PingContext(r.Context()); err != nil {
-        http.Error(w, `{"status":"not ready"}`, http.StatusServiceUnavailable)
-        return
-    }
-    w.WriteHeader(http.StatusOK)
-    _, _ = w.Write([]byte(`{"status":"ready"}`))
-})
-```
-
-### Minimal Node/Express Implementation
-
-```typescript
-app.get('/healthz', (_req, res) => {
-  res.json({ status: 'ok' });
-});
-
-app.get('/readyz', async (_req, res) => {
-  try {
-    await db.query('SELECT 1');
-    res.json({ status: 'ready' });
-  } catch {
-    res.status(503).json({ status: 'not ready' });
-  }
-});
-```
 
 ## Private vs Public Image Registries
 
@@ -127,44 +96,3 @@ Grant `packages: write` to the build job for GHCR. Remove it for Docker Hub.
 - When a REST API service is deployed from a container image or platform-native service artifact.
 - When `deploymentModel` is `kubernetes` and Argo CD deploys the API from a GitOps repository.
 - When the API needs health and readiness checks for safe runtime lifecycle management.
-
-## Kubernetes Helm Chart: Probes Configuration
-
-Apply this section only when `deploymentModel` is `kubernetes`. Add `livenessProbe` and `readinessProbe` to the deployment template in your Helm chart:
-
-```yaml
-# charts/<your-chart>/templates/deployment.yaml
-containers:
-  - name: {{ .Chart.Name }}
-    image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
-    ports:
-      - name: http
-        containerPort: {{ .Values.service.port }}
-    livenessProbe:
-      httpGet:
-        path: /healthz
-        port: http
-      initialDelaySeconds: 10
-      periodSeconds: 15
-      failureThreshold: 3
-    readinessProbe:
-      httpGet:
-        path: /readyz
-        port: http
-      initialDelaySeconds: 5
-      periodSeconds: 10
-      failureThreshold: 3
-      successThreshold: 1
-```
-
-And in `values.yaml`:
-
-```yaml
-image:
-  repository: ghcr.io/OWNER/IMAGE
-  tag: v1.2.3
-  digest: ""          # filled in by the publish workflow
-
-service:
-  port: 8080
-```

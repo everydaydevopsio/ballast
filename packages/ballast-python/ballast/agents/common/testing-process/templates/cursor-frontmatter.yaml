@@ -1,0 +1,9 @@
+---
+description: 'Testing process specialist - TDD discipline, smoke tests, and E2E policy shared across languages'
+alwaysApply: false
+globs:
+  - '**/*.test.*'
+  - '**/*_test.*'
+  - 'tests/**'
+  - '.github/workflows/*.yml'
+---
