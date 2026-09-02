@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/docs" version="5.18.3" checksum="6adeb352c0e3ec2d7df3598a9c20dc80dd3821ead7b408c0e6d21be8ecb6ba6c" -->
 # Documentation Rules
 
 These rules keep documentation accurate and current using GitHub Markdown by default, or an existing Docusaurus site when the repository already uses one.

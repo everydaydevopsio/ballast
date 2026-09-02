@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/plan-lifecycle" version="5.18.3" checksum="84c943ebefc5f99a89245062c5c1ada6f90fd0ed9d57efc87df71f470777d770" -->
 # Plan Lifecycle
 
 Create and maintain plans for non-trivial work, then graduate completed plans to ADRs.
@@ -80,7 +81,7 @@ The chosen solution in plain language. What will change and how.
 
 ## Verification
 
-How the decision was validated.
+How will we know this works? Commands, tests, or checks to run.
 
 ## Alternatives Rejected
 

@@ -57,6 +57,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/common/tasks-task-system.md` — Rules for common/tasks-task-system
 - `.claude/rules/common/tasks-todo.md` — Rules for common/tasks-todo
 - `.claude/rules/common/spec-kit.md` — Rules for common/spec-kit
+- `.claude/rules/common/testing-process.md` — Rules for common/testing-process
 - `.claude/rules/typescript/typescript-linting.md` — Rules for typescript/linting
 - `.claude/rules/typescript/typescript-logging.md` — Rules for typescript/logging
 - `.claude/rules/typescript/typescript-testing.md` — Rules for typescript/testing

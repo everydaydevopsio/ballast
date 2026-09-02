@@ -4,6 +4,7 @@
 These rules help design and maintain release workflows for libraries, SDKs, and apps.
 
 ---
+<!-- ballast:rule id="typescript/publishing/web" version="5.18.3" checksum="78259bc1f4596e5c9bcdce72d96c8d24d70e6a15bde9c3371d5338036697e17c" -->
 # Web App Publishing Agent
 
 You are a publishing specialist for web applications deployed as Docker containers or platform-native app artifacts.
@@ -20,7 +21,7 @@ Keep this rule focused on release decisions, quality gates, artifact identity, a
 
 ## Activation
 
-No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
+No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, Docker registry, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
 
 ## Release Model
 
@@ -45,6 +46,7 @@ No app deployment model is configured (`deploymentModel: none`). Deployment guid
 
 - For `deploymentModel: none`, keep deployment-state changes inactive unless the user explicitly asks to add deployment ownership.
 - For `deploymentModel: kubernetes`, prefer a GitOps handoff: publish the image, then update the environment repository or chart values watched by Argo CD or the repo’s existing GitOps controller.
+- For `deploymentModel: docker`, stop at a registry handoff unless repo docs define a separate runtime owner: publish the image to GHCR or Docker Hub, expose the digest, and document pull credentials and visibility.
 - For hosted platforms, use the platform’s native deploy action or CLI only after build artifacts are immutable and traceable to the release tag.
 - Keep deployment credentials scoped to the deploy job and avoid exposing them to pull request workflows.
 

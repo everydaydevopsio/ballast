@@ -1,4 +1,4 @@
-<!-- ballast:rule id="docker/testing" version="dev" checksum="10c525f545d2f5c8db399a50228684cdac9f42045bc680aa7a3b4e3c6c06c7ba" -->
+<!-- ballast:rule id="docker/testing" version="5.18.3" checksum="c4d58934de3567ab942cafedc961888575984b0fe29ff8b5a062575e0e7f9239" -->
 # Docker Testing Rules
 
 These rules provide Docker image build, smoke test, and scan guidance for projects in this repository.

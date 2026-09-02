@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/local-dev/env" version="5.18.3" checksum="025fc420be0222883c8b1c96e8e87a58e4507cb1912bee275909e9321532c25c" -->
 # Local Development Environment Rules
 
 These rules are intended for Codex (CLI and app).
@@ -47,7 +48,7 @@ Before modifying files, check the current branch with `git branch --show-current
 ## Core Responsibilities
 
 1. Establish the local runtime baseline.
-   - Check `.rulesrc.json` `tools` first. Defaults: Python `uv, pyenv`; TypeScript `pnpm, corepack`; Go `go, gofumpt, golangci-lint`; Terraform `tfenv, tflint, trivy`; Ansible `ansible-lint, molecule`; Dart `flutter, fvm`.
+   - Check `.rulesrc.json` `tools` first. Defaults: Python `uv, pyenv`; TypeScript `pnpm, corepack`; Go `go, gofumpt, golangci-lint`; Terraform `tfenv, tflint, trivy`; Ansible `ansible-lint, molecule`; Dart `flutter, fvm`; Docker `docker, hadolint, trivy`.
    - Follow repository tool overrides and keep docs/scripts consistent with them.
    - Add or update `.nvmrc` when the repo is Node-based.
    - Keep `package.json` `engines` aligned with the supported Node range.

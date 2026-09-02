@@ -27,6 +27,7 @@ COMMON_AGENTS = [
     "tasks",
     "plan-lifecycle",
     "spec-kit",
+    "testing-process",
 ]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
@@ -90,6 +91,8 @@ def with_implicit_agents(agents: list[str]) -> list[str]:
     resolved = list(agents)
     if "linting" in resolved and "git-hooks" not in resolved:
         resolved.append("git-hooks")
+    if "testing" in resolved and "testing-process" not in resolved:
+        resolved.append("testing-process")
     return resolved
 
 
@@ -2112,6 +2115,14 @@ def merge_markdown_bodies(existing: str, canonical: str) -> str:
 
 def patch_rule_content(existing: str, canonical: str, target: str) -> str:
     if not existing.strip():
+        return canonical
+
+    # A rule whose checksum marker still verifies has never been user-edited;
+    # replace it wholesale so removed Ballast-generated sections do not linger
+    # as preserved "user" sections. Only edited files get the section merge.
+    # Verify against normalized line endings so a CRLF checkout (for example
+    # via git autocrlf) still counts as pristine.
+    if verify_rule_checksum(normalize_line_endings(existing)):
         return canonical
 
     if target in {"cursor", "opencode"}:

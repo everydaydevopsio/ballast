@@ -34,7 +34,7 @@ var (
 var isStdinInteractiveFunc = isStdinInteractive
 
 var (
-	commonAgents   = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle", "spec-kit"}
+	commonAgents   = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle", "spec-kit", "testing-process"}
 	languageAgents = []string{"linting", "logging", "testing"}
 	commonSkills   = []string{
 		"owasp-security-scan",
@@ -94,6 +94,9 @@ func withImplicitAgents(agents []string) []string {
 	resolved := slices.Clone(agents)
 	if contains(resolved, "linting") && !contains(resolved, "git-hooks") {
 		resolved = append(resolved, "git-hooks")
+	}
+	if contains(resolved, "testing") && !contains(resolved, "testing-process") {
+		resolved = append(resolved, "testing-process")
 	}
 	return resolved
 }
@@ -2014,6 +2017,14 @@ func mergeMarkdownBodies(existing, canonical string) string {
 
 func patchRuleContent(existing, canonical, target string) string {
 	if strings.TrimSpace(existing) == "" {
+		return normalizeLineEndings(canonical)
+	}
+	// A rule whose checksum marker still verifies has never been user-edited;
+	// replace it wholesale so removed Ballast-generated sections do not linger
+	// as preserved "user" sections. Only edited files get the section merge.
+	// Verify against normalized line endings so a CRLF checkout (for example
+	// via git autocrlf) still counts as pristine.
+	if verifyRuleChecksum(normalizeLineEndings(existing)) {
 		return normalizeLineEndings(canonical)
 	}
 	if target == "cursor" || target == "opencode" {

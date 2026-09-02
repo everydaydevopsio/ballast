@@ -476,53 +476,38 @@ describe('build', () => {
       }
     });
 
-    test('returns TypeScript testing content with web smoke and E2E placement guidance', () => {
-      const content = getContent('testing', undefined, 'typescript');
-      expect(content).toContain('web smoke test');
-      expect(content).toContain('live route or health endpoint');
-      expect(content).toContain(
-        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
-      );
-      expect(content).toContain(
-        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
-      );
-      expect(content).toContain('one critical user workflow');
-    });
-
-    test('returns TypeScript testing content with integration framework detection guidance', () => {
-      const content = getContent('testing', undefined, 'typescript');
-      expect(content).toContain(
-        'Detect existing unit, integration, and browser E2E frameworks before adding or replacing test tooling.'
-      );
-      for (const marker of [
-        'Jest',
-        'Vitest',
-        'Cypress',
-        'Playwright',
-        'WebdriverIO',
-        'Selenium',
-        'Puppeteer',
-        'Testing Library'
-      ]) {
-        expect(content).toContain(marker);
+    test('returns slimmed language testing content pointing at testing-process', () => {
+      for (const language of ['typescript', 'python', 'go'] as const) {
+        const content = getContent('testing', undefined, language);
+        expect(content).toContain(
+          'Follow the shared `testing-process` rules for TDD discipline'
+        );
+        expect(content).not.toContain('## TDD Process Discipline');
+        expect(content).not.toContain('Write a failing test first');
+        expect(content).not.toContain(
+          'Prefer Playwright only when Playwright markers already exist'
+        );
       }
-      expect(content).toContain(
-        'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
-      );
-      expect(content).toContain(
-        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
-      );
-      expect(content).toContain(
-        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
-      );
     });
 
-    test('returns TypeScript testing content with TDD process discipline', () => {
-      const content = getContent('testing', undefined, 'typescript');
+    test('keeps language-specific framework markers in testing content', () => {
+      const ts = getContent('testing', undefined, 'typescript');
+      for (const marker of ['Jest', 'Vitest', 'Cypress', 'WebdriverIO']) {
+        expect(ts).toContain(marker);
+      }
+      const py = getContent('testing', undefined, 'python');
+      for (const marker of ['pytest', 'Robot Framework', 'pytest-playwright']) {
+        expect(py).toContain(marker);
+      }
+      const go = getContent('testing', undefined, 'go');
+      for (const marker of ['chromedp', 'integration build tags', 'httptest']) {
+        expect(go).toContain(marker);
+      }
+    });
+
+    test('returns shared testing-process content with TDD, detection, and smoke guidance', () => {
+      const content = getContent('testing-process');
       expect(content).toContain('## TDD Process Discipline');
-      expect(content).toContain(
-        'Tooling setup and process discipline are separate responsibilities'
-      );
       for (const required of [
         'Start from acceptance criteria',
         'Write a failing test first',
@@ -535,39 +520,6 @@ describe('build', () => {
       ]) {
         expect(content).toContain(required);
       }
-    });
-
-    test('returns Python testing content with web smoke and E2E placement guidance', () => {
-      const content = getContent('testing', undefined, 'python');
-      expect(content).toContain('web smoke test');
-      expect(content).toContain('live route or health endpoint');
-      expect(content).toContain(
-        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
-      );
-      expect(content).toContain(
-        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
-      );
-    });
-
-    test('returns Python testing content with integration framework detection guidance', () => {
-      const content = getContent('testing', undefined, 'python');
-      expect(content).toContain(
-        'Detect existing unit, integration, API/service, and browser E2E frameworks before adding or replacing test tooling.'
-      );
-      for (const marker of [
-        'pytest',
-        'unittest',
-        'tox',
-        'nox',
-        'Robot Framework',
-        'Selenium',
-        'pytest-playwright',
-        'Playwright',
-        'FastAPI TestClient',
-        'Django test client'
-      ]) {
-        expect(content).toContain(marker);
-      }
       expect(content).toContain(
         'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
       );
@@ -575,28 +527,10 @@ describe('build', () => {
         'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
       );
       expect(content).toContain(
-        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
+        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
       );
-    });
-
-    test('returns Python testing content with TDD process discipline', () => {
-      const content = getContent('testing', undefined, 'python');
-      expect(content).toContain('## TDD Process Discipline');
-      expect(content).toContain(
-        'Tooling setup and process discipline are separate responsibilities'
-      );
-      for (const required of [
-        'Start from acceptance criteria',
-        'Write a failing test first',
-        'Confirm the test fails for the right reason',
-        'Implement the minimum change',
-        'Refactor only after the relevant tests are green',
-        'Proof of completion',
-        'Failure-path coverage',
-        'Traceability'
-      ]) {
-        expect(content).toContain(required);
-      }
+      expect(content).toContain('live route or health endpoint');
+      expect(content).not.toContain('{{include:');
     });
 
     test('returns CLI publishing content with packaged-command smoke guidance', () => {
@@ -743,55 +677,6 @@ describe('build', () => {
       const content = getContent('testing', undefined, 'go');
       expect(content).toContain('Go testing specialist');
       expect(content).toContain('go test ./...');
-    });
-
-    test('returns Go testing content with integration framework detection guidance', () => {
-      const content = getContent('testing', undefined, 'go');
-      expect(content).toContain(
-        'Detect existing unit, integration, API/service, and browser E2E frameworks before adding or replacing test tooling.'
-      );
-      for (const marker of [
-        'go test',
-        'integration build tags',
-        '_integration_test.go',
-        'httptest',
-        'Selenium',
-        'chromedp',
-        'rod',
-        'agouti',
-        'Playwright'
-      ]) {
-        expect(content).toContain(marker);
-      }
-      expect(content).toContain(
-        'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
-      );
-      expect(content).toContain(
-        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
-      );
-      expect(content).toContain(
-        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
-      );
-    });
-
-    test('returns Go testing content with TDD process discipline', () => {
-      const content = getContent('testing', undefined, 'go');
-      expect(content).toContain('## TDD Process Discipline');
-      expect(content).toContain(
-        'Tooling setup and process discipline are separate responsibilities'
-      );
-      for (const required of [
-        'Start from acceptance criteria',
-        'Write a failing test first',
-        'Confirm the test fails for the right reason',
-        'Implement the minimum change',
-        'Refactor only after the relevant tests are green',
-        'Proof of completion',
-        'Failure-path coverage',
-        'Traceability'
-      ]) {
-        expect(content).toContain(required);
-      }
     });
   });
 
@@ -980,22 +865,13 @@ describe('build', () => {
       expect(result).toContain('## Your Responsibilities');
     });
 
-    test('includes smoke and E2E guidance in generated Codex rules', () => {
-      const testing = buildCodexFormat('testing');
-      expect(testing).toContain('web smoke test');
-      expect(testing).toContain(
+    test('includes smoke and E2E guidance in the generated Codex testing-process rule', () => {
+      const process = buildCodexFormat('testing-process');
+      expect(process).toContain('live route or health endpoint');
+      expect(process).toContain(
         'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
       );
-      expect(testing).toContain(
-        'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
-      );
-
-      const pythonTesting = buildCodexFormat('testing', undefined, 'python');
-      expect(pythonTesting).toContain('web smoke test');
-      expect(pythonTesting).toContain(
-        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
-      );
-      expect(pythonTesting).toContain(
+      expect(process).toContain(
         'Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.'
       );
 
@@ -1009,45 +885,39 @@ describe('build', () => {
       );
     });
 
-    test('includes framework detection guidance in generated Codex testing rules', () => {
+    test('keeps framework markers in generated Codex testing rules', () => {
       const testing = buildCodexFormat('testing');
       expect(testing).toContain('Cypress');
       expect(testing).toContain('WebdriverIO');
-      expect(testing).toContain(
-        'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
-      );
-      expect(testing).toContain(
-        'Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.'
-      );
 
       const pythonTesting = buildCodexFormat('testing', undefined, 'python');
       expect(pythonTesting).toContain('Robot Framework');
       expect(pythonTesting).toContain('pytest-playwright');
-      expect(pythonTesting).toContain(
-        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
-      );
 
       const goTesting = buildCodexFormat('testing', undefined, 'go');
       expect(goTesting).toContain('chromedp');
       expect(goTesting).toContain('integration build tags');
-      expect(goTesting).toContain(
+
+      const process = buildCodexFormat('testing-process');
+      expect(process).toContain(
         'Preserve an existing browser E2E framework unless the user explicitly asks to migrate.'
+      );
+      expect(process).toContain(
+        'Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.'
       );
     });
 
-    test('includes TDD process discipline in generated Codex testing rules', () => {
+    test('includes TDD process discipline once in the generated Codex testing-process rule', () => {
+      const process = buildCodexFormat('testing-process');
+      expect(process).toContain('## TDD Process Discipline');
+      expect(process).toContain('Write a failing test first');
+      expect(process).toContain('Confirm the test fails for the right reason');
+      expect(process).toContain('Failure-path coverage');
+      expect(process).toContain('Traceability');
+
       for (const language of ['typescript', 'python', 'go'] as const) {
         const testing = buildCodexFormat('testing', undefined, language);
-        expect(testing).toContain('## TDD Process Discipline');
-        expect(testing).toContain(
-          'Tooling setup and process discipline are separate responsibilities'
-        );
-        expect(testing).toContain('Write a failing test first');
-        expect(testing).toContain(
-          'Confirm the test fails for the right reason'
-        );
-        expect(testing).toContain('Failure-path coverage');
-        expect(testing).toContain('Traceability');
+        expect(testing).not.toContain('## TDD Process Discipline');
       }
     });
   });
@@ -1341,16 +1211,14 @@ alwaysApply: false
     });
 
     test('resolves content fragment includes', () => {
-      for (const language of ['go', 'python', 'typescript'] as const) {
-        const content = getContent('testing', undefined, language);
-        expect(content).toContain(
-          '1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.'
-        );
-        expect(content).toContain(
-          '8. Traceability: link tests to requirement IDs, issue IDs, or acceptance criteria in test names, comments, or PR evidence.'
-        );
-        expect(content).not.toContain('{{include:');
-      }
+      const content = getContent('testing-process');
+      expect(content).toContain(
+        '1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.'
+      );
+      expect(content).toContain(
+        '8. Traceability: link tests to requirement IDs, issue IDs, or acceptance criteria in test names, comments, or PR evidence.'
+      );
+      expect(content).not.toContain('{{include:');
     });
 
     test('throws a clear error for a missing fragment include', () => {

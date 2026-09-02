@@ -263,14 +263,20 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("pnpm exec", content)
 
     def test_resolves_content_fragment_includes(self) -> None:
+        content = cli.read_content("testing-process", "python")
+
+        self.assertIn(
+            "1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.",
+            content,
+        )
+        self.assertNotIn("{{include:", content)
+
+    def test_language_testing_rules_point_at_testing_process(self) -> None:
         for language in ["go", "python", "typescript"]:
             content = cli.read_content("testing", language)
 
-            self.assertIn(
-                "1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.",
-                content,
-            )
-            self.assertNotIn("{{include:", content)
+            self.assertIn("testing-process", content)
+            self.assertNotIn("## TDD Process Discipline", content)
 
     def test_missing_fragment_include_raises(self) -> None:
         with self.assertRaisesRegex(FileNotFoundError, "does-not-exist.md"):
@@ -439,6 +445,25 @@ class PatchInstallTests(unittest.TestCase):
         self.assertIn("- Canonical GitHub repo: `acme/widgets`", merged)
         self.assertIn("- Primary package manager: `bun`", merged)
         self.assertIn("- Coverage threshold: `<value>`", merged)
+
+    def test_patch_replaces_pristine_rules_wholesale(self) -> None:
+        canonical_old = cli.build_content("testing", "claude", "go")
+        canonical_new = canonical_old.replace(
+            "## Framework Markers", "## Renamed Markers"
+        )
+
+        merged = cli.patch_rule_content(canonical_old, canonical_new, "claude")
+
+        self.assertEqual(merged, canonical_new)
+
+    def test_patch_merges_when_rule_was_user_edited(self) -> None:
+        canonical = cli.build_content("testing", "claude", "go")
+        edited = canonical + "\n## Team Notes\n\nKeep this.\n"
+
+        merged = cli.patch_rule_content(edited, canonical, "claude")
+
+        self.assertIn("## Team Notes", merged)
+        self.assertIn("Keep this.", merged)
 
     def test_patch_drops_stale_tool_policy_when_canonical_omits_it(self) -> None:
         existing = (

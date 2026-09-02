@@ -62,6 +62,7 @@ var agentRegistry = []agentEntry{
 	{ID: "tasks", Kind: kindCommon, Status: statusActive},
 	{ID: "plan-lifecycle", Kind: kindCommon, Status: statusActive},
 	{ID: "spec-kit", Kind: kindCommon, Status: statusActive},
+	{ID: "testing-process", Kind: kindCommon, Status: statusActive},
 
 	// Language agents — installed once per language sub-project.
 	{ID: "linting", Kind: kindLanguage, Status: statusActive},

@@ -6,6 +6,7 @@ These rules are intended for Codex (CLI and app).
 These rules help design and maintain release workflows for libraries, SDKs, and apps.
 
 ---
+<!-- ballast:rule id="typescript/publishing/apps" version="5.18.3" checksum="8f607174e282de13c43dcddfff5efd22f3797f289dbd63214dc3ced7b90a3aca" -->
 # Publishing Apps Agent
 
 You are a publishing specialist for installable apps and CLIs.
@@ -68,7 +69,7 @@ For TypeScript or Node CLI apps distributed through npmjs:
 
 ## App Deployment Model
 
-No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
+No app deployment model is configured (`deploymentModel: none`). Deployment guidance is reference-only. Deployment is inactive: keep library, SDK, CLI, and optional container publishing guidance active, but do not create deploy-on-main workflows, deployment-state updates, Kubernetes, serverless, hosted-platform, Docker registry, or self-managed server deployment ownership until the repository sets an active `deploymentModel`.
 
 ### Container Registry Targets
 

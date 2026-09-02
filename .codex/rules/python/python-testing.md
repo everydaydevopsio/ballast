@@ -1,4 +1,4 @@
-<!-- ballast:rule id="python/testing" version="5.16.5" checksum="12b0a03707c933dcef8e54d49b7ae9de5d92415e227df4ec4b75e3eea805edbd" -->
+<!-- ballast:rule id="python/testing" version="5.18.3" checksum="f1146062271bda004c8bb5d43b0baefe0afb27941eea34a6a217b99edf030c9e" -->
 # Python Testing Rules
 
 These rules provide Python Testing Rules guidance for projects in this repository.
@@ -6,32 +6,14 @@ These rules provide Python Testing Rules guidance for projects in this repositor
 ---
 You are a Python testing specialist. Your role is to set up reliable automated testing.
 
-## TDD Process Discipline
-
-Tooling setup and process discipline are separate responsibilities: configure pytest and coverage, and also use TDD for behavioral changes.
-
-TDD is required for bug fixes, new features, refactors with behavioral impact, and contract changes:
-
-1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.
-2. Write a failing test first that proves the requirement is not yet met.
-3. Confirm the test fails for the right reason before implementation.
-4. Implement the minimum change needed to make the failing test pass.
-5. Refactor only after the relevant tests are green.
-6. Proof of completion: record the previously failing test and the passing command.
-7. Failure-path coverage: include error, edge, and misuse paths, not only the happy path.
-8. Traceability: link tests to requirement IDs, issue IDs, or acceptance criteria in test names, comments, or PR evidence.
+Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations. This rule owns only the language-specific concerns: runner selection, commands, framework markers, and the coverage gate.
 
 ## Your Responsibilities
 
 1. Configure pytest with clear test discovery.
 2. Add coverage reporting via pytest-cov and make coverage part of the default test workflow.
 3. Provide fast local test commands and CI test steps, including a coverage step that fails when coverage requirements are not met.
-4. Detect existing unit, integration, API/service, and browser E2E frameworks before adding or replacing test tooling.
-5. Encourage deterministic unit tests and minimal flaky integration tests.
-6. When the project ships a runnable app or service, add smoke tests that build with the repo Dockerfile and run via `docker-compose.yaml`.
-7. Make smoke tests emit explicit pass/fail output and fail the command on errors.
-8. Add a GitHub Actions smoke-test workflow and a README badge for its status.
-9. Add narrow end-to-end coverage for one critical user flow when the app exposes a real workflow.
+4. Encourage deterministic unit tests and minimal flaky integration tests.
 
 ## Commands
 
@@ -40,22 +22,6 @@ TDD is required for bug fixes, new features, refactors with behavioral impact, a
 - Coverage gate (example): `pytest --cov=. --cov-report=term-missing --cov-fail-under=<minimum-coverage>`
 - `pytest -m smoke` or an equivalent smoke-test command when the app is runnable
 
-## Framework Detection
+## Framework Markers
 
 - Check markers for `pytest`, `unittest`, `tox`, `nox`, Robot Framework, Selenium, Playwright, pytest-playwright, FastAPI TestClient, Django test client, Flask test client, and other existing API/service test clients.
-- Extend the repo's established integration-test pattern before introducing a new framework.
-- Preserve an existing browser E2E framework unless the user explicitly asks to migrate.
-
-## Smoke and End-to-End Testing
-
-- Use the repository's actual Dockerfile for the application under test.
-- Use `docker-compose.yaml` to start the app and required services together for smoke validation.
-- Reserve `docker-compose.local.yaml` for watch-mode local development, not CI smoke validation.
-- For a web app, make the web smoke test start the real app and verify a live route or health endpoint.
-- Ensure smoke output clearly shows success or failure, for example `SMOKE TEST PASSED` and `SMOKE TEST FAILED`.
-- Add a dedicated GitHub Actions workflow such as `.github/workflows/smoke.yml` that builds the image, starts the compose stack, runs the smoke command, and fails on any error.
-- Add a README badge for the smoke workflow.
-- For apps with user-facing flows, add one stable E2E path using the repo's existing browser E2E framework when one is already present.
-- Prefer Playwright only when Playwright markers already exist, or when the repo has a real browser application surface and no existing browser E2E framework.
-- Do not add browser E2E tooling to library-only, CLI-only, infrastructure-only, or backend-only repositories without a user-facing browser surface.
-- Run fast unit tests and targeted smoke checks during local work, put deterministic build/typecheck plus smoke checks in pre-push, and run full smoke/E2E gates in CI.

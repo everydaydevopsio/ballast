@@ -1,3 +1,4 @@
+import { buildContent } from './build';
 import { patchCodexAgentsMd, patchRuleContent } from './patch';
 
 describe('patch', () => {
@@ -36,6 +37,35 @@ Canonical completion checklist.
       expect(merged).toContain('Canonical completion checklist.');
       expect(merged).toContain('## Team Overrides');
       expect(merged).toContain('Keep this section.');
+    });
+
+    test('replaces pristine rules wholesale so removed sections do not linger', () => {
+      const canonicalOld = buildContent('testing', 'claude', undefined, 'go');
+      const canonicalNew = canonicalOld.replace(
+        /## Framework Markers[\s\S]*$/,
+        ''
+      );
+      const merged = patchRuleContent(canonicalOld, canonicalNew, 'claude');
+      expect(merged).toBe(canonicalNew);
+    });
+
+    test('treats a \r\n checkout of a pristine rule as pristine', () => {
+      const canonicalOld = buildContent('testing', 'claude', undefined, 'go');
+      const crlfExisting = canonicalOld.replace(/\n/g, '\r\n');
+      const canonicalNew = canonicalOld.replace(
+        /## Framework Markers[\s\S]*$/,
+        ''
+      );
+      const merged = patchRuleContent(crlfExisting, canonicalNew, 'claude');
+      expect(merged).toBe(canonicalNew);
+    });
+
+    test('merges section-by-section when the rule was user-edited', () => {
+      const canonical = buildContent('testing', 'claude', undefined, 'go');
+      const edited = canonical + '\n## Team Notes\n\nKeep this.\n';
+      const merged = patchRuleContent(edited, canonical, 'claude');
+      expect(merged).toContain('## Team Notes');
+      expect(merged).toContain('Keep this.');
     });
 
     test('drops stale repository tool policy section when canonical omits it', () => {

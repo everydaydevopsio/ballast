@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/local-dev/badges" version="5.18.3" checksum="5751994aa2eb848c905027d3c8b50e6bea0f2eee6067f065ec0800e6994b2bcc" -->
 # Local Development: README Badges
 
 Add standard badges (CI, Release, License, GitHub Release; plus npm for published packages) to the top of README.md.

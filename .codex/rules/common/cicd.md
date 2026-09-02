@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/cicd" version="5.18.3" checksum="70b87d34df263b3f3da27520d4636dd22004f6bfe1b456adbb0385f1d1850990" -->
 # CI/CD Rules
 
 These rules are intended for Codex (CLI and app).

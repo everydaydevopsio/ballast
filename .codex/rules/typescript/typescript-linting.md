@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/linting" version="5.16.5" checksum="65d16fdc748fcafc789128d133433d6f31b7ab25cb52b5e5a64d3519bc1040ff" -->
+<!-- ballast:rule id="typescript/linting" version="5.18.3" checksum="65d16fdc748fcafc789128d133433d6f31b7ab25cb52b5e5a64d3519bc1040ff" -->
 # TypeScript Linting Rules
 
 These rules are intended for Codex (CLI and app).

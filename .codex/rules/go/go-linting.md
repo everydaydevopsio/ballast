@@ -1,4 +1,4 @@
-<!-- ballast:rule id="go/linting" version="5.16.5" checksum="488db029ad98d9aaa1f7c4b098eb19bce3c9f686b3e8e2751715e832d6374897" -->
+<!-- ballast:rule id="go/linting" version="5.18.3" checksum="488db029ad98d9aaa1f7c4b098eb19bce3c9f686b3e8e2751715e832d6374897" -->
 # Go Linting Rules
 
 These rules provide Go Linting Rules guidance for projects in this repository.

@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/docs" version="5.18.3" checksum="7d2f7454569b89a1871fcc9d9aff3b582593bd4cc2277588e0d836bf9f7e0889" -->
 # Documentation Rules
 
 These rules are intended for Codex (CLI and app).

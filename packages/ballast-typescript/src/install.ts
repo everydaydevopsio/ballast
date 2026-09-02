@@ -57,6 +57,9 @@ function withImplicitAgents(agents: string[]): string[] {
   if (next.includes('linting') && !next.includes('git-hooks')) {
     next.push('git-hooks');
   }
+  if (next.includes('testing') && !next.includes('testing-process')) {
+    next.push('testing-process');
+  }
   return next;
 }
 

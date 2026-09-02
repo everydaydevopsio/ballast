@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/tasks/todo" version="5.18.0" checksum="c31f8d7d00a753866b9ac69d70a7922b804f13b64078a70e0f7cc43189158589" -->
+<!-- ballast:rule id="typescript/tasks/todo" version="5.18.3" checksum="898cd876ec81098f4abf4a94c0779897cfc09006985b2593cbac3b047036b760" -->
 # Branch-Local TODO Tracking
 
 These rules are intended for Codex (CLI and app).

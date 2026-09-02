@@ -1,3 +1,4 @@
+<!-- ballast:rule id="typescript/spec-kit" version="5.18.3" checksum="2e04fcb54bf2c1b7aa6f7f8196fef762efc4f2a2efd66cc8513493539bb57458" -->
 # Spec Kit Rules
 
 These rules are intended for Claude Code.
