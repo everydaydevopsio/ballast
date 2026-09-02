@@ -2137,8 +2137,12 @@ def patch_codex_agents_md(
     existing: str, canonical: str, replace_unmanaged_sections: bool = True
 ) -> str:
     if not existing.strip():
-        return canonical
+        return normalize_line_endings(canonical)
 
+    # Normalize up-front so section offsets computed on normalized content are
+    # applied to identical strings (matches the TS and Go implementations).
+    existing = normalize_line_endings(existing)
+    canonical = normalize_line_endings(canonical)
     next_content = fill_placeholder_repository_facts(existing, canonical)
     for heading in ("Installed agent rules", "Installed skills"):
         canonical_range = find_markdown_section_range(canonical, heading)
