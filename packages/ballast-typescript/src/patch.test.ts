@@ -49,6 +49,17 @@ Canonical completion checklist.
       expect(merged).toBe(canonicalNew);
     });
 
+    test('treats a \r\n checkout of a pristine rule as pristine', () => {
+      const canonicalOld = buildContent('testing', 'claude', undefined, 'go');
+      const crlfExisting = canonicalOld.replace(/\n/g, '\r\n');
+      const canonicalNew = canonicalOld.replace(
+        /## Framework Markers[\s\S]*$/,
+        ''
+      );
+      const merged = patchRuleContent(crlfExisting, canonicalNew, 'claude');
+      expect(merged).toBe(canonicalNew);
+    });
+
     test('merges section-by-section when the rule was user-edited', () => {
       const canonical = buildContent('testing', 'claude', undefined, 'go');
       const edited = canonical + '\n## Team Notes\n\nKeep this.\n';

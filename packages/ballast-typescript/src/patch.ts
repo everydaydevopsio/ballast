@@ -196,7 +196,9 @@ export function patchRuleContent(
   // A rule whose checksum marker still verifies has never been user-edited;
   // replace it wholesale so removed Ballast-generated sections do not linger
   // as preserved "user" sections. Only edited files get the section merge.
-  if (verifyRuleChecksum(existing)) {
+  // Verify against normalized line endings so a CRLF checkout (for example
+  // via git autocrlf) still counts as pristine.
+  if (verifyRuleChecksum(normalizeLineEndings(existing))) {
     return canonical;
   }
 

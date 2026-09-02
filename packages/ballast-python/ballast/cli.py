@@ -2120,7 +2120,9 @@ def patch_rule_content(existing: str, canonical: str, target: str) -> str:
     # A rule whose checksum marker still verifies has never been user-edited;
     # replace it wholesale so removed Ballast-generated sections do not linger
     # as preserved "user" sections. Only edited files get the section merge.
-    if verify_rule_checksum(existing):
+    # Verify against normalized line endings so a CRLF checkout (for example
+    # via git autocrlf) still counts as pristine.
+    if verify_rule_checksum(normalize_line_endings(existing)):
         return canonical
 
     if target in {"cursor", "opencode"}:
