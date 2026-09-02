@@ -828,9 +828,57 @@ def list_rule_suffixes(
     return suffixes
 
 
+INCLUDE_TOKEN_RE = re.compile(r"\{\{include:([^}]+)\}\}")
+MAX_INCLUDE_DEPTH = 10
+
+
+def resolve_content_includes(
+    content: str,
+    agents_root: Path | None = None,
+    stack: tuple[str, ...] = (),
+) -> str:
+    """Resolve ``{{include:<path>.md}}`` tokens against the agents content
+    root. The fragment body is inserted with trailing whitespace trimmed so
+    tokens can sit inline in a content file. Fragments may include other
+    fragments; recursion and missing files fail the build with a clear
+    error."""
+    if "{{include:" not in content:
+        return content
+
+    root = agents_root if agents_root is not None else resolve_agents_root()
+
+    def replace(match: re.Match[str]) -> str:
+        include_path = match.group(1).strip()
+        if (
+            not include_path.endswith(".md")
+            or ".." in include_path
+            or include_path.startswith("/")
+        ):
+            raise ValueError(
+                f"Invalid include path {include_path!r}: "
+                "must be a relative .md path under agents/"
+            )
+        if include_path in stack or len(stack) >= MAX_INCLUDE_DEPTH:
+            chain = " -> ".join([*stack, include_path])
+            raise ValueError(
+                f"Recursive include detected for {include_path!r} (chain: {chain})"
+            )
+        file = root / include_path
+        if not file.exists():
+            raise FileNotFoundError(
+                f"Missing include fragment: {include_path} ({file})"
+            )
+        fragment = file.read_text(encoding="utf-8")
+        return resolve_content_includes(fragment, root, (*stack, include_path)).rstrip()
+
+    return INCLUDE_TOKEN_RE.sub(replace, content)
+
+
 def read_content(agent: str, language: str, suffix: str = "") -> str:
     filename = "content.md" if suffix == "" else f"content-{suffix}.md"
-    return (agent_dir(agent, language) / filename).read_text(encoding="utf-8")
+    return resolve_content_includes(
+        (agent_dir(agent, language) / filename).read_text(encoding="utf-8")
+    )
 
 
 def render_git_hooks_guidance(language: str, hook_mode: str) -> str:

@@ -6,6 +6,7 @@ import {
   COMMON_AGENT_IDS,
   COMMON_SKILL_IDS,
   getAgentDir,
+  getAgentsContentRoot,
   getSkillDir,
   SKILL_IDS
 } from './agents';
@@ -696,6 +697,60 @@ export function listRuleSuffixes(
   return suffixes;
 }
 
+const INCLUDE_PATTERN = /\{\{include:([^}]+)\}\}/g;
+const MAX_INCLUDE_DEPTH = 10;
+
+/**
+ * Resolve {{include:<path>.md}} tokens against the agents content root. The
+ * fragment body is inserted with trailing whitespace trimmed so tokens can sit
+ * inline in a content file. Fragments may include other fragments; recursion
+ * and missing files fail the build with a clear error.
+ */
+export function resolveContentIncludes(
+  content: string,
+  agentsContentRoot?: string,
+  stack: string[] = []
+): string {
+  if (!content.includes('{{include:')) {
+    return content;
+  }
+  return content.replace(INCLUDE_PATTERN, (_match, rawPath: string) => {
+    const includePath = rawPath.trim();
+    if (
+      !includePath.endsWith('.md') ||
+      includePath.includes('..') ||
+      path.isAbsolute(includePath)
+    ) {
+      throw new Error(
+        `Invalid include path "${includePath}": must be a relative .md path under agents/`
+      );
+    }
+    if (stack.includes(includePath) || stack.length >= MAX_INCLUDE_DEPTH) {
+      throw new Error(
+        `Recursive include detected for "${includePath}" (chain: ${[...stack, includePath].join(' -> ')})`
+      );
+    }
+    // Mirror content precedence: monorepo source checkout first, then the
+    // packaged agents root.
+    const roots = agentsContentRoot
+      ? [agentsContentRoot]
+      : [SOURCE_AGENTS_ROOT, getAgentsContentRoot()];
+    const file = roots
+      .map((root) => path.join(root, includePath))
+      .find((candidate) => fs.existsSync(candidate));
+    if (!file) {
+      throw new Error(
+        `Missing include fragment: ${includePath} (searched ${roots.join(', ')})`
+      );
+    }
+    const fragment = fs.readFileSync(file, 'utf8');
+    return resolveContentIncludes(fragment, agentsContentRoot, [
+      ...stack,
+      includePath
+    ]).trimEnd();
+  });
+}
+
 /**
  * Read agent content for a rule. ruleSuffix '' or undefined = content.md; else content-<suffix>.md.
  */
@@ -713,7 +768,7 @@ export function getContent(
   if (!fs.existsSync(file)) {
     throw new Error(`Agent "${agentId}" has no ${basename}`);
   }
-  let raw = fs.readFileSync(file, 'utf8');
+  let raw = resolveContentIncludes(fs.readFileSync(file, 'utf8'));
   if (options?.variables) {
     for (const [key, value] of Object.entries(options.variables)) {
       const replacement =

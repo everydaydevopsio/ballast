@@ -1,6 +1,9 @@
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import {
   getContent,
+  resolveContentIncludes,
   getTemplate,
   getSkillContent,
   listRuleSuffixes,
@@ -1335,6 +1338,49 @@ alwaysApply: false
       expect(() => buildContent('linting', 'unknown' as 'cursor')).toThrow(
         /Unknown target/
       );
+    });
+
+    test('resolves content fragment includes', () => {
+      for (const language of ['go', 'python', 'typescript'] as const) {
+        const content = getContent('testing', undefined, language);
+        expect(content).toContain(
+          '1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.'
+        );
+        expect(content).toContain(
+          '8. Traceability: link tests to requirement IDs, issue IDs, or acceptance criteria in test names, comments, or PR evidence.'
+        );
+        expect(content).not.toContain('{{include:');
+      }
+    });
+
+    test('throws a clear error for a missing fragment include', () => {
+      expect(() =>
+        resolveContentIncludes('{{include:common/fragments/does-not-exist.md}}')
+      ).toThrow(/common\/fragments\/does-not-exist\.md/);
+    });
+
+    test('rejects fragment paths that escape the agents root', () => {
+      expect(() => resolveContentIncludes('{{include:../secrets.md}}')).toThrow(
+        /invalid include path/i
+      );
+    });
+
+    test('throws on recursive fragment includes', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-frag-'));
+      try {
+        fs.mkdirSync(path.join(dir, 'common', 'fragments'), {
+          recursive: true
+        });
+        fs.writeFileSync(
+          path.join(dir, 'common', 'fragments', 'loop.md'),
+          '{{include:common/fragments/loop.md}}\n'
+        );
+        expect(() =>
+          resolveContentIncludes('{{include:common/fragments/loop.md}}', dir)
+        ).toThrow(/recursive include/i);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
     });
 
     test('publishing api omits kubernetes and code sections when deploymentModel is none', () => {

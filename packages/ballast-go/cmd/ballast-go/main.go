@@ -2592,6 +2592,52 @@ func listRuleSuffixes(agentID, language string) ([]string, error) {
 	return suffixes, nil
 }
 
+var includeTokenRegex = regexp.MustCompile(`\{\{include:([^}]+)\}\}`)
+
+const maxIncludeDepth = 10
+
+// resolveContentIncludes resolves {{include:<path>.md}} tokens against the
+// agents content root. The fragment body is inserted with trailing whitespace
+// trimmed so tokens can sit inline in a content file. Fragments may include
+// other fragments; recursion and missing files fail the build with a clear
+// error.
+func resolveContentIncludes(content string, stack []string) (string, error) {
+	if !strings.Contains(content, "{{include:") {
+		return content, nil
+	}
+	var resolveErr error
+	resolved := includeTokenRegex.ReplaceAllStringFunc(content, func(match string) string {
+		if resolveErr != nil {
+			return match
+		}
+		parts := includeTokenRegex.FindStringSubmatch(match)
+		includePath := strings.TrimSpace(parts[1])
+		if !strings.HasSuffix(includePath, ".md") || strings.Contains(includePath, "..") || strings.HasPrefix(includePath, "/") {
+			resolveErr = fmt.Errorf("invalid include path %q: must be a relative .md path under agents/", includePath)
+			return match
+		}
+		if contains(stack, includePath) || len(stack) >= maxIncludeDepth {
+			resolveErr = fmt.Errorf("recursive include detected for %q (chain: %s)", includePath, strings.Join(append(slices.Clone(stack), includePath), " -> "))
+			return match
+		}
+		fragment, err := readAgentFile(path.Join("agents", includePath))
+		if err != nil {
+			resolveErr = fmt.Errorf("missing include fragment: %s", includePath)
+			return match
+		}
+		expanded, err := resolveContentIncludes(string(fragment), append(slices.Clone(stack), includePath))
+		if err != nil {
+			resolveErr = err
+			return match
+		}
+		return strings.TrimRight(expanded, " \t\r\n")
+	})
+	if resolveErr != nil {
+		return "", resolveErr
+	}
+	return resolved, nil
+}
+
 func readContent(agentID, language, suffix, hookMode, taskSystem, deploymentModel string) (string, error) {
 	name := "content.md"
 	if suffix != "" {
@@ -2601,7 +2647,11 @@ func readContent(agentID, language, suffix, hookMode, taskSystem, deploymentMode
 	if err != nil {
 		return "", fmt.Errorf("agent %q has no %s", agentID, name)
 	}
-	content := applyDeploymentModelGuidance(string(bytes), agentID, deploymentModel)
+	raw, err := resolveContentIncludes(string(bytes), nil)
+	if err != nil {
+		return "", err
+	}
+	content := applyDeploymentModelGuidance(raw, agentID, deploymentModel)
 	content = applyTaskSystemVariables(content, agentID, taskSystem)
 	if agentID == "git-hooks" && strings.Contains(content, gitHooksGuidanceToken) {
 		content = strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode))
