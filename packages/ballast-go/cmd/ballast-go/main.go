@@ -2592,6 +2592,74 @@ func listRuleSuffixes(agentID, language string) ([]string, error) {
 	return suffixes, nil
 }
 
+var includeSegmentRegex = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// isValidIncludePath accepts only relative, forward-slash-separated .md paths
+// whose segments contain only safe characters — rejecting absolute paths,
+// Windows drive or rooted paths, and traversal on every platform.
+func isValidIncludePath(includePath string) bool {
+	if !strings.HasSuffix(includePath, ".md") {
+		return false
+	}
+	for _, segment := range strings.Split(includePath, "/") {
+		if !includeSegmentRegex.MatchString(segment) || segment == "." || segment == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+var includeTokenRegex = regexp.MustCompile(`\{\{include:([^}]+)\}\}`)
+
+const maxIncludeDepth = 10
+
+// resolveContentIncludes resolves {{include:<path>.md}} tokens against the
+// agents content root. The fragment body is inserted with trailing whitespace
+// trimmed so tokens can sit inline in a content file. Fragments may include
+// other fragments; recursion and missing files fail the build with a clear
+// error.
+func resolveContentIncludes(content string, stack []string) (string, error) {
+	if !strings.Contains(content, "{{include:") {
+		return content, nil
+	}
+	var resolveErr error
+	resolved := includeTokenRegex.ReplaceAllStringFunc(content, func(match string) string {
+		if resolveErr != nil {
+			return match
+		}
+		parts := includeTokenRegex.FindStringSubmatch(match)
+		includePath := strings.TrimSpace(parts[1])
+		if !isValidIncludePath(includePath) {
+			resolveErr = fmt.Errorf("invalid include path %q: must be a relative, forward-slash .md path under agents/", includePath)
+			return match
+		}
+		chain := strings.Join(append(slices.Clone(stack), includePath), " -> ")
+		if contains(stack, includePath) {
+			resolveErr = fmt.Errorf("recursive include detected for %q (chain: %s)", includePath, chain)
+			return match
+		}
+		if len(stack) >= maxIncludeDepth {
+			resolveErr = fmt.Errorf("include depth exceeded (max %d) at %q (chain: %s)", maxIncludeDepth, includePath, chain)
+			return match
+		}
+		fragment, err := readAgentFile(path.Join("agents", includePath))
+		if err != nil {
+			resolveErr = fmt.Errorf("missing include fragment: %s", includePath)
+			return match
+		}
+		expanded, err := resolveContentIncludes(string(fragment), append(slices.Clone(stack), includePath))
+		if err != nil {
+			resolveErr = err
+			return match
+		}
+		return strings.TrimRight(expanded, " \t\r\n")
+	})
+	if resolveErr != nil {
+		return "", resolveErr
+	}
+	return resolved, nil
+}
+
 func readContent(agentID, language, suffix, hookMode, taskSystem, deploymentModel string) (string, error) {
 	name := "content.md"
 	if suffix != "" {
@@ -2601,7 +2669,11 @@ func readContent(agentID, language, suffix, hookMode, taskSystem, deploymentMode
 	if err != nil {
 		return "", fmt.Errorf("agent %q has no %s", agentID, name)
 	}
-	content := applyDeploymentModelGuidance(string(bytes), agentID, deploymentModel)
+	raw, err := resolveContentIncludes(string(bytes), nil)
+	if err != nil {
+		return "", err
+	}
+	content := applyDeploymentModelGuidance(raw, agentID, deploymentModel)
 	content = applyTaskSystemVariables(content, agentID, taskSystem)
 	if agentID == "git-hooks" && strings.Contains(content, gitHooksGuidanceToken) {
 		content = strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode))

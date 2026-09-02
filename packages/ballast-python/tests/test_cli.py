@@ -262,6 +262,48 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("uv run <command>", content)
             self.assertIn("pnpm exec", content)
 
+    def test_resolves_content_fragment_includes(self) -> None:
+        for language in ["go", "python", "typescript"]:
+            content = cli.read_content("testing", language)
+
+            self.assertIn(
+                "1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.",
+                content,
+            )
+            self.assertNotIn("{{include:", content)
+
+    def test_missing_fragment_include_raises(self) -> None:
+        with self.assertRaisesRegex(FileNotFoundError, "does-not-exist.md"):
+            cli.resolve_content_includes(
+                "{{include:common/fragments/does-not-exist.md}}"
+            )
+
+    def test_include_path_escape_rejected(self) -> None:
+        for bad in [
+            "../secrets.md",
+            "/etc/passwd.md",
+            "C:/windows/system.md",
+            "C:\\windows.md",
+            "\\\\server\\share.md",
+            "common\\fragments\\tdd-process.md",
+        ]:
+            with self.assertRaisesRegex(ValueError, "Invalid include path"):
+                cli.resolve_content_includes("{{include:" + bad + "}}")
+
+    def test_recursive_fragment_include_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fragments = root / "common" / "fragments"
+            fragments.mkdir(parents=True)
+            (fragments / "loop.md").write_text(
+                "{{include:common/fragments/loop.md}}\n", encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(ValueError, "Recursive include"):
+                cli.resolve_content_includes(
+                    "{{include:common/fragments/loop.md}}", root
+                )
+
     def test_publishing_suffixes_exclude_opt_in_variants_by_default(self) -> None:
         suffixes = cli.list_rule_suffixes("publishing", "python")
 

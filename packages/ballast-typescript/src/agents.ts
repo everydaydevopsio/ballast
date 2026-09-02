@@ -87,6 +87,11 @@ export type SkillId = (typeof SKILL_IDS)[number];
 /**
  * Resolve path to an agent directory
  */
+/** Root directory containing agent content (packaged or BALLAST_REPO_ROOT). */
+export function getAgentsContentRoot(): string {
+  return path.join(AGENTS_ROOT, 'agents');
+}
+
 export function getAgentDir(
   agentId: string,
   language: Language = 'typescript'

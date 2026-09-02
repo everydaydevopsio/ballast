@@ -1155,6 +1155,61 @@ func TestInstallRendersDefaultToolsWhenSavingConfig(t *testing.T) {
 	}
 }
 
+func TestResolvesContentFragmentIncludes(t *testing.T) {
+	for _, language := range []string{"go", "python", "typescript"} {
+		content, err := readContent("testing", language, "", "pre-commit", "github", "none")
+		if err != nil {
+			t.Fatalf("readContent(%s): %v", language, err)
+		}
+		if !strings.Contains(content, "1. Start from acceptance criteria in `PRD.md`, the linked issue, or the current task.") {
+			t.Fatalf("expected TDD fragment expanded for %s, got %q", language, content)
+		}
+		if strings.Contains(content, "{{include:") {
+			t.Fatalf("expected include tokens resolved for %s, got %q", language, content)
+		}
+	}
+}
+
+func TestMissingFragmentIncludeFails(t *testing.T) {
+	_, err := resolveContentIncludes("{{include:common/fragments/does-not-exist.md}}", nil)
+	if err == nil || !strings.Contains(err.Error(), "does-not-exist.md") {
+		t.Fatalf("expected missing fragment error, got %v", err)
+	}
+}
+
+func TestIncludePathEscapeRejected(t *testing.T) {
+	for _, bad := range []string{
+		"../secrets.md",
+		"/etc/passwd.md",
+		"C:/windows/system.md",
+		`C:\windows.md`,
+		`\\server\share.md`,
+		`common\fragments\tdd-process.md`,
+	} {
+		_, err := resolveContentIncludes("{{include:"+bad+"}}", nil)
+		if err == nil || !strings.Contains(err.Error(), "invalid include path") {
+			t.Fatalf("expected invalid path error for %q, got %v", bad, err)
+		}
+	}
+}
+
+func TestRecursiveFragmentIncludeFails(t *testing.T) {
+	root := t.TempDir()
+	fragments := filepath.Join(root, "agents", "common", "fragments")
+	if err := os.MkdirAll(fragments, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fragments, "loop.md"), []byte("{{include:common/fragments/loop.md}}\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	t.Setenv("BALLAST_REPO_ROOT", root)
+
+	_, err := resolveContentIncludes("{{include:common/fragments/loop.md}}", nil)
+	if err == nil || !strings.Contains(err.Error(), "recursive include") {
+		t.Fatalf("expected recursion error, got %v", err)
+	}
+}
+
 func TestPublishingSuffixesExcludeOptInVariantsByDefault(t *testing.T) {
 	suffixes, err := listRuleSuffixes("publishing", "go")
 	if err != nil {

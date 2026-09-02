@@ -828,9 +828,74 @@ def list_rule_suffixes(
     return suffixes
 
 
+INCLUDE_SEGMENT_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _is_valid_include_path(include_path: str) -> bool:
+    """Includes must be relative, forward-slash-separated .md paths whose
+    segments contain only safe characters -- rejecting absolute paths,
+    Windows drive or rooted paths, and traversal on every platform."""
+    if not include_path.endswith(".md"):
+        return False
+    segments = include_path.split("/")
+    return all(
+        INCLUDE_SEGMENT_RE.match(segment) and segment not in (".", "..")
+        for segment in segments
+    )
+
+
+INCLUDE_TOKEN_RE = re.compile(r"\{\{include:([^}]+)\}\}")
+MAX_INCLUDE_DEPTH = 10
+
+
+def resolve_content_includes(
+    content: str,
+    agents_root: Path | None = None,
+    stack: tuple[str, ...] = (),
+) -> str:
+    """Resolve ``{{include:<path>.md}}`` tokens against the agents content
+    root. The fragment body is inserted with trailing whitespace trimmed so
+    tokens can sit inline in a content file. Fragments may include other
+    fragments; recursion and missing files fail the build with a clear
+    error."""
+    if "{{include:" not in content:
+        return content
+
+    root = agents_root if agents_root is not None else resolve_agents_root()
+
+    def replace(match: re.Match[str]) -> str:
+        include_path = match.group(1).strip()
+        if not _is_valid_include_path(include_path):
+            raise ValueError(
+                f"Invalid include path {include_path!r}: "
+                "must be a relative, forward-slash .md path under agents/"
+            )
+        chain = " -> ".join([*stack, include_path])
+        if include_path in stack:
+            raise ValueError(
+                f"Recursive include detected for {include_path!r} (chain: {chain})"
+            )
+        if len(stack) >= MAX_INCLUDE_DEPTH:
+            raise ValueError(
+                f"Include depth exceeded (max {MAX_INCLUDE_DEPTH}) "
+                f"at {include_path!r} (chain: {chain})"
+            )
+        file = root / include_path
+        if not file.exists():
+            raise FileNotFoundError(
+                f"Missing include fragment: {include_path} ({file})"
+            )
+        fragment = file.read_text(encoding="utf-8")
+        return resolve_content_includes(fragment, root, (*stack, include_path)).rstrip()
+
+    return INCLUDE_TOKEN_RE.sub(replace, content)
+
+
 def read_content(agent: str, language: str, suffix: str = "") -> str:
     filename = "content.md" if suffix == "" else f"content-{suffix}.md"
-    return (agent_dir(agent, language) / filename).read_text(encoding="utf-8")
+    return resolve_content_includes(
+        (agent_dir(agent, language) / filename).read_text(encoding="utf-8")
+    )
 
 
 def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
