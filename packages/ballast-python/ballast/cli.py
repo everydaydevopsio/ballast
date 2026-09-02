@@ -858,10 +858,15 @@ def resolve_content_includes(
                 f"Invalid include path {include_path!r}: "
                 "must be a relative .md path under agents/"
             )
-        if include_path in stack or len(stack) >= MAX_INCLUDE_DEPTH:
-            chain = " -> ".join([*stack, include_path])
+        chain = " -> ".join([*stack, include_path])
+        if include_path in stack:
             raise ValueError(
                 f"Recursive include detected for {include_path!r} (chain: {chain})"
+            )
+        if len(stack) >= MAX_INCLUDE_DEPTH:
+            raise ValueError(
+                f"Include depth exceeded (max {MAX_INCLUDE_DEPTH}) "
+                f"at {include_path!r} (chain: {chain})"
             )
         file = root / include_path
         if not file.exists():

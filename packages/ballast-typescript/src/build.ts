@@ -725,9 +725,14 @@ export function resolveContentIncludes(
         `Invalid include path "${includePath}": must be a relative .md path under agents/`
       );
     }
-    if (stack.includes(includePath) || stack.length >= MAX_INCLUDE_DEPTH) {
+    if (stack.includes(includePath)) {
       throw new Error(
         `Recursive include detected for "${includePath}" (chain: ${[...stack, includePath].join(' -> ')})`
+      );
+    }
+    if (stack.length >= MAX_INCLUDE_DEPTH) {
+      throw new Error(
+        `Include depth exceeded (max ${MAX_INCLUDE_DEPTH}) at "${includePath}" (chain: ${[...stack, includePath].join(' -> ')})`
       );
     }
     // Mirror content precedence: monorepo source checkout first, then the

@@ -2616,8 +2616,13 @@ func resolveContentIncludes(content string, stack []string) (string, error) {
 			resolveErr = fmt.Errorf("invalid include path %q: must be a relative .md path under agents/", includePath)
 			return match
 		}
-		if contains(stack, includePath) || len(stack) >= maxIncludeDepth {
-			resolveErr = fmt.Errorf("recursive include detected for %q (chain: %s)", includePath, strings.Join(append(slices.Clone(stack), includePath), " -> "))
+		chain := strings.Join(append(slices.Clone(stack), includePath), " -> ")
+		if contains(stack, includePath) {
+			resolveErr = fmt.Errorf("recursive include detected for %q (chain: %s)", includePath, chain)
+			return match
+		}
+		if len(stack) >= maxIncludeDepth {
+			resolveErr = fmt.Errorf("include depth exceeded (max %d) at %q (chain: %s)", maxIncludeDepth, includePath, chain)
 			return match
 		}
 		fragment, err := readAgentFile(path.Join("agents", includePath))

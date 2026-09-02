@@ -1378,6 +1378,20 @@ alwaysApply: false
         expect(() =>
           resolveContentIncludes('{{include:common/fragments/loop.md}}', dir)
         ).toThrow(/recursive include/i);
+
+        for (let i = 0; i < 12; i++) {
+          fs.writeFileSync(
+            path.join(dir, 'common', 'fragments', `deep-${i}.md`),
+            `{{include:common/fragments/deep-${i + 1}.md}}\n`
+          );
+        }
+        fs.writeFileSync(
+          path.join(dir, 'common', 'fragments', 'deep-12.md'),
+          'leaf\n'
+        );
+        expect(() =>
+          resolveContentIncludes('{{include:common/fragments/deep-0.md}}', dir)
+        ).toThrow(/include depth exceeded/i);
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
       }
