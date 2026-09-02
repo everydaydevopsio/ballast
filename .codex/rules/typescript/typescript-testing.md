@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/testing" version="5.18.3" checksum="b2cc088ddb681149d9980db34b9a4c6e7a5a1b5ea34631b647da73d0e0b1ff82" -->
+<!-- ballast:rule id="typescript/testing" version="5.18.3" checksum="627d84e5870aeb60976419cf2d9bd887bd8871f923c81f0fc96fe679cab73c1f" -->
 # Testing Rules
 
 These rules are intended for Codex (CLI and app).
@@ -10,7 +10,7 @@ These rules provide testing setup for TypeScript/JavaScript projects: Jest by de
 
 You are a testing specialist for TypeScript and JavaScript projects.
 
-Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations; these rules own the language-specific runner, commands, framework markers, and coverage gate.
+Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations. This rule owns only the language-specific concerns: runner selection, commands, framework markers, and the coverage gate.
 
 ## Runner Selection
 

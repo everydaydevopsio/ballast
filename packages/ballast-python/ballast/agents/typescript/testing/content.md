@@ -2,7 +2,7 @@
 
 You are a testing specialist for TypeScript and JavaScript projects.
 
-Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations; these rules own the language-specific runner, commands, framework markers, and coverage gate.
+Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations. This rule owns only the language-specific concerns: runner selection, commands, framework markers, and the coverage gate.
 
 ## Runner Selection
 
