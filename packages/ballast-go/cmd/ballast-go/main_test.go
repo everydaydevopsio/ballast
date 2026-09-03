@@ -1224,6 +1224,36 @@ func TestRecursiveFragmentIncludeFails(t *testing.T) {
 	}
 }
 
+func TestTaskSystemRuleRendersOnlyConfiguredSystemAndTarget(t *testing.T) {
+	claude, err := buildContent("tasks", "claude", "go", "task-system", "pre-commit", "github", "none")
+	if err != nil {
+		t.Fatalf("buildContent: %v", err)
+	}
+	if !strings.Contains(claude, "GITHUB_PERSONAL_ACCESS_TOKEN") {
+		t.Fatalf("expected github MCP config, got %q", claude)
+	}
+	if strings.Contains(claude, "JIRA_API_TOKEN") || strings.Contains(claude, "LINEAR_API_KEY") {
+		t.Fatalf("expected other task systems omitted, got %q", claude)
+	}
+	if !strings.Contains(claude, "**Claude Code:**") || strings.Contains(claude, "**Codex:**") {
+		t.Fatalf("expected only claude platform steps, got %q", claude)
+	}
+	if strings.Contains(claude, "BALLAST_IF") {
+		t.Fatalf("expected conditional markers stripped, got %q", claude)
+	}
+
+	codex, err := buildContent("tasks", "codex", "go", "task-system", "pre-commit", "jira", "none")
+	if err != nil {
+		t.Fatalf("buildContent: %v", err)
+	}
+	if !strings.Contains(codex, "JIRA_API_TOKEN") || strings.Contains(codex, "GITHUB_PERSONAL_ACCESS_TOKEN") {
+		t.Fatalf("expected only jira MCP config, got %q", codex)
+	}
+	if !strings.Contains(codex, "**Codex:**") || strings.Contains(codex, "**Claude Code:**") {
+		t.Fatalf("expected only codex platform steps, got %q", codex)
+	}
+}
+
 func TestPublishingSuffixesExcludeOptInVariantsByDefault(t *testing.T) {
 	suffixes, err := listRuleSuffixes("publishing", "go")
 	if err != nil {

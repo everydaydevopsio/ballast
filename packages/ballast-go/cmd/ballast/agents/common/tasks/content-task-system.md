@@ -17,50 +17,44 @@ When the user says any of the following, run the MCP setup check below:
 
 ### MCP Setup Check Procedure
 
-1. Ask the user which AI platform they are using: Claude Code, Cursor, Codex, or OpenCode.
-2. Check whether the correct MCP server for **{{taskSystem}}** is already configured for that platform (see platform-specific paths below).
-3. If it is configured and the user can connect, confirm success and stop.
-4. If it is not configured or the connection fails, walk the user through the setup steps for their platform.
+1. Check whether the MCP server for **{{taskSystem}}** is already configured for this platform (see below).
+2. If it is configured and the user can connect, confirm success and stop.
+3. If it is not configured or the connection fails, walk the user through the setup steps below.
 
-### MCP Server per Task System
+If the repository changes its saved `taskSystem` value, re-run `ballast install --refresh-config` so this rule matches the configured system.
 
+### MCP Server
+
+{{BALLAST_IF_TASK_SYSTEM:github}}
 **GitHub Issues** (`github`):
 - MCP server: `@modelcontextprotocol/server-github`
 - Requires a GitHub personal access token with `repo` scope.
 - The token should be set as `GITHUB_PERSONAL_ACCESS_TOKEN` in the platform config.
-
+{{BALLAST_END_IF_TASK_SYSTEM}}
+{{BALLAST_IF_TASK_SYSTEM:jira}}
 **Jira** (`jira`):
 - MCP server: `@modelcontextprotocol/server-atlassian` or a compatible Jira MCP server.
 - Requires a Jira API token and your Atlassian base URL.
 - Set `JIRA_API_TOKEN` and `JIRA_BASE_URL` in the platform config.
-
+{{BALLAST_END_IF_TASK_SYSTEM}}
+{{BALLAST_IF_TASK_SYSTEM:linear}}
 **Linear** (`linear`):
 - MCP server: `@linear/mcp-server` or `@modelcontextprotocol/server-linear`.
 - Requires a Linear API key.
 - Set `LINEAR_API_KEY` in the platform config.
+{{BALLAST_END_IF_TASK_SYSTEM}}
 
 ### Platform Setup Steps
 
+{{BALLAST_IF_TARGET:claude}}
 **Claude Code:**
 - MCP servers are configured in `~/.claude/settings.json` under the `mcpServers` key.
 - Add the server entry and restart Claude Code.
 - Verify with `/mcp` in the Claude Code CLI.
 
-**Cursor:**
-- MCP servers are configured in `.cursor/mcp.json` at the project root or in Cursor's global settings.
-- Add the server entry and reload the window.
+{{BALLAST_IF_TASK_SYSTEM:github}}
+Example `~/.claude/settings.json` entry:
 
-**Codex:**
-- MCP servers are configured per the OpenAI Codex CLI docs; check `~/.codex/config.json` or the equivalent config file.
-- Add the server entry and restart the CLI session.
-
-**OpenCode:**
-- MCP servers are configured in `~/.config/opencode/config.json` under `mcp`.
-- Add the server entry and restart OpenCode.
-
-### Example Claude Code Config (`~/.claude/settings.json`)
-
-For GitHub:
 ```json
 {
   "mcpServers": {
@@ -74,8 +68,10 @@ For GitHub:
   }
 }
 ```
+{{BALLAST_END_IF_TASK_SYSTEM}}
+{{BALLAST_IF_TASK_SYSTEM:linear}}
+Example `~/.claude/settings.json` entry:
 
-For Linear:
 ```json
 {
   "mcpServers": {
@@ -89,6 +85,28 @@ For Linear:
   }
 }
 ```
+{{BALLAST_END_IF_TASK_SYSTEM}}
+{{BALLAST_END_IF_TARGET}}
+{{BALLAST_IF_TARGET:cursor}}
+**Cursor:**
+- MCP servers are configured in `.cursor/mcp.json` at the project root or in Cursor's global settings.
+- Add the server entry and reload the window.
+{{BALLAST_END_IF_TARGET}}
+{{BALLAST_IF_TARGET:codex}}
+**Codex:**
+- MCP servers are configured per the OpenAI Codex CLI docs; check `~/.codex/config.json` or the equivalent config file.
+- Add the server entry and restart the CLI session.
+{{BALLAST_END_IF_TARGET}}
+{{BALLAST_IF_TARGET:opencode}}
+**OpenCode:**
+- MCP servers are configured in `~/.config/opencode/config.json` under `mcp`.
+- Add the server entry and restart OpenCode.
+{{BALLAST_END_IF_TARGET}}
+{{BALLAST_IF_TARGET:gemini}}
+**Gemini CLI:**
+- MCP servers are configured in `~/.gemini/settings.json` under the `mcpServers` key.
+- Add the server entry and restart Gemini CLI.
+{{BALLAST_END_IF_TARGET}}
 
 ## Using {{taskSystem}} for Work Items
 

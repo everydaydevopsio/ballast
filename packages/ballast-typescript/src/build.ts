@@ -530,6 +530,38 @@ function renderDeploymentModelGuidance(options?: BuildOptions): string {
   }
 }
 
+const CONDITIONAL_TOKEN_PATTERNS: Record<string, RegExp> = {
+  TASK_SYSTEM:
+    /\{\{BALLAST_IF_TASK_SYSTEM:([a-z, -]+)\}\}\r?\n?([\s\S]*?)\{\{BALLAST_END_IF_TASK_SYSTEM\}\}\r?\n?/g,
+  TARGET:
+    /\{\{BALLAST_IF_TARGET:([a-z, -]+)\}\}\r?\n?([\s\S]*?)\{\{BALLAST_END_IF_TARGET\}\}\r?\n?/g
+};
+
+/**
+ * Strip {{BALLAST_IF_<kind>:<names>}}...{{BALLAST_END_IF_<kind>}} blocks whose
+ * comma-separated name list does not satisfy the matcher.
+ */
+function applyConditionalTokenBlocks(
+  content: string,
+  kind: keyof typeof CONDITIONAL_TOKEN_PATTERNS,
+  matches: (name: string) => boolean
+): string {
+  if (!content.includes(`{{BALLAST_IF_${kind}:`)) {
+    return content;
+  }
+  return content.replace(
+    CONDITIONAL_TOKEN_PATTERNS[kind],
+    (_match, names: string, inner: string) =>
+      names
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .some(matches)
+        ? inner
+        : ''
+  );
+}
+
 const DEPLOYMENT_CONDITIONAL_PATTERN =
   /\{\{BALLAST_IF_DEPLOYMENT:([a-z, -]+)\}\}\r?\n?([\s\S]*?)\{\{BALLAST_END_IF_DEPLOYMENT\}\}\r?\n?/g;
 
@@ -1544,6 +1576,18 @@ export function buildContent(
     default:
       throw new Error(`Unknown target: ${target}`);
   }
+  const configuredTaskSystem =
+    options?.variables?.taskSystem?.trim().toLowerCase() || 'github';
+  result = applyConditionalTokenBlocks(
+    result,
+    'TASK_SYSTEM',
+    (name) => name === configuredTaskSystem
+  );
+  result = applyConditionalTokenBlocks(
+    result,
+    'TARGET',
+    (name) => name === target
+  );
   if (options?.variables) {
     for (const [key, value] of Object.entries(options.variables)) {
       result = result.replaceAll(`{{${key}}}`, value);
