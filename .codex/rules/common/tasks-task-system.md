@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.3" checksum="1a8e7c270d7b9711794c4e5b6e86c0e607992a5491b0c6eadb7148d1bba8282c" -->
+<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.3" checksum="66dc9a150f13576d36be7557e8795b332bdec29557c068714c7c3148615d9e6a" -->
 # Task System Integration
 
 These rules are intended for Codex (CLI and app).
@@ -19,19 +19,7 @@ External issue tracking is active (`taskSystem: github`). This repository uses *
 
 ## MCP Server Setup
 
-When the user says any of the following, run the MCP setup check below:
-- "set up my task system MCP"
-- "check my MCP setup"
-- "configure MCP for GitHub"
-- "is my MCP configured"
-
-### MCP Setup Check Procedure
-
-1. Check whether the MCP server for **GitHub** is already configured for this platform (see below).
-2. If it is configured and the user can connect, confirm success and stop.
-3. If it is not configured or the connection fails, walk the user through the setup steps below.
-
-If the repository changes its saved `taskSystem` value, re-run `ballast install --refresh-config` so this rule matches the configured system.
+When the user asks to set up, check, or configure their task system MCP: check whether the MCP server for **GitHub** is already configured for this platform (see below); confirm success if it connects, otherwise walk the user through the setup steps. If the repository changes its saved `taskSystem` value, re-run `ballast install --refresh-config` so this rule matches the configured system.
 
 ### MCP Server
 
@@ -55,6 +43,6 @@ If the repository changes its saved `taskSystem` value, re-run `ballast install 
 
 ## Important Notes
 
-- Do not use `tasks/todo.md` as a substitute for durable issue tracking. It is a structured branch-local task artifact for the current branch (see the `tasks/todo.md` rule).
-- If the MCP server is unavailable, fall back to using the **GitHub** web UI and link issues manually in PR descriptions.
+- `tasks/todo.md` is a branch-local task artifact, not a substitute for durable issue tracking (see the `tasks/todo.md` rule).
+- If the MCP server is unavailable, fall back to the **GitHub** web UI and link issues manually in PR descriptions.
 - Keep credentials out of committed files; use environment variables or platform secret stores.

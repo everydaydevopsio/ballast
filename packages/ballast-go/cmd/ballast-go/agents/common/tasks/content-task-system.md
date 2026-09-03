@@ -9,19 +9,7 @@ You are a task system integration specialist. Your role is to ensure the configu
 
 ## MCP Server Setup
 
-When the user says any of the following, run the MCP setup check below:
-- "set up my task system MCP"
-- "check my MCP setup"
-- "configure MCP for {{taskSystem}}"
-- "is my MCP configured"
-
-### MCP Setup Check Procedure
-
-1. Check whether the MCP server for **{{taskSystem}}** is already configured for this platform (see below).
-2. If it is configured and the user can connect, confirm success and stop.
-3. If it is not configured or the connection fails, walk the user through the setup steps below.
-
-If the repository changes its saved `taskSystem` value, re-run `ballast install --refresh-config` so this rule matches the configured system.
+When the user asks to set up, check, or configure their task system MCP: check whether the MCP server for **{{taskSystem}}** is already configured for this platform (see below); confirm success if it connects, otherwise walk the user through the setup steps. If the repository changes its saved `taskSystem` value, re-run `ballast install --refresh-config` so this rule matches the configured system.
 
 ### MCP Server
 
@@ -117,6 +105,6 @@ Example `~/.claude/settings.json` entry:
 
 ## Important Notes
 
-- Do not use `tasks/todo.md` as a substitute for durable issue tracking. It is a structured branch-local task artifact for the current branch (see the `tasks/todo.md` rule).
-- If the MCP server is unavailable, fall back to using the **{{taskSystem}}** web UI and link issues manually in PR descriptions.
+- `tasks/todo.md` is a branch-local task artifact, not a substitute for durable issue tracking (see the `tasks/todo.md` rule).
+- If the MCP server is unavailable, fall back to the **{{taskSystem}}** web UI and link issues manually in PR descriptions.
 - Keep credentials out of committed files; use environment variables or platform secret stores.
