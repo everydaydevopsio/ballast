@@ -7,188 +7,49 @@ You are a plan lifecycle specialist. Your role is to preserve implementation con
 
 ## When To Create A Plan
 
-Create a plan when:
-- The change touches more than two files.
-- You are unsure of the approach.
-- The feature takes more than one session to complete.
-- The work involves architectural decisions.
+Create a plan when the change touches more than two files, the approach is uncertain, the feature spans multiple sessions, or the work involves architectural decisions. Skip a plan for single-file fixes or changes that fit in one sentence.
 
-Skip a plan when:
-- The change is a single-file fix such as a typo, log line, or rename.
-- The entire change fits in one sentence.
+## Structure
 
-## Directory Structure
+- Plans live at `plans/plan-<feature-name>.md` (kebab-case, specific: `plan-oauth-google.md`, not `plan-auth.md`); index them in `plans/README.md` and commit both.
+- ADRs live at `adr/NNN-<decision-title>.md` with an index in `adr/README.md`.
+- Discovered out-of-scope work goes to `tasks/todo.md` under the branch-local TODO tracking rule, not into a widened plan.
 
-Use this project-root structure:
+## Plan Contents
 
-```text
-<project-root>/
-+-- plans/
-|   +-- README.md
-|   +-- plan-<feature-name>.md
-+-- tasks/
-|   +-- todo.md
-+-- adr/
-    +-- README.md
-    +-- NNN-<decision-title>.md
-```
-
-Defer `tasks/todo.md` behavior to the branch-local TODO tracking rule. Use it for discovered out-of-scope work instead of expanding the plan beyond the feature boundary.
-
-## Plan File Naming
-
-Create plans at `plans/plan-<feature-name>.md`.
-
-- Use kebab-case.
-- Be specific: `plan-oauth-google.md`, not `plan-auth.md`.
-- After creating the plan, update `plans/README.md` and commit both files.
-
-## Plan Template
-
-```markdown
-# Plan: <Feature Name>
-
-**Status:** In Progress
-**Branch:** <branch-name>
-**Created:** YYYY-MM-DD
-**Related ADRs:** _(link any relevant existing ADRs)_
-
-## Problem
-
-What are we solving and why does it matter now?
-
-## Approach
-
-The chosen solution in plain language. What will change and how.
-
-## Files Affected
-
-- `src/...` - reason
-- `tests/...` - reason
-
-## Phases
-
-- [ ] Phase 1: Explore and confirm approach
-- [ ] Phase 2: Core implementation
-- [ ] Phase 3: Tests and edge cases
-- [ ] Phase 4: Documentation and cleanup
-
-## Verification
-
-How will we know this works? Commands, tests, or checks to run.
-
-## Alternatives Rejected
-
-| Option | Why rejected |
-| --- | --- |
-| ... | ... |
-
-## Open Questions
-
-Things still to resolve. Remove entries as they are answered.
-
-## Change Log
-
-| Date | Change |
-| --- | --- |
-| YYYY-MM-DD | Plan created |
-```
+Each plan is a markdown doc with: a header (Status, Branch, Created date, Related ADRs), **Problem**, **Approach**, **Files Affected** (path + reason), **Phases** (checkboxes, typically explore -> core implementation -> tests and edge cases -> docs and cleanup), **Verification**, **Alternatives Rejected** (option + why), **Open Questions**, and a **Change Log** table (date + change).
 
 ## Maintaining The Plan
 
-- Check off phases as they complete.
-- If the approach changes, update **Approach** and record the change in **Change Log**.
-- Commit plan updates alongside related code changes.
+- Check off phases as they complete; commit plan updates alongside related code changes.
+- If the approach changes, update **Approach** and record it in the **Change Log**.
 - At the start of each session, read the plan to restore context.
-- When you discover real out-of-scope work, add it to `tasks/todo.md` under the branch-local TODO tracking rule instead of widening the plan.
 
-## Graduation Trigger
+## Graduation
 
-When the feature is ready to merge, use this trigger phrase:
+When the feature is ready to merge, the trigger phrase is: "Graduate `plans/plan-<feature-name>.md` to an ADR".
 
-> "Graduate `plans/plan-<feature-name>.md` to an ADR"
+1. Triage incomplete `tasks/todo.md` items from this feature: create task system work items and mark the lines `- [x] TASK-NNN: <description>`. Graduation is blocked until every feature TODO is checked off or referenced.
+2. Take the next ADR number from `adr/README.md` and create `adr/NNN-<decision-title>.md` from the plan.
+3. Update `adr/README.md`, remove the plan file, update `plans/README.md`, and commit with `docs: graduate plan-<feature-name> to ADR-NNN`.
 
-## Graduation Steps
+## ADR Contents
 
-1. Check `tasks/todo.md` for incomplete items (`- [ ]`) added during this feature.
-2. For each incomplete item, create a task system work item, then update the line to `- [x] TASK-NNN: <description>`.
-3. Determine the next ADR number from `adr/README.md`.
-4. Create `adr/NNN-<decision-title>.md` from the plan content.
-5. Update `adr/README.md` with the new row.
-6. Remove `plans/plan-<feature-name>.md`.
-7. Update `plans/README.md` to remove the entry.
-8. Commit with `docs: graduate plan-<feature-name> to ADR-NNN`.
-
-Graduation is blocked until every feature-related TODO item is checked off or has a task system work item reference.
-
-## ADR Template
-
-```markdown
-# ADR-NNN: <Decision Title>
-
-**Status:** Accepted
-**Date:** YYYY-MM-DD
-**Branch:** <branch-name>
-**PR:** #<number>
-**Supersedes:** _(ADR-NNN if replacing an earlier decision)_
-**Superseded by:** _(leave blank)_
-
-## Context
-
-Why did this decision need to be made?
-
-## Decision
-
-What was chosen and why.
-
-## Alternatives Considered
-
-| Option | Reason not chosen |
-| --- | --- |
-| ... | ... |
-
-## Consequences
-
-### Positive
-
-- What becomes easier
-
-### Negative or trade-offs
-
-- What becomes harder or what we gave up
-
-## Implementation Notes
-
-Key details future readers should know.
-
-## Verification
-
-How the decision was validated.
-
-## Lessons Learned
-
-What would you do differently? What worked better than expected?
-```
+Each ADR contains: a header (Status: Accepted/Deprecated/Superseded, Date, Branch, PR, Supersedes/Superseded-by), **Context**, **Decision**, **Alternatives Considered** (option + reason not chosen), **Consequences** (positive and negative), **Implementation Notes**, **Verification**, and **Lessons Learned**.
 
 ## ADR Management Rules
 
-| Rule | Detail |
-| --- | --- |
-| Never delete | Mark superseded and create a new ADR |
-| Sequential numbering | Zero-padded three digits: `001`, `002`, `003` |
-| One decision per ADR | Do not bundle unrelated decisions |
-| Status values | `Accepted`, `Deprecated`, `Superseded` |
+- Never delete an ADR: mark it superseded and create a new one.
+- Sequential zero-padded numbering (`001`, `002`, ...), one decision per ADR.
 
 ## Quick Reference
 
 | Situation | Action |
 | --- | --- |
 | Starting a feature | Create `plans/plan-<name>.md`, commit it |
-| New session on existing feature | Continue implementing `plans/plan-<name>.md` |
+| New session on existing feature | Continue implementing the plan |
 | Approach changed | Update plan and Change Log, commit with code |
-| Phase complete | Check off in plan, commit |
 | Discovered out-of-scope work | Add to `tasks/todo.md`, commit alongside current change |
-| Ready to merge | Graduate `plans/plan-<name>.md` to an ADR |
-| Graduation finds open TODO items | Create task system issues, add references to `tasks/todo.md`, then proceed |
+| Ready to merge | Graduate the plan to an ADR |
 | Decision reversed later | Mark ADR superseded, create a new ADR |
 | Small single-file fix | Skip the plan entirely |

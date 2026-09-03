@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/cicd" version="5.18.3" checksum="70b87d34df263b3f3da27520d4636dd22004f6bfe1b456adbb0385f1d1850990" -->
+<!-- ballast:rule id="typescript/cicd" version="5.18.3" checksum="c0f5f661b97e5cb5268dfe36e86df5f1d94292375dad9fe8bc9755d49e5eb647" -->
 # CI/CD Rules
 
 These rules are intended for Codex (CLI and app).
@@ -20,17 +20,11 @@ You are a CI/CD specialist for software projects across the repository's configu
 
 ## Scope
 
-- Workflow files (.github/workflows, .gitlab-ci.yml, etc.), job definitions, and caching strategies.
-- Branch/tag triggers and approval gates where relevant.
-- Integration with package registries and deployment targets.
-- `.github/dependabot.yml` for version and security updates.
+- Workflow files (.github/workflows, .gitlab-ci.yml, etc.), job definitions, caching strategies, branch/tag triggers, approval gates, registry and deployment integration, and `.github/dependabot.yml`.
 
 ## Concurrency
 
-Add a `concurrency` block to every GitHub Actions workflow so that redundant runs triggered by rapid pushes are handled correctly.
-
-- **CI workflows** (lint, test, build): cancel in-progress runs when a newer commit is pushed to the same branch.
-- **Publish/release workflows**: do not cancel in-progress runs — a publish that is already in flight should complete.
+Add a workflow-level `concurrency` block to every GitHub Actions workflow you create or update:
 
 ```yaml
 # CI workflows (lint, test, build) — cancel superseded runs
@@ -44,150 +38,12 @@ concurrency:
   cancel-in-progress: false
 ```
 
-Apply the appropriate block at the workflow level (outside any `jobs:` key) for every workflow you create or update.
-
 ## Dependabot
 
-Create a `.github/dependabot.yml` file for the current project when Dependabot is appropriate. Dependabot monitors dependencies and opens pull requests for updates. Always include `github-actions` so workflow actions stay current, and add package ecosystems that match detected manifests and lockfiles.
+Create `.github/dependabot.yml` (version 2) with a weekly-interval update block per detected package ecosystem plus `github-actions` for `/`, so workflow actions stay current. Set a sensible `open-pull-requests-limit` (10–15). Monorepos get one block per package directory.
 
-Do not add an Ansible package ecosystem entry. Dependabot does not support Ansible Galaxy roles, collections, `requirements.yml`, or `requirements.yaml` as a package ecosystem. For Ansible-only repositories, keep `github-actions` updates when GitHub Actions workflows exist, and document collection or role update review as a manual maintenance task or repo-specific automation outside Dependabot.
+Do not add an Ansible package ecosystem entry: Dependabot does not support Ansible Galaxy roles, collections, or `requirements.yml`. For Ansible-only repositories, keep `github-actions` updates when workflows exist and document collection/role update review as a manual maintenance task.
 
-### Basic Structure
+### Grouping Policy
 
-```yaml
-version: 2
-updates:
-  # Project dependencies (example: npm, yarn, or pnpm detected from lockfile)
-  - package-ecosystem: 'npm'
-    directory: '/'
-    schedule:
-      interval: 'weekly'
-    open-pull-requests-limit: 10
-
-  # GitHub Actions used in .github/workflows/
-  - package-ecosystem: 'github-actions'
-    directory: '/'
-    schedule:
-      interval: 'weekly'
-```
-
-### Node.js Project Groups
-
-For Node.js projects, use `groups` to consolidate related packages into fewer PRs. Group similar items (e.g. AWS SDK, Next.js, Sentry) so updates land together instead of as many separate PRs.
-
-**Common groups:**
-
-| Group       | Patterns                                                       | Rationale                                    |
-| ----------- | -------------------------------------------------------------- | -------------------------------------------- |
-| AWS SDK     | `aws-sdk`, `@aws-sdk/*`                                        | SDK v2 and v3 modular packages               |
-| Next.js     | `next`, `next-*`                                               | Core and plugins                             |
-| Sentry      | `@sentry/*`                                                    | SDK, integrations, build tools               |
-| Testing     | `jest`, `@jest/*`, `vitest`, `@vitest/*`, `@testing-library/*` | Test framework and helpers                   |
-| TypeScript  | `typescript`, `ts-*`, `@types/*`                               | Compiler and type definitions                |
-| Dev tooling | `eslint*`, `prettier`, `@typescript-eslint/*`                  | Linting and formatting                       |
-| Catch-all   | `*`                                                            | All remaining deps in one PR (use sparingly) |
-
-**Example: Grouped Node.js + GitHub Actions config**
-
-```yaml
-version: 2
-updates:
-  - package-ecosystem: 'npm'
-    directory: '/'
-    schedule:
-      interval: 'weekly'
-    open-pull-requests-limit: 15
-    groups:
-      aws-sdk:
-        patterns:
-          - 'aws-sdk'
-          - '@aws-sdk/*'
-      nextjs:
-        patterns:
-          - 'next'
-          - 'next-*'
-      sentry:
-        patterns:
-          - '@sentry/*'
-      testing:
-        patterns:
-          - 'jest'
-          - '@jest/*'
-          - 'vitest'
-          - '@vitest/*'
-          - '@testing-library/*'
-      typescript:
-        patterns:
-          - 'typescript'
-          - 'ts-*'
-          - '@types/*'
-      dev-tooling:
-        dependency-type: 'development'
-        patterns:
-          - 'eslint*'
-          - 'prettier'
-          - '@typescript-eslint/*'
-      # Remaining production deps grouped to limit PR noise
-      production-dependencies:
-        dependency-type: 'production'
-        patterns:
-          - '*'
-        exclude-patterns:
-          - 'aws-sdk'
-          - '@aws-sdk/*'
-          - 'next'
-          - 'next-*'
-          - '@sentry/*'
-
-  - package-ecosystem: 'github-actions'
-    directory: '/'
-    schedule:
-      interval: 'weekly'
-```
-
-**Notes:**
-
-- Omit groups the project doesn't use (e.g. no `nextjs` or `sentry` if not present).
-- Dependencies match the first group whose `patterns` apply; order matters.
-- Use `exclude-patterns` in catch-all groups to avoid overlapping with named groups.
-- `dependency-type: "development"` or `"production"` restricts a group to dev or prod deps only.
-
-### Monorepos
-
-For monorepos with multiple package directories (e.g. `packages/*`), add an update block per directory:
-
-```yaml
-version: 2
-updates:
-  - package-ecosystem: 'npm'
-    directory: '/'
-    schedule:
-      interval: 'weekly'
-    groups:
-      # ... groups as above ...
-
-  - package-ecosystem: 'npm'
-    directory: '/packages/web'
-    schedule:
-      interval: 'weekly'
-    groups:
-      # ... groups as above ...
-
-  - package-ecosystem: 'github-actions'
-    directory: '/'
-    schedule:
-      interval: 'weekly'
-```
-
-### Labels and Assignees (Optional)
-
-```yaml
-- package-ecosystem: 'npm'
-  directory: '/'
-  schedule:
-    interval: 'weekly'
-  labels:
-    - 'dependencies'
-  assignees:
-    - 'platform-team'
-```
+For Node.js projects, use `groups` to consolidate related packages into fewer PRs. Group families the project actually uses — e.g. `aws-sdk` (`aws-sdk`, `@aws-sdk/*`), `nextjs` (`next`, `next-*`), `sentry` (`@sentry/*`), `testing` (`jest`, `@jest/*`, `vitest`, `@vitest/*`, `@testing-library/*`), `typescript` (`typescript`, `ts-*`, `@types/*`), and `dev-tooling` (`eslint*`, `prettier`, `@typescript-eslint/*` with `dependency-type: development`). A catch-all `production-dependencies` group (`patterns: ['*']`, `dependency-type: production`) may consolidate the rest, with `exclude-patterns` covering every named group to avoid overlap. Dependencies match the first group whose patterns apply, so order matters. Optionally add `labels` or `assignees` per update block when the team routes dependency PRs.
