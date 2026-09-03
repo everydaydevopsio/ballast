@@ -1,15 +1,103 @@
-# Ballast
+<p align="center">
+  <img src=".github/assets/icon.svg" alt="Ballast project icon" width="128">
+</p>
 
-[![CI](https://github.com/everydaydevopsio/ballast/actions/workflows/ci.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/ci.yml)
-[![Release](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml/badge.svg)](https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml)
-[![License](https://img.shields.io/github/license/everydaydevopsio/ballast)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/everydaydevopsio/ballast)](https://github.com/everydaydevopsio/ballast/releases)
-[![npm version](https://img.shields.io/npm/v/%40everydaydevopsio%2Fballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
-[![npm downloads](https://img.shields.io/npm/dm/%40everydaydevopsio%2Fballast.svg)](https://www.npmjs.com/package/@everydaydevopsio/ballast)
+<h1 align="center">Ballast</h1>
 
-Ballast installs AI agent rules and skills for Cursor, Claude Code, OpenCode, Codex, and Gemini.
+<p align="center">
+  <strong>Reusable rules and skills that keep AI coding agents aligned with your repository.</strong>
+</p>
 
-This repository supports seven first-class language profiles:
+<p align="center">
+  <a href="https://github.com/everydaydevopsio/ballast/actions/workflows/ci.yml"><img src="https://github.com/everydaydevopsio/ballast/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml"><img src="https://github.com/everydaydevopsio/ballast/actions/workflows/publish.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/everydaydevopsio/ballast/releases"><img src="https://img.shields.io/github/v/release/everydaydevopsio/ballast" alt="GitHub release"></a>
+  <a href="https://www.npmjs.com/package/@everydaydevopsio/ballast"><img src="https://img.shields.io/npm/v/%40everydaydevopsio%2Fballast.svg" alt="npm version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/everydaydevopsio/ballast" alt="License"></a>
+</p>
+
+Ballast installs versioned AI-agent rules and task skills into a codebase. It gives Cursor, Claude Code, OpenCode, Codex, and Gemini the same repository-specific guidance without copying instructions by hand for every tool.
+
+Ballast does **not** run an agent or choose an AI model. It supplies the operating instructions that an agent loads from your repository.
+
+## What Ballast provides
+
+- **Agent rules** for recurring engineering concerns such as local development, documentation, CI/CD, observability, publishing, testing, logging, and linting.
+- **Task skills** for bounded workflows such as OWASP reviews, AWS health checks, GitHub repository checks, Docker publishing, and GitHub Spec Kit delivery.
+- **Native output for each AI tool**, including Cursor rules, Claude skills, Codex skills, OpenCode skills, Gemini rules, and managed support-file sections.
+- **Seven language profiles**: TypeScript, Python, Go, Ansible, Terraform, Dart, and Docker.
+- **Safe updates** that preserve existing files unless you explicitly request a patch or replacement.
+
+## Quick start
+
+The `ballast` wrapper detects the languages in a repository and dispatches to the matching installer.
+
+### macOS
+
+```bash
+brew tap everydaydevopsio/ballast
+brew trust everydaydevopsio/ballast
+brew install --cask everydaydevopsio/ballast/ballast
+```
+
+### Linux
+
+```bash
+brew tap everydaydevopsio/ballast
+brew trust everydaydevopsio/ballast
+brew install --formula everydaydevopsio/ballast/ballast
+```
+
+Use the fully qualified Homebrew name. Another project also publishes a package named `ballast`.
+
+Install all agent rules for Codex in the current repository:
+
+```bash
+cd /path/to/your/repository
+ballast install --target codex --all
+ballast doctor
+```
+
+Install selected guidance instead:
+
+```bash
+ballast install --target claude --agent local-dev,testing
+ballast install --target claude --skill owasp-security-scan
+```
+
+For a mixed-language monorepo, the wrapper detects every supported profile:
+
+```bash
+ballast install --target codex --all --yes
+```
+
+## Package-specific installation
+
+Use the language CLI directly when you do not need automatic detection.
+
+### TypeScript and JavaScript projects
+
+```bash
+pnpm add -D @everydaydevopsio/ballast
+pnpm exec ballast-typescript install --target cursor --all
+pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
+```
+
+### Python and Go projects
+
+Ballast publishes the Python wheel and Go binaries with each GitHub release. See the [installation guide](docs/installation.md) for `uv`, `uvx`, and direct binary commands.
+
+## Supported tools and languages
+
+| AI tool | Installed surface |
+| --- | --- |
+| Cursor | Rules under `.cursor/rules/` |
+| Claude Code | `CLAUDE.md` and skills under `.claude/skills/` |
+| OpenCode | Target-native files under `.opencode/` |
+| Codex | `AGENTS.md` and skills under `.codex/skills/` |
+| Gemini | `GEMINI.md` and rules under `.gemini/rules/` |
+
+Language profiles:
 
 - TypeScript
 - Python
@@ -19,37 +107,20 @@ This repository supports seven first-class language profiles:
 - Dart
 - Docker
 
-## Prerequisites
+Published entry points:
 
-- Node.js 22 (LTS) or 24 (Active LTS)
-- `nvm`
-- `pnpm`
-- `uv`
+| Command | Distribution | Role |
+| --- | --- | --- |
+| `ballast` | Homebrew | Detects repository languages and dispatches to the matching implementation |
+| `ballast-typescript` | npm | TypeScript implementation and npm integration |
+| `ballast-python` | GitHub release wheel | Python implementation |
+| `ballast-go` | GitHub release binary | Go implementation |
 
-Use the version in `.nvmrc` after cloning:
+The wrapper is the simplest choice for most repositories. The separate implementations let a project use a package or binary that fits its toolchain.
 
-```bash
-nvm install
-nvm use
-pnpm install
-```
+## Agents and skills
 
-AI agents should run the canonical bootstrap command before starting repository work:
-
-```bash
-ballast setup-dev
-```
-
-## Packages
-
-- `@everydaydevopsio/ballast` (npm)
-- `ballast-python` (GitHub Releases artifact)
-- `ballast-go` (Go)
-- `ballast` (Homebrew formula on Linux, Homebrew cask on macOS)
-
-## Agent Model
-
-Common agents (all languages):
+An **agent rule** tells an AI tool how work should be performed in this repository. Examples include:
 
 - `local-dev`
 - `docs`
@@ -57,379 +128,94 @@ Common agents (all languages):
 - `observability`
 - `publishing`
 - `git-hooks`
-- `tasks`
-- `plan-lifecycle`
-- `spec-kit`
+- `testing`
+- `linting`
+- `logging`
 
-Language-specific agents:
-
-- TypeScript: `linting`, `logging`, `testing`
-- Python: `linting`, `logging`, `testing`
-- Go: `linting`, `logging`, `testing`
-- Ansible: `linting`, `logging`, `testing`
-- Terraform: `linting`, `logging`, `testing`
-- Dart: `linting`, `logging`, `testing`
-- Docker: `linting`, `logging`, `testing`
-
-Agent sources in this repo:
-
-- `agents/common/*`
-- `agents/typescript/*`
-- `agents/python/*`
-- `agents/go/*`
-- `agents/ansible/*`
-- `agents/terraform/*`
-- `agents/dart/*`
-- `agents/docker/*`
-
-## Skill Model
-
-Common skills (all languages):
+A **skill** describes a focused task with a clear workflow. Examples include:
 
 - `owasp-security-scan`
 - `aws-health-review`
-- `aws-live-health-review`
-- `aws-weekly-security-review`
 - `github-health-check`
 - `github-pr-copilot-cycle`
 - `ballast-audit`
-- `ballast-project-maintenance`
 - `docker-registry-publish`
 - `speckit-bootstrap`
-- `speckit-reverse-engineer`
 - `speckit-delivery`
 
-Skill sources in this repo:
-
-- `skills/common/*`
-
-## Skills
-
-Skills are reusable task guides that Ballast installs for the target AI tool alongside the agent rules. In this repository, the shipped skills are:
-
-- `owasp-security-scan`: run an OWASP-aligned security audit across Go, TypeScript, and Python projects
-- `aws-health-review`: run a weekly read-only AWS operational health baseline and append prioritized TODO follow-up
-- `aws-live-health-review`: generate a current-state AWS operational snapshot for EC2, RDS, ALB, alarms, and logs
-- `aws-weekly-security-review`: run a weekly read-only AWS security baseline review with prioritized findings
-- `github-health-check`: run a comprehensive GitHub repository health check covering CI status, open PRs, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
-- `github-pr-copilot-cycle`: create or update a GitHub PR, request Copilot review, fix actionable feedback, check CI, and repeat the review cycle
-- `ballast-audit`: audit AI rule and skill files for context density, duplication, and bloat
-- `ballast-project-maintenance`: inspect, bootstrap, and repair Ballast-managed repository state, including generated `.ballast/` local tools
-- `docker-registry-publish`: publish Docker/OCI images to GHCR or Docker Hub with tags, credentials, visibility, and digest handoff
-- `speckit-bootstrap`: initialize or repair GitHub Spec Kit in an existing repository using native Spec Kit skills
-- `speckit-reverse-engineer`: create a brownfield Spec Kit baseline from runtime behavior, source, tests, and existing docs
-- `speckit-delivery`: orchestrate the native Spec Kit lifecycle for a bounded product change
-
-### Install a skill
-
-Install a specific skill with `--skill`:
-
-```bash
-pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
-pnpm exec ballast-typescript install --target codex --skill aws-health-review
-```
-
-Install every available skill for the selected language with `--all-skills`:
-
-```bash
-pnpm exec ballast-typescript install --target claude --all-skills
-```
-
-Skills can be combined with agent installs in the same command:
-
-```bash
-pnpm exec ballast-typescript install --target claude --agent linting,testing --skill owasp-security-scan
-pnpm exec ballast-typescript install --target codex --skill aws-live-health-review
-```
-
-### Use a skill
-
-After installation, invoke the skill naturally in your AI tool by naming it and asking for the task it covers. Examples:
-
-- Claude Code: ask to run `owasp-security-scan`
-- Claude Code: ask to run `aws-weekly-security-review`
-- Codex: ask to use `owasp-security-scan` to audit the repo
-- Codex: ask to use `aws-health-review` for a weekly AWS operations baseline
-- OpenCode: invoke the installed skill by name for a security scan request
-- Cursor: use the installed rule/skill file as part of your repo instructions and ask for the security audit
-
-Typical prompts:
+After installation, name the skill in your request:
 
 ```text
 Run owasp-security-scan on this repository.
-Use owasp-security-scan to audit dependencies and code security.
-Use aws-live-health-review with PROFILE=prod-readonly to summarize AWS health right now.
-Use speckit-bootstrap to prepare this repository for spec-driven development.
+Use github-health-check to review the repository.
 Use speckit-delivery for this product change.
 ```
 
-### Where skills are installed
-
-- Cursor: `.cursor/rules/<skill>.mdc`
-- Claude: `.claude/skills/<skill>.skill`
-- OpenCode: `.opencode/skills/<skill>.md`
-- Gemini: `.gemini/rules/<skill>.md`
-- Codex: `.codex/skills/<skill>/SKILL.md`, with root `AGENTS.md` listing installed skills
-
-## Install and Use (Single Language)
-
-`ballast` is the wrapper command (intended for Homebrew) that detects repo language and dispatches to the matching language CLI.
-
-### Homebrew wrapper on Linux
+Use `--all-skills` when you want every shipped skill for the selected language:
 
 ```bash
-brew tap everydaydevopsio/ballast
-brew trust everydaydevopsio/ballast   # required for third-party taps
-brew reinstall --formula everydaydevopsio/ballast/ballast
-ballast install --target cursor --all
+ballast install --target codex --all-skills
+```
+
+## How Ballast manages repository files
+
+Ballast records the selected languages, targets, agents, skills, and path mappings in `.rulesrc.json`.
+
+By default, it preserves existing rule and skill files. Choose an update policy explicitly when upstream guidance changes:
+
+```bash
+ballast upgrade           # preserve existing managed files
+ballast upgrade --patch   # merge updates while retaining local edits
+ballast upgrade --force   # reset managed content to the canonical version
+```
+
+Support files such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` use marked, Ballast-managed sections. Ballast updates those sections without replacing unrelated project guidance. In non-interactive mode, it will not silently overwrite a customized support file.
+
+Useful maintenance commands:
+
+```bash
 ballast doctor
-ballast install-cli --language python
-ballast upgrade
-ballast upgrade --patch
-ballast upgrade --force
+ballast install --refresh-config
+ballast setup-dev
 ```
 
-### Homebrew wrapper on macOS
+## Documentation
 
-```bash
-brew tap everydaydevopsio/ballast
-brew trust everydaydevopsio/ballast   # required for third-party taps
-brew install --cask everydaydevopsio/ballast/ballast
-ballast install --target cursor --all
-ballast doctor
-ballast install-cli --language python
-ballast upgrade
-ballast upgrade --patch
-ballast upgrade --force
-```
-
-For existing installs, use one of:
-
-```bash
-brew upgrade --cask everydaydevopsio/ballast/ballast
-# or
-brew reinstall --cask everydaydevopsio/ballast/ballast
-```
-
-### Homebrew Troubleshooting
-
-If Homebrew still installs an older Ballast release after the tap has been updated, your local tap checkout is stale. Reset the tap to the latest `origin/HEAD`, then reinstall:
-
-**Linux (formula):**
-
-```bash
-brew update-reset "$(brew --repository everydaydevopsio/ballast)"
-brew info --formula everydaydevopsio/ballast/ballast
-brew reinstall --formula everydaydevopsio/ballast/ballast
-```
-
-**macOS (cask):**
-
-```bash
-brew update-reset "$(brew --repository everydaydevopsio/ballast)"
-brew info --cask everydaydevopsio/ballast/ballast
-brew reinstall --cask everydaydevopsio/ballast/ballast
-```
-
-If the tap still does not refresh, remove and re-add it:
-
-**Linux:**
-
-```bash
-brew untap everydaydevopsio/ballast
-brew tap everydaydevopsio/ballast
-brew trust everydaydevopsio/ballast
-brew reinstall --formula everydaydevopsio/ballast/ballast
-```
-
-**macOS:**
-
-```bash
-brew untap everydaydevopsio/ballast
-brew tap everydaydevopsio/ballast
-brew trust everydaydevopsio/ballast
-brew install --cask everydaydevopsio/ballast/ballast
-```
-
-Notes:
-
-- Always use the fully qualified name `everydaydevopsio/ballast/ballast` for both the Linux formula and the macOS cask. Plain `ballast` can resolve to an unrelated third-party package.
-- Recent Homebrew versions require `brew trust` for third-party taps before formulas or casks can be installed. Run `brew trust everydaydevopsio/ballast` after tapping.
-- Verify the installed version with `ballast --version`.
-
-### TypeScript (npm)
-
-```bash
-pnpm add -D @everydaydevopsio/ballast
-pnpm exec ballast-typescript install --target cursor --all
-pnpm exec ballast-typescript install --target claude --skill owasp-security-scan
-pnpm exec ballast-typescript install --language ansible --target codex --agent linting
-pnpm exec ballast-typescript install --language terraform --target codex --agent linting
-```
-
-### Python
-
-```bash
-VERSION="<latest-release>"
-uv tool install --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python
-ballast-python install --target cursor --all
-# or
-uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target codex --agent linting
-# or
-uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target claude --skill owasp-security-scan
-```
-
-### Go
-
-```bash
-VERSION="<latest-release>"
-OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
-ARCH="$(uname -m)"
-case "$ARCH" in
-  x86_64) ARCH=amd64 ;;
-  arm64|aarch64) ARCH=arm64 ;;
-esac
-curl -fsSL -o /tmp/ballast-go.tar.gz "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast-go_${VERSION}_${OS}_${ARCH}.tar.gz"
-tar -xzf /tmp/ballast-go.tar.gz -C /tmp
-mkdir -p "${HOME}/.local/bin"
-install -m 0755 /tmp/ballast-go "${HOME}/.local/bin/ballast-go"
-ballast-go install --target cursor --all
-ballast-go install --target opencode --skill owasp-security-scan
-ballast-go install --language ansible --target codex --agent testing
-ballast-go install --language terraform --target codex --agent linting
-```
-
-## Monorepo: Install and Use by Language
-
-In a repo that contains TypeScript, Python, Go, Ansible, Terraform, Dart, or Docker projects, run Ballast once per language profile. The `ballast` wrapper can auto-detect single-language repos for all seven profiles and mixed repos that include them.
-
-### 1. TypeScript rules in a monorepo
-
-```bash
-pnpm exec ballast-typescript install --target cursor --all
-```
-
-### 2. Python rules in a monorepo
-
-```bash
-VERSION="<latest-release>"
-uvx --from "https://github.com/everydaydevopsio/ballast/releases/download/v${VERSION}/ballast_python-${VERSION}-py3-none-any.whl" ballast-python install --target cursor --all
-```
-
-### 3. Go rules in a monorepo
-
-```bash
-ballast-go install --target cursor --all
-```
-
-Recommended order for one repository that uses multiple language profiles:
-
-1. Run the TypeScript command.
-2. Run the Python command.
-3. Run the Go command.
-4. If the repo also contains Ansible, run `ballast-go install --language ansible --target cursor --all`.
-5. If the repo also contains Terraform, run `ballast-go install --language terraform --target cursor --all`.
-6. If the repo also contains Dart or Docker profiles, run `ballast-go install --language dart --target cursor --all` or `ballast-go install --language docker --target cursor --all`.
-
-Ballast only installs shipped agents and skills and follows the single overwrite policy: existing rule and skill files are preserved unless you explicitly choose `--patch` or `--force`. Existing support files (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) are patched by default when `--force` is not set, updating only installed-rule and installed-skill sections that include the Ballast-managed notice. Older or customized support-file sections without that notice are preserved unless you use `--patch` or confirm the interactive patch prompt.
-
-Use `--patch` when you want to merge upstream Ballast updates into an existing rule or skill file while preserving user-edited sections.
-
-Use `--force` when you want to reset a managed rule or skill file to canonical Ballast content. When `AGENTS.md`, `CLAUDE.md`, or `GEMINI.md` already exists, `--force` prompts before overwriting it; in non-interactive mode (`--yes` or CI), Ballast aborts instead of replacing the support file silently.
-
-## CLI Flags
-
-- `--target, -t`: `cursor`, `claude`, `opencode`, `codex`, `gemini`; adds to saved targets in `.rulesrc.json`
-- `--remove-target`: remove one or more saved targets and clean up Ballast-managed files for them
-- `--remove-language`: remove one or more languages from `.rulesrc.json`, remove their `paths`, and clean up unused Ballast-managed rules
-- `--agent, -a`: comma-separated agent list
-- `--skill, -s`: comma-separated skill list
-- `--all`: install all agents for the selected language
-- `--all-skills`: install all available skills for the selected language
-- `--task-system`: task system for the tasks agent: `github`, `jira`, or `linear`
-- `--deployment-model`: app/service deployment model for publishing: `none`, `kubernetes`, `serverless`, `server`, `docker`, or `hosted`; use `none` for CLI, library, or SDK-only projects
-- `--force, -f`: overwrite existing rule and skill files; prompts before replacing existing support files such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`
-- `--patch, -p`: merge upstream rule and skill updates into existing files while preserving user-edited sections (`--force` wins if both are set)
-- `--yes, -y`: non-interactive mode
-
-When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value, interactive installs prompt for `taskSystem` and app `deploymentModel`; `--yes` and CI mode use defaults. For CLI, library, or SDK-only projects, choose `none` for `deploymentModel`.
-
-## Wrapper Commands
-
-- `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, `--remove-language` removes language surfaces plus saved `paths` with cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings
-- `ballast doctor`: inspect local Ballast CLI versions and `.rulesrc.json` metadata; add `--fix` to install/upgrade backend CLIs and refresh config automatically, and add `--patch` to merge backend file updates during that refresh
-- `ballast upgrade [--patch] [--force]`: rewrite `.rulesrc.json` to the running Ballast wrapper version, then sync backend CLIs to match it; `--patch` and `--force` forward to the backend refresh
-- `ballast install-cli [--language <typescript|python|go|ansible|terraform|dart|docker>] [--version <x.y.z>]`: install or upgrade backend CLIs into the current repo’s `.ballast/` directory; omit `--version` for the latest release. The `ansible`, `terraform`, `dart`, and `docker` selections reuse the `ballast-go` backend.
-
-`.ballast/` is generated local tool state, is ignored by git, and is safe to recreate. Run `ballast doctor` to inspect it; run `ballast doctor --fix` or `ballast install-cli` if `.ballast/`, `.ballast/bin`, or `.ballast/tools` is missing.
-
-## Config Files
-
-- Canonical shared config for the wrapper and language CLIs: `.rulesrc.json`
-- Legacy fallback configs still read for backward compatibility:
-  - TypeScript CLI: `.rulesrc.ts.json`
-  - Python CLI: `.rulesrc.python.json`
-  - Go CLI: `.rulesrc.go.json`
-- Saved settings include `target`, `agents`, `skills`, and repo-level options such as `taskSystem`, `deploymentModel`, and `publishingProfiles`
-- `publishingProfiles` narrows `agents: ["publishing"]` to selected publishing rule files. Supported canonical values are `cli`, `apps`, `web`, `api`, `libraries`, `sdks`, `apt`, and `brew`; singular aliases `app`, `library`, and `sdk` are accepted when loading config. If `publishingProfiles` is omitted or empty, Ballast keeps the backward-compatible behavior and installs all publishing rule files.
-
-## Install Locations
-
-- Cursor: `.cursor/rules/<agent>.mdc`
-- Claude: `.claude/rules/<agent>.md` and `.claude/skills/<skill>.skill`
-- OpenCode: `.opencode/<agent>.md` and `.opencode/skills/<skill>.md`
-- Codex: `.codex/rules/<agent>.md` and root `AGENTS.md`
-- Gemini: `.gemini/rules/<agent>.md` and root `GEMINI.md`
-- Cursor skills: `.cursor/rules/<skill>.mdc`
-- Codex skills: `.codex/skills/<skill>/SKILL.md`, with root `AGENTS.md` listing installed skills
-- Gemini skills: `.gemini/rules/<skill>.md`, with root `GEMINI.md` listing installed skills
+| Guide | Purpose |
+| --- | --- |
+| [Documentation index](docs/README.md) | Agent and skill guide map |
+| [Installation](docs/installation.md) | Homebrew, npm, Python, Go, and monorepo workflows |
+| [Agent guides](docs/agents/) | Guidance installed by each agent family |
+| [Skill guides](docs/skills/) | Inputs, outputs, and usage for shipped skills |
+| [Publishing](docs/publish.md) | Package and release publishing |
+| [Architecture](ARCHITECTURE.md) | Repository structure and implementation design |
+| [Security policy](SECURITY.md) | Reporting security issues |
 
 ## Development
 
+The monorepo contains TypeScript, Python, and Go implementations. Use:
+
+- Node.js 22 or newer; `.nvmrc` pins the development version.
+- The `pnpm` version declared in `package.json`.
+- Python 3.10 or newer with `uv`.
+- Go 1.24 or newer.
+
 ```bash
+git clone https://github.com/everydaydevopsio/ballast.git
+cd ballast
+
 nvm install
+nvm use
+corepack enable
 pnpm install
+
+make build-all
 pnpm test
-pnpm run lint
-pnpm run build
+pnpm lint
 ```
 
-### Test Local Wrapper
-
-To test the wrapper against the local checkout instead of installed package binaries:
-
-```bash
-cd ~/src/ballast
-make build
-~/src/ballast/cli/ballast/ballast install --target cursor --all
-```
-
-`make build` builds the local artifacts the wrapper looks for:
-
-- `packages/ballast-typescript/dist/cli.js`
-- `packages/ballast-go/ballast-go`
-- `cli/ballast/ballast`
-
-The wrapper then dispatches to the local TypeScript, Python, and Go backends from this repo when those artifacts are present. If a local backend artifact is missing, the wrapper falls back to an installed backend on `PATH`.
-
-## Smoke Testing Container
-
-Use `Dockerfile.smoke` to test wrapper + language CLIs.
-
-Default (all binaries preinstalled from local checkout):
-
-```bash
-docker build -f Dockerfile.smoke -t ballast-smoke .
-docker run --rm -it ballast-smoke
-```
-
-On-demand mode (start with `ballast` wrapper and lazy-download language CLIs from GitHub):
-
-```bash
-docker build -f Dockerfile.smoke --build-arg PREINSTALL_ALL_BINARIES=0 -t ballast-smoke-lazy .
-docker run --rm -it ballast-smoke-lazy
-```
+Run `ballast setup-dev` before agent-assisted repository work so local tooling and generated guidance match the project configuration.
 
 ## License
 
-MIT
+Ballast is available under the [MIT License](LICENSE).
