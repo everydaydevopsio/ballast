@@ -262,7 +262,7 @@ describe('build', () => {
       });
       expect(content).toContain('github');
       expect(content).toContain('**GitHub** as the system of record');
-      expect(content).toContain('"configure MCP for GitHub"');
+      expect(content).toContain('the MCP server for **GitHub**');
       expect(content).not.toContain('**github**');
       expect(content).toContain(
         'External issue tracking is active (`taskSystem: github`).'
@@ -1304,6 +1304,43 @@ alwaysApply: false
         'Kubernetes Helm Chart: Probes Configuration'
       );
       expect(result).not.toContain('BALLAST_IF_DEPLOYMENT');
+    });
+
+    test('renders task-system rule only for the configured system and target', () => {
+      const claude = buildContent(
+        'tasks',
+        'claude',
+        'task-system',
+        'typescript',
+        {
+          variables: { taskSystem: 'github' }
+        }
+      );
+      expect(claude).toContain('GitHub Issues');
+      expect(claude).toContain('GITHUB_PERSONAL_ACCESS_TOKEN');
+      expect(claude).not.toContain('JIRA_API_TOKEN');
+      expect(claude).not.toContain('LINEAR_API_KEY');
+      expect(claude).toContain('**Claude Code:**');
+      expect(claude).not.toContain('**Cursor:**');
+      expect(claude).not.toContain('**Codex:**');
+      expect(claude).not.toContain('**OpenCode:**');
+      expect(claude).not.toContain('BALLAST_IF');
+      expect(claude).not.toContain('Ask the user which AI platform');
+
+      const codex = buildContent(
+        'tasks',
+        'codex',
+        'task-system',
+        'typescript',
+        {
+          variables: { taskSystem: 'jira' }
+        }
+      );
+      expect(codex).toContain('JIRA_API_TOKEN');
+      expect(codex).not.toContain('GITHUB_PERSONAL_ACCESS_TOKEN');
+      expect(codex).toContain('**Codex:**');
+      expect(codex).not.toContain('**Claude Code:**');
+      expect(codex).not.toContain('BALLAST_IF');
     });
 
     test('tasks task-system with variables resolves {{taskSystem}} in templates', () => {

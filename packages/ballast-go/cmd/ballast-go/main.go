@@ -2196,6 +2196,7 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 	if len(options) > 0 {
 		buildOpts = options[0]
 	}
+	content = applyConditionalTokenBlocks(content, "TARGET", func(name string) bool { return name == target })
 	// Manifest-bearing targets (claude, codex, gemini) get the tool policy once
 	// in their manifest's "Installed agent rules" section instead of per rule.
 	withToolPolicy := func(rendered string) string {
@@ -2451,6 +2452,32 @@ func renderDeploymentModelGuidance(deploymentModel string) string {
 	}
 }
 
+var conditionalTokenRegexes = map[string]*regexp.Regexp{
+	"TASK_SYSTEM": regexp.MustCompile("\\{\\{BALLAST_IF_TASK_SYSTEM:([a-z, -]+)\\}\\}\\r?\\n?([\\s\\S]*?)\\{\\{BALLAST_END_IF_TASK_SYSTEM\\}\\}\\r?\\n?"),
+	"TARGET":      regexp.MustCompile("\\{\\{BALLAST_IF_TARGET:([a-z, -]+)\\}\\}\\r?\\n?([\\s\\S]*?)\\{\\{BALLAST_END_IF_TARGET\\}\\}\\r?\\n?"),
+}
+
+// applyConditionalTokenBlocks strips {{BALLAST_IF_<kind>:<names>}} blocks
+// whose comma-separated name list does not satisfy the matcher.
+func applyConditionalTokenBlocks(content, kind string, matches func(string) bool) string {
+	if !strings.Contains(content, "{{BALLAST_IF_"+kind+":") {
+		return content
+	}
+	re := conditionalTokenRegexes[kind]
+	return re.ReplaceAllStringFunc(content, func(match string) string {
+		parts := re.FindStringSubmatch(match)
+		if len(parts) != 3 {
+			return match
+		}
+		for _, name := range strings.Split(parts[1], ",") {
+			if name = strings.TrimSpace(name); name != "" && matches(name) {
+				return parts[2]
+			}
+		}
+		return ""
+	})
+}
+
 var deploymentConditionalRegex = regexp.MustCompile(`\{\{BALLAST_IF_DEPLOYMENT:([a-z, -]+)\}\}\r?\n?([\s\S]*?)\{\{BALLAST_END_IF_DEPLOYMENT\}\}\r?\n?`)
 
 // applyDeploymentConditionalBlocks strips {{BALLAST_IF_DEPLOYMENT:<models>}}
@@ -2686,6 +2713,11 @@ func readContent(agentID, language, suffix, hookMode, taskSystem, deploymentMode
 	}
 	content := applyDeploymentModelGuidance(raw, agentID, deploymentModel)
 	content = applyTaskSystemVariables(content, agentID, taskSystem)
+	configuredTaskSystem := strings.ToLower(strings.TrimSpace(taskSystem))
+	if configuredTaskSystem == "" {
+		configuredTaskSystem = "github"
+	}
+	content = applyConditionalTokenBlocks(content, "TASK_SYSTEM", func(name string) bool { return name == configuredTaskSystem })
 	if agentID == "git-hooks" && strings.Contains(content, gitHooksGuidanceToken) {
 		content = strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode))
 	}

@@ -347,6 +347,25 @@ class PatchInstallTests(unittest.TestCase):
 
         self.assertEqual(suffixes, ["badges", "env", "license"])
 
+    def test_task_system_rule_renders_only_configured_system_and_target(self) -> None:
+        claude = cli.build_content(
+            "tasks", "claude", "python", "task-system", task_system="github"
+        )
+        self.assertIn("GITHUB_PERSONAL_ACCESS_TOKEN", claude)
+        self.assertNotIn("JIRA_API_TOKEN", claude)
+        self.assertNotIn("LINEAR_API_KEY", claude)
+        self.assertIn("**Claude Code:**", claude)
+        self.assertNotIn("**Codex:**", claude)
+        self.assertNotIn("BALLAST_IF", claude)
+
+        codex = cli.build_content(
+            "tasks", "codex", "python", "task-system", task_system="linear"
+        )
+        self.assertIn("LINEAR_API_KEY", codex)
+        self.assertNotIn("GITHUB_PERSONAL_ACCESS_TOKEN", codex)
+        self.assertIn("**Codex:**", codex)
+        self.assertNotIn("**Claude Code:**", codex)
+
     def test_manifests_include_tools_policy_once(self) -> None:
         tools = {"python": ["uv", "pyenv"]}
         for builder in [

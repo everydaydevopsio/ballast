@@ -1141,6 +1141,31 @@ def render_deployment_model_guidance(deployment_model: str | None) -> str:
     return "\n".join(lines)
 
 
+CONDITIONAL_TOKEN_RES = {
+    "TASK_SYSTEM": re.compile(
+        r"\{\{BALLAST_IF_TASK_SYSTEM:([a-z, -]+)\}\}\r?\n?"
+        r"([\s\S]*?)\{\{BALLAST_END_IF_TASK_SYSTEM\}\}\r?\n?"
+    ),
+    "TARGET": re.compile(
+        r"\{\{BALLAST_IF_TARGET:([a-z, -]+)\}\}\r?\n?"
+        r"([\s\S]*?)\{\{BALLAST_END_IF_TARGET\}\}\r?\n?"
+    ),
+}
+
+
+def apply_conditional_token_blocks(content, kind, matches):
+    """Strip {{BALLAST_IF_<kind>:<names>}} blocks whose comma-separated name
+    list does not satisfy the matcher."""
+    if "{{BALLAST_IF_" + kind + ":" not in content:
+        return content
+
+    def replace(match):
+        names = [name.strip() for name in match.group(1).split(",") if name.strip()]
+        return match.group(2) if any(matches(name) for name in names) else ""
+
+    return CONDITIONAL_TOKEN_RES[kind].sub(replace, content)
+
+
 DEPLOYMENT_CONDITIONAL_RE = re.compile(
     r"\{\{BALLAST_IF_DEPLOYMENT:([a-z, -]+)\}\}\r?\n?"
     r"([\s\S]*?)\{\{BALLAST_END_IF_DEPLOYMENT\}\}\r?\n?"
@@ -1299,6 +1324,11 @@ def build_content(
         agent,
         task_system,
     )
+    configured_task_system = normalize_task_system(task_system) or DEFAULT_TASK_SYSTEM
+    body = apply_conditional_token_blocks(
+        body, "TASK_SYSTEM", lambda name: name == configured_task_system
+    )
+    body = apply_conditional_token_blocks(body, "TARGET", lambda name: name == target)
     if target == "cursor":
         rendered = (
             apply_hook_template_variables(
