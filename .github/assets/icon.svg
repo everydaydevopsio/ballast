@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Ballast icon</title>
+  <desc id="desc">Stacked rule blocks balanced over a ship's keel.</desc>
+  <defs>
+    <linearGradient id="bg" x1="32" y1="24" x2="224" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172554"/>
+      <stop offset="1" stop-color="#07111F"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="64" y1="56" x2="184" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#818CF8"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="52" fill="url(#bg)"/>
+  <rect x="54" y="54" width="148" height="28" rx="10" fill="url(#accent)"/>
+  <rect x="70" y="94" width="116" height="28" rx="10" fill="#C4B5FD"/>
+  <rect x="86" y="134" width="84" height="28" rx="10" fill="#E0F2FE"/>
+  <path d="M88 178h80l-18 24H106l-18-24Z" fill="#67E8F9"/>
+  <path d="M103 212h50" stroke="#A5B4FC" stroke-width="10" stroke-linecap="round"/>
+</svg>
