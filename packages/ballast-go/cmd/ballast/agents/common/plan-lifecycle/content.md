@@ -46,7 +46,7 @@ Each ADR contains: a header (Status: Accepted/Deprecated/Superseded, Date, Branc
 
 | Situation | Action |
 | --- | --- |
-| Starting a feature | Create `plans/plan-<name>.md`, commit it |
+| Starting a feature | Create `plans/plan-<name>.md`, index it in `plans/README.md`, commit both |
 | New session on existing feature | Continue implementing the plan |
 | Approach changed | Update plan and Change Log, commit with code |
 | Discovered out-of-scope work | Add to `tasks/todo.md`, commit alongside current change |

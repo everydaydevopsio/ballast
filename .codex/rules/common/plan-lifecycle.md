@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/plan-lifecycle" version="5.18.3" checksum="3751ff187fec42ebfc6edc613be64ebd58cc9688be205f265451d1e6df2650e9" -->
+<!-- ballast:rule id="typescript/plan-lifecycle" version="5.18.3" checksum="a05a86afe1245943dbb6f92c38282fe7ce60ef2458c912cf6592b09678e096b6" -->
 # Plan Lifecycle
 
 These rules are intended for Codex (CLI and app).
@@ -54,7 +54,7 @@ Each ADR contains: a header (Status: Accepted/Deprecated/Superseded, Date, Branc
 
 | Situation | Action |
 | --- | --- |
-| Starting a feature | Create `plans/plan-<name>.md`, commit it |
+| Starting a feature | Create `plans/plan-<name>.md`, index it in `plans/README.md`, commit both |
 | New session on existing feature | Continue implementing the plan |
 | Approach changed | Update plan and Change Log, commit with code |
 | Discovered out-of-scope work | Add to `tasks/todo.md`, commit alongside current change |

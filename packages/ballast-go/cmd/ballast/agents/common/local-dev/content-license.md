@@ -8,7 +8,7 @@ When setting up or working on projects, ensure proper license configuration for 
 
 ## Your Responsibilities
 
-1. **`LICENSE` file**: create it when missing, using the license from project docs or MIT by default. Use the standard, unmodified license text with the current year and the copyright holder (e.g. from `package.json` author, or a placeholder).
+1. **`LICENSE` file**: create it when missing, using the license from project docs or MIT by default. Use the standard license text verbatim, filling in only its year and copyright-holder placeholders (e.g. from `package.json` author, or a placeholder).
 2. **`package.json`**: ensure the `license` field is set to the SPDX identifier; add it when missing.
 3. **`README.md`**: end with a License section referencing the file, e.g. `MIT License - see [LICENSE](LICENSE) file for details.`
 

@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/plan-lifecycle" version="5.18.3" checksum="9ac144549642edd192a49b3562135714390cdf94cf019c3f55897c05f8cb6f18" -->
+<!-- ballast:rule id="typescript/plan-lifecycle" version="5.18.3" checksum="81dbdf8bb1131403f4be7ad4df369435b06bf28869a95fdb29c33e642b3faafd" -->
 # Plan Lifecycle
 
 Create and maintain plans for non-trivial work, then graduate completed plans to ADRs.
@@ -52,7 +52,7 @@ Each ADR contains: a header (Status: Accepted/Deprecated/Superseded, Date, Branc
 
 | Situation | Action |
 | --- | --- |
-| Starting a feature | Create `plans/plan-<name>.md`, commit it |
+| Starting a feature | Create `plans/plan-<name>.md`, index it in `plans/README.md`, commit both |
 | New session on existing feature | Continue implementing the plan |
 | Approach changed | Update plan and Change Log, commit with code |
 | Discovered out-of-scope work | Add to `tasks/todo.md`, commit alongside current change |
