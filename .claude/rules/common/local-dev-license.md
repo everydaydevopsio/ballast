@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/local-dev/license" version="5.18.3" checksum="a0540581565d726119d5d5a49b03c105a654f3caad87cac607575e9bd1c72a14" -->
+<!-- ballast:rule id="typescript/local-dev/license" version="5.18.3" checksum="6c91bb512b01d52b2343d85718bf5562aa414de4ac3de1af9faf096fd24e00b4" -->
 # Local Development: License Setup
 
 Ensure proper license configuration (LICENSE file, package.json, README reference). Default: MIT. Overridable in AGENTS.md or CLAUDE.md.
@@ -10,91 +10,21 @@ When setting up or working on projects, ensure proper license configuration for 
 
 ## Default Behavior
 
-**If no license is specified**, use the **MIT License**. Projects can override this in `AGENTS.md` or `CLAUDE.md` (see Configuration below).
+**If no license is specified**, use the **MIT License**. Projects can override this in `AGENTS.md` or `CLAUDE.md` with a `## License` section naming an SPDX identifier (e.g. `Apache-2.0`, `ISC`, `BSD-3-Clause`); when both files define one, prefer `AGENTS.md`.
 
 ## Your Responsibilities
 
-1. **Create or update `LICENSE`**
-   - If the project has no `LICENSE` file, create one.
-   - Use the license specified in project docs (`AGENTS.md`, `CLAUDE.md`) if present; otherwise use MIT.
-   - For MIT, include the standard MIT License text with the current year and copyright holder (e.g. from `package.json` author or a placeholder).
-
-2. **Update `package.json`**
-   - Ensure the `license` field is set (e.g. `"license": "MIT"`).
-   - If `package.json` exists but has no `license` field, add it.
-   - Use [SPDX identifiers](https://spdx.org/licenses/) (e.g. `MIT`, `Apache-2.0`, `ISC`).
-
-3. **Reference LICENSE in README**
-   - Add a "License" section at the end of `README.md` that references the `LICENSE` file.
-   - Example: `MIT License - see [LICENSE](LICENSE) file for details.`
-
-## MIT License Template
-
-```
-MIT License
-
-Copyright (c) <YEAR> <COPYRIGHT HOLDER>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-Replace `<YEAR>` with the current year and `<COPYRIGHT HOLDER>` with the author/org (e.g. from `package.json` author).
-
-## Example README Addition
-
-```markdown
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-```
-
-## Example package.json Addition
-
-```json
-{
-  "license": "MIT"
-}
-```
-
-## Configuration: Override Default License
-
-Projects may specify a non-MIT license in `AGENTS.md` or `CLAUDE.md`:
-
-```markdown
-## License
-
-Default license for this project: Apache-2.0 (or ISC, BSD-3-Clause, etc.)
-```
-
-When such a section exists, use the specified license instead of MIT. If both files define a license, prefer `AGENTS.md` (it is agent-facing and typically more authoritative for automation).
+1. **`LICENSE` file**: create it when missing, using the license from project docs or MIT by default. Use the standard license text verbatim, filling in only its year and copyright-holder placeholders (e.g. from `package.json` author, or a placeholder).
+2. **`package.json`**: ensure the `license` field is set to the SPDX identifier; add it when missing.
+3. **`README.md`**: end with a License section referencing the file, e.g. `MIT License - see [LICENSE](LICENSE) file for details.`
 
 ## Implementation Order
 
-1. Check `AGENTS.md` and `CLAUDE.md` for a license override.
-2. If none, use MIT.
-3. Check if `LICENSE` exists; if not, create it with the chosen license text.
-4. Check `package.json` for the `license` field; add or update if missing.
-5. Check `README.md` for a License section at the end; add one if missing, referencing `[LICENSE](LICENSE)`.
+1. Check `AGENTS.md` and `CLAUDE.md` for a license override; otherwise use MIT.
+2. Create `LICENSE` if missing.
+3. Add or fix the `package.json` `license` field.
+4. Add the README License section if missing.
 
 ## When to Apply
 
-- When creating a new project.
-- When a project lacks a `LICENSE` file.
-- When `package.json` has no `license` field.
-- When `README.md` does not reference the LICENSE file at the end.
+- When creating a new project, or when `LICENSE`, the `package.json` `license` field, or the README license reference is missing.

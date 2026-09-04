@@ -337,18 +337,16 @@ describe('build', () => {
       const content = getContent('plan-lifecycle');
       expect(content).toContain('Plan -> ADR lifecycle');
       expect(content).toContain('Create a plan when');
-      expect(content).toContain('Skip a plan when');
+      expect(content).toContain('Skip a plan');
       expect(content).toContain('plans/plan-<feature-name>.md');
       expect(content).toContain('## Maintaining The Plan');
       expect(content).toContain(
         'Graduate `plans/plan-<feature-name>.md` to an ADR'
       );
-      expect(content).toContain('## ADR Template');
+      expect(content).toContain('## ADR Contents');
       expect(content).toContain('## ADR Management Rules');
       expect(content).toContain('## Quick Reference');
-      expect(content).toContain(
-        'Defer `tasks/todo.md` behavior to the branch-local TODO tracking rule'
-      );
+      expect(content).toContain('branch-local TODO tracking rule');
       expect(content).toContain('task system work item');
       expect(content).not.toContain('Jira');
     });
