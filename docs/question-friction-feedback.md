@@ -2,7 +2,35 @@
 
 Ballast should treat unnecessary agent questions as a measurable policy defect.
 
-`orchael/bridgectl` exports an aggregate JSON document with `schema_version: 1`. Each entry describes one recurring question fingerprint and how the human answered it: accepted, rejected, changed, or unknown.
+`orchael/bridgectl` emits redacted schema-version 1 question events. Ballast can collect them centrally with `services/telemetry-aggregator`, then use aggregate results to improve source rules.
+
+## Architecture
+
+```text
+Claude / Codex / OpenCode / Gemini
+              |
+          bridgectl
+   detect + redact + classify
+              |
+              v
+ Ballast Telemetry Aggregator
+     local JSONL or S3
+              |
+              v
+   fingerprint summaries
+              |
+              v
+        Ballast review
+              |
+              v
+   source-rule improvement
+              |
+              +----> measure again
+```
+
+The aggregator runs locally in Docker or in Kubernetes via `charts/telemetry-aggregator`.
+
+Use local storage for a single collector. Use S3 for distributed collectors and multiple replicas; every event is stored as a separate immutable object so collectors do not need shared locks.
 
 ## Candidate rule
 
@@ -26,18 +54,20 @@ The following categories require human input even when historic acceptance is hi
 
 For each high-confidence candidate:
 
-1. Find the narrowest existing Ballast rule that owns the behavior.
-2. Prefer an instruction that lets the agent act without asking.
-3. If the question comes from a provider permission system, prefer a scoped allow-list over an unprotected/bypass mode.
-4. Add a regression example showing what the agent should do instead of asking.
-5. Regenerate checked-in agent outputs with `ballast upgrade --patch`.
-6. Roll the change out to a small set of repositories first.
-7. Compare bridgectl telemetry before and after the rollout.
+1. Query `GET /v1/summary` for the review window.
+2. Rank recurring fingerprints by frequency, unchanged acceptance rate, and human response time.
+3. Find the narrowest existing Ballast rule that owns the behavior.
+4. Prefer an instruction that lets the agent act without asking.
+5. If the question comes from a provider permission system, prefer a scoped allow-list over an unprotected/bypass mode.
+6. Add a regression example showing what the agent should do instead of asking.
+7. Regenerate checked-in agent outputs with `ballast upgrade --patch`.
+8. Roll the change out to a small set of repositories first.
+9. Compare aggregator telemetry before and after the rollout.
 
-The success metric is fewer questions per agent-hour while keeping rejected and changed answers flat or lower. A rule that suppresses useful questions is a regression even if total prompt count falls.
+Track questions per agent-hour, questions per completed session, unchanged acceptance rate, changed/rejected rate, and human response latency. A rule that suppresses useful questions is a regression even if total prompt count falls.
 
 ## Example
 
-If bridgectl reports "Should I run the unit tests?" 27 times with 27 acceptances, Ballast should add or strengthen a rule that verification commands run automatically after implementation.
+If telemetry reports "Should I run the unit tests?" 27 times with 27 acceptances, Ballast should add or strengthen a rule that verification commands run automatically after implementation.
 
 If it reports "Should I deploy to production?" 27 times with 27 acceptances, Ballast should **not** infer blanket deployment approval. Production remains an explicit decision boundary unless the repository has a separately reviewed deployment policy granting that authority.
