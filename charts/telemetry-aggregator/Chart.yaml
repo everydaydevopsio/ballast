@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ballast-telemetry-aggregator
+description: Ballast question-friction telemetry aggregator
+version: 0.1.0
+appVersion: "0.1.0"
+type: application
