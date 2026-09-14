@@ -211,6 +211,7 @@ type ballastLocalState struct {
 
 type doctorConfigDrift struct {
 	MissingConfiguredPaths  []string
+	MisconfiguredProfiles   []string
 	StaleConfiguredProfiles []string
 	UntrackedProfiles       []string
 	UntrackedLanguages      []string
@@ -1185,6 +1186,9 @@ func printDoctorConfigDrift(root string, config *monorepoConfig) {
 	for _, item := range drift.MissingConfiguredPaths {
 		fmt.Printf("- missing configured path: %s\n", item)
 	}
+	for _, item := range drift.MisconfiguredProfiles {
+		fmt.Printf("- misconfigured profile: %s\n", item)
+	}
 	for _, item := range drift.StaleConfiguredProfiles {
 		fmt.Printf("- stale configured profile: %s\n", item)
 	}
@@ -1194,11 +1198,20 @@ func printDoctorConfigDrift(root string, config *monorepoConfig) {
 	for _, item := range drift.UntrackedLanguages {
 		fmt.Printf("- untracked detected language: %s\n", item)
 	}
-	fmt.Println("- remediation: Run `ballast doctor --fix` to refresh saved languages and paths from current repository detection.")
+	if len(drift.MissingConfiguredPaths) > 0 ||
+		len(drift.StaleConfiguredProfiles) > 0 ||
+		len(drift.UntrackedProfiles) > 0 ||
+		len(drift.UntrackedLanguages) > 0 {
+		fmt.Println("- remediation: Run `ballast doctor --fix` to refresh saved languages and paths from current repository detection.")
+	}
+	if len(drift.MisconfiguredProfiles) > 0 {
+		fmt.Println("- remediation: Run `ballast install --remove-language typescript --yes` if this is not a TypeScript project, or add tsconfig.json when it should be managed as TypeScript.")
+	}
 }
 
 func (drift doctorConfigDrift) hasDrift() bool {
 	return len(drift.MissingConfiguredPaths) > 0 ||
+		len(drift.MisconfiguredProfiles) > 0 ||
 		len(drift.StaleConfiguredProfiles) > 0 ||
 		len(drift.UntrackedProfiles) > 0 ||
 		len(drift.UntrackedLanguages) > 0
@@ -1223,6 +1236,10 @@ func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigD
 				drift.MissingConfiguredPaths = append(drift.MissingConfiguredPaths, string(lang)+"="+configuredPath)
 				continue
 			}
+			if issue := configuredProfileIssue(root, lang, configuredPath); issue != "" {
+				drift.MisconfiguredProfiles = append(drift.MisconfiguredProfiles, issue)
+				continue
+			}
 			if !stringSliceContains(detectedPaths[lang], configuredPath) {
 				drift.StaleConfiguredProfiles = append(drift.StaleConfiguredProfiles, string(lang)+"="+configuredPath)
 			}
@@ -1242,6 +1259,21 @@ func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigD
 		}
 	}
 	return drift
+}
+
+func configuredProfileIssue(root string, lang language, configuredPath string) string {
+	if lang != langTypeScript {
+		return ""
+	}
+	absolutePath := filepath.Join(root, configuredPath)
+	if fileExists(filepath.Join(absolutePath, "tsconfig.json")) {
+		return ""
+	}
+	metadata, ok := loadPackageJSONMetadata(absolutePath)
+	if !ok || !looksLikeJavaScriptComponent(metadata) {
+		return ""
+	}
+	return fmt.Sprintf("%s=%s looks like a JavaScript package without tsconfig.json", lang, configuredPath)
 }
 
 func refreshDoctorConfigProfiles(root string, selectedLanguage language) error {

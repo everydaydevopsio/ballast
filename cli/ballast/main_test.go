@@ -514,6 +514,110 @@ func TestRunDoctorReportsStaleConfiguredProfile(t *testing.T) {
 	}
 }
 
+func TestRunDoctorReportsMisconfiguredJavaScriptProfile(t *testing.T) {
+	originalCollect := collectDoctorBackendsFunc
+	t.Cleanup(func() {
+		collectDoctorBackendsFunc = originalCollect
+	})
+
+	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
+		return []doctorBackendStatus{{Name: "ballast-typescript", Version: "5.0.2", Location: "/tmp/ts", Found: true}}
+	}
+
+	root := resolvedTempDir(t)
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "tools"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(root, "castoff", "package.json"), `{
+  "name": "castoff",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1"
+  }
+}`)
+	mustWriteFile(t, filepath.Join(root, "castoff", "index.js"), "export function main() {}\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript"],
+  "paths":{"typescript":["castoff"]}
+}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"doctor"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	expected := "- misconfigured profile: typescript=castoff looks like a JavaScript package without tsconfig.json"
+	if !strings.Contains(output, expected) {
+		t.Fatalf("expected %q in doctor output, got %q", expected, output)
+	}
+	if strings.Contains(output, "- stale configured profile: typescript=castoff") {
+		t.Fatalf("expected JavaScript package to be reported as misconfigured instead of stale, got %q", output)
+	}
+	if strings.Contains(output, "Run `ballast doctor --fix`") {
+		t.Fatalf("expected doctor not to recommend doctor --fix for JavaScript package misconfiguration, got %q", output)
+	}
+	if !strings.Contains(output, "ballast install --remove-language typescript --yes") {
+		t.Fatalf("expected removal guidance for JavaScript package misconfiguration, got %q", output)
+	}
+}
+
+func TestConfiguredProfileIssueIgnoresValidOrUnrecognizedPackages(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		lang     language
+		manifest string
+		tsconfig bool
+	}{
+		{"typescript config", langTypeScript, `{"scripts":{"test":"jest"}}`, true},
+		{"other language", langGo, `{"scripts":{"test":"jest"}}`, false},
+		{"metadata only", langTypeScript, `{"name":"workspace"}`, false},
+		{"malformed manifest", langTypeScript, `{`, false},
+		{"missing manifest", langTypeScript, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := resolvedTempDir(t)
+			if tc.manifest != "" {
+				mustWriteFile(t, filepath.Join(root, "package.json"), tc.manifest)
+			}
+			if tc.tsconfig {
+				mustWriteFile(t, filepath.Join(root, "tsconfig.json"), `{}`)
+			}
+			if issue := configuredProfileIssue(root, tc.lang, "."); issue != "" {
+				t.Fatalf("unexpected misconfiguration: %s", issue)
+			}
+		})
+	}
+}
+
+func TestDoctorMixedDriftRetainsBothRemediations(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "js", "package.json"), `{"main":"index.js"}`)
+	config := &monorepoConfig{
+		Languages: []string{"typescript"},
+		Paths:     map[string][]string{"typescript": {"js", "missing"}},
+	}
+	output := captureStdout(t, func() { printDoctorConfigDrift(root, config) })
+	for _, expected := range []string{"misconfigured profile: typescript=js", "missing configured path: typescript=missing", "ballast doctor --fix", "ballast install --remove-language typescript --yes"} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("expected %q in %q", expected, output)
+		}
+	}
+}
+
 func TestPrintDoctorConfigDriftReportsScanError(t *testing.T) {
 	originalWalk := walkDirFunc
 	t.Cleanup(func() {
