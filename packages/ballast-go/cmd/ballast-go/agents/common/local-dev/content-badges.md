@@ -1,5 +1,3 @@
-# README Badges
-
 When setting up or improving project documentation, add standard badges near the top of `README.md` for quick visibility into CI status, releases, license, and (for npm packages) registry info.
 
 ## Your Responsibilities

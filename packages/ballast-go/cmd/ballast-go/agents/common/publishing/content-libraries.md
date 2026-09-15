@@ -1,7 +1,5 @@
 # Publishing Libraries Agent
 
-You are a publishing specialist for versioned libraries.
-
 ## Goals
 
 - Ship reproducible releases from tagged source, not from an arbitrary branch state.

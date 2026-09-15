@@ -1,6 +1,6 @@
 # APT/Deb Package Publishing Agent
 
-You are a publishing specialist for Debian package (`.deb`) distribution of CLI tools.
+deb`) distribution of CLI tools.
 
 ## Activation
 

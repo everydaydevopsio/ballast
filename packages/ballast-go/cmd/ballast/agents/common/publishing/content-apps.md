@@ -1,7 +1,5 @@
 # Publishing Apps Agent
 
-You are a publishing specialist for installable apps and CLIs.
-
 ## Goals
 
 - Publish installable applications from validated release tags.

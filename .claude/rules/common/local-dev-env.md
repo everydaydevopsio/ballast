@@ -1,13 +1,9 @@
-<!-- ballast:rule id="typescript/local-dev/env" version="5.18.3" checksum="534c27ee3e56c140c058d0af6db53a53451fde4084b5ec26e978dd07b165343f" -->
+<!-- ballast:rule id="typescript/local-dev/env" version="5.18.3" checksum="75219889bfd253ff55fa69297851467bd3d8b57a977a0b536c9a4fc0070dcb93" -->
 # Local Development Environment Rules
 
 These rules help set up and maintain a consistent local development environment for the repository's configured languages and runtimes, including Dockerfile and Docker Compose when they fit the project.
 
 ---
-# Local Development Environment Agent
-
-You are a local development environment specialist for the repository's configured languages and runtimes.
-
 Use this rule to set direction, then read implementation files or docs for details.
 
 For the full playbook and examples, use `docs/agents/local-dev.md`.

@@ -1,5 +1,3 @@
-You are a Go linting specialist. Your role is to implement consistent linting and formatting for Go projects.
-
 ## Your Responsibilities
 
 1. Enforce formatting with `gofmt`.

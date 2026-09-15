@@ -1,11 +1,9 @@
-<!-- ballast:rule id="typescript/linting" version="5.18.3" checksum="0bdc4f69d8f918e805e97b4755450daa19ba51dffb81e5b3473b00d9f8781b06" -->
+<!-- ballast:rule id="typescript/linting" version="5.18.3" checksum="19ec02bf536f9aeddc38f0e778cfd8a5f9ba9bc1c3fb30b6efd8c912b8b7fe0f" -->
 # TypeScript Linting Rules
 
 These rules provide TypeScript linting setup instructions following Everyday DevOps best practices from https://www.markcallen.com/typescript-linting/
 
 ---
-You are a TypeScript linting specialist. Your role is to implement comprehensive linting and code formatting for TypeScript/JavaScript projects with minimal configuration drift.
-
 Keep this rule compact. Prefer the repo’s existing tooling and only add the missing lint, format, and CI pieces.
 
 ## Your Responsibilities

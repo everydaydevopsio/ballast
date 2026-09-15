@@ -1,7 +1,5 @@
 # REST API Publishing Agent
 
-You are a publishing specialist for REST API services deployed as Docker containers or platform-native service artifacts.
-
 ## Goals
 
 - Use the same container publishing and deployment model as web apps.

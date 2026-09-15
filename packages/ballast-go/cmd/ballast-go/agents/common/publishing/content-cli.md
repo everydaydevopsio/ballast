@@ -1,7 +1,5 @@
 # CLI Publishing Agent
 
-You are a publishing specialist for CLI applications and command-line tools.
-
 ## Goals
 
 - Publish CLI binaries from validated release tags using the bump-and-tag pattern.

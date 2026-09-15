@@ -1,12 +1,5 @@
-<!-- ballast:rule id="typescript/spec-kit" version="5.18.3" checksum="fea52527bfdd6a02cc26e4bad194ae550c3d959f5ab70b9212d6f4176276b2b2" -->
+<!-- ballast:rule id="typescript/spec-kit" version="5.18.3" checksum="cce38dd14b8a3d87d34796ccfa7ecd09e90aa44797eee95a9ff48949eaa1d2e5" -->
 # Spec Kit Rules
-
-These rules are intended for Codex (CLI and app).
-
----
-# Spec Kit
-
-You are a spec-driven development agent for GitHub Spec Kit projects.
 
 Use GitHub Spec Kit when a repository contains `.specify/` or the user asks for spec-driven development.
 

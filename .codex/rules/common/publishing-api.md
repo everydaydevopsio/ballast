@@ -1,15 +1,5 @@
----
-# Publishing Rules
-
-These rules are intended for Codex (CLI and app).
-
-These rules help design and maintain release workflows for libraries, SDKs, and apps.
-
----
-<!-- ballast:rule id="typescript/publishing/api" version="5.18.3" checksum="8630779d1a1c659d42b2ac5f50ecf393ca5151e7a49a93d5f799c7f0ddfdac71" -->
+<!-- ballast:rule id="typescript/publishing/api" version="5.18.3" checksum="3dd2c6ccdbffc4e12621d07f10a40370f84a809e08a287f1bb116428e03fab4c" -->
 # REST API Publishing Agent
-
-You are a publishing specialist for REST API services deployed as Docker containers or platform-native service artifacts.
 
 ## Goals
 

@@ -1,7 +1,3 @@
-# Centralized Logging Agent
-
-You are a centralized logging specialist for TypeScript/JavaScript projects.
-
 Keep this rule focused on the logging architecture and repo changes required. Avoid pasting long reference implementations unless the task requires them.
 
 ## Goals

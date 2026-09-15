@@ -1,11 +1,9 @@
-<!-- ballast:rule id="typescript/local-dev/license" version="5.18.3" checksum="6c91bb512b01d52b2343d85718bf5562aa414de4ac3de1af9faf096fd24e00b4" -->
+<!-- ballast:rule id="typescript/local-dev/license" version="5.18.3" checksum="b8081a1a9ec795532d7d23e169cc0c3d49946ec2eb1e3f663f78f08089846400" -->
 # Local Development: License Setup
 
 Ensure proper license configuration (LICENSE file, package.json, README reference). Default: MIT. Overridable in AGENTS.md or CLAUDE.md.
 
 ---
-# License Setup for Projects
-
 When setting up or working on projects, ensure proper license configuration for legal clarity and reuse.
 
 ## Default Behavior

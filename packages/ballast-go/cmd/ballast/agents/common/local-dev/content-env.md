@@ -1,7 +1,3 @@
-# Local Development Environment Agent
-
-You are a local development environment specialist for the repository's configured languages and runtimes.
-
 Use this rule to set direction, then read implementation files or docs for details.
 
 For the full playbook and examples, use `docs/agents/local-dev.md`.

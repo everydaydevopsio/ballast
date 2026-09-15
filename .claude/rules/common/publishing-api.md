@@ -1,13 +1,5 @@
----
-# Publishing Rules
-
-These rules help design and maintain release workflows for libraries, SDKs, and apps.
-
----
-<!-- ballast:rule id="typescript/publishing/api" version="5.18.3" checksum="aacf281e897950c871f4dcab5e24f6a5eb9cf9049cb0d7d818f5f498cb32e2e1" -->
+<!-- ballast:rule id="typescript/publishing/api" version="5.18.3" checksum="3dd2c6ccdbffc4e12621d07f10a40370f84a809e08a287f1bb116428e03fab4c" -->
 # REST API Publishing Agent
-
-You are a publishing specialist for REST API services deployed as Docker containers or platform-native service artifacts.
 
 ## Goals
 
