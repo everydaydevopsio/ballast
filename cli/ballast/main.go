@@ -2672,6 +2672,7 @@ func detectGeneratedPaths(root string) string {
 }
 
 type packageJSONMetadata struct {
+	Type                 string         `json:"type"`
 	Scripts              map[string]any `json:"scripts"`
 	PackageManager       string         `json:"packageManager"`
 	Dependencies         map[string]any `json:"dependencies"`
@@ -2729,6 +2730,9 @@ func javascriptComponentWarning(root string) string {
 }
 
 func looksLikeJavaScriptComponent(metadata packageJSONMetadata) bool {
+	if metadata.Type == "module" || metadata.Type == "commonjs" {
+		return true
+	}
 	if len(metadata.Scripts) > 0 {
 		return true
 	}
@@ -2813,7 +2817,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	profiles = filterProfilesByLanguage(profiles, removeLanguages)
 
 	if len(profiles) < 2 {
-		allowLanguageRemovalPlan := len(removeLanguages) > 0 && config != nil && len(config.Languages) > 1
+		allowLanguageRemovalPlan := len(removeLanguages) > 0 && config != nil && len(config.Languages) > 0
 		if !allowLanguageRemovalPlan {
 			return nil, nil
 		}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -600,6 +601,54 @@ func TestConfiguredProfileIssueIgnoresValidOrUnrecognizedPackages(t *testing.T) 
 				t.Fatalf("unexpected misconfiguration: %s", issue)
 			}
 		})
+	}
+}
+
+func TestConfiguredProfileIssueRecognizesMinimalJavaScriptPackages(t *testing.T) {
+	for _, packageType := range []string{"module", "commonjs"} {
+		t.Run(packageType, func(t *testing.T) {
+			root := resolvedTempDir(t)
+			mustWriteFile(t, filepath.Join(root, "package.json"), fmt.Sprintf(`{"name":"app","type":%q}`, packageType))
+			mustWriteFile(t, filepath.Join(root, "index.js"), "// JavaScript entry point\n")
+			if issue := configuredProfileIssue(root, langTypeScript, "."); issue == "" {
+				t.Fatal("expected minimal JavaScript package to be misconfigured")
+			}
+		})
+	}
+}
+
+func TestRunRemoveLastLanguageCleansConfigAndManagedRules(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"targets":["codex"],"agents":["linting"],"languages":["typescript"],"paths":{"typescript":["."]},"tools":{"typescript":["pnpm"]}}`)
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{"main":"index.js"}`)
+	managed := filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")
+	custom := filepath.Join(root, ".codex", "rules", "typescript", "custom.md")
+	mustWriteFile(t, managed, "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n")
+	mustWriteFile(t, custom, "# My custom rule\n")
+	originalEnsure, originalExec := ensureInstalledFunc, execToolFunc
+	t.Cleanup(func() { ensureInstalledFunc, execToolFunc = originalEnsure, originalExec })
+	ensureInstalledFunc = func(tool toolConfig) error { t.Error("cleanup must not install a backend"); return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		t.Error("cleanup must not invoke a backend")
+		return 0, nil
+	}
+	withWorkingDir(t, root, func() {
+		if code := run([]string{"install", "--remove-language", "typescript", "--yes"}); code != 0 {
+			t.Fatalf("expected successful cleanup, got %d", code)
+		}
+	})
+	config, err := loadDoctorConfig(root)
+	if err != nil || config == nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	if len(config.Languages) != 0 || len(config.Paths) != 0 || len(config.Tools) != 0 {
+		t.Fatalf("expected no saved language profiles or tools, got %#v", config)
+	}
+	if _, err := os.Stat(managed); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected managed rule removed, got %v", err)
+	}
+	if content, err := os.ReadFile(custom); err != nil || string(content) != "# My custom rule\n" {
+		t.Fatalf("expected custom rule preserved, got %q, %v", content, err)
 	}
 }
 
