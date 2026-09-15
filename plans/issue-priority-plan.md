@@ -25,12 +25,12 @@ Implement the context-hygiene phases in order (#286/#287/#288 first), then retur
 
 ## Active Workstream: Context Hygiene (#286–#297)
 
-### Status (2026-09-15)
+### Status (2026-09-15, final)
 
-- **Phases 1 and 2 complete, Phase 3 nearly complete.** Merged: #286 (tool policy once, PR #305), #287 (skip inactive rules, PR #309), #288 (repository facts fill, PR #310), #291 (fragment includes, PR #311), #290 (testing-process common rule + pristine-checksum patch replacement, PR #312), #293 (config/target-aware task-system rule, PR #314), #292 (reference-bloat trims, PR #315), #294 (framing cleanup, PR #331), #289 (publishing consolidation onto a shared release-pattern rule, PR #332). Also: broken-lockfile hotfix PR #313.
-- **Payload trajectory** (`.claude/rules/`, always loaded): 133.3 KB baseline → 119.2 (#286) → 108.4 (#287) → 104.25 (#290) → 103.2 (#293) → 92.3 (#292) → 86.8 (#294) → **72.0 KB (#289) — 46% reduction**, with all emitted rules carrying valid checksums (the drift blocking #10 is cleared).
-- **Spec Kit review (merged via #302)**: follows the context-hygiene rules; treated as the reference shape for future agents (small trigger rule, skills for procedure, scoped cursor globs — prior art for #297).
-- **Open design question on #295 (ruleProfile)**: the issue specifies `minimal` converts non-core rules to on-demand skills, but rules are config-rendered per repo while skills are a fixed registry across four surfaces — conversion machinery is the bulk of the work. Options: (a) full spec as written; (b) v1 `minimal` = compiled core rule only, detailed rules not emitted (skills conversion as follow-up); (c) drop `standard`-as-skills and keep two profiles. Decision needed before implementation.
+- **All twelve context-hygiene issues (#286–#297) are complete.** Phase 1: #286 (PR #305), #287 (PR #309), #288 (PR #310). Phase 2: #291 (PR #311), #290 (PR #312), #293 (PR #314), #292 (PR #315), #294 (PR #331). Phase 3: #289 (PR #332), #295 ruleProfile v1 (PR #334, scoped without rule-to-skill conversion per the decision on the issue). Phase 4: #296 size gate (PR #335), #297 scoped-loading findings (ARCHITECTURE.md "Rule Loading Behavior per Target"). Also: broken-lockfile hotfix (PR #313) and the plan checkpoint (PR #333).
+- **Final payload**: 133.3 KB baseline → **71.2 KB (−47%)** per target, all emitted rules ≤ 5 KB with valid checksums, enforced by the CI gate (rule ≤ 5 KB, target total ≤ 80 KB, `ruleBudget` override) and doctor recommendations. `ruleProfile: minimal` compiles a ~1.8 KB core rule for small-context agents.
+- Deferred follow-ups: rule-to-skill conversion for a `standard` profile tier (noted on #295); dynamic Cursor globs from `.rulesrc.json` `paths` (noted in ARCHITECTURE.md); strict byte-for-byte artifact enforcement (#10) is now unblocked since checksum drift is cleared.
+- **Next workstream**: setup/toolchain reliability (#128 + #94), per the priority table below.
 
 Goal: reduce the always-loaded rule payload from ~33k tokens to ~10k (standard) or ~1–2k (minimal profile) per session with zero loss of actual policy, and prevent regression.
 
