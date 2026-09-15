@@ -3095,6 +3095,9 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		if cfg.Discovery == nil {
 			cfg.Discovery = existing.Discovery
 		}
+		if strings.TrimSpace(cfg.RuleProfile) == "" {
+			cfg.RuleProfile = existing.RuleProfile
+		}
 		cfg.Targets = mergeStringLists(existing.Targets, cfg.Targets)
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)
 		cfg.Paths = mergeLanguagePaths(existing.Paths, cfg.Languages)

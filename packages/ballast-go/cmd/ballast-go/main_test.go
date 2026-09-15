@@ -1225,6 +1225,27 @@ func TestRecursiveFragmentIncludeFails(t *testing.T) {
 	}
 }
 
+func TestSaveConfigPreservesRuleProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	config := `{"targets":["claude"],"agents":["linting"],"languages":["go"],"ruleProfile":"minimal"}`
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(config), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	if err := saveConfig(tmpDir, "go", rulesConfig{
+		Targets:   []string{"claude"},
+		Agents:    []string{"linting"},
+		Languages: []string{"go"},
+	}); err != nil {
+		t.Fatalf("saveConfig: %v", err)
+	}
+
+	loaded := loadConfig(tmpDir, "go")
+	if loaded == nil || loaded.RuleProfile != "minimal" {
+		t.Fatalf("expected ruleProfile preserved through saveConfig, got %+v", loaded)
+	}
+}
+
 func TestMinimalRuleProfileEmitsOnlyCoreRule(t *testing.T) {
 	tmpDir := t.TempDir()
 	config := `{"targets":["claude"],"agents":["linting","testing","docs"],"languages":["go","python"],"ruleProfile":"minimal"}`

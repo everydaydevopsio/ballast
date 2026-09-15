@@ -347,6 +347,35 @@ describe('rule file status collection', () => {
     );
   });
 
+  test('minimal ruleProfile treats only the core rule as active', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-doctor-'));
+    try {
+      const claudeRules = path.join(tmpDir, '.claude', 'rules');
+      fs.mkdirSync(claudeRules, { recursive: true });
+      fs.writeFileSync(
+        path.join(claudeRules, 'core.md'),
+        buildContent('core', 'claude', undefined, 'typescript', {
+          languages: ['typescript', 'go']
+        }),
+        'utf8'
+      );
+
+      const statuses = collectRuleFileStatuses(tmpDir, {
+        targets: ['claude'],
+        agents: ['linting', 'testing', 'docs'],
+        languages: ['typescript', 'go'],
+        paths: {},
+        ruleProfile: 'minimal'
+      });
+
+      const core = statuses.find((s) => path.basename(s.path) === 'core.md');
+      expect(core?.status).toBe('ok');
+      expect(statuses.filter((s) => s.status !== 'ok')).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   test('removeStaleRuleFiles removes only stale managed files', () => {
     const codexRules = path.join(tmpDir, '.codex', 'rules');
     fs.mkdirSync(codexRules, { recursive: true });
