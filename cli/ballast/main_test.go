@@ -3861,6 +3861,43 @@ func TestResolveMonorepoPlanRemoveLanguageCleanupOnly(t *testing.T) {
 	}
 }
 
+func TestLanguageCleanupUsesOnlySavedProfiles(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		removed string
+		paths   string
+		want    []string
+	}{
+		{"new Go profile is not adopted", "typescript", `{"typescript":["."]}`, nil},
+		{"unrelated removal preserves empty path", "python", `{"typescript":[]}`, []string{"typescript"}},
+		{"unrelated removal preserves mismatched path", "python", `{"typescript":["missing"]}`, []string{"typescript"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := resolvedTempDir(t)
+			mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), fmt.Sprintf(`{"targets":["codex"],"agents":["linting"],"languages":["typescript"],"paths":%s,"tools":{"typescript":["pnpm"]}}`, tc.paths))
+			mustWriteFile(t, filepath.Join(root, "package.json"), `{"main":"index.js"}`)
+			mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24\n")
+			before, err := loadMonorepoConfig(root)
+			if err != nil || before == nil {
+				t.Fatalf("load fixture: %v", err)
+			}
+			plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-language", tc.removed, "--yes"})
+			if err != nil || plan == nil {
+				t.Fatalf("expected cleanup plan, got %v, %v", plan, err)
+			}
+			if len(plan.Invocations) != 0 || !slices.Equal(plan.Config.Languages, tc.want) {
+				t.Fatalf("unexpected cleanup plan: %#v", plan)
+			}
+			if tc.removed != "typescript" && (!reflect.DeepEqual(plan.Config.Paths, before.Paths) || !reflect.DeepEqual(plan.Config.Tools, before.Tools)) {
+				t.Fatalf("unrelated removal changed saved paths or tools: %#v", plan.Config)
+			}
+			if _, ok := plan.Config.Paths["go"]; ok {
+				t.Fatal("cleanup adopted an uninstalled Go profile")
+			}
+		})
+	}
+}
+
 func TestResolveMonorepoPlanRemoveLanguageWithTargetRunsInstallPath(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "apps", "frontend", "tsconfig.json"), "{}")

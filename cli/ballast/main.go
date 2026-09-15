@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -2944,6 +2945,22 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
+	}
+	if languageCleanupOnly && config != nil {
+		// Removal must not adopt newly detected profiles or discard saved paths
+		// that detection cannot currently recognize.
+		configToSave.Languages = nil
+		for _, savedLanguage := range config.Languages {
+			if !slices.Contains(removeLanguages, strings.ToLower(strings.TrimSpace(savedLanguage))) {
+				configToSave.Languages = append(configToSave.Languages, savedLanguage)
+			}
+		}
+		configToSave.Paths = maps.Clone(config.Paths)
+		for savedLanguage := range configToSave.Paths {
+			if slices.Contains(removeLanguages, strings.ToLower(strings.TrimSpace(savedLanguage))) {
+				delete(configToSave.Paths, savedLanguage)
+			}
+		}
 	}
 	configToSave.Tools = mergeLanguageTools(config, configToSave.Languages)
 	for _, removedLanguage := range removeLanguages {
