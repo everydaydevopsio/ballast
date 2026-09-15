@@ -1302,6 +1302,15 @@ alwaysApply: false
       expect(result).not.toContain('BALLAST_IF_DEPLOYMENT');
     });
 
+    test('ignores unknown or traversal language values in core commands', () => {
+      const content = buildContent('core', 'claude', undefined, 'typescript', {
+        languages: ['typescript', '../secrets', '/etc', 'not-a-language']
+      });
+      expect(content).toContain('## Commands — Typescript');
+      expect(content).not.toContain('secrets');
+      expect(content).not.toContain('/etc');
+    });
+
     test('renders core rule with invariants and configured language commands', () => {
       const content = buildContent('core', 'claude', undefined, 'typescript', {
         languages: ['typescript', 'go']

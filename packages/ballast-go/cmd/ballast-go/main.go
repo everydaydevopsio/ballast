@@ -2671,6 +2671,10 @@ func isValidIncludePath(includePath string) bool {
 	return true
 }
 
+func isKnownLanguage(value string) bool {
+	return contains(languages, value)
+}
+
 const coreCommandsToken = "{{BALLAST_CORE_COMMANDS}}"
 
 // renderCoreCommands renders per-language command summaries for the core rule
@@ -2679,6 +2683,11 @@ const coreCommandsToken = "{{BALLAST_CORE_COMMANDS}}"
 func renderCoreCommands(languages []string) string {
 	sections := make([]string, 0, len(languages))
 	for _, language := range languages {
+		// Language values come from .rulesrc.json; only known language ids may
+		// be joined into the agents path (never user-controlled segments).
+		if !isKnownLanguage(language) {
+			continue
+		}
 		fragment, err := readAgentFile(path.Join("agents", language, "fragments", "core-commands.md"))
 		if err != nil {
 			continue

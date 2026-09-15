@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { findProjectRoot, getRulesrcFilename, loadConfig } from './config';
 import type { PublishingProfile, Target } from './config';
+import { LANGUAGES } from './agents';
 import type { Language } from './agents';
 import {
   buildContent,
@@ -374,9 +375,7 @@ function configuredLanguages(config: RuleConfig): Language[] {
   const values =
     config.languages.length > 0 ? config.languages : ['typescript'];
   return values.filter((value): value is Language =>
-    ['typescript', 'python', 'go', 'ansible', 'terraform', 'dart'].includes(
-      value
-    )
+    (LANGUAGES as readonly string[]).includes(value)
   );
 }
 

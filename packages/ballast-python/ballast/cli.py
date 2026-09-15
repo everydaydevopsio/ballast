@@ -874,6 +874,10 @@ def render_core_commands(languages: list[str]) -> str:
     sections: list[str] = []
     root = resolve_agents_root()
     for language in languages:
+        # Language values come from .rulesrc.json; only known language ids may
+        # be joined into the agents path (never user-controlled segments).
+        if language not in LANGUAGES:
+            continue
         fragment = root / language / "fragments" / "core-commands.md"
         if not fragment.exists():
             continue

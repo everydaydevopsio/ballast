@@ -4,6 +4,7 @@ import path from 'path';
 import YAML from 'yaml';
 import {
   COMMON_AGENT_IDS,
+  LANGUAGES,
   COMMON_SKILL_IDS,
   getAgentDir,
   getAgentsContentRoot,
@@ -763,6 +764,11 @@ const CORE_COMMANDS_TOKEN = '{{BALLAST_CORE_COMMANDS}}';
 function renderCoreCommands(languages: string[]): string {
   const sections: string[] = [];
   for (const language of languages) {
+    // Language values come from .rulesrc.json; only known language ids may be
+    // joined into the agents path (never user-controlled path segments).
+    if (!(LANGUAGES as readonly string[]).includes(language)) {
+      continue;
+    }
     const relPath = path.join(language, 'fragments', 'core-commands.md');
     const roots = [SOURCE_AGENTS_ROOT, getAgentsContentRoot()];
     const file = roots
