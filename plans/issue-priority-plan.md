@@ -1,3 +1,10 @@
+### Status (2026-09-15)
+
+- **Phases 1 and 2 complete, Phase 3 nearly complete.** Merged: #286 (tool policy once, PR #305), #287 (skip inactive rules, PR #309), #288 (repository facts fill, PR #310), #291 (fragment includes, PR #311), #290 (testing-process common rule + pristine-checksum patch replacement, PR #312), #293 (config/target-aware task-system rule, PR #314), #292 (reference-bloat trims, PR #315), #294 (framing cleanup, PR #331), #289 (publishing consolidation onto a shared release-pattern rule, PR #332). Also: broken-lockfile hotfix PR #313.
+- **Payload trajectory** (`.claude/rules/`, always loaded): 133.3 KB baseline → 119.2 (#286) → 108.4 (#287) → 104.25 (#290) → 103.2 (#293) → 92.3 (#292) → 86.8 (#294) → **72.0 KB (#289) — 46% reduction**, with all emitted rules carrying valid checksums (the drift blocking #10 is cleared).
+- **Spec Kit review (merged via #302)**: follows the context-hygiene rules; treated as the reference shape for future agents (small trigger rule, skills for procedure, scoped cursor globs — prior art for #297).
+- **Open design question on #295 (ruleProfile)**: the issue specifies `minimal` converts non-core rules to on-demand skills, but rules are config-rendered per repo while skills are a fixed registry across four surfaces — conversion machinery is the bulk of the work. Options: (a) full spec as written; (b) v1 `minimal` = compiled core rule only, detailed rules not emitted (skills conversion as follow-up); (c) drop `standard`-as-skills and keep two profiles. Decision needed before implementation.
+
 # Plan: Open Issue Review and Next Priorities
 
 **Status:** Updated 2026-08-26 after the context-hygiene rules review.
