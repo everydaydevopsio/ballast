@@ -4244,7 +4244,7 @@ func ruleSuffixesForAgent(agent string) []string {
 		return []string{"badges", "env", "license"}
 	}
 	if agent == "publishing" {
-		return []string{"api", "apps", "cli", "libraries", "sdks", "web"}
+		return []string{"", "api", "apps", "cli", "libraries", "sdks", "web"}
 	}
 	if agent == "tasks" {
 		return []string{"task-system", "todo"}
@@ -4260,7 +4260,7 @@ func allRuleSuffixesForAgent(agent string) []string {
 		return []string{"badges", "env", "license", "mcp"}
 	}
 	if agent == "publishing" {
-		return []string{"api", "apps", "apt", "brew", "cli", "libraries", "sdks", "web"}
+		return []string{"", "api", "apps", "apt", "brew", "cli", "libraries", "sdks", "web"}
 	}
 	return ruleSuffixesForAgent(agent)
 }
@@ -4271,7 +4271,7 @@ func allRuleSuffixesForAgent(agent string) []string {
 func configuredRuleSuffixesForAgent(agent string, config *monorepoConfig) []string {
 	if agent == "publishing" && config != nil {
 		if profiles := normalizePublishingProfiles(config.PublishingProfiles); len(profiles) > 0 {
-			return profiles
+			return append([]string{""}, profiles...)
 		}
 	}
 	return ruleSuffixesForAgent(agent)

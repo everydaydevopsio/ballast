@@ -2585,7 +2585,12 @@ func filterPublishingSuffixes(agentID string, suffixes, profiles []string) []str
 		for _, suffix := range suffixes {
 			available[suffix] = struct{}{}
 		}
-		selected := make([]string, 0, len(profiles))
+		// The shared release-pattern rule (empty suffix) is always emitted
+		// alongside the selected variants.
+		selected := make([]string, 0, len(profiles)+1)
+		if _, ok := available[""]; ok {
+			selected = append(selected, "")
+		}
 		for _, profile := range profiles {
 			if _, ok := available[profile]; ok {
 				selected = append(selected, profile)

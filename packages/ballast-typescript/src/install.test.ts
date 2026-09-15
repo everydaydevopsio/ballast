@@ -1792,7 +1792,7 @@ Keep my custom responsibilities.
         saveConfig: false
       });
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules.length).toBe(6);
+      expect(result.installedRules.length).toBe(7);
       expect(
         fs.existsSync(
           path.join(tmpDir, '.cursor', 'rules', 'publishing-apt.mdc')
@@ -1875,9 +1875,10 @@ Keep my custom responsibilities.
       });
 
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules).toHaveLength(2);
+      expect(result.installedRules).toHaveLength(3);
       expect(result.installedRules).toEqual(
         expect.arrayContaining([
+          { agentId: 'publishing', ruleSuffix: '' },
           { agentId: 'publishing', ruleSuffix: 'apps' },
           { agentId: 'publishing', ruleSuffix: 'cli' }
         ])
@@ -1929,7 +1930,7 @@ Keep my custom responsibilities.
       });
 
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules).toHaveLength(6);
+      expect(result.installedRules).toHaveLength(7);
       for (const suffix of ['api', 'apps', 'cli', 'libraries', 'sdks', 'web']) {
         expect(
           fs.existsSync(

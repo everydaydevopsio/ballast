@@ -822,7 +822,12 @@ def list_rule_suffixes(
     if agent == "publishing":
         if publishing_profiles:
             available = set(suffixes)
-            return [profile for profile in publishing_profiles if profile in available]
+            # The shared release-pattern rule (empty suffix) is always emitted
+            # alongside the selected variants.
+            selected = [
+                profile for profile in publishing_profiles if profile in available
+            ]
+            return ([""] if "" in available else []) + selected
         # Opt-in variants are reference-only unless explicitly configured; do
         # not emit them into the always-loaded rule set by default.
         return [

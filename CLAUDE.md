@@ -46,6 +46,7 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/common/docs.md` — Rules for common/docs
 - `.claude/rules/common/cicd.md` — Rules for common/cicd
 - `.claude/rules/common/observability.md` — Rules for common/observability
+- `.claude/rules/common/publishing.md` — Rules for common/publishing
 - `.claude/rules/common/publishing-api.md` — Rules for common/publishing-api
 - `.claude/rules/common/publishing-apps.md` — Rules for common/publishing-apps
 - `.claude/rules/common/publishing-cli.md` — Rules for common/publishing-cli
