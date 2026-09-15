@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -212,6 +213,7 @@ type ballastLocalState struct {
 
 type doctorConfigDrift struct {
 	MissingConfiguredPaths  []string
+	MisconfiguredProfiles   []string
 	StaleConfiguredProfiles []string
 	UntrackedProfiles       []string
 	UntrackedLanguages      []string
@@ -1186,6 +1188,9 @@ func printDoctorConfigDrift(root string, config *monorepoConfig) {
 	for _, item := range drift.MissingConfiguredPaths {
 		fmt.Printf("- missing configured path: %s\n", item)
 	}
+	for _, item := range drift.MisconfiguredProfiles {
+		fmt.Printf("- misconfigured profile: %s\n", item)
+	}
 	for _, item := range drift.StaleConfiguredProfiles {
 		fmt.Printf("- stale configured profile: %s\n", item)
 	}
@@ -1195,11 +1200,20 @@ func printDoctorConfigDrift(root string, config *monorepoConfig) {
 	for _, item := range drift.UntrackedLanguages {
 		fmt.Printf("- untracked detected language: %s\n", item)
 	}
-	fmt.Println("- remediation: Run `ballast doctor --fix` to refresh saved languages and paths from current repository detection.")
+	if len(drift.MissingConfiguredPaths) > 0 ||
+		len(drift.StaleConfiguredProfiles) > 0 ||
+		len(drift.UntrackedProfiles) > 0 ||
+		len(drift.UntrackedLanguages) > 0 {
+		fmt.Println("- remediation: Run `ballast doctor --fix` to refresh saved languages and paths from current repository detection.")
+	}
+	if len(drift.MisconfiguredProfiles) > 0 {
+		fmt.Println("- remediation: Run `ballast install --remove-language typescript --yes` if this is not a TypeScript project, or add tsconfig.json when it should be managed as TypeScript.")
+	}
 }
 
 func (drift doctorConfigDrift) hasDrift() bool {
 	return len(drift.MissingConfiguredPaths) > 0 ||
+		len(drift.MisconfiguredProfiles) > 0 ||
 		len(drift.StaleConfiguredProfiles) > 0 ||
 		len(drift.UntrackedProfiles) > 0 ||
 		len(drift.UntrackedLanguages) > 0
@@ -1224,6 +1238,10 @@ func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigD
 				drift.MissingConfiguredPaths = append(drift.MissingConfiguredPaths, string(lang)+"="+configuredPath)
 				continue
 			}
+			if issue := configuredProfileIssue(root, lang, configuredPath); issue != "" {
+				drift.MisconfiguredProfiles = append(drift.MisconfiguredProfiles, issue)
+				continue
+			}
 			if !stringSliceContains(detectedPaths[lang], configuredPath) {
 				drift.StaleConfiguredProfiles = append(drift.StaleConfiguredProfiles, string(lang)+"="+configuredPath)
 			}
@@ -1243,6 +1261,21 @@ func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigD
 		}
 	}
 	return drift
+}
+
+func configuredProfileIssue(root string, lang language, configuredPath string) string {
+	if lang != langTypeScript {
+		return ""
+	}
+	absolutePath := filepath.Join(root, configuredPath)
+	if fileExists(filepath.Join(absolutePath, "tsconfig.json")) {
+		return ""
+	}
+	metadata, ok := loadPackageJSONMetadata(absolutePath)
+	if !ok || !looksLikeJavaScriptComponent(metadata) {
+		return ""
+	}
+	return fmt.Sprintf("%s=%s looks like a JavaScript package without tsconfig.json", lang, configuredPath)
 }
 
 func refreshDoctorConfigProfiles(root string, selectedLanguage language) error {
@@ -2641,6 +2674,7 @@ func detectGeneratedPaths(root string) string {
 }
 
 type packageJSONMetadata struct {
+	Type                 string         `json:"type"`
 	Scripts              map[string]any `json:"scripts"`
 	PackageManager       string         `json:"packageManager"`
 	Dependencies         map[string]any `json:"dependencies"`
@@ -2698,6 +2732,9 @@ func javascriptComponentWarning(root string) string {
 }
 
 func looksLikeJavaScriptComponent(metadata packageJSONMetadata) bool {
+	if metadata.Type == "module" || metadata.Type == "commonjs" {
+		return true
+	}
 	if len(metadata.Scripts) > 0 {
 		return true
 	}
@@ -2782,7 +2819,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	profiles = filterProfilesByLanguage(profiles, removeLanguages)
 
 	if len(profiles) < 2 {
-		allowLanguageRemovalPlan := len(removeLanguages) > 0 && config != nil && len(config.Languages) > 1
+		allowLanguageRemovalPlan := len(removeLanguages) > 0 && config != nil && len(config.Languages) > 0
 		if !allowLanguageRemovalPlan {
 			return nil, nil
 		}
@@ -2913,7 +2950,26 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
 	}
+	if languageCleanupOnly && config != nil {
+		// Removal must not adopt newly detected profiles or discard saved paths
+		// that detection cannot currently recognize.
+		configToSave.Languages = nil
+		for _, savedLanguage := range config.Languages {
+			if !slices.Contains(removeLanguages, strings.ToLower(strings.TrimSpace(savedLanguage))) {
+				configToSave.Languages = append(configToSave.Languages, savedLanguage)
+			}
+		}
+		configToSave.Paths = maps.Clone(config.Paths)
+		for savedLanguage := range configToSave.Paths {
+			if slices.Contains(removeLanguages, strings.ToLower(strings.TrimSpace(savedLanguage))) {
+				delete(configToSave.Paths, savedLanguage)
+			}
+		}
+	}
 	configToSave.Tools = mergeLanguageTools(config, configToSave.Languages)
+	for _, removedLanguage := range removeLanguages {
+		delete(configToSave.Tools, removedLanguage)
+	}
 	commonSelection := filterAgents(configToSave.Agents, commonAgentIDs())
 	languageSelection := filterAgents(configToSave.Agents, languageAgentIDs())
 	if normalizeWrapperRuleProfile(configToSave.RuleProfile) == "minimal" {
