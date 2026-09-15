@@ -1,0 +1,2 @@
+- Lint/format: `gofmt -w .` (or `gofumpt`), `golangci-lint run`.
+- Test: `go test ./...` with `-cover`; coverage gate enforced in CI.

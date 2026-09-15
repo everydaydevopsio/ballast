@@ -105,6 +105,7 @@ func TestListAgentsIncludesAllRegistryAgents(t *testing.T) {
 		"plan-lifecycle",
 		"spec-kit",
 		"testing-process",
+		"core",
 		"linting",
 		"logging",
 		"testing",
@@ -1221,6 +1222,48 @@ func TestRecursiveFragmentIncludeFails(t *testing.T) {
 	_, err := resolveContentIncludes("{{include:common/fragments/loop.md}}", nil)
 	if err == nil || !strings.Contains(err.Error(), "recursive include") {
 		t.Fatalf("expected recursion error, got %v", err)
+	}
+}
+
+func TestMinimalRuleProfileEmitsOnlyCoreRule(t *testing.T) {
+	tmpDir := t.TempDir()
+	config := `{"targets":["claude"],"agents":["linting","testing","docs"],"languages":["go","python"],"ruleProfile":"minimal"}`
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(config), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		agents:      []string{"linting", "testing", "docs"},
+		language:    "go",
+		force:       true,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	core := filepath.Join(tmpDir, ".claude", "rules", "core.md")
+	content, err := os.ReadFile(core)
+	if err != nil {
+		t.Fatalf("read core rule: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "# Ballast Core Rules") || !strings.Contains(text, "## Commands — Go") || !strings.Contains(text, "## Commands — Python") {
+		t.Fatalf("expected core rule with language commands, got %q", text)
+	}
+	if strings.Contains(text, "BALLAST_CORE_COMMANDS") {
+		t.Fatalf("expected token rendered, got %q", text)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".claude", "rules", "go-linting.md")); err == nil {
+		t.Fatalf("expected no language rules in minimal profile")
+	}
+	claudeMD, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read CLAUDE.md: %v", err)
+	}
+	if !strings.Contains(string(claudeMD), "core.md") || strings.Contains(string(claudeMD), "go-linting.md") {
+		t.Fatalf("expected manifest to list only the core rule, got %q", string(claudeMD))
 	}
 }
 

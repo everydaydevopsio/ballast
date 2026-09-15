@@ -31,6 +31,7 @@ interface BuildOptions {
   hookMode?: HookMode;
   tools?: Record<string, string[]>;
   variables?: Record<string, string>;
+  languages?: string[];
 }
 
 export interface RuleMarker {
@@ -752,6 +753,46 @@ function isValidIncludePath(includePath: string): boolean {
   );
 }
 
+const CORE_COMMANDS_TOKEN = '{{BALLAST_CORE_COMMANDS}}';
+
+/**
+ * Render per-language command summaries for the core rule from
+ * agents/<language>/fragments/core-commands.md, one section per configured
+ * language. Languages without a fragment are skipped.
+ */
+function renderCoreCommands(languages: string[]): string {
+  const sections: string[] = [];
+  for (const language of languages) {
+    const relPath = path.join(language, 'fragments', 'core-commands.md');
+    const roots = [SOURCE_AGENTS_ROOT, getAgentsContentRoot()];
+    const file = roots
+      .map((root) => path.join(root, relPath))
+      .find((candidate) => fs.existsSync(candidate));
+    if (!file) continue;
+    const title = language.charAt(0).toUpperCase() + language.slice(1);
+    sections.push(
+      `## Commands — ${title}\n\n${fs.readFileSync(file, 'utf8').trimEnd()}`
+    );
+  }
+  return sections.join('\n\n');
+}
+
+function applyCoreCommandsGuidance(
+  content: string,
+  agentId: string,
+  language: Language,
+  options?: BuildOptions
+): string {
+  if (agentId !== 'core' || !content.includes(CORE_COMMANDS_TOKEN)) {
+    return content;
+  }
+  const languages =
+    options?.languages && options.languages.length > 0
+      ? options.languages
+      : [language];
+  return content.replace(CORE_COMMANDS_TOKEN, renderCoreCommands(languages));
+}
+
 const INCLUDE_PATTERN = /\{\{include:([^}]+)\}\}/g;
 const MAX_INCLUDE_DEPTH = 10;
 
@@ -832,16 +873,21 @@ export function getContent(
       raw = raw.replaceAll(`{{${key}}}`, replacement);
     }
   }
-  return applyTaskSystemGuidance(
-    applyDeploymentModelGuidance(
-      applyDeploymentConditionalBlocks(
-        applyHookGuidance(raw, agentId, language, options),
-        options?.variables?.deploymentModel ?? 'none'
+  return applyCoreCommandsGuidance(
+    applyTaskSystemGuidance(
+      applyDeploymentModelGuidance(
+        applyDeploymentConditionalBlocks(
+          applyHookGuidance(raw, agentId, language, options),
+          options?.variables?.deploymentModel ?? 'none'
+        ),
+        agentId,
+        options
       ),
       agentId,
       options
     ),
     agentId,
+    language,
     options
   );
 }

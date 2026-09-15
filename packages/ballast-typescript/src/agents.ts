@@ -63,7 +63,8 @@ export const COMMON_AGENT_IDS = [
   'tasks',
   'plan-lifecycle',
   'spec-kit',
-  'testing-process'
+  'testing-process',
+  'core'
 ] as const;
 export const LANGUAGE_AGENT_IDS = ['linting', 'logging', 'testing'] as const;
 export const AGENT_IDS = [...COMMON_AGENT_IDS, ...LANGUAGE_AGENT_IDS] as const;

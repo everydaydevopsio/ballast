@@ -1,0 +1,2 @@
+- Lint: `hadolint Dockerfile`, `docker compose config`, `trivy config .`.
+- Test: build the real Dockerfile, smoke-test the built image, and scan with `trivy image` before publishing.

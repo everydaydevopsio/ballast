@@ -2597,6 +2597,43 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(agentsMd).not.toContain('`.codex/rules/publishing-apt.md`');
     });
 
+    test('minimal ruleProfile emits only the core rule', async () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['linting', 'testing', 'docs'],
+          languages: ['typescript'],
+          ruleProfile: 'minimal'
+        },
+        tmpDir
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: ['linting', 'testing', 'docs'],
+        force: true
+      });
+
+      expect(result.errors).toEqual([]);
+      expect(result.installedRules).toEqual([
+        { agentId: 'core', ruleSuffix: '' }
+      ]);
+      const corePath = path.join(tmpDir, '.claude', 'rules', 'core.md');
+      expect(fs.existsSync(corePath)).toBe(true);
+      const core = fs.readFileSync(corePath, 'utf8');
+      expect(core).toContain('# Ballast Core Rules');
+      expect(core).toContain('## Commands — Typescript');
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.claude', 'rules', 'typescript-linting.md')
+        )
+      ).toBe(false);
+      const claudeMd = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8');
+      expect(claudeMd).toContain('`.claude/rules/core.md`');
+      expect(claudeMd).not.toContain('typescript-linting.md');
+    });
+
     test('installs opt-in publishing variants when explicitly configured', async () => {
       saveConfig(
         {

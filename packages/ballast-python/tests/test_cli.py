@@ -348,6 +348,47 @@ class PatchInstallTests(unittest.TestCase):
 
         self.assertEqual(suffixes, ["badges", "env", "license"])
 
+    def test_minimal_rule_profile_emits_only_core_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["claude"],
+                        "agents": ["linting", "testing", "docs"],
+                        "languages": ["python", "go"],
+                        "ruleProfile": "minimal",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = cli.install(
+                root,
+                "claude",
+                ["linting", "testing", "docs"],
+                [],
+                "python",
+                True,
+                False,
+                False,
+            )
+
+            self.assertEqual(result.errors, [])
+            core = root / ".claude" / "rules" / "core.md"
+            self.assertTrue(core.exists())
+            content = core.read_text(encoding="utf-8")
+            self.assertIn("# Ballast Core Rules", content)
+            self.assertIn("## Commands — Python", content)
+            self.assertIn("## Commands — Go", content)
+            self.assertNotIn("BALLAST_CORE_COMMANDS", content)
+            self.assertFalse(
+                (root / ".claude" / "rules" / "python-linting.md").exists()
+            )
+            claude_md = (root / "CLAUDE.md").read_text(encoding="utf-8")
+            self.assertIn("core.md", claude_md)
+            self.assertNotIn("python-linting.md", claude_md)
+
     def test_task_system_rule_renders_only_configured_system_and_target(self) -> None:
         claude = cli.build_content(
             "tasks", "claude", "python", "task-system", task_system="github"

@@ -34,7 +34,7 @@ var (
 var isStdinInteractiveFunc = isStdinInteractive
 
 var (
-	commonAgents   = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle", "spec-kit", "testing-process"}
+	commonAgents   = []string{"local-dev", "docs", "cicd", "observability", "publishing", "git-hooks", "tasks", "plan-lifecycle", "spec-kit", "testing-process", "core"}
 	languageAgents = []string{"linting", "logging", "testing"}
 	commonSkills   = []string{
 		"owasp-security-scan",
@@ -131,6 +131,7 @@ type rulesConfig struct {
 	TaskSystem         string              `json:"taskSystem,omitempty"`
 	DeploymentModel    string              `json:"deploymentModel,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
+	RuleProfile        string              `json:"ruleProfile,omitempty"`
 }
 
 type discoveryConfig struct {
@@ -150,6 +151,7 @@ type rawRulesConfig struct {
 	TaskSystem         string              `json:"taskSystem,omitempty"`
 	DeploymentModel    string              `json:"deploymentModel,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
+	RuleProfile        string              `json:"ruleProfile,omitempty"`
 }
 
 type installResult struct {
@@ -204,7 +206,8 @@ type installOptions struct {
 }
 
 type buildOptions struct {
-	tools map[string][]string
+	tools     map[string][]string
+	languages []string
 }
 
 type markdownSection struct {
@@ -960,8 +963,23 @@ func install(opts installOptions) installResult {
 	supportAgents = uniqueStrings(supportAgents)
 	supportSkills = uniqueStrings(supportSkills)
 	rulePublishingProfiles := []string{}
+	ruleProfile := "full"
+	configuredLanguages := []string{opts.language}
 	if configForInstall != nil {
 		rulePublishingProfiles = normalizePublishingProfiles(configForInstall.PublishingProfiles)
+		if configForInstall.RuleProfile != "" {
+			ruleProfile = configForInstall.RuleProfile
+		}
+		if len(configForInstall.Languages) > 0 {
+			configuredLanguages = configForInstall.Languages
+		}
+	}
+	// Minimal profile: emit only the compiled core rule; the configured agent
+	// set stays in .rulesrc.json so switching back to full restores it.
+	profileAgents := opts.agents
+	if ruleProfile == "minimal" {
+		profileAgents = []string{"core"}
+		supportAgents = []string{"core"}
 	}
 
 	for _, target := range targets {
@@ -981,7 +999,7 @@ func install(opts installOptions) installResult {
 			}
 		}
 
-		for _, agentID := range opts.agents {
+		for _, agentID := range profileAgents {
 			if !isValidAgent(agentID, opts.language) {
 				result.errors = append(result.errors, agentError{agent: agentID, err: "Unknown agent"})
 				continue
@@ -1004,7 +1022,7 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
 				}
-				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, opts.taskSystem, opts.deploymentModel, buildOptions{tools: effectiveTools})
+				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, opts.taskSystem, opts.deploymentModel, buildOptions{tools: effectiveTools, languages: configuredLanguages})
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
@@ -2196,6 +2214,7 @@ func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deplo
 	if len(options) > 0 {
 		buildOpts = options[0]
 	}
+	content = applyCoreCommandsGuidance(content, agentID, language, buildOpts.languages)
 	content = applyConditionalTokenBlocks(content, "TARGET", func(name string) bool { return name == target })
 	// Manifest-bearing targets (claude, codex, gemini) get the tool policy once
 	// in their manifest's "Installed agent rules" section instead of per rule.
@@ -2652,6 +2671,35 @@ func isValidIncludePath(includePath string) bool {
 	return true
 }
 
+const coreCommandsToken = "{{BALLAST_CORE_COMMANDS}}"
+
+// renderCoreCommands renders per-language command summaries for the core rule
+// from agents/<language>/fragments/core-commands.md; languages without a
+// fragment are skipped.
+func renderCoreCommands(languages []string) string {
+	sections := make([]string, 0, len(languages))
+	for _, language := range languages {
+		fragment, err := readAgentFile(path.Join("agents", language, "fragments", "core-commands.md"))
+		if err != nil {
+			continue
+		}
+		title := strings.ToUpper(language[:1]) + language[1:]
+		sections = append(sections, "## Commands — "+title+"\n\n"+strings.TrimRight(string(fragment), " \t\r\n"))
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+func applyCoreCommandsGuidance(content, agentID, language string, languages []string) string {
+	if agentID != "core" || !strings.Contains(content, coreCommandsToken) {
+		return content
+	}
+	effective := languages
+	if len(effective) == 0 {
+		effective = []string{language}
+	}
+	return strings.ReplaceAll(content, coreCommandsToken, renderCoreCommands(effective))
+}
+
 var includeTokenRegex = regexp.MustCompile(`\{\{include:([^}]+)\}\}`)
 
 const maxIncludeDepth = 10
@@ -2995,7 +3043,16 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		TaskSystem:         normalizeRequiredInstallOptionValue(raw.TaskSystem),
 		DeploymentModel:    normalizeDeploymentModel(raw.DeploymentModel),
 		PublishingProfiles: normalizePublishingProfiles(raw.PublishingProfiles),
+		RuleProfile:        normalizeRuleProfile(raw.RuleProfile),
 	}
+}
+
+func normalizeRuleProfile(value string) string {
+	profile := strings.ToLower(strings.TrimSpace(value))
+	if profile == "full" || profile == "minimal" {
+		return profile
+	}
+	return ""
 }
 
 func normalizePublishingProfiles(values []string) []string {
