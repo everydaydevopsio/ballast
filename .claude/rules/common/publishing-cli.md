@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing/cli" version="5.18.3" checksum="7feee8246c12d38e74154efef41492848d4c2a16a8189247f324afef550cc21f" -->
+<!-- ballast:rule id="typescript/publishing/cli" version="5.18.3" checksum="3ffbcbd0bfe95a7677ffacf1473054ca49cb9cbe68eb3652eec2620bd06a387f" -->
 # CLI Publishing Agent
 
 ## Goals
@@ -10,9 +10,9 @@ Follow the shared publishing release pattern (`publishing` rule) for the bump-an
 
 ## Go CLIs: GoReleaser
 
-Use GoReleaser to produce binary archives and checksums attached to GitHub Releases. Configure `.goreleaser.yaml` at the repo root (or the CLI subdirectory) with: `project_name` and per-build `binary`/`main`, `ldflags` embedding the version (`-s -w -X main.version={{ .Version }}`), `CGO_ENABLED=0` for portable binaries, `goos` linux/darwin/windows and `goarch` amd64/arm64 (ignore windows/arm64), tar.gz archives with zip overrides for windows, and a distinct `checksum.name_template` when multiple GoReleaser configs coexist in one repo.
+Use GoReleaser to produce binary archives and checksums attached to GitHub Releases. Configure `.goreleaser.yaml` at the repo root (or the CLI subdirectory) with: top-level `version: 2` (required by GoReleaser v2), `project_name` and per-build `binary`/`main`, `ldflags` embedding the version (`-s -w -X main.version={{ .Version }}`), `CGO_ENABLED=0` for portable binaries, `goos` linux/darwin/windows and `goarch` amd64/arm64 (ignore windows/arm64), tar.gz archives with zip overrides for windows, and a distinct `checksum.name_template` when multiple GoReleaser configs coexist in one repo.
 
-In the publish job: `actions/setup-go`, verify the binary builds, run `go test ./...`, then run `goreleaser/goreleaser-action` pinned to an explicit stable release version (e.g. `'v2.14.0'`, not `'~> v2'`) with `args: release --clean` and `contents: write`.
+In the publish job: `actions/setup-go`, verify the binary builds, run `go test ./...`, then run `goreleaser/goreleaser-action@v7` with `distribution: goreleaser`, `version` pinned to an explicit stable release (e.g. `'v2.14.0'`, not `'~> v2'`), `args: release --clean`, and `GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}` in the step env — the job needs `contents: write` and the token must be passed explicitly.
 
 ## CLI-Specific Requirements
 
