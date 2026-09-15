@@ -2946,6 +2946,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
 	}
 	configToSave.Tools = mergeLanguageTools(config, configToSave.Languages)
+	for _, removedLanguage := range removeLanguages {
+		delete(configToSave.Tools, removedLanguage)
+	}
 	commonSelection := filterAgents(configToSave.Agents, commonAgentIDs())
 	languageSelection := filterAgents(configToSave.Agents, languageAgentIDs())
 	if cleanupOnly || languageCleanupOnly {
