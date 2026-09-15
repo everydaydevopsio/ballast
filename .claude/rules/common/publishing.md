@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing" version="5.18.3" checksum="37655ff2ecda18086c8aaa6b580b171b977f19471c7ce185210f6f49de5aafaf" -->
+<!-- ballast:rule id="typescript/publishing" version="5.18.3" checksum="b8378afa13fb33154cc04e6b274ba5672442bbeda1346eed9e8224707e460a4e" -->
 # Publishing Rules
 
 Shared release pattern for every publishing variant in this repository. The `publishing-<variant>` rules add artifact-specific requirements on top of this pattern.
@@ -9,7 +9,7 @@ Model release workflows on the Ballast `publish.yml` pattern:
 
 1. Trigger on `workflow_dispatch` with a required `release_type` choice input of `patch`, `minor`, or `major` (and on release tags when the project publishes from `refs/tags/v*`).
 2. Add a `bump_and_tag` job, gated to `if: github.event_name == 'workflow_dispatch'` so tag-triggered runs never re-bump, that reads the previous tag with `WyriHaximus/github-action-get-previous-tag@v2`, computes next versions with `WyriHaximus/github-action-next-semvers`, selects the version for the chosen `release_type`, updates version files, commits the bump, and creates and pushes the `v<version>` tag.
-3. Expose the computed version as a job output; publish jobs must check out `refs/tags/v<version>`, never the branch head.
+3. Expose the computed version as a job output; publish jobs must check out the release tag, never the branch head — `refs/tags/v<version>` from the bump job's output on `workflow_dispatch` runs, or `github.ref` (the pushed `v*` tag) on tag-triggered runs where the bump job is skipped.
 4. Add a workflow-level `concurrency` block with `group: ${{ github.workflow }}-${{ github.ref }}` and `cancel-in-progress: false` so an in-flight publish is never cancelled mid-run.
 5. Validate before publishing: check out the tagged ref, install dependencies, run build and tests.
 6. Keep publish jobs separate per language or distribution target, each with only the permissions it needs.
