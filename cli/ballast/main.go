@@ -177,6 +177,7 @@ type monorepoConfig struct {
 	TaskSystem         string              `json:"taskSystem,omitempty"`
 	DeploymentModel    string              `json:"deploymentModel,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
+	RuleProfile        string              `json:"ruleProfile,omitempty"`
 }
 
 type discoveryConfig struct {
@@ -2905,6 +2906,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		TaskSystem:      savedTaskSystem,
 		DeploymentModel: savedDeploymentModel,
 	}
+	if config != nil {
+		configToSave.RuleProfile = normalizeWrapperRuleProfile(config.RuleProfile)
+	}
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
 		configToSave.Paths[string(profile.Language)] = relativePaths(root, profile.Paths)
@@ -2912,6 +2916,12 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	configToSave.Tools = mergeLanguageTools(config, configToSave.Languages)
 	commonSelection := filterAgents(configToSave.Agents, commonAgentIDs())
 	languageSelection := filterAgents(configToSave.Agents, languageAgentIDs())
+	if normalizeWrapperRuleProfile(configToSave.RuleProfile) == "minimal" {
+		// Minimal profile: only the compiled core rule is emitted; the
+		// configured agent set stays in .rulesrc.json.
+		commonSelection = []string{"core"}
+		languageSelection = nil
+	}
 	if cleanupOnly || languageCleanupOnly {
 		return &monorepoPlan{
 			Invocations: nil,
@@ -2979,8 +2989,8 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		Invocations: plan,
 		Config:      configToSave,
 		Targets:     requestedTargets,
-		Common:      filterAgents(configToSave.Agents, commonAgentIDs()),
-		Language:    filterAgents(configToSave.Agents, languageAgentIDs()),
+		Common:      commonSelection,
+		Language:    languageSelection,
 		Removed:     removeTargets,
 		Previous:    config,
 	}, nil
@@ -3917,6 +3927,11 @@ func removeManagedTargetFiles(root string, target string, config *monorepoConfig
 }
 
 func managedRulePaths(root string, target string, config *monorepoConfig) []string {
+	if config != nil && normalizeWrapperRuleProfile(config.RuleProfile) == "minimal" {
+		minimal := *config
+		minimal.Agents = []string{"core"}
+		config = &minimal
+	}
 	return managedRulePathsWithSuffixes(root, target, config, func(agent string) []string {
 		return configuredRuleSuffixesForAgent(agent, config)
 	})
@@ -4268,6 +4283,14 @@ func allRuleSuffixesForAgent(agent string) []string {
 // configuredRuleSuffixesForAgent returns the rule suffixes selected by the
 // repository configuration: explicit publishing profiles when set, otherwise
 // the default active suffixes.
+func normalizeWrapperRuleProfile(value string) string {
+	profile := strings.ToLower(strings.TrimSpace(value))
+	if profile == "full" || profile == "minimal" {
+		return profile
+	}
+	return ""
+}
+
 func configuredRuleSuffixesForAgent(agent string, config *monorepoConfig) []string {
 	if agent == "publishing" && config != nil {
 		if profiles := normalizePublishingProfiles(config.PublishingProfiles); len(profiles) > 0 {

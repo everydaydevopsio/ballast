@@ -5558,6 +5558,37 @@ func TestMergeManagedSupportSectionsFillsPlaceholderRepositoryFacts(t *testing.T
 	}
 }
 
+func TestMinimalProfileSupportFileAndManagedPaths(t *testing.T) {
+	plan := &monorepoPlan{
+		Common: []string{"core"},
+		Config: monorepoConfig{
+			Languages:   []string{"typescript"},
+			RuleProfile: "minimal",
+		},
+	}
+
+	root := resolvedTempDir(t)
+	content := buildMonorepoSupportFile(root, plan, "claude")
+
+	if !strings.Contains(content, "`.claude/rules/common/core.md`") {
+		t.Fatalf("expected core rule listed in minimal support file, got %q", content)
+	}
+	if strings.Contains(content, "typescript-linting.md") || strings.Contains(content, "publishing-cli.md") {
+		t.Fatalf("expected no other rules listed in minimal support file, got %q", content)
+	}
+
+	config := &monorepoConfig{
+		Agents:      []string{"linting", "testing", "docs", "publishing"},
+		Languages:   []string{"typescript"},
+		RuleProfile: "minimal",
+	}
+	paths := managedRulePaths(root, "claude", config)
+	want := filepath.Join(root, ".claude", "rules", "common", "core.md")
+	if len(paths) != 1 || paths[0] != want {
+		t.Fatalf("expected minimal managed paths to be only the core rule, got %v", paths)
+	}
+}
+
 func TestBuildMonorepoSupportFileExcludesOptInAndRemovedRulesByDefault(t *testing.T) {
 	plan := &monorepoPlan{
 		Common: []string{"local-dev", "publishing"},

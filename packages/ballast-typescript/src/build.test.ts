@@ -1302,6 +1302,30 @@ alwaysApply: false
       expect(result).not.toContain('BALLAST_IF_DEPLOYMENT');
     });
 
+    test('ignores unknown or traversal language values in core commands', () => {
+      const content = buildContent('core', 'claude', undefined, 'typescript', {
+        languages: ['typescript', '../secrets', '/etc', 'not-a-language']
+      });
+      expect(content).toContain('## Commands — Typescript');
+      expect(content).not.toContain('secrets');
+      expect(content).not.toContain('/etc');
+    });
+
+    test('renders core rule with invariants and configured language commands', () => {
+      const content = buildContent('core', 'claude', undefined, 'typescript', {
+        languages: ['typescript', 'go']
+      });
+      expect(content).toContain('# Ballast Core Rules');
+      expect(content).toContain('Branch before code');
+      expect(content).toContain('TDD for behavioral changes');
+      expect(content).toContain('## Commands — Typescript');
+      expect(content).toContain('pnpm lint');
+      expect(content).toContain('## Commands — Go');
+      expect(content).toContain('golangci-lint run');
+      expect(content).not.toContain('## Commands — Python');
+      expect(content).not.toContain('BALLAST_CORE_COMMANDS');
+    });
+
     test('renders task-system rule only for the configured system and target', () => {
       const claude = buildContent(
         'tasks',

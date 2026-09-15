@@ -1,0 +1,2 @@
+- Lint/format: `terraform fmt -check`, `tflint`, `trivy config .`.
+- Test: `terraform validate` plus plan review in CI.

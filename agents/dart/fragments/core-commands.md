@@ -1,0 +1,2 @@
+- Lint/format: `flutter analyze`, `dart format --set-exit-if-changed .`.
+- Test: `flutter test` with coverage enforced in CI.

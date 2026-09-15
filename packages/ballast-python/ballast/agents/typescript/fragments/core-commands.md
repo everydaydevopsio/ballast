@@ -1,0 +1,2 @@
+- Lint/format: `pnpm lint`, `pnpm prettier` (or the repo's package-manager equivalents); ESLint flat config; frozen-lockfile installs in CI.
+- Test: `test` and `test:coverage` scripts; runner fails CI below the coverage threshold.
