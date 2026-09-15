@@ -1,13 +1,6 @@
-### Status (2026-09-15)
-
-- **Phases 1 and 2 complete, Phase 3 nearly complete.** Merged: #286 (tool policy once, PR #305), #287 (skip inactive rules, PR #309), #288 (repository facts fill, PR #310), #291 (fragment includes, PR #311), #290 (testing-process common rule + pristine-checksum patch replacement, PR #312), #293 (config/target-aware task-system rule, PR #314), #292 (reference-bloat trims, PR #315), #294 (framing cleanup, PR #331), #289 (publishing consolidation onto a shared release-pattern rule, PR #332). Also: broken-lockfile hotfix PR #313.
-- **Payload trajectory** (`.claude/rules/`, always loaded): 133.3 KB baseline → 119.2 (#286) → 108.4 (#287) → 104.25 (#290) → 103.2 (#293) → 92.3 (#292) → 86.8 (#294) → **72.0 KB (#289) — 46% reduction**, with all emitted rules carrying valid checksums (the drift blocking #10 is cleared).
-- **Spec Kit review (merged via #302)**: follows the context-hygiene rules; treated as the reference shape for future agents (small trigger rule, skills for procedure, scoped cursor globs — prior art for #297).
-- **Open design question on #295 (ruleProfile)**: the issue specifies `minimal` converts non-core rules to on-demand skills, but rules are config-rendered per repo while skills are a fixed registry across four surfaces — conversion machinery is the bulk of the work. Options: (a) full spec as written; (b) v1 `minimal` = compiled core rule only, detailed rules not emitted (skills conversion as follow-up); (c) drop `standard`-as-skills and keep two profiles. Decision needed before implementation.
-
 # Plan: Open Issue Review and Next Priorities
 
-**Status:** Updated 2026-08-26 after the context-hygiene rules review.
+**Status:** Updated 2026-09-15 after Phase 3 publishing consolidation.
 **Created:** 2026-07-09
 **Source:** Full review of generated rule output and the Ballast generation pipeline, plus live GitHub issue review for `everydaydevopsio/ballast`.
 
@@ -32,11 +25,12 @@ Implement the context-hygiene phases in order (#286/#287/#288 first), then retur
 
 ## Active Workstream: Context Hygiene (#286–#297)
 
-### Status (2026-08-29)
+### Status (2026-09-15)
 
-- **#286 implemented** (PR #305): tool policy renders once in each target manifest's managed section; per-rule injection remains only for cursor/opencode (no manifest); the wrapper's monorepo support files render it from merged language tools; and the `--patch` upgrade path now drops the stale per-rule policy sections so existing repos converge. Rule payload in this repo dropped from 133.3 KB to 119.2 KB even after absorbing the Spec Kit rule.
-- **Spec Kit review (merged via #302)**: the new surfaces follow the context-hygiene rules and do not re-bloat the payload. The always-loaded `spec-kit` rule is ~1.1 KB post-#286 with a one-line activation trigger (`.specify/` presence); the heavy content lives in three on-demand skills (speckit-bootstrap 2.2 KB, speckit-delivery 3.0 KB, speckit-reverse-engineer 4.5 KB) — the skill-first shape Phases 2–3 push the rest of the catalog toward. Its cursor rule is the first path-scoped rule (`globs: ['.specify/**', 'specs/**']`, `alwaysApply: false`) and is the template for #297. Residual nits are already covered by open issues: duplicated H1/persona framing (#294) and three new manifest skill lines (#295 minimal profile).
-- Treat spec-kit as the reference shape for future agents: small always-on trigger rule, skills for procedure, scoped cursor globs. The #296 CI gate should lock this in.
+- **Phases 1 and 2 complete, Phase 3 nearly complete.** Merged: #286 (tool policy once, PR #305), #287 (skip inactive rules, PR #309), #288 (repository facts fill, PR #310), #291 (fragment includes, PR #311), #290 (testing-process common rule + pristine-checksum patch replacement, PR #312), #293 (config/target-aware task-system rule, PR #314), #292 (reference-bloat trims, PR #315), #294 (framing cleanup, PR #331), #289 (publishing consolidation onto a shared release-pattern rule, PR #332). Also: broken-lockfile hotfix PR #313.
+- **Payload trajectory** (`.claude/rules/`, always loaded): 133.3 KB baseline → 119.2 (#286) → 108.4 (#287) → 104.25 (#290) → 103.2 (#293) → 92.3 (#292) → 86.8 (#294) → **72.0 KB (#289) — 46% reduction**, with all emitted rules carrying valid checksums (the drift blocking #10 is cleared).
+- **Spec Kit review (merged via #302)**: follows the context-hygiene rules; treated as the reference shape for future agents (small trigger rule, skills for procedure, scoped cursor globs — prior art for #297).
+- **Open design question on #295 (ruleProfile)**: the issue specifies `minimal` converts non-core rules to on-demand skills, but rules are config-rendered per repo while skills are a fixed registry across four surfaces — conversion machinery is the bulk of the work. Options: (a) full spec as written; (b) v1 `minimal` = compiled core rule only, detailed rules not emitted (skills conversion as follow-up); (c) drop `standard`-as-skills and keep two profiles. Decision needed before implementation.
 
 Goal: reduce the always-loaded rule payload from ~33k tokens to ~10k (standard) or ~1–2k (minimal profile) per session with zero loss of actual policy, and prevent regression.
 
