@@ -26,6 +26,7 @@
     "github-health-check",
     "github-pr-copilot-cycle",
     "ballast-audit",
+    "agent-performance-audit",
     "ballast-project-maintenance",
     "speckit-bootstrap",
     "speckit-reverse-engineer",
