@@ -717,7 +717,12 @@ export function listRuleSuffixes(
   if (agentId === 'publishing') {
     if (publishingProfiles !== undefined && publishingProfiles.length > 0) {
       const available = new Set(suffixes);
-      return publishingProfiles.filter((profile) => available.has(profile));
+      // The shared release-pattern rule (empty suffix) is always emitted
+      // alongside the selected variants.
+      return [
+        ...(available.has('') ? [''] : []),
+        ...publishingProfiles.filter((profile) => available.has(profile))
+      ];
     }
     // Opt-in variants are reference-only unless explicitly configured; do not
     // emit them into the always-loaded rule set by default.

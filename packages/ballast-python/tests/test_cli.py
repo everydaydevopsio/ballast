@@ -315,14 +315,15 @@ class PatchInstallTests(unittest.TestCase):
 
         self.assertNotIn("apt", suffixes)
         self.assertNotIn("brew", suffixes)
-        self.assertEqual(len(suffixes), 6)
+        self.assertIn("", suffixes)
+        self.assertEqual(len(suffixes), 7)
 
     def test_publishing_suffixes_honor_explicit_profiles(self) -> None:
         suffixes = cli.list_rule_suffixes(
             "publishing", "python", ["cli", "apt", "brew"]
         )
 
-        self.assertEqual(suffixes, ["cli", "apt", "brew"])
+        self.assertEqual(suffixes, ["", "cli", "apt", "brew"])
 
     def test_publishing_api_omits_kubernetes_sections_for_none(self) -> None:
         content = cli.build_content(

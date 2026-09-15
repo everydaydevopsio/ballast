@@ -1264,8 +1264,8 @@ func TestPublishingSuffixesExcludeOptInVariantsByDefault(t *testing.T) {
 	if contains(suffixes, "apt") || contains(suffixes, "brew") {
 		t.Fatalf("expected opt-in variants excluded by default, got %v", suffixes)
 	}
-	if len(suffixes) != 6 {
-		t.Fatalf("expected 6 default publishing suffixes, got %v", suffixes)
+	if !contains(suffixes, "") || len(suffixes) != 7 {
+		t.Fatalf("expected 7 default publishing suffixes including the shared pattern rule, got %v", suffixes)
 	}
 }
 
@@ -1276,8 +1276,8 @@ func TestPublishingSuffixesHonorExplicitProfiles(t *testing.T) {
 	}
 	selected := filterPublishingSuffixes("publishing", suffixes, []string{"cli", "apt", "brew"})
 
-	if len(selected) != 3 || !contains(selected, "apt") || !contains(selected, "brew") {
-		t.Fatalf("expected explicit opt-in profiles honored, got %v", selected)
+	if len(selected) != 4 || selected[0] != "" || !contains(selected, "apt") || !contains(selected, "brew") {
+		t.Fatalf("expected explicit opt-in profiles honored plus the shared pattern rule, got %v", selected)
 	}
 }
 

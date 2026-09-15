@@ -126,6 +126,7 @@ describe('build', () => {
       const suffixes = listRuleSuffixes('publishing');
       expect(suffixes).toEqual(
         expect.arrayContaining([
+          '',
           'libraries',
           'sdks',
           'apps',
@@ -136,7 +137,7 @@ describe('build', () => {
       );
       expect(suffixes).not.toContain('apt');
       expect(suffixes).not.toContain('brew');
-      expect(suffixes.length).toBe(6);
+      expect(suffixes.length).toBe(7);
     });
 
     test('returns opt-in publishing variants when explicitly configured', () => {
@@ -144,8 +145,7 @@ describe('build', () => {
         'apt',
         'brew'
       ]);
-      expect(suffixes).toEqual(expect.arrayContaining(['apt', 'brew']));
-      expect(suffixes).toHaveLength(2);
+      expect(suffixes).toEqual(['', 'apt', 'brew']);
     });
 
     test('returns selected publishing profiles when configured', () => {
@@ -154,16 +154,16 @@ describe('build', () => {
         'apps'
       ]);
 
-      expect(suffixes).toHaveLength(2);
-      expect(suffixes).toEqual(expect.arrayContaining(['cli', 'apps']));
+      expect(suffixes).toEqual(['', 'cli', 'apps']);
     });
 
     test('treats empty publishingProfiles as default profiles', () => {
       const suffixes = listRuleSuffixes('publishing', 'typescript', []);
 
-      expect(suffixes).toHaveLength(6);
+      expect(suffixes).toHaveLength(7);
       expect(suffixes).toEqual(
         expect.arrayContaining([
+          '',
           'libraries',
           'sdks',
           'apps',
@@ -366,37 +366,35 @@ describe('build', () => {
 
     test('returns publishing libraries content', () => {
       const content = getContent('publishing', 'libraries');
-      expect(content).toContain('Publishing Libraries Agent');
-      expect(content).toContain('release_type');
-      expect(content).toContain('patch');
-      expect(content).toContain('minor');
-      expect(content).toContain('major');
-      expect(content).toContain('bump_and_tag');
+      expect(content).toContain('shared publishing release pattern');
+      expect(content).toContain('npmjs');
+      expect(content).toContain('PyPI');
+      expect(content).toContain('GitHub tags');
+    });
+
+    test('returns shared publishing release pattern content', () => {
+      const content = getContent('publishing');
       expect(content).toContain(
         'WyriHaximus/github-action-get-previous-tag@v2'
       );
       expect(content).toContain('WyriHaximus/github-action-next-semvers');
+      expect(content).toContain('cancel-in-progress: false');
       expect(content).toContain('npm publish --access public --provenance');
-      expect(content).toContain('PyPI');
-      expect(content).toContain('GitHub Releases');
+      expect(content).toContain('uv publish');
+      expect(content).toContain('go test ./...');
+      expect(content).toContain('refs/tags/v<version>');
+      expect(content).not.toContain('{{include:');
     });
 
     test('returns publishing apps content for Kubernetes GitOps deployments', () => {
       const content = getContent('publishing', 'apps', 'typescript', {
         variables: { deploymentModel: 'kubernetes' }
       });
-      expect(content).toContain('release_type');
-      expect(content).toContain('v<version>');
-      expect(content).toContain(
-        'WyriHaximus/github-action-get-previous-tag@v2'
-      );
-      expect(content).toContain('WyriHaximus/github-action-next-semvers');
+      expect(content).toContain('shared publishing release pattern');
       expect(content).toContain('ghcr.io');
       expect(content).toContain('Docker Hub');
       expect(content).toContain('charts/<app>/');
-      expect(content).toContain('ArgoCD');
       expect(content).toContain('GitOps repository');
-      expect(content).toContain('image digest');
       expect(content).toContain('## App Deployment Model');
       expect(content).toContain(
         'Deployment guidance is active (`deploymentModel: kubernetes`).'
