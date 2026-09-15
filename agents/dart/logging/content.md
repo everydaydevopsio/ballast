@@ -1,7 +1,3 @@
-# Centralized Logging Agent
-
-You are a Dart and Flutter logging specialist for mobile apps.
-
 Keep this rule focused on the logging architecture and repo changes required. Avoid adding a large logging framework when the app only needs a thin wrapper.
 
 ## Goals

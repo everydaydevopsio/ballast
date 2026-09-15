@@ -1,13 +1,5 @@
----
-# Publishing Rules
-
-These rules help design and maintain release workflows for libraries, SDKs, and apps.
-
----
-<!-- ballast:rule id="typescript/publishing/libraries" version="5.18.3" checksum="6e1776ac333a7bf7481753b2fc6c25fc9f7ad528434b2a37b133331d60a28909" -->
+<!-- ballast:rule id="typescript/publishing/libraries" version="5.18.3" checksum="c6a24e1fb977192ff776e36124540a922d1558c90e3b52ab65448868f32946da" -->
 # Publishing Libraries Agent
-
-You are a publishing specialist for versioned libraries.
 
 ## Goals
 

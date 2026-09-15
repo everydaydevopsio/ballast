@@ -610,7 +610,7 @@ func TestInstallSupportsDocsAgent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected docs.mdc to exist: %v", err)
 	}
-	if !strings.Contains(string(content), "Documentation Agent") {
+	if !strings.Contains(string(content), "Documentation is part of the product") {
 		t.Fatalf("expected docs content, got %q", string(content))
 	}
 	if !strings.Contains(string(content), "publish-docs") {
@@ -647,7 +647,7 @@ func TestInstallSupportsDocsAgentForOpenCodeWithFrontmatter(t *testing.T) {
 	if !strings.Contains(string(content), "mode: subagent") {
 		t.Fatalf("expected opencode mode in frontmatter, got %q", string(content))
 	}
-	if !strings.Contains(string(content), "Documentation Agent") {
+	if !strings.Contains(string(content), "Documentation is part of the product") {
 		t.Fatalf("expected docs content, got %q", string(content))
 	}
 }
@@ -673,7 +673,7 @@ func TestInstallSupportsTerraformLanguageProfile(t *testing.T) {
 		t.Fatalf("expected terraform-linting.mdc to exist: %v", err)
 	}
 	text := string(content)
-	if !strings.Contains(text, "Terraform linting specialist") {
+	if !strings.Contains(text, "tflint") {
 		t.Fatalf("expected terraform linting content, got %q", text)
 	}
 	if !strings.Contains(text, ".terraform-version") ||
@@ -744,18 +744,18 @@ func TestInstallSupportsDartFlutterLanguageProfile(t *testing.T) {
 
 	checks := map[string][]string{
 		"dart-linting.md": {
-			"Dart and Flutter linting specialist",
+			"flutter analyze",
 			"flutter_lints",
 			"dart format --set-exit-if-changed",
 			"flutter analyze",
 		},
 		"dart-logging.md": {
-			"Dart and Flutter logging specialist",
+			"logging",
 			"dart:developer",
 			"Crashlytics",
 		},
 		"dart-testing.md": {
-			"Dart and Flutter testing specialist",
+			"flutter test",
 			"flutter test",
 			"integration_test",
 		},
@@ -995,7 +995,7 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read go-linting.md: %v", err)
 	}
-	if !strings.Contains(string(content), "Go linting specialist") {
+	if !strings.Contains(string(content), "golangci-lint") {
 		t.Fatalf("expected go-specific linting content, got %s", string(content))
 	}
 	if strings.Contains(string(content), "{{BALLAST_HOOK_GUIDANCE}}") {
@@ -1580,7 +1580,7 @@ func TestBuildContentGeminiIncludesMandates(t *testing.T) {
 	if !strings.Contains(content, "### Narrative Flow") {
 		t.Fatalf("expected narrative flow section, got %q", content)
 	}
-	if !strings.Contains(content, "Go linting specialist") {
+	if !strings.Contains(content, "golangci-lint") {
 		t.Fatalf("expected go linting body, got %q", content)
 	}
 }

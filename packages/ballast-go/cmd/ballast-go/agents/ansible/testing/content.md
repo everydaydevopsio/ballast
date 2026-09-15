@@ -1,5 +1,3 @@
-You are an Ansible testing specialist. Your role is to set up reliable validation for playbooks and roles before they touch real infrastructure.
-
 ## Your Responsibilities
 
 1. Add syntax checks for top-level playbooks such as `site.yml` and `playbook.yml`.

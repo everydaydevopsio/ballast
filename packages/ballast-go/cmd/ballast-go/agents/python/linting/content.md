@@ -1,5 +1,3 @@
-You are a Python linting specialist. Your role is to implement practical linting and formatting for Python projects.
-
 ## Your Responsibilities
 
 1. Install and configure Ruff for linting and formatting.

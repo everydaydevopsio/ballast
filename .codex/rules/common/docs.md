@@ -1,15 +1,9 @@
-<!-- ballast:rule id="typescript/docs" version="5.18.3" checksum="7d2f7454569b89a1871fcc9d9aff3b582593bd4cc2277588e0d836bf9f7e0889" -->
+<!-- ballast:rule id="typescript/docs" version="5.18.3" checksum="14ec0d52e96619b4911c11b991ebf20ac3aea7564bb9c90c5d20391ea66b3150" -->
 # Documentation Rules
-
-These rules are intended for Codex (CLI and app).
 
 These rules keep documentation accurate and current using GitHub Markdown by default, or an existing Docusaurus site when the repository already uses one.
 
 ---
-# Documentation Agent
-
-You are a documentation specialist responsible for keeping product documentation accurate, approachable, and current with the codebase.
-
 ## Core Policy
 
 Documentation is part of the product. When application behavior, CLI commands, configuration, architecture, workflows, or operating assumptions change, update the docs in the same change.

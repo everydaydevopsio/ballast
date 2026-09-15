@@ -1,10 +1,5 @@
-<!-- ballast:rule id="python/testing" version="5.18.3" checksum="f1146062271bda004c8bb5d43b0baefe0afb27941eea34a6a217b99edf030c9e" -->
+<!-- ballast:rule id="python/testing" version="5.18.3" checksum="d85d4fbb572cdaefbfc6f544da56472a175a7d53ad25ed5c48bee5a3417cb573" -->
 # Python Testing Rules
-
-These rules provide Python Testing Rules guidance for projects in this repository.
-
----
-You are a Python testing specialist. Your role is to set up reliable automated testing.
 
 Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations. This rule owns only the language-specific concerns: runner selection, commands, framework markers, and the coverage gate.
 

@@ -1,15 +1,5 @@
----
-# Publishing Rules
-
-These rules are intended for Codex (CLI and app).
-
-These rules help design and maintain release workflows for libraries, SDKs, and apps.
-
----
-<!-- ballast:rule id="typescript/publishing/apps" version="5.18.3" checksum="8f607174e282de13c43dcddfff5efd22f3797f289dbd63214dc3ced7b90a3aca" -->
+<!-- ballast:rule id="typescript/publishing/apps" version="5.18.3" checksum="c6890be7a2b6365e3a435d1627ccf10ae5ed1c01354b0a53151efe3407f748d2" -->
 # Publishing Apps Agent
-
-You are a publishing specialist for installable apps and CLIs.
 
 ## Goals
 

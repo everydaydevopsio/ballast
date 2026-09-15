@@ -1,13 +1,5 @@
----
-# Publishing Rules
-
-These rules help design and maintain release workflows for libraries, SDKs, and apps.
-
----
-<!-- ballast:rule id="typescript/publishing/sdks" version="5.18.3" checksum="223e88db8c5c0caaf284f30e34d9f2054b7a74f74dc0944906b02c20741d4667" -->
+<!-- ballast:rule id="typescript/publishing/sdks" version="5.18.3" checksum="0f15bb8243914a3c9d746b66a3faa353b984947e7f3016b285985f39e0b84b49" -->
 # Publishing SDKs Agent
-
-You are a publishing specialist for SDKs and generated client packages.
 
 ## Goals
 

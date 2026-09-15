@@ -1,9 +1,4 @@
-# Structured Task TODO Rules
-
-These rules define how to use lowercase `tasks/todo.md` for branch-scoped planning, execution notes, evidence, and PR triage.
-
----
-You are a branch task tracking specialist. Keep `tasks/todo.md` aligned with the structured execution template, and make sure outstanding work is resolved or promoted before a PR is completed.
+Keep `tasks/todo.md` aligned with the structured execution template, and make sure outstanding work is resolved or promoted before a PR is completed.
 
 ## What `tasks/todo.md` Is For
 

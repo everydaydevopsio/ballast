@@ -188,20 +188,20 @@ describe('build', () => {
   describe('getContent', () => {
     test('returns content for linting agent', () => {
       const content = getContent('linting');
-      expect(content).toContain('TypeScript linting specialist');
+      expect(content).toContain('flat config format');
       expect(content).toContain('## Your Responsibilities');
     });
 
     test('returns content for logging agent', () => {
       const content = getContent('logging');
-      expect(content).toContain('Centralized Logging Agent');
+      expect(content).toContain('pino');
       expect(content).toContain('pino-browser');
       expect(content).toContain('/api/logs');
     });
 
     test('returns env content for local-dev with ruleSuffix env', () => {
       const content = getContent('local-dev', 'env');
-      expect(content).toContain('Local Development Environment Agent');
+      expect(content).toContain('ballast setup-dev');
       expect(content).toContain('docker-compose.local.yaml');
       expect(content).toContain('Makefile');
       expect(content).toContain('make up-local');
@@ -335,7 +335,7 @@ describe('build', () => {
 
     test('returns plan-lifecycle content', () => {
       const content = getContent('plan-lifecycle');
-      expect(content).toContain('Plan -> ADR lifecycle');
+      expect(content).toContain('When To Create A Plan');
       expect(content).toContain('Create a plan when');
       expect(content).toContain('Skip a plan');
       expect(content).toContain('plans/plan-<feature-name>.md');
@@ -358,7 +358,7 @@ describe('build', () => {
 
     test('returns docs content', () => {
       const content = getContent('docs');
-      expect(content).toContain('Documentation Agent');
+      expect(content).toContain('Documentation is part of the product');
       expect(content).toContain('Default to a GitHub-readable Markdown');
       expect(content).toContain('publish-docs');
       expect(content).toContain('Mermaid');
@@ -553,7 +553,7 @@ describe('build', () => {
 
     test('returns python-specific linting content without hook guidance when language is python', () => {
       const content = getContent('linting', undefined, 'python');
-      expect(content).toContain('Python linting specialist');
+      expect(content).toContain('Ruff');
       expect(content).toContain('Ruff');
       expect(content).not.toContain('.pre-commit-config.yaml');
       expect(content).not.toContain('pre-commit install');
@@ -563,7 +563,7 @@ describe('build', () => {
 
     test('returns go-specific linting content without hook guidance', () => {
       const content = getContent('linting', undefined, 'go');
-      expect(content).toContain('Go linting specialist');
+      expect(content).toContain('golangci-lint');
       expect(content).not.toContain('.pre-commit-config.yaml');
       expect(content).not.toContain('sub-pre-commit');
       expect(content).not.toContain('pre-commit install --hook-type pre-push');
@@ -572,7 +572,7 @@ describe('build', () => {
 
     test('returns pre-commit git-hooks content for python', () => {
       const content = getContent('git-hooks', undefined, 'python');
-      expect(content).toContain('Git hook specialist');
+      expect(content).toContain('pre-commit install');
       expect(content).toContain('.pre-commit-config.yaml');
       expect(content).toContain('gitleaks');
       expect(content).not.toContain('scripts/check-no-secrets.sh');
@@ -673,7 +673,7 @@ describe('build', () => {
 
     test('returns go-specific testing content when language is go', () => {
       const content = getContent('testing', undefined, 'go');
-      expect(content).toContain('Go testing specialist');
+      expect(content).toContain('go test ./...');
       expect(content).toContain('go test ./...');
     });
   });

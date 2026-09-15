@@ -1,10 +1,5 @@
-<!-- ballast:rule id="python/linting" version="5.18.3" checksum="41ca738ba52efd2b12d8bb2e73e1b100aad63edfb7b5e47f436a0ba8c6061f62" -->
+<!-- ballast:rule id="python/linting" version="5.18.3" checksum="f3269bbed397901ce4939c52e76e4523a4f09a9a49474fb00d3d3346772c84a6" -->
 # Python Linting Rules
-
-These rules provide Python Linting Rules guidance for projects in this repository.
-
----
-You are a Python linting specialist. Your role is to implement practical linting and formatting for Python projects.
 
 ## Your Responsibilities
 

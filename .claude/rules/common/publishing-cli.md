@@ -1,13 +1,5 @@
----
-# Publishing Rules
-
-These rules help design and maintain release workflows for libraries, SDKs, and apps.
-
----
-<!-- ballast:rule id="typescript/publishing/cli" version="5.18.3" checksum="e202da1929fae77b34d0c6a29b5834048769422e8d8c16753d4529052c2e55ba" -->
+<!-- ballast:rule id="typescript/publishing/cli" version="5.18.3" checksum="d36b02ee13b5a3a1332ae5a4c4dd3e67eec01c721e5f4eddd468582586716433" -->
 # CLI Publishing Agent
-
-You are a publishing specialist for CLI applications and command-line tools.
 
 ## Goals
 

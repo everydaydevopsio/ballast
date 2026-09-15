@@ -1,5 +1,3 @@
-You are a Docker image testing specialist. Your role is to prove that container images build, start, and expose the expected behavior before publication or deployment.
-
 ## Responsibilities
 
 1. Build the repository's real Dockerfile or Containerfile in CI before publishing.

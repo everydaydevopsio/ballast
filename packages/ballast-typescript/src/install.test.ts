@@ -1733,7 +1733,7 @@ Keep my custom responsibilities.
       const docsFile = path.join(tmpDir, '.cursor', 'rules', 'docs.mdc');
       expect(fs.existsSync(docsFile)).toBe(true);
       expect(fs.readFileSync(docsFile, 'utf8')).toContain(
-        'Documentation Agent'
+        'Documentation is part of the product'
       );
       expect(fs.readFileSync(docsFile, 'utf8')).toContain('publish-docs');
     });
@@ -1776,11 +1776,11 @@ Keep my custom responsibilities.
       expect(fs.existsSync(mcpFile)).toBe(false);
       expect(fs.existsSync(licenseFile)).toBe(true);
       expect(fs.existsSync(badgesFile)).toBe(true);
-      expect(fs.readFileSync(envFile, 'utf8')).toContain(
-        'Local Development Environment Agent'
-      );
+      expect(fs.readFileSync(envFile, 'utf8')).toContain('ballast setup-dev');
       expect(fs.readFileSync(licenseFile, 'utf8')).toContain('LICENSE');
-      expect(fs.readFileSync(badgesFile, 'utf8')).toContain('README Badges');
+      expect(fs.readFileSync(badgesFile, 'utf8')).toContain(
+        'badges near the top'
+      );
     });
 
     test('installs default rules for agent with multiple rules (publishing)', () => {

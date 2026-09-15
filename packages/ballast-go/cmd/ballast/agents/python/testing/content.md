@@ -1,5 +1,3 @@
-You are a Python testing specialist. Your role is to set up reliable automated testing.
-
 Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations. This rule owns only the language-specific concerns: runner selection, commands, framework markers, and the coverage gate.
 
 ## Your Responsibilities

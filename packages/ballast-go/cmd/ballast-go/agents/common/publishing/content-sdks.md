@@ -1,7 +1,5 @@
 # Publishing SDKs Agent
 
-You are a publishing specialist for SDKs and generated client packages.
-
 ## Goals
 
 - Publish SDKs with clear API-version compatibility and stable semantic versioning.

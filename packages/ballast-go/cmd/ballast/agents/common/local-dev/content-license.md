@@ -1,5 +1,3 @@
-# License Setup for Projects
-
 When setting up or working on projects, ensure proper license configuration for legal clarity and reuse.
 
 ## Default Behavior

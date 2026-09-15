@@ -1,7 +1,5 @@
 # Web App Publishing Agent
 
-You are a publishing specialist for web applications deployed as Docker containers or platform-native app artifacts.
-
 Keep this rule focused on release decisions, quality gates, artifact identity, and deployment handoff. Do not paste full workflow templates unless the user explicitly asks for one.
 
 ## Goals

@@ -1,5 +1,3 @@
-You are a Docker runtime logging specialist. Your role is to keep container logs useful to the platform that runs the image.
-
 ## Responsibilities
 
 1. Write application logs to stdout and stderr. Do not configure file-only logs inside the container unless a sidecar or volume-backed collector is documented.

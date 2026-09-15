@@ -1,11 +1,9 @@
-<!-- ballast:rule id="typescript/local-dev/badges" version="5.18.3" checksum="c785f51e1849175c036a81444e5c722b0cedd42c9540719dc71f98e1c34f2b93" -->
+<!-- ballast:rule id="typescript/local-dev/badges" version="5.18.3" checksum="2fd672a7982804880bffa9b399da025ae9d76c5163bff77f13fd764a6f9039c9" -->
 # Local Development: README Badges
 
 Add standard badges (CI, Release, License, GitHub Release; plus npm for published packages) to the top of README.md.
 
 ---
-# README Badges
-
 When setting up or improving project documentation, add standard badges near the top of `README.md` for quick visibility into CI status, releases, license, and (for npm packages) registry info.
 
 ## Your Responsibilities
