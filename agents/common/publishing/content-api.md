@@ -36,14 +36,10 @@ If `deploymentModel` is `none`, do not add deployment-state update jobs unless t
 
 ## Health Endpoint Requirements
 
-Before enabling automated rollout health checks, ensure the API exposes at least one health endpoint:
-
 ### Recommended Endpoints
 
-| Path | Purpose | Behavior |
-|------|---------|---------|
-| `/health` or `/healthz` | Liveness — is the process alive? | Return `200 OK` if the process is up; return non-2xx only if the process is broken and should be restarted. |
-| `/ready` or `/readyz` | Readiness — is the service ready for traffic? | Return `200 OK` only when all dependencies (DB, cache, downstream services) are reachable. Return `503` during startup or when a dependency is down. |
+- `/health` or `/healthz` (liveness): return `200 OK` while the process is up; non-2xx only when the process is broken and should be restarted.
+- `/ready` or `/readyz` (readiness): return `200 OK` only when all critical dependencies (DB, cache, downstream services) are reachable; `503` during startup or dependency outage.
 
 Separate liveness and readiness checks when the runtime supports both. In Kubernetes, a liveness failure triggers a pod restart and a readiness failure removes the pod from service without restarting it. In hosted, serverless, or server models, map these endpoints to the platform's health check and traffic cutover controls.
 
@@ -129,21 +125,9 @@ service:
 {{BALLAST_END_IF_DEPLOYMENT}}
 ## Private vs Public Image Registries
 
-| Use case | Registry | Auth |
-|---------|---------|------|
-| Internal API, org-only access | GHCR (`ghcr.io`) | `GITHUB_TOKEN` |
-| Public API, open source | Docker Hub (`docker.io`) | `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` secrets |
-
-Grant `packages: write` to the build job for GHCR. Remove it for Docker Hub.
-
-## Required Secrets and Permissions
-
-| Secret | Required for |
-|--------|-------------|
-| `GITHUB_TOKEN` | GHCR push (automatic) |
-| `DOCKERHUB_USERNAME` | Docker Hub push |
-| `DOCKERHUB_TOKEN` | Docker Hub push |
-| `DEPLOYMENT_STATE_REPO_TOKEN` | External deployment state or GitOps repo write access |
+- Internal/org-only APIs: GHCR (`ghcr.io`) with the automatic `GITHUB_TOKEN`; grant `packages: write` to the build job.
+- Public/open-source APIs: Docker Hub (`docker.io`) with `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` secrets (no `packages: write`).
+- External deployment-state or GitOps repo writes need a scoped `DEPLOYMENT_STATE_REPO_TOKEN`.
 
 ## README Badge
 
@@ -153,12 +137,11 @@ Grant `packages: write` to the build job for GHCR. Remove it for Docker Hub.
 
 ## Important Notes
 
-- Liveness and readiness endpoints should have different semantics. Do not reuse the same handler for both unless the runtime only supports a single health check.
-- For Kubernetes, set `initialDelaySeconds` long enough that the API finishes startup before the first probe fires; misconfigured probes cause restart loops.
-- For Kubernetes HTTP services, prefer `httpGet` probes over `exec` probes.
-- Readiness checks should cover critical dependencies; liveness checks should only verify process health.
+- Liveness and readiness have different semantics — do not reuse one handler for both unless the runtime supports only a single health check; readiness covers critical dependencies, liveness only process health.
 - Never create unprefixed Git release tags. Normalize action outputs to `version=<major>.<minor>.<patch>` and `release_tag=v<major>.<minor>.<patch>`.
-- For Kubernetes, use `digest` not `tag` in the container spec so the cluster pulls the exact image version, even if a mutable tag is updated.
+{{BALLAST_IF_DEPLOYMENT:kubernetes}}
+- Set `initialDelaySeconds` long enough that the API finishes startup before the first probe fires; prefer `httpGet` over `exec` probes; use `digest` not `tag` in the container spec so the cluster pulls the exact image version.
+{{BALLAST_END_IF_DEPLOYMENT}}
 
 ## When to Apply
 

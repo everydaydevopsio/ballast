@@ -210,14 +210,13 @@ describe('build', () => {
       expect(content).toContain(
         'gh repo view --json defaultBranchRef --jq .defaultBranchRef.name'
       );
-      expect(content).toContain('If that command fails for any reason');
-      expect(content).toContain('strip the `origin/` prefix');
       expect(content).toContain(
-        'If both default-branch detection methods fail'
+        'git symbolic-ref --short refs/remotes/origin/HEAD'
       );
-      expect(content).toContain('current branch name is empty');
+      expect(content).toContain('create or switch to a task branch first');
+      expect(content).toContain('if both fail, or the checkout is detached');
       expect(content).toContain('issue-212-branch-before-code');
-      expect(content).toContain('Read-only investigation');
+      expect(content).toContain('read-only investigation needs no branch');
     });
 
     test('returns Copilot review loop guidance for local-dev PR workflow', () => {

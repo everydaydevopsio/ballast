@@ -51,7 +51,11 @@ export interface RuleFileStatus {
   target: Target;
   ruleId: string | null;
   status: RuleFileState;
+  sizeBytes?: number;
 }
+
+/** Emitted rules above this size violate the ballast-audit threshold. */
+export const MAX_RULE_BYTES = 5 * 1024;
 
 const CLI_NAMES = [
   'ballast-typescript',
@@ -305,6 +309,11 @@ export function buildDoctorReport(
         `Remove stale managed rule file ${ruleFile.path}: ballast doctor --fix`
       );
     }
+    if ((ruleFile.sizeBytes ?? 0) > MAX_RULE_BYTES) {
+      recommendations.push(
+        `Rule file ${ruleFile.path} is ${ruleFile.sizeBytes} bytes (> ${MAX_RULE_BYTES}); trim it or move procedural content to a skill`
+      );
+    }
   }
 
   return {
@@ -505,7 +514,8 @@ export function collectRuleFileStatuses(
             path: filePath,
             target,
             ruleId: null,
-            status: 'unowned'
+            status: 'unowned',
+            sizeBytes: Buffer.byteLength(content, 'utf8')
           });
           continue;
         }
@@ -528,7 +538,8 @@ export function collectRuleFileStatuses(
           path: filePath,
           target,
           ruleId: marker.ruleId,
-          status: drifted ? 'drifted' : 'ok'
+          status: drifted ? 'drifted' : 'ok',
+          sizeBytes: Buffer.byteLength(content, 'utf8')
         });
       }
     }

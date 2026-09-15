@@ -347,6 +347,53 @@ describe('rule file status collection', () => {
     );
   });
 
+  test('recommends trimming rules above the size threshold', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-doctor-'));
+    try {
+      const claudeRules = path.join(tmpDir, '.claude', 'rules');
+      fs.mkdirSync(claudeRules, { recursive: true });
+      const canonical = buildContent('docs', 'claude');
+      fs.writeFileSync(
+        path.join(claudeRules, 'docs.md'),
+        canonical + '\n' + 'x'.repeat(6 * 1024),
+        'utf8'
+      );
+
+      const statuses = collectRuleFileStatuses(tmpDir, {
+        targets: ['claude'],
+        agents: ['docs'],
+        languages: ['typescript'],
+        paths: {}
+      });
+      const report = buildDoctorReport(
+        'ballast-typescript',
+        '5.0.2',
+        path.join(tmpDir, '.rulesrc.json'),
+        '5.0.2',
+        ['claude'],
+        ['docs'],
+        [],
+        ['typescript'],
+        {},
+        {},
+        [],
+        null,
+        null,
+        [],
+        [],
+        'unknown',
+        statuses
+      );
+      expect(
+        report.recommendations.some((line) =>
+          line.includes('trim it or move procedural content to a skill')
+        )
+      ).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   test('minimal ruleProfile treats only the core rule as active', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-doctor-'));
     try {
