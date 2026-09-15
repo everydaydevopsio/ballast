@@ -87,6 +87,38 @@ function addCandidate(
 }
 
 describe('repo generated artifacts', () => {
+  test('emitted rules stay within the context-size budget', () => {
+    const rulesrc = JSON.parse(fs.readFileSync(RULESRC_PATH, 'utf8')) as {
+      ruleBudget?: { maxRuleBytes?: number; maxTargetBytes?: number };
+    };
+    const maxRuleBytes = rulesrc.ruleBudget?.maxRuleBytes ?? 5 * 1024;
+    const maxTargetBytes = rulesrc.ruleBudget?.maxTargetBytes ?? 80 * 1024;
+
+    for (const target of ['.claude', '.codex']) {
+      const rulesRoot = path.join(REPO_ROOT, target, 'rules');
+      const files = collectFiles(rulesRoot).filter((file) =>
+        file.endsWith('.md')
+      );
+      let total = 0;
+      const oversized: string[] = [];
+      for (const file of files) {
+        const size = fs.statSync(path.join(REPO_ROOT, file)).size;
+        total += size;
+        if (size > maxRuleBytes) {
+          oversized.push(`${file} (${size} bytes > ${maxRuleBytes})`);
+        }
+      }
+      expect(oversized).toEqual([]);
+      if (total > maxTargetBytes) {
+        throw new Error(
+          `${target} rules payload ${total} bytes exceeds the ${maxTargetBytes}-byte budget; ` +
+            'trim rules or move procedural content to skills (see ballast-audit thresholds), ' +
+            'or raise ruleBudget in .rulesrc.json deliberately.'
+        );
+      }
+    }
+  });
+
   test('tracked .codex and .claude artifacts stay in sync with source templates', () => {
     const rulesrc = JSON.parse(fs.readFileSync(RULESRC_PATH, 'utf8')) as {
       agents?: string[];
