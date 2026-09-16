@@ -1,0 +1,5 @@
+Per-registry publish guidance:
+
+- **npmjs (TypeScript/Node)**: require `package.json` with `name`, `version`, `license`, `repository`, and correct `files`/`exports` (plus `bin` and `engines` for CLIs). Use npm trusted publishing via GitHub Actions OIDC (`id-token: write`), `actions/setup-node` with the registry URL, lockfile installs, build before tests when tests need compiled output, and `npm publish --access public --provenance`.
+- **PyPI (Python)**: prefer PyPI trusted publishing via OIDC over long-lived tokens. Use `actions/setup-python` (and `astral-sh/setup-uv` when the project uses `uv`), build both wheel and sdist, run tests, and publish with `uv publish` or `pypa/gh-action-pypi-publish`. Grant `id-token: write` only to the publish job. Ensure `pyproject.toml` has complete metadata, supported Python versions, and classifiers.
+- **Go (GitHub)**: publish by tagging the module and creating a matching GitHub release — no registry upload step. Check out the tag with full history, run `go test ./...`, verify the build, and create release notes for the tag. Preserve import-path stability and semantic import versioning for `v2+` modules.

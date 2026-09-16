@@ -105,6 +105,7 @@ func TestListAgentsIncludesAllRegistryAgents(t *testing.T) {
 		"plan-lifecycle",
 		"spec-kit",
 		"testing-process",
+		"core",
 		"linting",
 		"logging",
 		"testing",
@@ -610,7 +611,7 @@ func TestInstallSupportsDocsAgent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected docs.mdc to exist: %v", err)
 	}
-	if !strings.Contains(string(content), "Documentation Agent") {
+	if !strings.Contains(string(content), "Documentation is part of the product") {
 		t.Fatalf("expected docs content, got %q", string(content))
 	}
 	if !strings.Contains(string(content), "publish-docs") {
@@ -647,7 +648,7 @@ func TestInstallSupportsDocsAgentForOpenCodeWithFrontmatter(t *testing.T) {
 	if !strings.Contains(string(content), "mode: subagent") {
 		t.Fatalf("expected opencode mode in frontmatter, got %q", string(content))
 	}
-	if !strings.Contains(string(content), "Documentation Agent") {
+	if !strings.Contains(string(content), "Documentation is part of the product") {
 		t.Fatalf("expected docs content, got %q", string(content))
 	}
 }
@@ -673,7 +674,7 @@ func TestInstallSupportsTerraformLanguageProfile(t *testing.T) {
 		t.Fatalf("expected terraform-linting.mdc to exist: %v", err)
 	}
 	text := string(content)
-	if !strings.Contains(text, "Terraform linting specialist") {
+	if !strings.Contains(text, "tflint") {
 		t.Fatalf("expected terraform linting content, got %q", text)
 	}
 	if !strings.Contains(text, ".terraform-version") ||
@@ -744,18 +745,18 @@ func TestInstallSupportsDartFlutterLanguageProfile(t *testing.T) {
 
 	checks := map[string][]string{
 		"dart-linting.md": {
-			"Dart and Flutter linting specialist",
+			"flutter analyze",
 			"flutter_lints",
 			"dart format --set-exit-if-changed",
 			"flutter analyze",
 		},
 		"dart-logging.md": {
-			"Dart and Flutter logging specialist",
+			"logging",
 			"dart:developer",
 			"Crashlytics",
 		},
 		"dart-testing.md": {
-			"Dart and Flutter testing specialist",
+			"flutter test",
 			"flutter test",
 			"integration_test",
 		},
@@ -995,7 +996,7 @@ func TestInstallCreatesLanguagePrefixedRuleFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read go-linting.md: %v", err)
 	}
-	if !strings.Contains(string(content), "Go linting specialist") {
+	if !strings.Contains(string(content), "golangci-lint") {
 		t.Fatalf("expected go-specific linting content, got %s", string(content))
 	}
 	if strings.Contains(string(content), "{{BALLAST_HOOK_GUIDANCE}}") {
@@ -1224,6 +1225,69 @@ func TestRecursiveFragmentIncludeFails(t *testing.T) {
 	}
 }
 
+func TestSaveConfigPreservesRuleProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	config := `{"targets":["claude"],"agents":["linting"],"languages":["go"],"ruleProfile":"minimal"}`
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(config), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	if err := saveConfig(tmpDir, "go", rulesConfig{
+		Targets:   []string{"claude"},
+		Agents:    []string{"linting"},
+		Languages: []string{"go"},
+	}); err != nil {
+		t.Fatalf("saveConfig: %v", err)
+	}
+
+	loaded := loadConfig(tmpDir, "go")
+	if loaded == nil || loaded.RuleProfile != "minimal" {
+		t.Fatalf("expected ruleProfile preserved through saveConfig, got %+v", loaded)
+	}
+}
+
+func TestMinimalRuleProfileEmitsOnlyCoreRule(t *testing.T) {
+	tmpDir := t.TempDir()
+	config := `{"targets":["claude"],"agents":["linting","testing","docs"],"languages":["go","python"],"ruleProfile":"minimal"}`
+	if err := os.WriteFile(filepath.Join(tmpDir, ".rulesrc.json"), []byte(config), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	result := install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		agents:      []string{"linting", "testing", "docs"},
+		language:    "go",
+		force:       true,
+	})
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
+	}
+
+	core := filepath.Join(tmpDir, ".claude", "rules", "core.md")
+	content, err := os.ReadFile(core)
+	if err != nil {
+		t.Fatalf("read core rule: %v", err)
+	}
+	text := string(content)
+	if !strings.Contains(text, "# Ballast Core Rules") || !strings.Contains(text, "## Commands — Go") || !strings.Contains(text, "## Commands — Python") {
+		t.Fatalf("expected core rule with language commands, got %q", text)
+	}
+	if strings.Contains(text, "BALLAST_CORE_COMMANDS") {
+		t.Fatalf("expected token rendered, got %q", text)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".claude", "rules", "go-linting.md")); err == nil {
+		t.Fatalf("expected no language rules in minimal profile")
+	}
+	claudeMD, err := os.ReadFile(filepath.Join(tmpDir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read CLAUDE.md: %v", err)
+	}
+	if !strings.Contains(string(claudeMD), "core.md") || strings.Contains(string(claudeMD), "go-linting.md") {
+		t.Fatalf("expected manifest to list only the core rule, got %q", string(claudeMD))
+	}
+}
+
 func TestTaskSystemRuleRendersOnlyConfiguredSystemAndTarget(t *testing.T) {
 	claude, err := buildContent("tasks", "claude", "go", "task-system", "pre-commit", "github", "none")
 	if err != nil {
@@ -1264,8 +1328,8 @@ func TestPublishingSuffixesExcludeOptInVariantsByDefault(t *testing.T) {
 	if contains(suffixes, "apt") || contains(suffixes, "brew") {
 		t.Fatalf("expected opt-in variants excluded by default, got %v", suffixes)
 	}
-	if len(suffixes) != 6 {
-		t.Fatalf("expected 6 default publishing suffixes, got %v", suffixes)
+	if !contains(suffixes, "") || len(suffixes) != 7 {
+		t.Fatalf("expected 7 default publishing suffixes including the shared pattern rule, got %v", suffixes)
 	}
 }
 
@@ -1276,8 +1340,8 @@ func TestPublishingSuffixesHonorExplicitProfiles(t *testing.T) {
 	}
 	selected := filterPublishingSuffixes("publishing", suffixes, []string{"cli", "apt", "brew"})
 
-	if len(selected) != 3 || !contains(selected, "apt") || !contains(selected, "brew") {
-		t.Fatalf("expected explicit opt-in profiles honored, got %v", selected)
+	if len(selected) != 4 || selected[0] != "" || !contains(selected, "apt") || !contains(selected, "brew") {
+		t.Fatalf("expected explicit opt-in profiles honored plus the shared pattern rule, got %v", selected)
 	}
 }
 
@@ -1580,7 +1644,7 @@ func TestBuildContentGeminiIncludesMandates(t *testing.T) {
 	if !strings.Contains(content, "### Narrative Flow") {
 		t.Fatalf("expected narrative flow section, got %q", content)
 	}
-	if !strings.Contains(content, "Go linting specialist") {
+	if !strings.Contains(content, "golangci-lint") {
 		t.Fatalf("expected go linting body, got %q", content)
 	}
 }

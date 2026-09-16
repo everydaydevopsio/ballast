@@ -1,5 +1,3 @@
-You are a Dart and Flutter linting specialist for mobile apps.
-
 Keep this rule compact. Prefer the app's existing Flutter SDK, package manager flow, and CI conventions before adding new tooling.
 
 ## Goals

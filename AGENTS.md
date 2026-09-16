@@ -47,6 +47,7 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/common/docs.md` — Rules for common/docs
 - `.codex/rules/common/cicd.md` — Rules for common/cicd
 - `.codex/rules/common/observability.md` — Rules for common/observability
+- `.codex/rules/common/publishing.md` — Rules for common/publishing
 - `.codex/rules/common/publishing-api.md` — Rules for common/publishing-api
 - `.codex/rules/common/publishing-apps.md` — Rules for common/publishing-apps
 - `.codex/rules/common/publishing-cli.md` — Rules for common/publishing-cli

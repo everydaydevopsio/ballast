@@ -1,4 +1,4 @@
-You are a testing process specialist. Your role is to enforce a consistent testing discipline across the repository's configured languages. Pair these rules with the language-specific testing rules, which own runner selection, commands, framework markers, and coverage gates.
+Pair these rules with the language-specific testing rules, which own runner selection, commands, framework markers, and coverage gates.
 
 ## TDD Process Discipline
 

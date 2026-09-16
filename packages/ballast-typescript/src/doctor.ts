@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { findProjectRoot, getRulesrcFilename, loadConfig } from './config';
 import type { PublishingProfile, Target } from './config';
+import { LANGUAGES } from './agents';
 import type { Language } from './agents';
 import {
   buildContent,
@@ -50,7 +51,11 @@ export interface RuleFileStatus {
   target: Target;
   ruleId: string | null;
   status: RuleFileState;
+  sizeBytes?: number;
 }
+
+/** Emitted rules above this size violate the ballast-audit threshold. */
+export const MAX_RULE_BYTES = 5 * 1024;
 
 const CLI_NAMES = [
   'ballast-typescript',
@@ -304,6 +309,11 @@ export function buildDoctorReport(
         `Remove stale managed rule file ${ruleFile.path}: ballast doctor --fix`
       );
     }
+    if ((ruleFile.sizeBytes ?? 0) > MAX_RULE_BYTES) {
+      recommendations.push(
+        `Rule file ${ruleFile.path} is ${ruleFile.sizeBytes} bytes (> ${MAX_RULE_BYTES}); trim it or move procedural content to a skill`
+      );
+    }
   }
 
   return {
@@ -336,6 +346,7 @@ interface RuleConfig {
   taskSystem?: string | null;
   deploymentModel?: string | null;
   publishingProfiles?: PublishingProfile[];
+  ruleProfile?: string;
 }
 
 const TARGET_RULE_DIRS: Record<Target, string[]> = {
@@ -373,17 +384,20 @@ function configuredLanguages(config: RuleConfig): Language[] {
   const values =
     config.languages.length > 0 ? config.languages : ['typescript'];
   return values.filter((value): value is Language =>
-    ['typescript', 'python', 'go', 'ansible', 'terraform', 'dart'].includes(
-      value
-    )
+    (LANGUAGES as readonly string[]).includes(value)
   );
 }
 
 function configuredRuleKeys(config: RuleConfig): Set<string> {
   const active = new Set<string>();
+  // Minimal profile installs emit only the compiled core rule.
+  const profileAgents =
+    config.ruleProfile === 'minimal'
+      ? ['core']
+      : withImplicitAgents(config.agents);
   for (const target of config.targets) {
     for (const language of configuredLanguages(config)) {
-      for (const agentId of withImplicitAgents(config.agents)) {
+      for (const agentId of profileAgents) {
         try {
           for (const suffix of listRuleSuffixes(
             agentId,
@@ -444,7 +458,13 @@ function canonicalRuleContent(
       : undefined;
   const options = {
     ...(hookMode ? { hookMode } : {}),
-    ...(Object.keys(variables).length > 0 ? { variables } : {})
+    ...(Object.keys(variables).length > 0 ? { variables } : {}),
+    // The core rule renders per-language command sections from the configured
+    // languages; without them the canonical comparison would flag core.md
+    // stale in multi-language repos.
+    ...(parsed.agentId === 'core' && config.languages.length > 0
+      ? { languages: config.languages }
+      : {})
   };
   try {
     return buildContent(
@@ -494,7 +514,8 @@ export function collectRuleFileStatuses(
             path: filePath,
             target,
             ruleId: null,
-            status: 'unowned'
+            status: 'unowned',
+            sizeBytes: Buffer.byteLength(content, 'utf8')
           });
           continue;
         }
@@ -517,7 +538,8 @@ export function collectRuleFileStatuses(
           path: filePath,
           target,
           ruleId: marker.ruleId,
-          status: drifted ? 'drifted' : 'ok'
+          status: drifted ? 'drifted' : 'ok',
+          sizeBytes: Buffer.byteLength(content, 'utf8')
         });
       }
     }
@@ -703,7 +725,8 @@ export function runDoctor(options: { fix?: boolean } = {}): number {
     paths: config?.paths ?? {},
     taskSystem: config?.taskSystem ?? null,
     deploymentModel: config?.deploymentModel ?? null,
-    publishingProfiles: config?.publishingProfiles ?? []
+    publishingProfiles: config?.publishingProfiles ?? [],
+    ruleProfile: config?.ruleProfile
   });
   const removedRuleFiles =
     options.fix && config ? removeStaleRuleFiles(ruleFiles) : [];

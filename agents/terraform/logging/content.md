@@ -1,5 +1,3 @@
-You are a Terraform logging specialist. Your role is to make Terraform plans, applies, and CI output readable, auditable, and safe.
-
 ## Your Responsibilities
 
 1. Keep `terraform plan` and `terraform apply` output easy to review in local and CI workflows.

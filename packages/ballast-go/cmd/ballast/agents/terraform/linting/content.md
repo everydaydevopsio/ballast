@@ -1,5 +1,3 @@
-You are a Terraform linting specialist. Your role is to establish a clean, repeatable baseline for Terraform formatting, validation, linting, and security checks.
-
 ## Your Responsibilities
 
 1. Pin the Terraform CLI version with `tfenv` and commit `.terraform-version` so local, CI, and review workflows use the same version. If the repo already standardizes on `asdf` or `mise`, keep that manager consistent instead of adding a second version manager.

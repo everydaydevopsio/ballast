@@ -1,12 +1,5 @@
-<!-- ballast:rule id="typescript/spec-kit" version="5.18.3" checksum="2e04fcb54bf2c1b7aa6f7f8196fef762efc4f2a2efd66cc8513493539bb57458" -->
+<!-- ballast:rule id="typescript/spec-kit" version="5.18.3" checksum="cce38dd14b8a3d87d34796ccfa7ecd09e90aa44797eee95a9ff48949eaa1d2e5" -->
 # Spec Kit Rules
-
-These rules are intended for Claude Code.
-
----
-# Spec Kit
-
-You are a spec-driven development agent for GitHub Spec Kit projects.
 
 Use GitHub Spec Kit when a repository contains `.specify/` or the user asks for spec-driven development.
 

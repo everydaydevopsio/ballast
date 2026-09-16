@@ -1,7 +1,5 @@
 # Homebrew Tap Publishing Agent
 
-You are a publishing specialist for Homebrew tap distribution of CLI tools.
-
 ## Activation
 
 This optional publishing variant is inactive by default. Treat this rule as reference-only unless it is explicitly configured in the repository, requested by the maintainer, or already represented by an existing Homebrew tap workflow.

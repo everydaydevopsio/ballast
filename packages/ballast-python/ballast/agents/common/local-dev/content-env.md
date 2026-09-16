@@ -1,16 +1,8 @@
-# Local Development Environment Agent
-
-You are a local development environment specialist for the repository's configured languages and runtimes.
-
-Use this rule to set direction, then read implementation files or docs for details.
-
-For the full playbook and examples, use `docs/agents/local-dev.md`.
+Use this rule to set direction; the full playbook and examples live in `docs/agents/local-dev.md`.
 
 ## Goals
 
-- Keep local setup reproducible.
-- Keep the first-run path short for new contributors.
-- Keep README and runbooks aligned with the actual developer workflow.
+- Keep local setup reproducible, the first-run path short, and README/runbooks aligned with the actual developer workflow.
 
 ## Agent Startup
 
@@ -28,20 +20,16 @@ For the full playbook and examples, use `docs/agents/local-dev.md`.
 
 ## Branch Before Code
 
-Before modifying files, check the current branch with `git branch --show-current` and determine the default branch with `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. If that command fails for any reason, use `git symbolic-ref --short refs/remotes/origin/HEAD` and strip the `origin/` prefix. If both default-branch detection methods fail, create or switch to a task branch before editing files.
+Before modifying files, check `git branch --show-current` against the default branch (`gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`, falling back to `git symbolic-ref --short refs/remotes/origin/HEAD`; if both fail, or the checkout is detached, branch first).
 
-- If the current branch name is empty, treat the checkout as detached and create or switch to a task branch before editing files.
-- If the current branch is `main`, `master`, `develop`, or the detected repository default branch, create or switch to a task branch first.
-- Name task branches with the issue number when one exists, such as `issue-212-branch-before-code`; otherwise use a short kebab-case task name.
-- Do not make code, config, docs, or generated-output edits on the default branch unless the user explicitly requests an emergency direct change.
-- Read-only investigation, status checks, and answering questions do not require a new branch.
-- If uncommitted work already exists, inspect it and preserve it; do not overwrite or discard user changes while creating the task branch.
+- If the current branch is `main`, `master`, `develop`, or the detected default branch, create or switch to a task branch first — named with the issue number when one exists (`issue-212-branch-before-code`), otherwise a short kebab-case task name.
+- Do not make code, config, docs, or generated-output edits on the default branch unless the user explicitly requests an emergency direct change; read-only investigation needs no branch.
+- Preserve any existing uncommitted work while creating the task branch.
 
 ## Core Responsibilities
 
 1. Establish the local runtime baseline.
-   - Check `.rulesrc.json` `tools` first. Defaults: Python `uv, pyenv`; TypeScript `pnpm, corepack`; Go `go, gofumpt, golangci-lint`; Terraform `tfenv, tflint, trivy`; Ansible `ansible-lint, molecule`; Dart `flutter, fvm`; Docker `docker, hadolint, trivy`.
-   - Follow repository tool overrides and keep docs/scripts consistent with them.
+   - Check `.rulesrc.json` `tools` first (the Repository Tool Policy in the manifest lists the configured tools); follow overrides and keep docs/scripts consistent with them.
    - Add or update `.nvmrc` when the repo is Node-based.
    - Keep `package.json` `engines` aligned with the supported Node range.
    - Document prerequisites and setup commands in `README.md`.

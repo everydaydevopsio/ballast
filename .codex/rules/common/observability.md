@@ -1,15 +1,9 @@
-<!-- ballast:rule id="typescript/observability" version="5.18.3" checksum="31598c4217e942e6888d1b6d23191b2b05e647ad027d5fb39e3b58120630e509" -->
+<!-- ballast:rule id="typescript/observability" version="5.18.3" checksum="208c1d26ff7e212e3f9b30511bd8e38d6d15a7462095b57208b4183d7d0fc1c9" -->
 # Observability Rules
-
-These rules are intended for Codex (CLI and app).
 
 These rules help add logging, tracing, metrics, and SLOs to applications and services in the repository's configured languages and runtimes.
 
 ---
-# Observability Agent
-
-You are an observability specialist for applications and services in the repository's configured languages and runtimes.
-
 ## Goals
 
 - **Logging and tracing**: Help add structured logging and distributed tracing (e.g. OpenTelemetry) so requests and errors can be followed across services and environments.

@@ -28,6 +28,7 @@ COMMON_AGENTS = [
     "plan-lifecycle",
     "spec-kit",
     "testing-process",
+    "core",
 ]
 LANGUAGE_AGENTS = ["linting", "logging", "testing"]
 AGENTS_BY_LANGUAGE = {
@@ -421,6 +422,12 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
                 else None
             ),
             "publishingProfiles": normalize_publishing_profiles(publishing_profiles),
+            "ruleProfile": (
+                data["ruleProfile"].strip().lower()
+                if isinstance(data.get("ruleProfile"), str)
+                and data["ruleProfile"].strip().lower() in ("full", "minimal")
+                else None
+            ),
         }
     except Exception:
         return None
@@ -441,6 +448,7 @@ def save_config(
     existing_discovery: dict[str, list[str]] | None = None
     existing_task_system: str | None = None
     existing_deployment_model: str | None = None
+    existing_rule_profile: str | None = None
     tools: dict[str, list[str]] = {}
     if file_path.exists():
         try:
@@ -466,6 +474,8 @@ def save_config(
                     existing_task_system = raw["taskSystem"].strip().lower()
                 if isinstance(raw.get("deploymentModel"), str):
                     existing_deployment_model = raw["deploymentModel"].strip().lower()
+                if isinstance(raw.get("ruleProfile"), str):
+                    existing_rule_profile = raw["ruleProfile"].strip().lower()
         except (OSError, json.JSONDecodeError):
             # Invalid/unreadable existing config should fall back to defaults
             # while preserving current save behavior.
@@ -518,6 +528,8 @@ def save_config(
         payload["taskSystem"] = normalized_task_system
     if normalized_deployment_model:
         payload["deploymentModel"] = normalized_deployment_model
+    if existing_rule_profile in ("full", "minimal"):
+        payload["ruleProfile"] = existing_rule_profile
 
     file_path.write_text(
         json.dumps(payload, indent=2),
@@ -822,7 +834,12 @@ def list_rule_suffixes(
     if agent == "publishing":
         if publishing_profiles:
             available = set(suffixes)
-            return [profile for profile in publishing_profiles if profile in available]
+            # The shared release-pattern rule (empty suffix) is always emitted
+            # alongside the selected variants.
+            selected = [
+                profile for profile in publishing_profiles if profile in available
+            ]
+            return ([""] if "" in available else []) + selected
         # Opt-in variants are reference-only unless explicitly configured; do
         # not emit them into the always-loaded rule set by default.
         return [
@@ -845,6 +862,39 @@ def _is_valid_include_path(include_path: str) -> bool:
         INCLUDE_SEGMENT_RE.match(segment) and segment not in (".", "..")
         for segment in segments
     )
+
+
+CORE_COMMANDS_TOKEN = "{{BALLAST_CORE_COMMANDS}}"
+
+
+def render_core_commands(languages: list[str]) -> str:
+    """Render per-language command summaries for the core rule from
+    agents/<language>/fragments/core-commands.md; languages without a
+    fragment are skipped."""
+    sections: list[str] = []
+    root = resolve_agents_root()
+    for language in languages:
+        # Language values come from .rulesrc.json; only known language ids may
+        # be joined into the agents path (never user-controlled segments).
+        if language not in LANGUAGES:
+            continue
+        fragment = root / language / "fragments" / "core-commands.md"
+        if not fragment.exists():
+            continue
+        title = language[:1].upper() + language[1:]
+        sections.append(
+            f"## Commands — {title}\n\n" + fragment.read_text(encoding="utf-8").rstrip()
+        )
+    return "\n\n".join(sections)
+
+
+def apply_core_commands_guidance(
+    content: str, agent: str, language: str, languages: list[str] | None
+) -> str:
+    if agent != "core" or CORE_COMMANDS_TOKEN not in content:
+        return content
+    effective = languages if languages else [language]
+    return content.replace(CORE_COMMANDS_TOKEN, render_core_commands(effective))
 
 
 INCLUDE_TOKEN_RE = re.compile(r"\{\{include:([^}]+)\}\}")
@@ -1312,6 +1362,7 @@ def build_content(
     deployment_model: str | None = None,
     task_system: str | None = None,
     tools: dict[str, list[str]] | None = None,
+    languages: list[str] | None = None,
 ) -> str:
     body = apply_task_system_guidance(
         apply_deployment_model_guidance(
@@ -1324,6 +1375,7 @@ def build_content(
         agent,
         task_system,
     )
+    body = apply_core_commands_guidance(body, agent, language, languages)
     configured_task_system = normalize_task_system(task_system) or DEFAULT_TASK_SYSTEM
     body = apply_conditional_token_blocks(
         body, "TASK_SYSTEM", lambda name: name == configured_task_system
@@ -2585,11 +2637,25 @@ def install(
         if config_for_support_files
         else []
     )
+    rule_profile = (
+        config_for_support_files.get("ruleProfile")
+        if config_for_support_files
+        else None
+    ) or "full"
+    configured_languages = (
+        config_for_support_files.get("languages")
+        if config_for_support_files
+        and isinstance(config_for_support_files.get("languages"), list)
+        and config_for_support_files.get("languages")
+        else [language]
+    )
     support_agents = with_implicit_agents(
         config_for_support_files.get("agents", agents)
         if config_for_support_files
         else agents
     )
+    if rule_profile == "minimal":
+        support_agents = ["core"]
     support_skills = (
         config_for_support_files.get("skills", skills)
         if config_for_support_files
@@ -2611,7 +2677,10 @@ def install(
             if "Created by Ballast" in legacy.read_text(encoding="utf-8"):
                 legacy.unlink()
 
-    for agent in agents:
+    # Minimal profile: emit only the compiled core rule; the configured agent
+    # set stays in .rulesrc.json so switching back to full restores it.
+    profile_agents = ["core"] if rule_profile == "minimal" else agents
+    for agent in profile_agents:
         if not is_valid_agent(agent, language):
             result.errors.append((agent, "Unknown agent"))
             continue
@@ -2633,6 +2702,7 @@ def install(
                     deployment_model,
                     task_system if isinstance(task_system, str) else None,
                     rule_tools,
+                    languages=configured_languages,
                 )
                 if (
                     dst.exists()

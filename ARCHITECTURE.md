@@ -254,6 +254,20 @@ Key workflows include:
 4. publishes Go binaries with GoReleaser
 5. publishes the wrapper CLI with GoReleaser
 
+## Rule Loading Behavior per Target
+
+How each target consumes emitted rules determines whether rule size costs context on every session or only on demand (investigated for issue #297):
+
+| Target | Loading | Path scoping |
+| --- | --- | --- |
+| Claude Code (`.claude/rules/*.md`) | **Eager** — every rule file is injected into every session's context; the manifest's "when they apply" wording is advisory only. | Not supported by the platform. Mitigations are the rule size budget (CI gate + doctor) and `ruleProfile: minimal`. |
+| Codex (`.codex/rules/*.md`) | **Advisory** — `AGENTS.md` is loaded and lists rule paths; the agent reads rule files on demand. | Not applicable (pointer-based). Keep `AGENTS.md` listings and descriptions accurate. |
+| Cursor (`.cursor/rules/*.mdc`) | **Scoped** — native frontmatter controls loading. | **Supported and implemented**: every generated `.mdc` carries `globs` and `alwaysApply` (e.g. spec-kit scopes to `.specify/**`). Scoping language-rule globs to the repo's `.rulesrc.json` `paths` is a possible future refinement. |
+| Gemini (`.gemini/rules/*.md`) | **Advisory** — `GEMINI.md` is loaded with memory-tier guidance and rule pointers. | Not applicable (pointer-based). |
+| OpenCode (`.opencode/*.md`) | **On demand** — rules are subagent definitions invoked when relevant. | Frontmatter-based agent selection; effectively on-demand. |
+
+Because Claude Code is the only fully eager target, its payload is the budget that matters: the CI size gate holds every emitted rule at ≤ 5 KB and the per-target total at ≤ 80 KB (overridable via `ruleBudget` in `.rulesrc.json`), and repos serving small-context agents can switch to `ruleProfile: minimal`.
+
 ## Design Constraints
 
 - Ballast only installs content shipped in this repository.

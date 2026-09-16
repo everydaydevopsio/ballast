@@ -1,7 +1,3 @@
-# Testing Agent
-
-You are a Dart and Flutter testing specialist for mobile apps.
-
 Keep this rule limited to runner choice, coverage policy, CI integration, and mobile smoke/integration expectations.
 
 ## Goals

@@ -1,6 +1,6 @@
 # Plan: Open Issue Review and Next Priorities
 
-**Status:** Updated 2026-08-26 after the context-hygiene rules review.
+**Status:** Updated 2026-09-15 after Phase 3 publishing consolidation.
 **Created:** 2026-07-09
 **Source:** Full review of generated rule output and the Ballast generation pipeline, plus live GitHub issue review for `everydaydevopsio/ballast`.
 
@@ -25,11 +25,12 @@ Implement the context-hygiene phases in order (#286/#287/#288 first), then retur
 
 ## Active Workstream: Context Hygiene (#286–#297)
 
-### Status (2026-08-29)
+### Status (2026-09-15, final)
 
-- **#286 implemented** (PR #305): tool policy renders once in each target manifest's managed section; per-rule injection remains only for cursor/opencode (no manifest); the wrapper's monorepo support files render it from merged language tools; and the `--patch` upgrade path now drops the stale per-rule policy sections so existing repos converge. Rule payload in this repo dropped from 133.3 KB to 119.2 KB even after absorbing the Spec Kit rule.
-- **Spec Kit review (merged via #302)**: the new surfaces follow the context-hygiene rules and do not re-bloat the payload. The always-loaded `spec-kit` rule is ~1.1 KB post-#286 with a one-line activation trigger (`.specify/` presence); the heavy content lives in three on-demand skills (speckit-bootstrap 2.2 KB, speckit-delivery 3.0 KB, speckit-reverse-engineer 4.5 KB) — the skill-first shape Phases 2–3 push the rest of the catalog toward. Its cursor rule is the first path-scoped rule (`globs: ['.specify/**', 'specs/**']`, `alwaysApply: false`) and is the template for #297. Residual nits are already covered by open issues: duplicated H1/persona framing (#294) and three new manifest skill lines (#295 minimal profile).
-- Treat spec-kit as the reference shape for future agents: small always-on trigger rule, skills for procedure, scoped cursor globs. The #296 CI gate should lock this in.
+- **All twelve context-hygiene issues (#286–#297) are complete.** Phase 1: #286 (PR #305), #287 (PR #309), #288 (PR #310). Phase 2: #291 (PR #311), #290 (PR #312), #293 (PR #314), #292 (PR #315), #294 (PR #331). Phase 3: #289 (PR #332), #295 ruleProfile v1 (PR #334, scoped without rule-to-skill conversion per the decision on the issue). Phase 4: #296 size gate (PR #335), #297 scoped-loading findings (ARCHITECTURE.md "Rule Loading Behavior per Target"). Also: broken-lockfile hotfix (PR #313) and the plan checkpoint (PR #333).
+- **Final payload**: 133.3 KB baseline → **71.2 KB (−47%)** per target, all emitted rules ≤ 5 KB with valid checksums, enforced by the CI gate (rule ≤ 5 KB, target total ≤ 80 KB, `ruleBudget` override) and doctor recommendations. `ruleProfile: minimal` compiles a ~1.8 KB core rule for small-context agents.
+- Deferred follow-ups: rule-to-skill conversion for a `standard` profile tier (noted on #295); dynamic Cursor globs from `.rulesrc.json` `paths` (noted in ARCHITECTURE.md); strict byte-for-byte artifact enforcement (#10) is now unblocked since checksum drift is cleared.
+- **Next workstream**: setup/toolchain reliability (#128 + #94), per the priority table below.
 
 Goal: reduce the always-loaded rule payload from ~33k tokens to ~10k (standard) or ~1–2k (minimal profile) per session with zero loss of actual policy, and prevent regression.
 

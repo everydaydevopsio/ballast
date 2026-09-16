@@ -433,6 +433,7 @@ Operators also need to know when saved language paths have drifted from the repo
 7. The wrapper `ballast doctor` report must identify detected language profiles that are not saved in `.rulesrc.json`, including newly added directories and newly added languages.
 8. `ballast doctor --fix` must refresh saved `languages` and `paths` from current repository detection before reapplying the saved install configuration when current detection can produce a supported profile set.
 9. When `.rulesrc.json` contains configured `languages`, wrapper `ballast doctor` must check only the backend CLIs required by those languages; Ansible and Terraform configurations use the Go backend.
+10. A configured TypeScript path containing a JavaScript package without `tsconfig.json` must be reported as misconfigured, with guidance to remove the TypeScript language or add the missing configuration. This issue alone must not recommend `doctor --fix`.
 
 ### Acceptance Criteria
 
@@ -446,6 +447,9 @@ Operators also need to know when saved language paths have drifted from the repo
 8. Given a repo where current detection finds a language not saved in `.rulesrc.json`, wrapper `ballast doctor` prints a config drift line that names the untracked detected language.
 9. Given stale saved TypeScript paths and a current detected TypeScript path, wrapper `ballast doctor --fix` rewrites `.rulesrc.json` to the detected path before refreshing generated outputs.
 10. Given a `.rulesrc.json` with only `go` configured and a globally installed `ballast-typescript` on `PATH`, wrapper `ballast doctor` does not report the TypeScript backend.
+11. Given a configured TypeScript path with JavaScript package metadata and no `tsconfig.json`, doctor reports a misconfigured profile instead of a stale profile and gives explicit remediation. Other drift still recommends `doctor --fix`.
+12. The diagnostic recognizes minimal packages with `type: module` or `type: commonjs`. The recommended removal command must clean up the saved language, paths, tools, and managed language rules even when TypeScript is the only saved language, preserving user-authored rules.
+13. Cleanup-only language removal must subtract from saved profiles without adopting newly detected languages. Removing an unrelated language must preserve the saved language and path selections, including empty path entries.
 
 ## Ballast Doctor Rule Drift Detection
 

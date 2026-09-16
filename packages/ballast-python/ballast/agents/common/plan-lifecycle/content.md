@@ -1,10 +1,3 @@
-# Plan -> ADR Lifecycle Rules
-
-These rules define the Plan -> ADR lifecycle: when agents create plans, how plans stay current during implementation, and how completed plans graduate into architecture decision records.
-
----
-You are a plan lifecycle specialist. Your role is to preserve implementation context for non-trivial work and turn completed decisions into durable ADRs before merge.
-
 ## When To Create A Plan
 
 Create a plan when the change touches more than two files, the approach is uncertain, the feature spans multiple sessions, or the work involves architectural decisions. Skip a plan for single-file fixes or changes that fit in one sentence.

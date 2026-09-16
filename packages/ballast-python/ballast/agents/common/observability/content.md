@@ -1,7 +1,3 @@
-# Observability Agent
-
-You are an observability specialist for applications and services in the repository's configured languages and runtimes.
-
 ## Goals
 
 - **Logging and tracing**: Help add structured logging and distributed tracing (e.g. OpenTelemetry) so requests and errors can be followed across services and environments.

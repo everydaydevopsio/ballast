@@ -1,13 +1,5 @@
----
-# Publishing Rules
-
-These rules help design and maintain release workflows for libraries, SDKs, and apps.
-
----
-<!-- ballast:rule id="typescript/publishing/web" version="5.18.3" checksum="78259bc1f4596e5c9bcdce72d96c8d24d70e6a15bde9c3371d5338036697e17c" -->
+<!-- ballast:rule id="typescript/publishing/web" version="5.18.3" checksum="864caa1bcc7e634c02cb30242c82878320da383814df889fa58ccbf7047869c3" -->
 # Web App Publishing Agent
-
-You are a publishing specialist for web applications deployed as Docker containers or platform-native app artifacts.
 
 Keep this rule focused on release decisions, quality gates, artifact identity, and deployment handoff. Do not paste full workflow templates unless the user explicitly asks for one.
 

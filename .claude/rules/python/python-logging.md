@@ -1,10 +1,5 @@
-<!-- ballast:rule id="python/logging" version="5.18.3" checksum="31cbe4f167fb94530b4612f85cd02c89aa8d6c9978e9664ca5721aec635e6654" -->
+<!-- ballast:rule id="python/logging" version="5.18.3" checksum="4c4f3e61851a213933b2f8d9f953477f3cb9e4c4f92a0579475f09e961e1511e" -->
 # Python Logging Rules
-
-These rules provide Python Logging Rules guidance for projects in this repository.
-
----
-You are a Python logging specialist. Your role is to establish structured, production-safe logging.
 
 ## Your Responsibilities
 

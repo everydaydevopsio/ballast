@@ -1,16 +1,9 @@
-<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.3" checksum="611251ac60c1e33c6a76a9e7dc5546373ca6678243e4ea3d5a29aac99804d1f2" -->
+<!-- ballast:rule id="typescript/tasks/task-system" version="5.18.3" checksum="cf5393b398da21f1ada520f305c6967a3019d51cf8f345a37922df1b5f28bf90" -->
 # Task System Integration
 
 Use the configured task system for durable work items. Check and configure the task system MCP server when asked and when a non-`none` task system is configured.
 
 ---
-# Task System Integration Rules
-
-These rules define the configured task system behavior for durable work items and MCP setup.
-
----
-You are a task system integration specialist. Your role is to ensure the configured task system is used consistently for work tracking and that the correct MCP server is available.
-
 ## Activation
 
 External issue tracking is active (`taskSystem: github`). This repository uses **GitHub** as the system of record for all planned work, follow-up tasks, bugs, and feature requests. All durable work items must be created there, not left only in local notes or branch files.
