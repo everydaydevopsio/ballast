@@ -12,11 +12,33 @@ tools:
   grep: true
 permission:
   bash:
-    'git push*': ask
-    'git reset --hard*': ask
-    'git clean*': ask
-    'npm publish*': ask
-    'pnpm publish*': ask
-    'rm -rf*': ask
-    '*': allow
+    'git status*': allow
+    'git diff*': allow
+    'git log*': allow
+    'git show*': allow
+    'git branch*': allow
+    'git fetch*': allow
+    'npm test*': allow
+    'npm run test*': allow
+    'npm run lint*': allow
+    'npm run build*': allow
+    'pnpm test*': allow
+    'pnpm run test*': allow
+    'pnpm run lint*': allow
+    'pnpm run build*': allow
+    'pnpm lint*': allow
+    'pnpm build*': allow
+    'go test*': allow
+    'go build*': allow
+    'go vet*': allow
+    'gofmt*': allow
+    'golangci-lint*': allow
+    'pytest*': allow
+    'ruff*': allow
+    'mypy*': allow
+    'eslint*': allow
+    'prettier*': allow
+    'hadolint*': allow
+    'tflint*': allow
+    '*': ask
 ---
