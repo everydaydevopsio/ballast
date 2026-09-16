@@ -1,3 +1,9 @@
+<!-- ballast:rule id="typescript/local-dev/autonomy" version="5.18.3" checksum="3f05923b7d3f3da583cfc46c9b091486b796d9a682784c5f31664ef50dbe3bae" -->
+# Autonomy and Question Minimization
+
+Minimize low-information agent questions: proceed on safe, reversible work implied by the request and ask only when the answer materially changes the outcome or crosses a protected boundary.
+
+---
 Minimize low-information questions. Prefer completing safe, reversible work over asking for confirmation.
 
 ## Default behavior

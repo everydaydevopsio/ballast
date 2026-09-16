@@ -41,6 +41,7 @@ Created by Ballast. Do not edit this section.
 
 Read and follow these rule files in `.codex/rules/` when they apply:
 
+- `.codex/rules/common/local-dev-autonomy.md` — Rules for common/local-dev-autonomy
 - `.codex/rules/common/local-dev-badges.md` — Rules for common/local-dev-badges
 - `.codex/rules/common/local-dev-env.md` — Rules for common/local-dev-env
 - `.codex/rules/common/local-dev-license.md` — Rules for common/local-dev-license
@@ -86,6 +87,7 @@ Read and use these skill files in `.codex/skills/` when they are relevant:
 - `.codex/skills/github-health-check/SKILL.md` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 - `.codex/skills/github-pr-copilot-cycle/SKILL.md` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
 - `.codex/skills/ballast-audit/SKILL.md` — audit AI rule and skill files for context density, duplication, and bloat
+- `.codex/skills/agent-performance-audit/SKILL.md` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
 - `.codex/skills/ballast-project-maintenance/SKILL.md` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
 - `.codex/skills/speckit-bootstrap/SKILL.md` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
 - `.codex/skills/speckit-reverse-engineer/SKILL.md` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
