@@ -619,7 +619,7 @@ func TestConfiguredProfileIssueRecognizesMinimalJavaScriptPackages(t *testing.T)
 
 func TestRunRemoveLastLanguageCleansConfigAndManagedRules(t *testing.T) {
 	root := resolvedTempDir(t)
-	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"targets":["codex"],"agents":["linting"],"languages":["typescript"],"paths":{"typescript":["."]},"tools":{"typescript":["pnpm"]}}`)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"targets":["codex"],"agents":["linting"],"languages":["typescript"],"paths":{"typescript":["."]},"tools":{"typescript":["pnpm"],"go":["go"]}}`)
 	mustWriteFile(t, filepath.Join(root, "package.json"), `{"main":"index.js"}`)
 	managed := filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")
 	custom := filepath.Join(root, ".codex", "rules", "typescript", "custom.md")

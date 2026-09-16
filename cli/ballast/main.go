@@ -2963,6 +2963,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		}
 	}
 	configToSave.Tools = mergeLanguageTools(config, configToSave.Languages)
+	if languageCleanupOnly && len(configToSave.Languages) == 0 {
+		configToSave.Tools = map[string][]string{}
+	}
 	for _, removedLanguage := range removeLanguages {
 		delete(configToSave.Tools, removedLanguage)
 	}
