@@ -82,19 +82,18 @@ Use this Ballast configuration shape to enable Spec Kit for this repository whil
 }
 ```
 
-When this config changes, run `ballast upgrade --patch` and commit the refreshed `.claude/`, `.codex/`, `AGENTS.md`, and `CLAUDE.md` managed outputs in the same PR.
+This example was verified against the repository's `.rulesrc.json` on 2026-09-16. When this config changes, run `ballast upgrade --patch` and commit the refreshed `.claude/`, `.codex/`, `AGENTS.md`, and `CLAUDE.md` managed outputs in the same PR.
 
 ## Files Affected
 
 - `plans/plan-spec-kit-development-process.md` - process plan and adoption workflow.
 - `plans/README.md` - active plan index.
 - `.rulesrc.json` - already includes the required `spec-kit` agent and `speckit-*` skills; use the config above as the target shape.
-- `docs/agents/spec-kit.md` - future home for user-facing agent process guidance.
-- `docs/skills/speckit-bootstrap.md` - future home for bootstrap/adoption procedure details.
-- `docs/skills/speckit-reverse-engineer.md` - future home for brownfield baseline procedure details.
-- `docs/skills/speckit-delivery.md` - future home for forward delivery procedure details.
-- `docs/skills/github-pr-copilot-cycle.md` - future home for PR closure process details.
-- `docs/code_review.md` - missing referenced review guidance; create or update the `AGENTS.md` reference before relying on it as a process gate.
+- `docs/development-process.md` - proposed new home for the end-to-end workflow (does not exist yet; see Open Questions for placement).
+- `docs/agents/spec-kit.md` - exists; add cross-links from the agent guide into this process.
+- `docs/skills/speckit-bootstrap.md`, `docs/skills/speckit-reverse-engineer.md`, `docs/skills/speckit-delivery.md` - exist; each covers its own procedure, so this process should link them rather than restate them.
+- `docs/skills/github-pr-copilot-cycle.md` - exists; link it as the PR closure gate.
+- `docs/code_review.md` - **missing but referenced** by `AGENTS.md` ("Follow `docs/code_review.md` for code reviews"). Either create it or fix the reference before treating it as a process gate.
 
 ## Process Model
 
@@ -226,10 +225,12 @@ A change is complete only when:
 
 ## Phases
 
-- [ ] Phase 1: Document the end-to-end process in `docs/`.
-- [ ] Phase 2: Add or fix missing review documentation referenced by `AGENTS.md`.
-- [ ] Phase 3: Add cross-links from Spec Kit docs to task, plan lifecycle, testing, docs, and PR review guidance.
-- [ ] Phase 4: Add generated-content or docs tests that prevent drift in the advertised process.
+Per-agent and per-skill guides (`docs/agents/spec-kit.md`, `docs/skills/speckit-*.md`, `docs/skills/github-pr-copilot-cycle.md`) already exist from the Spec Kit merge, so the remaining work is the connective tissue between them, not new per-artifact docs.
+
+- [ ] Phase 1: Resolve the placement question, then write the end-to-end process doc that sequences the existing guides.
+- [ ] Phase 2: Fix the broken `docs/code_review.md` reference in `AGENTS.md` (create the doc or repoint the reference).
+- [ ] Phase 3: Add cross-links from the existing Spec Kit guides to task, plan lifecycle, testing, docs, and PR review guidance.
+- [ ] Phase 4: Add a docs-link check that prevents advertised-process drift (would have caught the `docs/code_review.md` break).
 - [ ] Phase 5: Run focused validation and update this plan with evidence.
 
 ## Verification
@@ -265,6 +266,7 @@ Future implementation should verify:
 
 ## Change Log
 
-| Date       | Change                                                                             |
-| ---------- | ---------------------------------------------------------------------------------- |
-| 2026-08-29 | Plan created with Spec Kit process model and target `.rulesrc.json` configuration. |
+| Date       | Change                                                                                                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-29 | Plan created with Spec Kit process model and target `.rulesrc.json` configuration.                                                                                                                        |
+| 2026-09-16 | Merged main; corrected Files Affected (Spec Kit agent/skill docs already exist) and rescoped phases to the remaining connective work; confirmed the `.rulesrc.json` example still matches the repository. |
