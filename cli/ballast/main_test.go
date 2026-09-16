@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -511,6 +512,158 @@ func TestRunDoctorReportsStaleConfiguredProfile(t *testing.T) {
 	}
 	if !strings.Contains(output, "- untracked detected profile: typescript=apps/web") {
 		t.Fatalf("expected untracked detected profile in doctor output, got %q", output)
+	}
+}
+
+func TestRunDoctorReportsMisconfiguredJavaScriptProfile(t *testing.T) {
+	originalCollect := collectDoctorBackendsFunc
+	t.Cleanup(func() {
+		collectDoctorBackendsFunc = originalCollect
+	})
+
+	collectDoctorBackendsFunc = func(root string) []doctorBackendStatus {
+		return []doctorBackendStatus{{Name: "ballast-typescript", Version: "5.0.2", Location: "/tmp/ts", Found: true}}
+	}
+
+	root := resolvedTempDir(t)
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".ballast", "tools"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(root, "castoff", "package.json"), `{
+  "name": "castoff",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1"
+  }
+}`)
+	mustWriteFile(t, filepath.Join(root, "castoff", "index.js"), "export function main() {}\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "ballastVersion":"5.0.2",
+  "targets":["codex"],
+  "agents":["linting"],
+  "languages":["typescript"],
+  "paths":{"typescript":["castoff"]}
+}`)
+
+	output := captureStdout(t, func() {
+		withWorkingDir(t, root, func() {
+			exitCode := run([]string{"doctor"})
+			if exitCode != 0 {
+				t.Fatalf("expected exit code 0, got %d", exitCode)
+			}
+		})
+	})
+
+	expected := "- misconfigured profile: typescript=castoff looks like a JavaScript package without tsconfig.json"
+	if !strings.Contains(output, expected) {
+		t.Fatalf("expected %q in doctor output, got %q", expected, output)
+	}
+	if strings.Contains(output, "- stale configured profile: typescript=castoff") {
+		t.Fatalf("expected JavaScript package to be reported as misconfigured instead of stale, got %q", output)
+	}
+	if strings.Contains(output, "Run `ballast doctor --fix`") {
+		t.Fatalf("expected doctor not to recommend doctor --fix for JavaScript package misconfiguration, got %q", output)
+	}
+	if !strings.Contains(output, "ballast install --remove-language typescript --yes") {
+		t.Fatalf("expected removal guidance for JavaScript package misconfiguration, got %q", output)
+	}
+}
+
+func TestConfiguredProfileIssueIgnoresValidOrUnrecognizedPackages(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		lang     language
+		manifest string
+		tsconfig bool
+	}{
+		{"typescript config", langTypeScript, `{"scripts":{"test":"jest"}}`, true},
+		{"other language", langGo, `{"scripts":{"test":"jest"}}`, false},
+		{"metadata only", langTypeScript, `{"name":"workspace"}`, false},
+		{"malformed manifest", langTypeScript, `{`, false},
+		{"missing manifest", langTypeScript, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := resolvedTempDir(t)
+			if tc.manifest != "" {
+				mustWriteFile(t, filepath.Join(root, "package.json"), tc.manifest)
+			}
+			if tc.tsconfig {
+				mustWriteFile(t, filepath.Join(root, "tsconfig.json"), `{}`)
+			}
+			if issue := configuredProfileIssue(root, tc.lang, "."); issue != "" {
+				t.Fatalf("unexpected misconfiguration: %s", issue)
+			}
+		})
+	}
+}
+
+func TestConfiguredProfileIssueRecognizesMinimalJavaScriptPackages(t *testing.T) {
+	for _, packageType := range []string{"module", "commonjs"} {
+		t.Run(packageType, func(t *testing.T) {
+			root := resolvedTempDir(t)
+			mustWriteFile(t, filepath.Join(root, "package.json"), fmt.Sprintf(`{"name":"app","type":%q}`, packageType))
+			mustWriteFile(t, filepath.Join(root, "index.js"), "// JavaScript entry point\n")
+			if issue := configuredProfileIssue(root, langTypeScript, "."); issue == "" {
+				t.Fatal("expected minimal JavaScript package to be misconfigured")
+			}
+		})
+	}
+}
+
+func TestRunRemoveLastLanguageCleansConfigAndManagedRules(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"targets":["codex"],"agents":["linting"],"languages":["typescript"],"paths":{"typescript":["."]},"tools":{"typescript":["pnpm"],"go":["go"]}}`)
+	mustWriteFile(t, filepath.Join(root, "package.json"), `{"main":"index.js"}`)
+	managed := filepath.Join(root, ".codex", "rules", "typescript", "typescript-linting.md")
+	custom := filepath.Join(root, ".codex", "rules", "typescript", "custom.md")
+	mustWriteFile(t, managed, "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n")
+	mustWriteFile(t, custom, "# My custom rule\n")
+	originalEnsure, originalExec := ensureInstalledFunc, execToolFunc
+	t.Cleanup(func() { ensureInstalledFunc, execToolFunc = originalEnsure, originalExec })
+	ensureInstalledFunc = func(tool toolConfig) error { t.Error("cleanup must not install a backend"); return nil }
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		t.Error("cleanup must not invoke a backend")
+		return 0, nil
+	}
+	withWorkingDir(t, root, func() {
+		if code := run([]string{"install", "--remove-language", "typescript", "--yes"}); code != 0 {
+			t.Fatalf("expected successful cleanup, got %d", code)
+		}
+	})
+	config, err := loadDoctorConfig(root)
+	if err != nil || config == nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	if len(config.Languages) != 0 || len(config.Paths) != 0 || len(config.Tools) != 0 {
+		t.Fatalf("expected no saved language profiles or tools, got %#v", config)
+	}
+	if _, err := os.Stat(managed); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected managed rule removed, got %v", err)
+	}
+	if content, err := os.ReadFile(custom); err != nil || string(content) != "# My custom rule\n" {
+		t.Fatalf("expected custom rule preserved, got %q, %v", content, err)
+	}
+}
+
+func TestDoctorMixedDriftRetainsBothRemediations(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "js", "package.json"), `{"main":"index.js"}`)
+	config := &monorepoConfig{
+		Languages: []string{"typescript"},
+		Paths:     map[string][]string{"typescript": {"js", "missing"}},
+	}
+	output := captureStdout(t, func() { printDoctorConfigDrift(root, config) })
+	for _, expected := range []string{"misconfigured profile: typescript=js", "missing configured path: typescript=missing", "ballast doctor --fix", "ballast install --remove-language typescript --yes"} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("expected %q in %q", expected, output)
+		}
 	}
 }
 
@@ -3705,6 +3858,43 @@ func TestResolveMonorepoPlanRemoveLanguageCleanupOnly(t *testing.T) {
 	}
 	if !reflect.DeepEqual(plan.Language, []string{"linting"}) {
 		t.Fatalf("expected cleanup-only plan to keep language rule selection, got %#v", plan.Language)
+	}
+}
+
+func TestLanguageCleanupUsesOnlySavedProfiles(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		removed string
+		paths   string
+		want    []string
+	}{
+		{"new Go profile is not adopted", "typescript", `{"typescript":["."]}`, nil},
+		{"unrelated removal preserves empty path", "python", `{"typescript":[]}`, []string{"typescript"}},
+		{"unrelated removal preserves mismatched path", "python", `{"typescript":["missing"]}`, []string{"typescript"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := resolvedTempDir(t)
+			mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), fmt.Sprintf(`{"targets":["codex"],"agents":["linting"],"languages":["typescript"],"paths":%s,"tools":{"typescript":["pnpm"]}}`, tc.paths))
+			mustWriteFile(t, filepath.Join(root, "package.json"), `{"main":"index.js"}`)
+			mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/app\n\ngo 1.24\n")
+			before, err := loadMonorepoConfig(root)
+			if err != nil || before == nil {
+				t.Fatalf("load fixture: %v", err)
+			}
+			plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-language", tc.removed, "--yes"})
+			if err != nil || plan == nil {
+				t.Fatalf("expected cleanup plan, got %v, %v", plan, err)
+			}
+			if len(plan.Invocations) != 0 || !slices.Equal(plan.Config.Languages, tc.want) {
+				t.Fatalf("unexpected cleanup plan: %#v", plan)
+			}
+			if tc.removed != "typescript" && (!reflect.DeepEqual(plan.Config.Paths, before.Paths) || !reflect.DeepEqual(plan.Config.Tools, before.Tools)) {
+				t.Fatalf("unrelated removal changed saved paths or tools: %#v", plan.Config)
+			}
+			if _, ok := plan.Config.Paths["go"]; ok {
+				t.Fatal("cleanup adopted an uninstalled Go profile")
+			}
+		})
 	}
 }
 

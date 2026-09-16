@@ -247,6 +247,8 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
 
 `.ballast/` is generated repository-local tool state for backend CLIs. It is safe to recreate and should remain ignored by git. `ballast install` does not require `.ballast/` to exist before installing rules or skills. Use `ballast doctor` to inspect `.ballast/`, `.ballast/bin`, and `.ballast/tools`; use `ballast doctor --fix` or `ballast install-cli` to recreate missing or incomplete local tool state.
 
+If doctor reports a configured TypeScript path as a JavaScript package without `tsconfig.json`, add that file if the package should be managed as TypeScript. If the repository should not use TypeScript rules, run `ballast install --remove-language typescript --yes`. This removes the repository's TypeScript language selection, so retain it when other packages still need TypeScript rules. `doctor --fix` does not create a missing `tsconfig.json`.
+
 ## Config Persistence
 
 - Shared config (wrapper + TypeScript/Python/Go CLIs, current default): `.rulesrc.json`
