@@ -1733,7 +1733,7 @@ Keep my custom responsibilities.
       const docsFile = path.join(tmpDir, '.cursor', 'rules', 'docs.mdc');
       expect(fs.existsSync(docsFile)).toBe(true);
       expect(fs.readFileSync(docsFile, 'utf8')).toContain(
-        'Documentation Agent'
+        'Documentation is part of the product'
       );
       expect(fs.readFileSync(docsFile, 'utf8')).toContain('publish-docs');
     });
@@ -1776,11 +1776,11 @@ Keep my custom responsibilities.
       expect(fs.existsSync(mcpFile)).toBe(false);
       expect(fs.existsSync(licenseFile)).toBe(true);
       expect(fs.existsSync(badgesFile)).toBe(true);
-      expect(fs.readFileSync(envFile, 'utf8')).toContain(
-        'Local Development Environment Agent'
-      );
+      expect(fs.readFileSync(envFile, 'utf8')).toContain('ballast setup-dev');
       expect(fs.readFileSync(licenseFile, 'utf8')).toContain('LICENSE');
-      expect(fs.readFileSync(badgesFile, 'utf8')).toContain('README Badges');
+      expect(fs.readFileSync(badgesFile, 'utf8')).toContain(
+        'badges near the top'
+      );
     });
 
     test('installs default rules for agent with multiple rules (publishing)', () => {
@@ -1792,7 +1792,7 @@ Keep my custom responsibilities.
         saveConfig: false
       });
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules.length).toBe(6);
+      expect(result.installedRules.length).toBe(7);
       expect(
         fs.existsSync(
           path.join(tmpDir, '.cursor', 'rules', 'publishing-apt.mdc')
@@ -1875,9 +1875,10 @@ Keep my custom responsibilities.
       });
 
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules).toHaveLength(2);
+      expect(result.installedRules).toHaveLength(3);
       expect(result.installedRules).toEqual(
         expect.arrayContaining([
+          { agentId: 'publishing', ruleSuffix: '' },
           { agentId: 'publishing', ruleSuffix: 'apps' },
           { agentId: 'publishing', ruleSuffix: 'cli' }
         ])
@@ -1929,7 +1930,7 @@ Keep my custom responsibilities.
       });
 
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules).toHaveLength(6);
+      expect(result.installedRules).toHaveLength(7);
       for (const suffix of ['api', 'apps', 'cli', 'libraries', 'sdks', 'web']) {
         expect(
           fs.existsSync(
@@ -2594,6 +2595,43 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(agentsMd).toContain('`.codex/rules/publishing-web.md`');
       expect(agentsMd).not.toContain('`.codex/rules/publishing-brew.md`');
       expect(agentsMd).not.toContain('`.codex/rules/publishing-apt.md`');
+    });
+
+    test('minimal ruleProfile emits only the core rule', async () => {
+      saveConfig(
+        {
+          targets: ['claude'],
+          agents: ['linting', 'testing', 'docs'],
+          languages: ['typescript'],
+          ruleProfile: 'minimal'
+        },
+        tmpDir
+      );
+
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: ['linting', 'testing', 'docs'],
+        force: true
+      });
+
+      expect(result.errors).toEqual([]);
+      expect(result.installedRules).toEqual([
+        { agentId: 'core', ruleSuffix: '' }
+      ]);
+      const corePath = path.join(tmpDir, '.claude', 'rules', 'core.md');
+      expect(fs.existsSync(corePath)).toBe(true);
+      const core = fs.readFileSync(corePath, 'utf8');
+      expect(core).toContain('# Ballast Core Rules');
+      expect(core).toContain('## Commands — Typescript');
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.claude', 'rules', 'typescript-linting.md')
+        )
+      ).toBe(false);
+      const claudeMd = fs.readFileSync(path.join(tmpDir, 'CLAUDE.md'), 'utf8');
+      expect(claudeMd).toContain('`.claude/rules/core.md`');
+      expect(claudeMd).not.toContain('typescript-linting.md');
     });
 
     test('installs opt-in publishing variants when explicitly configured', async () => {

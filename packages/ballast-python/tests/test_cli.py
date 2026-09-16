@@ -315,14 +315,15 @@ class PatchInstallTests(unittest.TestCase):
 
         self.assertNotIn("apt", suffixes)
         self.assertNotIn("brew", suffixes)
-        self.assertEqual(len(suffixes), 6)
+        self.assertIn("", suffixes)
+        self.assertEqual(len(suffixes), 7)
 
     def test_publishing_suffixes_honor_explicit_profiles(self) -> None:
         suffixes = cli.list_rule_suffixes(
             "publishing", "python", ["cli", "apt", "brew"]
         )
 
-        self.assertEqual(suffixes, ["cli", "apt", "brew"])
+        self.assertEqual(suffixes, ["", "cli", "apt", "brew"])
 
     def test_publishing_api_omits_kubernetes_sections_for_none(self) -> None:
         content = cli.build_content(
@@ -346,6 +347,47 @@ class PatchInstallTests(unittest.TestCase):
         suffixes = cli.list_rule_suffixes("local-dev", "python")
 
         self.assertEqual(suffixes, ["badges", "env", "license"])
+
+    def test_minimal_rule_profile_emits_only_core_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["claude"],
+                        "agents": ["linting", "testing", "docs"],
+                        "languages": ["python", "go"],
+                        "ruleProfile": "minimal",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = cli.install(
+                root,
+                "claude",
+                ["linting", "testing", "docs"],
+                [],
+                "python",
+                True,
+                False,
+                False,
+            )
+
+            self.assertEqual(result.errors, [])
+            core = root / ".claude" / "rules" / "core.md"
+            self.assertTrue(core.exists())
+            content = core.read_text(encoding="utf-8")
+            self.assertIn("# Ballast Core Rules", content)
+            self.assertIn("## Commands — Python", content)
+            self.assertIn("## Commands — Go", content)
+            self.assertNotIn("BALLAST_CORE_COMMANDS", content)
+            self.assertFalse(
+                (root / ".claude" / "rules" / "python-linting.md").exists()
+            )
+            claude_md = (root / "CLAUDE.md").read_text(encoding="utf-8")
+            self.assertIn("core.md", claude_md)
+            self.assertNotIn("python-linting.md", claude_md)
 
     def test_task_system_rule_renders_only_configured_system_and_target(self) -> None:
         claude = cli.build_content(
@@ -1145,9 +1187,7 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("linting", result.installed)
             rule = root / ".codex" / "rules" / "ansible-linting.md"
             self.assertTrue(rule.exists())
-            self.assertIn(
-                "Ansible linting specialist", rule.read_text(encoding="utf-8")
-            )
+            self.assertIn("ansible-lint", rule.read_text(encoding="utf-8"))
 
     def test_install_supports_terraform_language_profile(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1168,7 +1208,7 @@ class PatchInstallTests(unittest.TestCase):
             rule = root / ".codex" / "rules" / "terraform-linting.md"
             self.assertTrue(rule.exists())
             content = rule.read_text(encoding="utf-8")
-            self.assertIn("Terraform linting specialist", content)
+            self.assertIn("tflint", content)
             self.assertIn(".terraform-version", content)
             self.assertIn("tfenv install", content)
             self.assertIn("trivy config", content)
@@ -1265,7 +1305,7 @@ class PatchInstallTests(unittest.TestCase):
             self.assertTrue(testing.exists())
             self.assertTrue(git_hooks.exists())
             self.assertIn("hadolint", linting.read_text(encoding="utf-8"))
-            self.assertIn("container logs", logging.read_text(encoding="utf-8"))
+            self.assertIn("docker logs", logging.read_text(encoding="utf-8"))
             self.assertIn("docker build", testing.read_text(encoding="utf-8"))
             git_hooks_content = git_hooks.read_text(encoding="utf-8")
             self.assertIn("docker compose config", git_hooks_content)
@@ -1425,7 +1465,9 @@ class PatchInstallTests(unittest.TestCase):
             self.assertIn("docs", result.installed)
             rule = root / ".cursor" / "rules" / "docs.mdc"
             self.assertTrue(rule.exists())
-            self.assertIn("Documentation Agent", rule.read_text(encoding="utf-8"))
+            self.assertIn(
+                "Documentation is part of the product", rule.read_text(encoding="utf-8")
+            )
             self.assertIn("publish-docs", rule.read_text(encoding="utf-8"))
             self.assertTrue(rule.read_text(encoding="utf-8").startswith("---\n"))
 
@@ -1450,7 +1492,7 @@ class PatchInstallTests(unittest.TestCase):
             content = rule.read_text(encoding="utf-8")
             self.assertTrue(content.startswith("---\n"))
             self.assertIn("mode: subagent", content)
-            self.assertIn("Documentation Agent", content)
+            self.assertIn("Documentation is part of the product", content)
 
     def test_parse_skill_tokens_supports_all(self) -> None:
         self.assertEqual(
@@ -1897,7 +1939,7 @@ Keep team-specific usage notes.
             self.assertIn("linting", result.installed)
             rule = root / ".codex" / "rules" / "python-linting.md"
             self.assertTrue(rule.exists())
-            self.assertIn("Python linting specialist", rule.read_text(encoding="utf-8"))
+            self.assertIn("Ruff", rule.read_text(encoding="utf-8"))
 
     def test_install_moves_python_hook_guidance_to_dedicated_rule(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1917,7 +1959,7 @@ Keep team-specific usage notes.
             git_hooks = root / ".codex" / "rules" / "git-hooks.md"
             self.assertTrue(git_hooks.exists())
             git_hooks_content = git_hooks.read_text(encoding="utf-8")
-            self.assertIn("Git hook specialist", git_hooks_content)
+            self.assertIn("pre-commit install", git_hooks_content)
             self.assertIn("pre-commit install", git_hooks_content)
             self.assertIn("pre-commit install --hook-type pre-push", git_hooks_content)
             self.assertIn("gitleaks", git_hooks_content)

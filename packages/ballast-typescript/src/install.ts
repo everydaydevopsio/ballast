@@ -638,14 +638,26 @@ export function install(options: InstallOptions): InstallResult {
     ? (loadConfig(projectRoot, language) ?? existingConfig)
     : existingConfig;
   const effectiveTools = configForInstall?.tools ?? {};
+  const ruleProfile = configForInstall?.ruleProfile ?? 'full';
+  // Minimal profile: emit only the compiled core rule; the configured agent
+  // set stays in .rulesrc.json so switching back to full restores it.
+  const profileAgents = ruleProfile === 'minimal' ? ['core'] : effectiveAgents;
+  const configuredLanguages =
+    configForInstall?.languages && configForInstall.languages.length > 0
+      ? configForInstall.languages
+      : [language];
   const hookMode = resolveTsHookMode(projectRoot, language);
-  const supportSelections = resolveSupportFileSelections(
+  const baseSupportSelections = resolveSupportFileSelections(
     projectRoot,
     language,
     effectiveAgents,
     skills,
     resolvedPublishingProfiles
   );
+  const supportSelections =
+    ruleProfile === 'minimal'
+      ? { ...baseSupportSelections, agents: ['core'] }
+      : baseSupportSelections;
   const skippedSupportSet = new Set(skipSupportFiles);
 
   if (target === 'codex' && refreshManagedSkills) {
@@ -661,7 +673,7 @@ export function install(options: InstallOptions): InstallResult {
     }
   }
 
-  for (const agentId of effectiveAgents) {
+  for (const agentId of profileAgents) {
     if (!isValidAgent(agentId, language)) {
       errors.push({ agent: agentId, error: 'Unknown agent' });
       continue;
@@ -707,6 +719,7 @@ export function install(options: InstallOptions): InstallResult {
           {
             hookMode,
             tools: effectiveTools,
+            languages: configuredLanguages,
             variables:
               Object.keys(buildVariables).length > 0
                 ? buildVariables

@@ -1,5 +1,3 @@
-You are a Go logging specialist. Your role is to establish structured and maintainable application logging.
-
 ## Your Responsibilities
 
 1. Prefer structured logging with `log/slog` (or `zerolog` where already adopted).

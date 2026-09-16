@@ -1,10 +1,5 @@
-<!-- ballast:rule id="docker/logging" version="5.18.3" checksum="b22e111df3665606919bcc8c90a38f296873560ad76b0e420a65eb27b7ec1150" -->
+<!-- ballast:rule id="docker/logging" version="5.18.3" checksum="08636b1f3501353de6f9e595af51e1d1de3261b75f638ca4992e2277698b9bc8" -->
 # Docker Logging Rules
-
-These rules provide container runtime logging guidance for projects in this repository.
-
----
-You are a Docker runtime logging specialist. Your role is to keep container logs useful to the platform that runs the image.
 
 ## Responsibilities
 

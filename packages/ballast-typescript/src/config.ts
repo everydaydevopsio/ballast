@@ -44,6 +44,9 @@ export type PublishingProfile = (typeof PUBLISHING_PROFILES)[number];
 /** Reference-only variants that are emitted only when explicitly configured. */
 export const OPT_IN_PUBLISHING_PROFILES = ['apt', 'brew'] as const;
 
+export const RULE_PROFILES = ['full', 'minimal'] as const;
+export type RuleProfile = (typeof RULE_PROFILES)[number];
+
 export interface DiscoveryConfig {
   excludePaths?: string[];
 }
@@ -60,6 +63,7 @@ export interface RulesConfig {
   taskSystem?: TaskSystem;
   deploymentModel?: DeploymentModel;
   publishingProfiles?: PublishingProfile[];
+  ruleProfile?: RuleProfile;
 }
 
 export function getRulesrcFilename(): string {
@@ -264,6 +268,11 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     nextConfig = { ...nextConfig, publishingProfiles };
   }
 
+  const ruleProfile = config.ruleProfile ?? existing?.ruleProfile;
+  if (ruleProfile !== undefined) {
+    nextConfig = { ...nextConfig, ruleProfile };
+  }
+
   fs.writeFileSync(filePath, JSON.stringify(nextConfig, null, 2), 'utf8');
 }
 
@@ -293,6 +302,7 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     taskSystem?: unknown;
     deploymentModel?: unknown;
     publishingProfiles?: unknown;
+    ruleProfile?: unknown;
   };
   const targets = normalizeTargets(record.targets ?? record.target);
   if (targets.length === 0 || !Array.isArray(record.agents)) {
@@ -352,6 +362,12 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     config.publishingProfiles = normalizePublishingProfiles(
       record.publishingProfiles
     );
+  }
+  if (typeof record.ruleProfile === 'string') {
+    const profile = record.ruleProfile.trim().toLowerCase();
+    if ((RULE_PROFILES as readonly string[]).includes(profile)) {
+      config.ruleProfile = profile as RuleProfile;
+    }
   }
   return config;
 }

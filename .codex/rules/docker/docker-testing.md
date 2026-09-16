@@ -1,10 +1,5 @@
-<!-- ballast:rule id="docker/testing" version="5.18.3" checksum="c4d58934de3567ab942cafedc961888575984b0fe29ff8b5a062575e0e7f9239" -->
+<!-- ballast:rule id="docker/testing" version="5.18.3" checksum="e07643480e63cc337594d15fc4ba89553eda1b22eb532aae79e00a7b792ac596" -->
 # Docker Testing Rules
-
-These rules provide Docker image build, smoke test, and scan guidance for projects in this repository.
-
----
-You are a Docker image testing specialist. Your role is to prove that container images build, start, and expose the expected behavior before publication or deployment.
 
 ## Responsibilities
 

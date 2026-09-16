@@ -247,6 +247,8 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
 
 `.ballast/` is generated repository-local tool state for backend CLIs. It is safe to recreate and should remain ignored by git. `ballast install` does not require `.ballast/` to exist before installing rules or skills. Use `ballast doctor` to inspect `.ballast/`, `.ballast/bin`, and `.ballast/tools`; use `ballast doctor --fix` or `ballast install-cli` to recreate missing or incomplete local tool state.
 
+If doctor reports a configured TypeScript path as a JavaScript package without `tsconfig.json`, add that file if the package should be managed as TypeScript. If the repository should not use TypeScript rules, run `ballast install --remove-language typescript --yes`. This removes the repository's TypeScript language selection, so retain it when other packages still need TypeScript rules. `doctor --fix` does not create a missing `tsconfig.json`.
+
 ## Config Persistence
 
 - Shared config (wrapper + TypeScript/Python/Go CLIs, current default): `.rulesrc.json`
@@ -255,7 +257,7 @@ When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value,
   - Python CLI (legacy): `.rulesrc.python.json`
   - Go CLI (legacy): `.rulesrc.go.json`
 
-Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVersion`, `languages`, `paths`, `tools`, `discovery.excludePaths`, `taskSystem`, `deploymentModel`, and `publishingProfiles`. Use `deploymentModel: docker` for repos whose deployable artifact is a Docker/OCI image published to GHCR or Docker Hub without Ballast assuming server, Kubernetes, hosted-platform, or serverless rollout ownership. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
+Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVersion`, `languages`, `paths`, `tools`, `discovery.excludePaths`, `taskSystem`, `deploymentModel`, `publishingProfiles`, and `ruleProfile`. Set `ruleProfile: "minimal"` for small-context AI agents: installs then emit a single compiled `core.md` rule (engineering invariants plus per-language command summaries) instead of the full rule set, while the configured agents stay saved so switching back to `full` (the default) restores them on the next refresh. Use `deploymentModel: docker` for repos whose deployable artifact is a Docker/OCI image published to GHCR or Docker Hub without Ballast assuming server, Kubernetes, hosted-platform, or serverless rollout ownership. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
 
 ## Install Paths
 

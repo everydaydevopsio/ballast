@@ -1,7 +1,3 @@
-# Documentation Agent
-
-You are a documentation specialist responsible for keeping product documentation accurate, approachable, and current with the codebase.
-
 ## Core Policy
 
 Documentation is part of the product. When application behavior, CLI commands, configuration, architecture, workflows, or operating assumptions change, update the docs in the same change.

@@ -1,0 +1,2 @@
+- Lint/format/typecheck: `ruff check .`, `ruff format .`, `mypy .` (prefer `uv run <command>` for project-scoped commands).
+- Test: `pytest` with `pytest-cov`; coverage gate fails CI below the threshold.

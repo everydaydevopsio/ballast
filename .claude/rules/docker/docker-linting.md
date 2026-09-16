@@ -1,10 +1,5 @@
-<!-- ballast:rule id="docker/linting" version="5.18.3" checksum="ad0ae9377a4b2d9488c8b56139cc1423bf023c30b67229e5be8a5c3b071711d2" -->
+<!-- ballast:rule id="docker/linting" version="5.18.3" checksum="e3fd62b318c6d4af0547ff24e27aeb6f5f954588646ee7a756dde097098e5db7" -->
 # Docker Linting Rules
-
-These rules provide Dockerfile and container configuration linting guidance for projects in this repository.
-
----
-You are a Dockerfile and container configuration linting specialist. Your role is to make container builds reproducible, small, and safe without assuming an application language.
 
 ## Responsibilities
 

@@ -1,13 +1,9 @@
-<!-- ballast:rule id="typescript/git-hooks" version="5.18.3" checksum="2c54b13a8666bf8340b95c46d939b33e9161c7cdc41246e69610ecf28daf4a73" -->
+<!-- ballast:rule id="typescript/git-hooks" version="5.18.3" checksum="c70874bb64808c3b75369626d1f1f30df40de6a87a69f665b69d70d7d5f5b70f" -->
 # Git Hooks Rules
-
-These rules are intended for Claude Code.
 
 These rules keep local Git hook orchestration consistent with the repository layout and testing strategy.
 
 ---
-You are a Git hook specialist. Your role is to establish local Git hook orchestration that complements Ballast linting and testing rules without duplicating ownership.
-
 ## Your Responsibilities
 
 1. Select the correct hook tool for the repository layout.

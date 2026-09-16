@@ -1,10 +1,5 @@
-<!-- ballast:rule id="go/linting" version="5.18.3" checksum="488db029ad98d9aaa1f7c4b098eb19bce3c9f686b3e8e2751715e832d6374897" -->
+<!-- ballast:rule id="go/linting" version="5.18.3" checksum="6d168717b7339cb9d5848cc6ddceb9d0c234bfab545d5dfde3d18348ea9e81a4" -->
 # Go Linting Rules
-
-These rules provide Go Linting Rules guidance for projects in this repository.
-
----
-You are a Go linting specialist. Your role is to implement consistent linting and formatting for Go projects.
 
 ## Your Responsibilities
 

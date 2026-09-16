@@ -126,6 +126,7 @@ describe('build', () => {
       const suffixes = listRuleSuffixes('publishing');
       expect(suffixes).toEqual(
         expect.arrayContaining([
+          '',
           'libraries',
           'sdks',
           'apps',
@@ -136,7 +137,7 @@ describe('build', () => {
       );
       expect(suffixes).not.toContain('apt');
       expect(suffixes).not.toContain('brew');
-      expect(suffixes.length).toBe(6);
+      expect(suffixes.length).toBe(7);
     });
 
     test('returns opt-in publishing variants when explicitly configured', () => {
@@ -144,8 +145,7 @@ describe('build', () => {
         'apt',
         'brew'
       ]);
-      expect(suffixes).toEqual(expect.arrayContaining(['apt', 'brew']));
-      expect(suffixes).toHaveLength(2);
+      expect(suffixes).toEqual(['', 'apt', 'brew']);
     });
 
     test('returns selected publishing profiles when configured', () => {
@@ -154,16 +154,16 @@ describe('build', () => {
         'apps'
       ]);
 
-      expect(suffixes).toHaveLength(2);
-      expect(suffixes).toEqual(expect.arrayContaining(['cli', 'apps']));
+      expect(suffixes).toEqual(['', 'cli', 'apps']);
     });
 
     test('treats empty publishingProfiles as default profiles', () => {
       const suffixes = listRuleSuffixes('publishing', 'typescript', []);
 
-      expect(suffixes).toHaveLength(6);
+      expect(suffixes).toHaveLength(7);
       expect(suffixes).toEqual(
         expect.arrayContaining([
+          '',
           'libraries',
           'sdks',
           'apps',
@@ -188,20 +188,20 @@ describe('build', () => {
   describe('getContent', () => {
     test('returns content for linting agent', () => {
       const content = getContent('linting');
-      expect(content).toContain('TypeScript linting specialist');
+      expect(content).toContain('flat config format');
       expect(content).toContain('## Your Responsibilities');
     });
 
     test('returns content for logging agent', () => {
       const content = getContent('logging');
-      expect(content).toContain('Centralized Logging Agent');
+      expect(content).toContain('pino');
       expect(content).toContain('pino-browser');
       expect(content).toContain('/api/logs');
     });
 
     test('returns env content for local-dev with ruleSuffix env', () => {
       const content = getContent('local-dev', 'env');
-      expect(content).toContain('Local Development Environment Agent');
+      expect(content).toContain('ballast setup-dev');
       expect(content).toContain('docker-compose.local.yaml');
       expect(content).toContain('Makefile');
       expect(content).toContain('make up-local');
@@ -210,14 +210,13 @@ describe('build', () => {
       expect(content).toContain(
         'gh repo view --json defaultBranchRef --jq .defaultBranchRef.name'
       );
-      expect(content).toContain('If that command fails for any reason');
-      expect(content).toContain('strip the `origin/` prefix');
       expect(content).toContain(
-        'If both default-branch detection methods fail'
+        'git symbolic-ref --short refs/remotes/origin/HEAD'
       );
-      expect(content).toContain('current branch name is empty');
+      expect(content).toContain('create or switch to a task branch first');
+      expect(content).toContain('if both fail, or the checkout is detached');
       expect(content).toContain('issue-212-branch-before-code');
-      expect(content).toContain('Read-only investigation');
+      expect(content).toContain('read-only investigation needs no branch');
     });
 
     test('returns Copilot review loop guidance for local-dev PR workflow', () => {
@@ -335,7 +334,7 @@ describe('build', () => {
 
     test('returns plan-lifecycle content', () => {
       const content = getContent('plan-lifecycle');
-      expect(content).toContain('Plan -> ADR lifecycle');
+      expect(content).toContain('When To Create A Plan');
       expect(content).toContain('Create a plan when');
       expect(content).toContain('Skip a plan');
       expect(content).toContain('plans/plan-<feature-name>.md');
@@ -358,7 +357,7 @@ describe('build', () => {
 
     test('returns docs content', () => {
       const content = getContent('docs');
-      expect(content).toContain('Documentation Agent');
+      expect(content).toContain('Documentation is part of the product');
       expect(content).toContain('Default to a GitHub-readable Markdown');
       expect(content).toContain('publish-docs');
       expect(content).toContain('Mermaid');
@@ -366,37 +365,35 @@ describe('build', () => {
 
     test('returns publishing libraries content', () => {
       const content = getContent('publishing', 'libraries');
-      expect(content).toContain('Publishing Libraries Agent');
-      expect(content).toContain('release_type');
-      expect(content).toContain('patch');
-      expect(content).toContain('minor');
-      expect(content).toContain('major');
-      expect(content).toContain('bump_and_tag');
+      expect(content).toContain('shared publishing release pattern');
+      expect(content).toContain('npmjs');
+      expect(content).toContain('PyPI');
+      expect(content).toContain('GitHub tags');
+    });
+
+    test('returns shared publishing release pattern content', () => {
+      const content = getContent('publishing');
       expect(content).toContain(
         'WyriHaximus/github-action-get-previous-tag@v2'
       );
       expect(content).toContain('WyriHaximus/github-action-next-semvers');
+      expect(content).toContain('cancel-in-progress: false');
       expect(content).toContain('npm publish --access public --provenance');
-      expect(content).toContain('PyPI');
-      expect(content).toContain('GitHub Releases');
+      expect(content).toContain('uv publish');
+      expect(content).toContain('go test ./...');
+      expect(content).toContain('refs/tags/v<version>');
+      expect(content).not.toContain('{{include:');
     });
 
     test('returns publishing apps content for Kubernetes GitOps deployments', () => {
       const content = getContent('publishing', 'apps', 'typescript', {
         variables: { deploymentModel: 'kubernetes' }
       });
-      expect(content).toContain('release_type');
-      expect(content).toContain('v<version>');
-      expect(content).toContain(
-        'WyriHaximus/github-action-get-previous-tag@v2'
-      );
-      expect(content).toContain('WyriHaximus/github-action-next-semvers');
+      expect(content).toContain('shared publishing release pattern');
       expect(content).toContain('ghcr.io');
       expect(content).toContain('Docker Hub');
       expect(content).toContain('charts/<app>/');
-      expect(content).toContain('ArgoCD');
       expect(content).toContain('GitOps repository');
-      expect(content).toContain('image digest');
       expect(content).toContain('## App Deployment Model');
       expect(content).toContain(
         'Deployment guidance is active (`deploymentModel: kubernetes`).'
@@ -553,7 +550,7 @@ describe('build', () => {
 
     test('returns python-specific linting content without hook guidance when language is python', () => {
       const content = getContent('linting', undefined, 'python');
-      expect(content).toContain('Python linting specialist');
+      expect(content).toContain('Ruff');
       expect(content).toContain('Ruff');
       expect(content).not.toContain('.pre-commit-config.yaml');
       expect(content).not.toContain('pre-commit install');
@@ -563,7 +560,7 @@ describe('build', () => {
 
     test('returns go-specific linting content without hook guidance', () => {
       const content = getContent('linting', undefined, 'go');
-      expect(content).toContain('Go linting specialist');
+      expect(content).toContain('golangci-lint');
       expect(content).not.toContain('.pre-commit-config.yaml');
       expect(content).not.toContain('sub-pre-commit');
       expect(content).not.toContain('pre-commit install --hook-type pre-push');
@@ -572,7 +569,7 @@ describe('build', () => {
 
     test('returns pre-commit git-hooks content for python', () => {
       const content = getContent('git-hooks', undefined, 'python');
-      expect(content).toContain('Git hook specialist');
+      expect(content).toContain('pre-commit install');
       expect(content).toContain('.pre-commit-config.yaml');
       expect(content).toContain('gitleaks');
       expect(content).not.toContain('scripts/check-no-secrets.sh');
@@ -673,7 +670,7 @@ describe('build', () => {
 
     test('returns go-specific testing content when language is go', () => {
       const content = getContent('testing', undefined, 'go');
-      expect(content).toContain('Go testing specialist');
+      expect(content).toContain('go test ./...');
       expect(content).toContain('go test ./...');
     });
   });
@@ -1302,6 +1299,30 @@ alwaysApply: false
         'Kubernetes Helm Chart: Probes Configuration'
       );
       expect(result).not.toContain('BALLAST_IF_DEPLOYMENT');
+    });
+
+    test('ignores unknown or traversal language values in core commands', () => {
+      const content = buildContent('core', 'claude', undefined, 'typescript', {
+        languages: ['typescript', '../secrets', '/etc', 'not-a-language']
+      });
+      expect(content).toContain('## Commands — Typescript');
+      expect(content).not.toContain('secrets');
+      expect(content).not.toContain('/etc');
+    });
+
+    test('renders core rule with invariants and configured language commands', () => {
+      const content = buildContent('core', 'claude', undefined, 'typescript', {
+        languages: ['typescript', 'go']
+      });
+      expect(content).toContain('# Ballast Core Rules');
+      expect(content).toContain('Branch before code');
+      expect(content).toContain('TDD for behavioral changes');
+      expect(content).toContain('## Commands — Typescript');
+      expect(content).toContain('pnpm lint');
+      expect(content).toContain('## Commands — Go');
+      expect(content).toContain('golangci-lint run');
+      expect(content).not.toContain('## Commands — Python');
+      expect(content).not.toContain('BALLAST_CORE_COMMANDS');
     });
 
     test('renders task-system rule only for the configured system and target', () => {

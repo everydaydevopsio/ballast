@@ -1,0 +1,2 @@
+- Lint: `ansible-lint`; syntax-check playbooks in pre-push.
+- Test: `molecule test` for roles with test scenarios.

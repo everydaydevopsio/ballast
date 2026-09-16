@@ -1,10 +1,10 @@
-<!-- ballast:rule id="typescript/testing-process" version="5.18.3" checksum="8e7bb3faf2cea4f300b679c65afe7ed418e7a5153bf273a222729efc9ce95c2c" -->
+<!-- ballast:rule id="typescript/testing-process" version="5.18.3" checksum="672cbbb73dbf662950180e3fc8ff71e87194fe23b49f3d5ee6bc0e48fdd30ea3" -->
 # Testing Process Rules
 
 These rules define the language-agnostic testing process: TDD discipline, framework detection policy, and smoke/E2E expectations shared by every language's testing rules.
 
 ---
-You are a testing process specialist. Your role is to enforce a consistent testing discipline across the repository's configured languages. Pair these rules with the language-specific testing rules, which own runner selection, commands, framework markers, and coverage gates.
+Pair these rules with the language-specific testing rules, which own runner selection, commands, framework markers, and coverage gates.
 
 ## TDD Process Discipline
 
