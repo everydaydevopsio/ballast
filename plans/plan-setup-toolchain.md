@@ -78,3 +78,4 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 | Date | Change |
 | --- | --- |
 | 2026-09-15 | Initial plan from the #128/#94 review plus the #325 Go toolchain finding |
+| 2026-09-16 | Re-verified against main: typescript/linting still advises an explicit `pnpm/action-setup` version, this repo's CI still pins `version: 10.27.0` despite declaring `packageManager`, both Go modules still pin `go 1.24`, and #325 still fails all three Go jobs. Plan stacked on the Spec Kit process plan so both share one `plans/README.md` index. |
