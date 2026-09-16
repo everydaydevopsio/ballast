@@ -12,6 +12,11 @@ tools:
   grep: true
 permission:
   bash:
-    'git *': ask
-    '*': ask
+    'git push*': ask
+    'git reset --hard*': ask
+    'git clean*': ask
+    'npm publish*': ask
+    'pnpm publish*': ask
+    'rm -rf*': ask
+    '*': allow
 ---
