@@ -103,10 +103,11 @@ describe('CI workflow', () => {
       for (const line of source.content.split('\n')) {
         if (!/go build\b/.test(line)) continue;
         if (!/ballast-go/.test(line)) continue;
-        // Verification builds discard their output or drop it in /tmp; they
-        // never become the backend the wrapper runs, so a stamp is moot.
+        // Only an explicit /tmp output is exempt. A build with no `-o` still
+        // writes a usable binary into the module directory, which the wrapper
+        // prefers over the installer path.
         const output = line.match(/-o\s+("?)([^\s"]+)\1/);
-        if (!output || output[2].includes('/tmp/')) continue;
+        if (output && output[2].includes('/tmp/')) continue;
         if (!line.includes('-X main.ballastVersion=')) {
           unstamped.push(`${source.path}: ${line.trim()}`);
         }

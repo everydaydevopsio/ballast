@@ -745,6 +745,9 @@ func resolveInstallCLIVersion(root string, requestedVersion string) (string, err
 	if strings.TrimSpace(requestedVersion) != "" {
 		return requestedVersion, nil
 	}
+	if sourceModeInstall(root) {
+		return "", nil
+	}
 	config, err := loadDoctorConfig(root)
 	if err != nil {
 		return "", err
@@ -1115,7 +1118,18 @@ func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool,
 	return 0
 }
 
+// sourceModeInstall reports whether backends should be built from a local
+// checkout rather than downloaded. This keys off the wrapper binary and the
+// source root only -- never the version recorded in .rulesrc.json, which during
+// a release bump names a version that is not published yet.
+func sourceModeInstall(root string) bool {
+	return releaseVersion(resolveVersion()) == "" && preferredSourceRoot(root) != ""
+}
+
 func desiredDoctorInstallVersion(root string) string {
+	if sourceModeInstall(root) {
+		return resolveVersion()
+	}
 	config, err := loadDoctorConfig(root)
 	if err == nil && config != nil {
 		if release := releaseVersion(config.BallastVersion); release != "" {

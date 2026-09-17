@@ -6302,3 +6302,58 @@ func TestRecordedVersionKeepsReleaseVersionForInstalledWrapper(t *testing.T) {
 		t.Fatalf("expected installed wrapper to keep its own version, got %q", got)
 	}
 }
+
+// Recording the repository version in .rulesrc.json must not push the install
+// paths onto the released-backend route. During a release bump the recorded
+// version is not published yet, so a dev wrapper in a source checkout has to
+// keep building backends from the tree.
+func TestDoctorInstallVersionStaysSourceModeForDevWrapperInSource(t *testing.T) {
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "dev"
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast","version":"5.19.0"}`)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.26.0\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"targets":["claude"],"agents":["linting"],"ballastVersion":"5.19.0"}`)
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(root, "cli", "ballast", "ballast"), nil
+	}
+
+	if got := desiredDoctorInstallVersion(root); releaseVersion(got) != "" {
+		t.Fatalf("expected source mode (no release version), got %q", got)
+	}
+
+	resolved, err := resolveInstallCLIVersion(root, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if releaseVersion(resolved) != "" {
+		t.Fatalf("expected source mode (no release version), got %q", resolved)
+	}
+}
+
+func TestDoctorInstallVersionKeepsRecordedReleaseOutsideSourceCheckout(t *testing.T) {
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "5.19.0"
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"targets":["claude"],"agents":["linting"],"ballastVersion":"5.18.3"}`)
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(resolvedTempDir(t), "outside-ballast", "ballast"), nil
+	}
+
+	if got := desiredDoctorInstallVersion(root); got != "5.18.3" {
+		t.Fatalf("expected the recorded release version, got %q", got)
+	}
+}

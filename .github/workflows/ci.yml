@@ -250,7 +250,9 @@ jobs:
 
       - name: Build ballast-go language pack
         working-directory: packages/ballast-go
-        run: go build ./cmd/ballast-go
+        # Compile check only: write to /tmp so this never leaves an unstamped
+        # ballast-go in the module directory, which the wrapper would prefer.
+        run: go build -o /tmp/ballast-go-build-check ./cmd/ballast-go
 
   cli-lint:
     name: CLI lint

@@ -113,20 +113,30 @@ jobs:
           go build -C cli/ballast -o "${PWD}/.ci/bin/ballast" .
           .ci/bin/ballast upgrade --patch
 
-      - name: Verify regenerated outputs carry the release version
+      # Rule markers record which version generated that content, so a rule
+      # whose body did not change keeps its older stamp -- patch mode
+      # deliberately leaves pristine files alone. Requiring every marker to
+      # equal the release version would fail every release. What must hold is
+      # that the config records this release and that nothing claims a version
+      # newer than it, which would mean a stale or hand-edited artifact.
+      - name: Verify regenerated outputs record the release version
         run: |
           set -euo pipefail
           VERSION="${{ steps.version.outputs.version }}"
-          # Compare the ballast:rule markers themselves; a plain inverted grep
-          # would match every ordinary line of every rule body.
-          STALE="$(grep -rho 'version="[^"]*"' .claude/rules .codex/rules \
-            --include='*.md' | sort -u | grep -v "^version=\"${VERSION}\"$" || true)"
-          if [ -n "${STALE}" ]; then
-            echo "Rules carry version markers other than ${VERSION}:" >&2
-            echo "${STALE}" >&2
+          grep -q "\"ballastVersion\": \"${VERSION}\"" .rulesrc.json
+          NEWER="$(grep -rho 'version="[^"]*"' .claude/rules .codex/rules \
+            --include='*.md' | sort -u | sed 's/version="//; s/"$//' \
+            | while read -r marker; do
+                [ "${marker}" = "${VERSION}" ] && continue
+                if [ "$(printf '%s\n%s\n' "${VERSION}" "${marker}" | sort -V | tail -1)" = "${marker}" ]; then
+                  echo "${marker}"
+                fi
+              done)"
+          if [ -n "${NEWER}" ]; then
+            echo "Rules claim versions newer than ${VERSION}:" >&2
+            echo "${NEWER}" >&2
             exit 1
           fi
-          grep -q "\"ballastVersion\": \"${VERSION}\"" .rulesrc.json
 
       - name: Commit and create tag
         run: |

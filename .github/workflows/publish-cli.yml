@@ -24,6 +24,8 @@ permissions:
 jobs:
   validate_cross_language:
     uses: ./.github/workflows/cross-language-validate.yml
+    with:
+      ref: refs/tags/v${{ inputs.version }}
 
   release:
     if: ${{ github.event_name == 'workflow_dispatch' }}
