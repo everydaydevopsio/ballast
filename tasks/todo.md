@@ -78,8 +78,18 @@ Prior branch work in this file (issues #158/#159 task templates, #278 root selec
 1. **Phase 2 (#128)** — the three unchecked `#128` items above. Smallest of the remaining phases: recon found exactly **one** line of stale agent guidance (`agents/typescript/linting/content.md:30`) plus this repo's own inconsistent pnpm pins. The Node half of #128 is already correct — `agents/common/local-dev/content-env.md:58` already says "prefer the current LTS for `.nvmrc`", and no stale `node-version` examples exist in `agents/`, so that part of the issue can be closed as already-satisfied rather than reworked.
 2. **Phase 3 (#94)** — doctor `PATH` checks with the Homebrew remediation map. Largest remaining piece; wrapper-only by default, with backend parity noted as a follow-up.
 3. **Then** close out the plan: regenerate managed outputs, tick `plans/plan-setup-toolchain.md` phase boxes with evidence, and graduate the plan to an ADR.
+4. **Adopt castoff** once it supports `CHANGELOG.md` modification — see the blocked section below.
 
 Unrelated to this workstream but open: **#340** (one-line `AGENTS.md` fix, good filler task) and **PR #320** (agent performance analyzer — green with 3 clean Copilot cycles, awaiting merge; merging it should close #321 and #323). **PR #319** (Crew verification contract) has still never been reviewed.
+
+## Blocked: Adopt Castoff For Release Notes
+
+Castoff (`everydaydevopsio/castoff`) generates AI release notes from `git log <previous-tag>..HEAD` and returns a `release_notes` string. Adopt it **once it can also write `CHANGELOG.md`** — today it only produces a release body, so it cannot close the changelog gap on its own.
+
+- Blocker: castoff has no CHANGELOG.md output. Until it does, adopting it leaves `CHANGELOG.md` stale (newest documented release is `[3.0.0] - 2026-01-30` against a 5.18.3 project) even though GitHub Releases would look correct.
+- When unblocked, wire it into `publish.yml`, not a `softprops/action-gh-release` step: this repo's releases are created by **GoReleaser** (twice — `packages/ballast-go/.goreleaser.yaml` and `cli/ballast/.goreleaser.yaml`, each with its own `changelog:` block), so the hook is `goreleaser release --release-notes=<file>` rather than the snippet in castoff's README.
+- Prerequisites: add an `OPENAI_API_KEY` secret (absent — the repo has only Apple, Codecov, and Homebrew secrets); pin `everydaydevopsio/castoff/castoff@v2` (castoff is at v2.0.0; its README still documents `@v1`).
+- Already satisfied: `bump_and_tag` checks out with `fetch-depth: 0`, which castoff's `git describe` needs, and the commit range fits castoff's default `max_commits: 200`.
 
 ## Follow-ups Tracked Elsewhere
 

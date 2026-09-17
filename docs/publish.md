@@ -178,8 +178,9 @@ Both should succeed after a signed release is installed.
 
 ## Quick Checklist
 
-- Single-language publish workflows call the shared cross-language validation workflow before publishing.
-- Release validation runs `scripts/release-cross-language-check.sh` to verify TypeScript, Python, Go, and unified monorepo installs.
+- `publish.yml` and the single-language publish workflows all call the shared cross-language validation workflow before tagging or publishing.
+- Release validation runs `scripts/release-cross-language-check.sh` to verify TypeScript, Python, Go, and unified monorepo installs. It checks out `everydaydevopsio/ballast-examples` into `.ci/ballast-examples`, which `scripts/smoke-wrapper-monorepo.sh` requires.
+- `bump_and_tag` regenerates the managed `.claude/` and `.codex/` outputs at the new version and fails the release if any rule marker or `.rulesrc.json` still carries an older version.
 - npm trusted publisher configured for this repo/workflow.
 - Python workflow uploads wheel/sdist assets to GitHub Release tag `v<version>`.
 - CLI workflow uploads archives/checksums to GitHub Release and updates the Homebrew tap formula and cask.

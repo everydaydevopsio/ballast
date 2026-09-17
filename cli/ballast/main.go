@@ -63,6 +63,41 @@ func preferredSourceRoot(projectRoot string) string {
 	return localSourceRoot()
 }
 
+// sourceRepositoryVersion reads the monorepo version from the TypeScript
+// package manifest, which is the version the release workflow bumps first and
+// the one the TypeScript and Python backends stamp onto their own output.
+func sourceRepositoryVersion(sourceRoot string) string {
+	data, err := os.ReadFile(filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"))
+	if err != nil {
+		return ""
+	}
+	var manifest struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return ""
+	}
+	return releaseVersion(strings.TrimSpace(manifest.Version))
+}
+
+// resolveRecordedVersion is the version written into .rulesrc.json and stamped
+// onto generated output. A wrapper built from source reports "dev", which is
+// meaningless to record, so fall back to the repository version when running
+// inside a Ballast source checkout. Backend source-vs-release selection still
+// keys off the binary's own version, so this does not change install behavior.
+func resolveRecordedVersion(projectRoot string) string {
+	resolved := resolveVersion()
+	if releaseVersion(resolved) != "" {
+		return resolved
+	}
+	if sourceRoot := preferredSourceRoot(projectRoot); sourceRoot != "" {
+		if repoVersion := sourceRepositoryVersion(sourceRoot); repoVersion != "" {
+			return repoVersion
+		}
+	}
+	return resolved
+}
+
 func preferredInstallSourceRoot(projectRoot string, version string) string {
 	if releaseVersion(version) != "" {
 		return ""
@@ -114,7 +149,15 @@ var goTool = toolConfig{
 	installCommand: func(version string, projectRoot string) ([]string, error) {
 		if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
 			moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
-			return []string{"go", "build", "-C", moduleRoot, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go"}, nil
+			command := []string{"go", "build", "-C", moduleRoot}
+			// Stamp the repository version so rules emitted by a source-built
+			// backend match the version the other backends report, instead of
+			// falling back to the "dev" default.
+			if repoVersion := sourceRepositoryVersion(sourceRoot); repoVersion != "" {
+				command = append(command, "-ldflags", "-X main.ballastVersion="+repoVersion)
+			}
+			command = append(command, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go")
+			return command, nil
 		}
 		return releasedGoInstallCommand(version, projectRoot)
 	},
@@ -1000,7 +1043,7 @@ func runUpgrade(selectedLanguage language, args []string) int {
 		return 1
 	}
 
-	config.BallastVersion = normalizeVersion(resolveVersion())
+	config.BallastVersion = normalizeVersion(resolveRecordedVersion(root))
 	if err := saveMonorepoConfig(root, *config); err != nil {
 		fmt.Println(err)
 		return 1
@@ -2935,7 +2978,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		Targets:         savedTargets,
 		Agents:          persistAgents,
 		Skills:          persistSkills,
-		BallastVersion:  normalizeVersion(resolveVersion()),
+		BallastVersion:  normalizeVersion(resolveRecordedVersion(root)),
 		Languages:       make([]string, 0, len(profiles)),
 		Paths:           map[string][]string{},
 		Tools:           mergeLanguageTools(config, nil),

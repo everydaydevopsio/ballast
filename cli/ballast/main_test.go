@@ -6204,3 +6204,101 @@ func TestRegistryConsistency(t *testing.T) {
 		}
 	}
 }
+
+// Source-built Go backends must carry the repository version, otherwise every
+// rule they emit is stamped `dev` and the checked-in generated outputs drift
+// away from the release version.
+func TestGoInstallCommandStampsRepositoryVersionForSourceBuilds(t *testing.T) {
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "dev"
+	sourceRoot := resolvedTempDir(t)
+	projectRoot := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast","version":"5.19.0"}`)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.26.0\n")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(sourceRoot, "cli", "ballast", "ballast"), nil
+	}
+
+	command, err := toolsByLanguage[langGo].installCommand("", projectRoot)
+	if err != nil {
+		t.Fatalf("unexpected install error: %v", err)
+	}
+
+	joined := strings.Join(command, " ")
+	if !strings.Contains(joined, "-ldflags") {
+		t.Fatalf("expected source build to pass ldflags, got %#v", command)
+	}
+	if !strings.Contains(joined, "-X main.ballastVersion=5.19.0") {
+		t.Fatalf("expected source build to stamp the repository version, got %#v", command)
+	}
+}
+
+func TestGoInstallCommandOmitsStampWhenRepositoryVersionUnknown(t *testing.T) {
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "dev"
+	sourceRoot := resolvedTempDir(t)
+	projectRoot := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.26.0\n")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(sourceRoot, "cli", "ballast", "ballast"), nil
+	}
+
+	command, err := toolsByLanguage[langGo].installCommand("", projectRoot)
+	if err != nil {
+		t.Fatalf("unexpected install error: %v", err)
+	}
+
+	if strings.Contains(strings.Join(command, " "), "-ldflags") {
+		t.Fatalf("expected no stamp without a readable repository version, got %#v", command)
+	}
+}
+
+// A dev wrapper running inside its own source checkout must record the
+// repository version in .rulesrc.json. Recording "dev" would put a meaningless
+// version into the release commit and into every contributor's config.
+func TestRecordedVersionPrefersRepositoryVersionForDevWrapperInSource(t *testing.T) {
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "dev"
+	sourceRoot := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast","version":"5.19.0"}`)
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(sourceRoot, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.26.0\n")
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(sourceRoot, "cli", "ballast", "ballast"), nil
+	}
+
+	if got := resolveRecordedVersion(sourceRoot); got != "5.19.0" {
+		t.Fatalf("expected recorded version 5.19.0, got %q", got)
+	}
+}
+
+func TestRecordedVersionKeepsReleaseVersionForInstalledWrapper(t *testing.T) {
+	originalVersion := version
+	t.Cleanup(func() { version = originalVersion })
+
+	version = "5.18.3"
+	if got := resolveRecordedVersion(resolvedTempDir(t)); got != "5.18.3" {
+		t.Fatalf("expected installed wrapper to keep its own version, got %q", got)
+	}
+}

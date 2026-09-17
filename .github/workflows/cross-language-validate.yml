@@ -24,6 +24,15 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
+      # release-cross-language-check.sh runs smoke-wrapper-monorepo.sh, which
+      # exits 1 without this fixture. Without the checkout the whole gate fails
+      # before it validates anything.
+      - name: Checkout ballast-examples repo
+        uses: actions/checkout@v7
+        with:
+          repository: everydaydevopsio/ballast-examples
+          path: .ci/ballast-examples
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v6.1.0
         with:
