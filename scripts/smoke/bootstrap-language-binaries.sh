@@ -138,7 +138,17 @@ install_go() {
     exit 1
   fi
 
-  "$go_bin" build -C "$module_root" -o "$target" "$cmd_path"
+  # The wrapper prefers a ballast-go sitting beside it, so this build has to
+  # carry the repository version itself or the image emits `dev` markers.
+  local ldflags=()
+  local repo_version
+  repo_version="$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' \
+    "$source_root/packages/ballast-typescript/package.json" 2>/dev/null | head -1)"
+  if [[ -n "$repo_version" ]]; then
+    ldflags=(-ldflags "-X main.ballastVersion=$repo_version")
+  fi
+
+  "$go_bin" build -C "$module_root" "${ldflags[@]}" -o "$target" "$cmd_path"
   chmod +x "$target"
 }
 
