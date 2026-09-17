@@ -52,14 +52,14 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 
 ## Phases
 
-- [x] Phase 1 (#339): Go toolchain 1.26 bump; supersedes dependabot #325
+- [x] Phase 1 (#339): Go toolchain 1.26 bump (PR #342, merged as 9918d50); dependabot #325 closed as superseded
 - [ ] Phase 2 (#128): package-manager guidance sweep + repo CI dogfooding
 - [ ] Phase 3 (#94): doctor PATH checks + Homebrew remediation map
 - [ ] Docs and plan close-out
 
 ## Verification
 
-- Phase 1: all Go CI jobs green on 1.26; #325 merges clean.
+- Phase 1: all Go CI jobs green on 1.26; the `x/term` bump lands directly in #342 and dependabot #325 is closed as superseded, since rebasing it onto `main` drops its commit as already-upstream.
 - Phase 2: no `pnpm@<major>`/`version: <major>` pins remain in generated content when `packageManager` governs; repo CI green without the explicit pnpm version.
 - Phase 3: doctor on a machine missing a tool lists it with a copyable install command; wrapper tests cover present/missing/no-brew paths.
 
@@ -81,5 +81,6 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 | Date | Change |
 | --- | --- |
 | 2026-09-15 | Initial plan from the #128/#94 review plus the #325 Go toolchain finding |
+| 2026-09-17 | Phase 1 merged as PR #342 (9918d50); #325 closed as superseded after a rebase dropped its commit as already-upstream. Copilot cycle 1 added two Phase 1 items beyond the original scope: `Dockerfile.smoke` -> `golang:1.26-bookworm`, and the guard widened to discover every `go.mod`, parse workflow YAML instead of regex, and check golang Docker base images. Phase 2 recon recorded on #128. |
 | 2026-09-17 | Phase 1 complete: both modules on `go 1.26.0`, all pinned `go-version` bumped to `1.26.x`, `golang.org/x/term` 0.34.0 → 0.46.0 (and `x/sys` 0.35.0 → 0.48.0) applied directly, README prerequisite and toolchain rationale documented, regression guard added in `packages/ballast-typescript/src/go-toolchain.test.ts`. |
 | 2026-09-16 | Re-verified against main: typescript/linting still advises an explicit `pnpm/action-setup` version, this repo's CI still pins `version: 10.27.0` despite declaring `packageManager`, both Go modules still pin `go 1.24`, and #325 still fails all three Go jobs. Plan stacked on the Spec Kit process plan so both share one `plans/README.md` index. |
