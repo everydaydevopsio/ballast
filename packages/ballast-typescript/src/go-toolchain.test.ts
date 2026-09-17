@@ -1,16 +1,53 @@
 import fs from 'fs';
 import path from 'path';
 
-// Issue #339: the golang.org/x/* family requires Go >= 1.26, so every Go module
-// and every pinned setup-go version in CI must stay on one supported toolchain.
+// Issue #339: the golang.org/x/* family requires Go >= 1.26, so every Ballast
+// Go module, every pinned setup-go version, and every golang Docker base image
+// must stay on one supported toolchain.
 const MINIMUM_GO_VERSION = [1, 26] as const;
 
 const repoRoot = path.resolve(__dirname, '../../..');
 
-const GO_MODULES = ['packages/ballast-go/go.mod', 'cli/ballast/go.mod'];
+// Sample projects under examples/ exist only so language detection sees a Go
+// project; nothing builds them against the Ballast toolchain, so they may
+// declare an older directive. Listing them explicitly means a NEW module is a
+// production module until someone deliberately classifies it as a fixture.
+const FIXTURE_MODULES = ['examples/smoke/go-sample/go.mod'];
+
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  '.venv',
+  'coverage'
+]);
 
 function readRepoFile(relativePath: string): string {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+}
+
+function discoverGoModules(): string[] {
+  const found: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(path.join(repoRoot, dir || '.'), {
+      withFileTypes: true
+    })) {
+      const relative = dir ? path.posix.join(dir, entry.name) : entry.name;
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) walk(relative);
+      } else if (entry.name === 'go.mod') {
+        found.push(relative);
+      }
+    }
+  };
+  walk('');
+  return found.sort();
+}
+
+function productionModules(): string[] {
+  return discoverGoModules().filter(
+    (modulePath) => !FIXTURE_MODULES.includes(modulePath)
+  );
 }
 
 function parseGoDirective(relativePath: string): number[] {
@@ -32,29 +69,44 @@ function workflowFiles(): string[] {
   return fs
     .readdirSync(workflowDir)
     .filter((entry) => entry.endsWith('.yml') || entry.endsWith('.yaml'))
-    .map((entry) => path.join('.github/workflows', entry));
+    .map((entry) => path.posix.join('.github/workflows', entry));
+}
+
+function dockerfiles(): string[] {
+  return fs
+    .readdirSync(repoRoot)
+    .filter((entry) => entry.startsWith('Dockerfile'))
+    .filter((entry) => fs.statSync(path.join(repoRoot, entry)).isFile());
 }
 
 describe('Go toolchain pins', () => {
-  test('every Go module requires at least the supported toolchain', () => {
-    for (const modulePath of GO_MODULES) {
-      const version = parseGoDirective(modulePath);
-      expect({ modulePath, ok: isAtLeastMinimum(version) }).toEqual({
-        modulePath,
-        ok: true
-      });
+  test('every discovered Go module is classified as production or fixture', () => {
+    // Guards the fixture allowlist itself: a stale entry would silently exempt
+    // nothing, and an unlisted new module correctly falls through to production.
+    const discovered = discoverGoModules();
+    expect(discovered.length).toBeGreaterThan(0);
+    for (const fixture of FIXTURE_MODULES) {
+      expect(discovered).toContain(fixture);
     }
+    expect(productionModules().length).toBeGreaterThan(0);
   });
 
-  test('all Go modules declare the same go directive', () => {
-    const directives = GO_MODULES.map((modulePath) =>
+  test('every production Go module requires at least the supported toolchain', () => {
+    const offenders = productionModules().filter(
+      (modulePath) => !isAtLeastMinimum(parseGoDirective(modulePath))
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  test('all production Go modules declare the same go directive', () => {
+    const directives = productionModules().map((modulePath) =>
       parseGoDirective(modulePath).join('.')
     );
     expect(new Set(directives).size).toBe(1);
   });
 
   test('pinned setup-go versions in workflows match the module toolchain', () => {
-    const [major, minor] = parseGoDirective(GO_MODULES[0]);
+    const [major, minor] = parseGoDirective(productionModules()[0]);
     const expectedPin = `${major}.${minor}.x`;
     const offenders: string[] = [];
 
@@ -63,6 +115,23 @@ describe('Go toolchain pins', () => {
       for (const match of content.matchAll(/go-version:\s*'([^']+)'/g)) {
         if (match[1] !== expectedPin) {
           offenders.push(`${workflowPath}: ${match[1]}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  test('golang Docker base images match the module toolchain', () => {
+    const [major, minor] = parseGoDirective(productionModules()[0]);
+    const expectedSeries = `${major}.${minor}`;
+    const offenders: string[] = [];
+
+    for (const dockerfile of dockerfiles()) {
+      const content = readRepoFile(dockerfile);
+      for (const match of content.matchAll(/^FROM\s+golang:([^\s-]+)/gm)) {
+        if (match[1] !== expectedSeries) {
+          offenders.push(`${dockerfile}: golang:${match[1]}`);
         }
       }
     }
