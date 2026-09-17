@@ -52,7 +52,7 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 
 ## Phases
 
-- [ ] Phase 1 (#339): Go toolchain 1.26 bump; merge dependabot #325
+- [x] Phase 1 (#339): Go toolchain 1.26 bump; supersedes dependabot #325
 - [ ] Phase 2 (#128): package-manager guidance sweep + repo CI dogfooding
 - [ ] Phase 3 (#94): doctor PATH checks + Homebrew remediation map
 - [ ] Docs and plan close-out
@@ -70,12 +70,16 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 
 ## Open Questions
 
-- Go 1.26: bump `go.mod` `go` directive to 1.26.0 exactly, or keep lower and rely on `toolchain`/`GOTOOLCHAIN`? (Decide in Phase 1 PR.)
 - Should TS/Python backends gain doctor tool checks for parity, or is the wrapper the single front door? (Default: wrapper-only; note parity as follow-up.)
+
+## Decisions
+
+- **Go directive (Phase 1)**: both modules declare `go 1.26.0` exactly, with no `toolchain` line. The module graph already requires >= 1.26.0 through `golang.org/x/*`, so a lower directive plus `toolchain` would only re-introduce implicit toolchain downloads — which `actions/setup-go` disables by running with `GOTOOLCHAIN=local`. An explicit directive is the honest floor and keeps CI deterministic. CI pins `go-version: '1.26.x'`; workflows that already use `go-version-file` need no change.
 
 ## Change Log
 
 | Date | Change |
 | --- | --- |
 | 2026-09-15 | Initial plan from the #128/#94 review plus the #325 Go toolchain finding |
+| 2026-09-17 | Phase 1 complete: both modules on `go 1.26.0`, all pinned `go-version` bumped to `1.26.x`, `golang.org/x/term` 0.34.0 → 0.46.0 (and `x/sys` 0.35.0 → 0.48.0) applied directly, README prerequisite and toolchain rationale documented, regression guard added in `packages/ballast-typescript/src/go-toolchain.test.ts`. |
 | 2026-09-16 | Re-verified against main: typescript/linting still advises an explicit `pnpm/action-setup` version, this repo's CI still pins `version: 10.27.0` despite declaring `packageManager`, both Go modules still pin `go 1.24`, and #325 still fails all three Go jobs. Plan stacked on the Spec Kit process plan so both share one `plans/README.md` index. |
