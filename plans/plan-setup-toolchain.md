@@ -15,13 +15,21 @@ Three related gaps in first-run/setup reliability, from issues #128 and #94 plus
 
 ## What Is Already Built (review findings, 2026-09-15)
 
-- The wrapper's `detectNodePackageManager` (cli/ballast/main.go) already implements #128's exact precedence: `package.json#packageManager` → `pnpm-lock.yaml` → `yarn.lock` → `package-lock.json` → npm default.
+- The wrapper's `detectNodePackageManager` (cli/ballast/main.go) implements #128's exact precedence: `package.json#packageManager` → `pnpm-lock.yaml` → `yarn.lock` → `package-lock.json` → npm default. **Superseded 2026-09-17:** it is not the detector that feeds generated output — see the correction below.
 - `ballast setup-dev` already runs `corepack enable` when the manager is declared, then `<manager> install`.
-- Repository-facts discovery (#288) already writes the detected package manager into CLAUDE.md/AGENTS.md.
+- Repository-facts discovery (#288) already writes the detected package manager into CLAUDE.md/AGENTS.md — but via `detectPackageManager`, which has the wrong precedence. See the correction below.
 - `.rulesrc.json` `tools` per language is rendered once into the manifest's Repository Tool Policy (#286); doctor prints the configured tools but performs no PATH checks.
 - local-dev env content already prefers Node LTS for `.nvmrc`.
 
-So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor extension over the existing `tools` config.
+So #94 reduces to a doctor extension over the existing `tools` config.
+
+### Correction (2026-09-17): #128 is not a content/CI sweep alone
+
+This section originally concluded that #128 reduced to a content and CI alignment sweep. That was wrong, and the statement above is superseded.
+
+`discoverRepositoryFactsSection` does not call `detectNodePackageManager`. It calls `detectPackageManager` (`cli/ballast/main.go:2505`, defined at `:2576`), which checks lockfiles **before** `package.json#packageManager`. A repository that declares one manager while carrying another's lockfile therefore gets the wrong manager written into its generated Repository Facts.
+
+Phase 2 accordingly includes a behavioural fix with tests, regeneration of the three packaged backend copies of the stale guidance as well as `.claude/` and `.codex/`, and a decision on whether `detectNodePackageManager` returning `""` with neither a `package.json` nor a lockfile should be the documented npm fallback. Full scope in `tasks/todo.md` and on #128.
 
 ## Approach
 
@@ -81,6 +89,7 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 | Date | Change |
 | --- | --- |
 | 2026-09-15 | Initial plan from the #128/#94 review plus the #325 Go toolchain finding |
+| 2026-09-17 | Corrected the "already built" findings: #128 is not a content/CI sweep alone, because generated Repository Facts come from `detectPackageManager`, whose precedence is inverted. |
 | 2026-09-17 | Phase 1 merged as PR #342 (9918d50); #325 closed as superseded after a rebase dropped its commit as already-upstream. Copilot cycle 1 added two Phase 1 items beyond the original scope: `Dockerfile.smoke` -> `golang:1.26-bookworm`, and the guard widened to discover every `go.mod`, parse workflow YAML instead of regex, and check golang Docker base images. Phase 2 recon recorded on #128. |
 | 2026-09-17 | Phase 1 complete: both modules on `go 1.26.0`, all pinned `go-version` bumped to `1.26.x`, `golang.org/x/term` 0.34.0 → 0.46.0 (and `x/sys` 0.35.0 → 0.48.0) applied directly, README prerequisite and toolchain rationale documented, regression guard added in `packages/ballast-typescript/src/go-toolchain.test.ts`. |
 | 2026-09-16 | Re-verified against main: typescript/linting still advises an explicit `pnpm/action-setup` version, this repo's CI still pins `version: 10.27.0` despite declaring `packageManager`, both Go modules still pin `go 1.24`, and #325 still fails all three Go jobs. Plan stacked on the Spec Kit process plan so both share one `plans/README.md` index. |
