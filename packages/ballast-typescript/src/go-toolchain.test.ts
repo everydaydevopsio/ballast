@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import YAML from 'yaml';
 
 // Issue #339: the golang.org/x/* family requires Go >= 1.26, so every Ballast
 // Go module, every pinned setup-go version, and every golang Docker base image
@@ -79,6 +80,32 @@ function dockerfiles(): string[] {
     .filter((entry) => fs.statSync(path.join(repoRoot, entry)).isFile());
 }
 
+function collectGoVersionPins(node: unknown): string[] {
+  const pins: string[] = [];
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (value === null || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(
+      value as Record<string, unknown>
+    )) {
+      // `go-version-file` points at a go.mod and needs no pin comparison.
+      if (
+        key === 'go-version' &&
+        (typeof child === 'string' || typeof child === 'number')
+      ) {
+        pins.push(String(child));
+      } else {
+        visit(child);
+      }
+    }
+  };
+  visit(node);
+  return pins;
+}
+
 describe('Go toolchain pins', () => {
   test('every discovered Go module is classified as production or fixture', () => {
     // Guards the fixture allowlist itself: a stale entry would silently exempt
@@ -111,10 +138,13 @@ describe('Go toolchain pins', () => {
     const offenders: string[] = [];
 
     for (const workflowPath of workflowFiles()) {
-      const content = readRepoFile(workflowPath);
-      for (const match of content.matchAll(/go-version:\s*'([^']+)'/g)) {
-        if (match[1] !== expectedPin) {
-          offenders.push(`${workflowPath}: ${match[1]}`);
+      // Parse the YAML rather than the raw text: quoting is the author's
+      // choice, and `go-version: 1.26` unquoted even parses as a number.
+      for (const pin of collectGoVersionPins(
+        YAML.parse(readRepoFile(workflowPath))
+      )) {
+        if (pin !== expectedPin) {
+          offenders.push(`${workflowPath}: ${pin}`);
         }
       }
     }
