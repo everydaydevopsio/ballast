@@ -35,8 +35,8 @@ Prior branch work in this file (issues #158/#159 task templates, #278 root selec
 
 ## Execution Checklist
 
-- [ ] #339 Phase 1: raise `go` directive and CI `go-version` to 1.26.x across both modules; decide and document the `toolchain`/`GOTOOLCHAIN` stance.
-- [ ] #339: verify release/GoReleaser paths build on 1.26, then merge dependabot #325.
+- [x] #339 Phase 1: both modules declare `go 1.26.0`, all pinned CI `go-version` raised to `1.26.x`; stance documented in README and the plan's Decisions section (explicit directive, no `toolchain` line, since `actions/setup-go` runs `GOTOOLCHAIN=local`).
+- [x] #339: all GoReleaser targets cross-compile on 1.26 (linux/darwin/windows x amd64/arm64, windows/arm64 ignored); `golang.org/x/term` 0.34.0 -> 0.46.0 and `x/sys` 0.35.0 -> 0.48.0 applied here, so dependabot #325 is superseded and should be closed.
 - [ ] #128 Phase 2: rewrite the `pnpm/action-setup` guidance in `agents/typescript/linting/content.md` to omit the version when `packageManager` is declared.
 - [ ] #128: sweep remaining agent content for stale package-manager pins and non-LTS Node examples; document the detection order in docs.
 - [ ] #128: drop the hardcoded pnpm `version:` from this repo's workflows (dogfooding).

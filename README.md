@@ -198,7 +198,7 @@ The monorepo contains TypeScript, Python, and Go implementations. Use:
 - Node.js 22 or newer; `.nvmrc` pins the development version.
 - The `pnpm` version declared in `package.json`.
 - Python 3.10 or newer with `uv`.
-- Go 1.24 or newer.
+- Go 1.26 or newer. Both Go modules declare `go 1.26.0` because the `golang.org/x/*` dependencies require it; CI pins `go-version: '1.26.x'` rather than relying on toolchain downloads, since `actions/setup-go` runs with `GOTOOLCHAIN=local`.
 
 ```bash
 git clone https://github.com/everydaydevopsio/ballast.git
