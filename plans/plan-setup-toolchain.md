@@ -59,7 +59,7 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 
 ## Verification
 
-- Phase 1: all Go CI jobs green on 1.26; #325 merges clean.
+- Phase 1: all Go CI jobs green on 1.26; the `x/term` bump lands directly in #342 and dependabot #325 is closed as superseded, since rebasing it onto `main` drops its commit as already-upstream.
 - Phase 2: no `pnpm@<major>`/`version: <major>` pins remain in generated content when `packageManager` governs; repo CI green without the explicit pnpm version.
 - Phase 3: doctor on a machine missing a tool lists it with a copyable install command; wrapper tests cover present/missing/no-brew paths.
 
