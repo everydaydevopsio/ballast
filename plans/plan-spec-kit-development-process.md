@@ -228,7 +228,7 @@ A change is complete only when:
 Per-agent and per-skill guides (`docs/agents/spec-kit.md`, `docs/skills/speckit-*.md`, `docs/skills/github-pr-copilot-cycle.md`) already exist from the Spec Kit merge, so the remaining work is the connective tissue between them, not new per-artifact docs.
 
 - [ ] Phase 1: Resolve the placement question, then write the end-to-end process doc that sequences the existing guides.
-- [ ] Phase 2: Fix the broken `docs/code_review.md` reference in `AGENTS.md` (create the doc or repoint the reference).
+- [ ] Phase 2 (#340): Fix the broken `docs/code_review.md` reference in `AGENTS.md` (create the doc or repoint the reference).
 - [ ] Phase 3: Add cross-links from the existing Spec Kit guides to task, plan lifecycle, testing, docs, and PR review guidance.
 - [ ] Phase 4: Add a docs-link check that prevents advertised-process drift (would have caught the `docs/code_review.md` break).
 - [ ] Phase 5: Run focused validation and update this plan with evidence.

@@ -25,7 +25,7 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 
 ## Approach
 
-### Phase 1 — Go toolchain bump (unblocks dependabot #325)
+### Phase 1 — Go toolchain bump (#339; unblocks dependabot #325)
 
 - Raise the Go toolchain to 1.26.x: `packages/ballast-go/go.mod`, `cli/ballast/go.mod`, `actions/setup-go` versions in workflows, and any GoReleaser config references.
 - Re-run and merge dependabot #325 (x/term 0.46.0) after CI is green on 1.26.
@@ -52,9 +52,9 @@ So #128 reduces to a content/CI alignment sweep, and #94 reduces to a doctor ext
 
 ## Phases
 
-- [ ] Phase 1: Go toolchain 1.26 bump; merge dependabot #325
-- [ ] Phase 2: package-manager guidance sweep + repo CI dogfooding
-- [ ] Phase 3: doctor PATH checks + Homebrew remediation map
+- [ ] Phase 1 (#339): Go toolchain 1.26 bump; merge dependabot #325
+- [ ] Phase 2 (#128): package-manager guidance sweep + repo CI dogfooding
+- [ ] Phase 3 (#94): doctor PATH checks + Homebrew remediation map
 - [ ] Docs and plan close-out
 
 ## Verification
