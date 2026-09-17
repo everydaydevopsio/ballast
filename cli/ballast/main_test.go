@@ -6357,3 +6357,49 @@ func TestDoctorInstallVersionKeepsRecordedReleaseOutsideSourceCheckout(t *testin
 		t.Fatalf("expected the recorded release version, got %q", got)
 	}
 }
+
+// doctor --fix must not persist the wrapper's "dev" build version into
+// .rulesrc.json. The install path and the recorded version are separate
+// concerns: source mode selects how backends are built, the repository version
+// is what gets written down.
+func TestDoctorFixPersistsRepositoryVersionInSourceCheckout(t *testing.T) {
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "dev"
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast","version":"5.19.0"}`)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.26.0\n")
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"targets":["claude"],"agents":["linting"],"ballastVersion":"5.19.0"}`)
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(root, "cli", "ballast", "ballast"), nil
+	}
+
+	if got := doctorConfigVersionToPersist(root, desiredDoctorInstallVersion(root)); got != "5.19.0" {
+		t.Fatalf("expected the repository version to be persisted, got %q", got)
+	}
+}
+
+func TestDoctorFixPersistsExplicitReleaseVersion(t *testing.T) {
+	originalVersion := version
+	originalExecutable := osExecutableFunc
+	t.Cleanup(func() {
+		version = originalVersion
+		osExecutableFunc = originalExecutable
+	})
+
+	version = "5.19.0"
+	root := resolvedTempDir(t)
+	osExecutableFunc = func() (string, error) {
+		return filepath.Join(resolvedTempDir(t), "outside-ballast", "ballast"), nil
+	}
+
+	if got := doctorConfigVersionToPersist(root, "5.18.3"); got != "5.18.3" {
+		t.Fatalf("expected the explicit release version, got %q", got)
+	}
+}

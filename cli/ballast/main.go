@@ -1109,8 +1109,8 @@ func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool,
 		}
 		return exitCode
 	}
-	if desiredVersion != "" {
-		if err := rewriteDoctorConfigVersion(root, desiredVersion); err != nil {
+	if persisted := doctorConfigVersionToPersist(root, desiredVersion); persisted != "" {
+		if err := rewriteDoctorConfigVersion(root, persisted); err != nil {
 			fmt.Println(err)
 			return 1
 		}
@@ -1124,6 +1124,17 @@ func runDoctorFixWithVersion(root string, selectedLanguage language, patch bool,
 // a release bump names a version that is not published yet.
 func sourceModeInstall(root string) bool {
 	return releaseVersion(resolveVersion()) == "" && preferredSourceRoot(root) != ""
+}
+
+// doctorConfigVersionToPersist separates the install-path version from the one
+// written to .rulesrc.json. In source mode the install version is the wrapper's
+// own "dev", which must never be persisted; record the repository version
+// instead.
+func doctorConfigVersionToPersist(root string, desiredVersion string) string {
+	if releaseVersion(desiredVersion) != "" {
+		return desiredVersion
+	}
+	return releaseVersion(resolveRecordedVersion(root))
 }
 
 func desiredDoctorInstallVersion(root string) string {
