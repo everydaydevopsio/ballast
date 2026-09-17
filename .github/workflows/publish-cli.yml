@@ -22,8 +22,12 @@ permissions:
   contents: read
 
 jobs:
+  validate_cross_language:
+    uses: ./.github/workflows/cross-language-validate.yml
+
   release:
     if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: validate_cross_language
     runs-on: macos-latest
     permissions:
       contents: write
@@ -99,6 +103,7 @@ jobs:
 
   release_from_version:
     if: ${{ github.event_name == 'workflow_call' }}
+    needs: validate_cross_language
     runs-on: macos-latest
     permissions:
       contents: write

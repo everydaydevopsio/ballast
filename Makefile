@@ -42,9 +42,15 @@ build-python:
 	@echo "Run it from any repo directory with:"
 	@echo "  $(PY_RUN_ENV) python -m ballast install --target cursor --all"
 
+# Stamp the backend so rules it emits carry the repository version instead of
+# the "dev" default. Deliberately NOT applied to the wrapper (build-cli): a
+# wrapper reporting a release version installs published backends instead of
+# building them from this tree.
+BALLAST_VERSION := $(shell sed -n 's/.*"version": "\([^"]*\)".*/\1/p' packages/ballast-typescript/package.json | head -1)
+
 build-go:
 	@echo "==> Building Go installer CLI (ballast-go)"
-	cd $(GO_DIR) && env GOCACHE=$(GO_GOCACHE) go build -o $(ROOT)/$(GO_BIN) ./cmd/ballast-go
+	cd $(GO_DIR) && env GOCACHE=$(GO_GOCACHE) go build -ldflags "-X main.ballastVersion=$(BALLAST_VERSION)" -o $(ROOT)/$(GO_BIN) ./cmd/ballast-go
 	@echo ""
 	@echo "Run it with:"
 	@echo "  $(ROOT)/$(GO_BIN) install --target cursor --all"

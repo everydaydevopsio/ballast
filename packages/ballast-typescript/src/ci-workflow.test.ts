@@ -82,4 +82,55 @@ describe('CI workflow', () => {
       fs.existsSync(path.join(repoRoot, '.github/workflows/language-packs.yml'))
     ).toBe(false);
   });
+  test('source builds of the Go backend carry a version stamp', () => {
+    // The wrapper prefers a `ballast-go` sitting next to it over the installer
+    // path, so an unstamped source build emits rules marked `dev`. The wrapper
+    // itself must NOT be stamped: a wrapper reporting a release version
+    // installs published backends instead of building from the tree.
+    const sources: Array<{ path: string; content: string }> = [
+      { path: 'Makefile', content: readRepoFile('Makefile') },
+      ...fs
+        .readdirSync(path.join(repoRoot, '.github/workflows'))
+        .filter((entry) => entry.endsWith('.yml') || entry.endsWith('.yaml'))
+        .map((entry) => {
+          const relative = `.github/workflows/${entry}`;
+          return { path: relative, content: readRepoFile(relative) };
+        })
+    ];
+
+    const unstamped: string[] = [];
+    for (const source of sources) {
+      for (const line of source.content.split('\n')) {
+        if (!/go build\b/.test(line)) continue;
+        if (!/ballast-go/.test(line)) continue;
+        // Verification builds discard their output or drop it in /tmp; they
+        // never become the backend the wrapper runs, so a stamp is moot.
+        const output = line.match(/-o\s+("?)([^\s"]+)\1/);
+        if (!output || output[2].includes('/tmp/')) continue;
+        if (!line.includes('-X main.ballastVersion=')) {
+          unstamped.push(`${source.path}: ${line.trim()}`);
+        }
+      }
+    }
+
+    expect(unstamped).toEqual([]);
+  });
+
+  test('the cross-language gate is wired into every publishing workflow', () => {
+    const gate = '.github/workflows/cross-language-validate.yml';
+    const publishing = fs
+      .readdirSync(path.join(repoRoot, '.github/workflows'))
+      .filter((entry) => entry.startsWith('publish'))
+      .map((entry) => `.github/workflows/${entry}`);
+
+    expect(publishing.length).toBeGreaterThan(0);
+    const missing = publishing.filter(
+      (workflowPath) =>
+        !readRepoFile(workflowPath).includes(
+          gate.replace('.github/workflows/', '')
+        )
+    );
+
+    expect(missing).toEqual([]);
+  });
 });
