@@ -1747,7 +1747,7 @@ Keep my custom responsibilities.
         saveConfig: false
       });
       expect(result.installed).toEqual(['local-dev']);
-      expect(result.installedRules.length).toBe(3);
+      expect(result.installedRules.length).toBe(4);
       const envFile = path.join(
         tmpDir,
         '.cursor',

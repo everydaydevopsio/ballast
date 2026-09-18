@@ -1,0 +1,68 @@
+---
+description: Autonomy policy - minimize low-information questions; proceed on safe reversible work, ask only at protected boundaries
+mode: subagent
+model: anthropic/claude-sonnet-4-20250514
+temperature: 0.2
+tools:
+  write: true
+  edit: true
+  bash: true
+  read: true
+  glob: true
+  grep: true
+permission:
+  bash:
+    'git status*': allow
+    'git diff*': allow
+    'git log*': allow
+    'git show*': allow
+    # Inspection forms only: `git branch*` would also authorize `git branch -D`
+    # and `-m`, and `git fetch*` would authorize `--prune`, all of which mutate
+    # refs and must stay behind the protected-operation prompt.
+    'git branch': allow
+    'git branch --list*': allow
+    'git branch --show-current': allow
+    'git branch -a': allow
+    'git branch --all': allow
+    'git branch -r': allow
+    'git branch --remotes': allow
+    'git fetch': allow
+    'git fetch --dry-run*': allow
+    'npm test*': allow
+    'npm run test*': allow
+    'npm run lint*': allow
+    'npm run build*': allow
+    'pnpm test*': allow
+    'pnpm run test*': allow
+    'pnpm run lint*': allow
+    'pnpm run build*': allow
+    'pnpm lint*': allow
+    'pnpm build*': allow
+    'go test*': allow
+    'go build*': allow
+    'go vet*': allow
+    'gofmt*': allow
+    'golangci-lint*': allow
+    'pytest*': allow
+    'ruff*': allow
+    'mypy*': allow
+    'eslint*': allow
+    'prettier*': allow
+    # Repository tool policy prefers `uv run <cmd>` for Python and
+    # `pnpm exec <cmd>` for TypeScript. Those forms do not match the bare
+    # prefixes above, so without these entries the project-standard
+    # verification commands fall through to `'*': ask` and the policy
+    # contradicts itself.
+    'uv run pytest*': allow
+    'uv run ruff*': allow
+    'uv run mypy*': allow
+    'uv run python -m pytest*': allow
+    'pnpm exec eslint*': allow
+    'pnpm exec prettier*': allow
+    'pnpm exec jest*': allow
+    'pnpm exec vitest*': allow
+    'pnpm exec tsc*': allow
+    'hadolint*': allow
+    'tflint*': allow
+    '*': ask
+---

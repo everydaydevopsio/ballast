@@ -111,6 +111,11 @@ var skillRegistry = []skillEntry{
 		Status:      statusActive,
 	},
 	{
+		ID:          "agent-performance-audit",
+		Description: "use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements",
+		Status:      statusActive,
+	},
+	{
 		ID:          "ballast-project-maintenance",
 		Description: "inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools",
 		Status:      statusActive,
