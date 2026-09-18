@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Entries from `3.0.1` through `5.18.3` were not recorded here. See the
 [GitHub Releases](https://github.com/everydaydevopsio/ballast/releases) page for
-that history. Releases from the next one onward are written here automatically
-during `publish.yml`.
+that history. From the next release onward `publish.yml` writes entries here
+automatically, provided an `OPENAI_API_KEY` secret is available to the
+repository; releases made without it are published but not recorded here, and
+GitHub Releases remains the complete history.
 
 ## [Unreleased]
 
