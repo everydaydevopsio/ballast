@@ -38,6 +38,20 @@ permission:
     'mypy*': allow
     'eslint*': allow
     'prettier*': allow
+    # Repository tool policy prefers `uv run <cmd>` for Python and
+    # `pnpm exec <cmd>` for TypeScript. Those forms do not match the bare
+    # prefixes above, so without these entries the project-standard
+    # verification commands fall through to `'*': ask` and the policy
+    # contradicts itself.
+    'uv run pytest*': allow
+    'uv run ruff*': allow
+    'uv run mypy*': allow
+    'uv run python -m pytest*': allow
+    'pnpm exec eslint*': allow
+    'pnpm exec prettier*': allow
+    'pnpm exec jest*': allow
+    'pnpm exec vitest*': allow
+    'pnpm exec tsc*': allow
     'hadolint*': allow
     'tflint*': allow
     '*': ask
