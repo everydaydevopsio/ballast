@@ -8,9 +8,11 @@ on:
         required: false
         type: string
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# No workflow-level concurrency: this workflow only runs when called, and
+# `github.workflow` resolves to the caller's name, so a group built from it
+# collides with the concurrency group the calling run already holds -- the
+# called job then never starts and the whole run fails with no logs. Callers
+# serialize their own releases.
 
 permissions:
   contents: read

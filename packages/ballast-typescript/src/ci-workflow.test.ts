@@ -146,6 +146,35 @@ describe('CI workflow', () => {
     expect(bootstrap).toContain('-X main.ballastVersion=');
   });
 
+  test('callable workflows do not key concurrency on github.workflow', () => {
+    // In a called workflow `github.workflow` resolves to the CALLER's name, so
+    // such a group collides with the caller's own. The caller already holds it,
+    // so the called job can never start and the run fails with every job
+    // skipped -- with no logs, because nothing ever ran. A literal prefix
+    // (`publish-cli-${{ github.ref }}`) is safe; this only rejects the
+    // interpolated form.
+    const offenders: string[] = [];
+    for (const entry of fs.readdirSync(path.join(repoRoot, '.github/workflows'))) {
+      if (!entry.endsWith('.yml') && !entry.endsWith('.yaml')) continue;
+      const relative = `.github/workflows/${entry}`;
+      const raw = readRepoFile(relative);
+      const workflow = YAML.parse(raw) as {
+        on?: Record<string, unknown>;
+        concurrency?: { group?: string };
+      };
+      const callable = Object.prototype.hasOwnProperty.call(
+        workflow.on ?? {},
+        'workflow_call'
+      );
+      const group = workflow.concurrency?.group ?? '';
+      if (callable && group.includes('github.workflow')) {
+        offenders.push(`${relative}: ${group}`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
   test('the cross-language gate is wired into every publishing workflow', () => {
     const gate = '.github/workflows/cross-language-validate.yml';
     const publishing = fs
