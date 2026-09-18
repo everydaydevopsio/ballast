@@ -37,11 +37,6 @@ jobs:
     permissions:
       contents: write
 
-    # Exposed at job level so steps can skip AI note generation when the secret
-    # is not configured; a release must still work without it.
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
     outputs:
       version: ${{ steps.version.outputs.version }}
       release_notes: ${{ steps.notes.outputs.release_notes }}
@@ -147,9 +142,24 @@ jobs:
       # castoff reads `git describe --tags --abbrev=0 HEAD^` and logs from there
       # to HEAD, so it runs before the release commit is made and the tag is
       # created. Skipped entirely when OPENAI_API_KEY is absent.
+      # Publishes a non-secret boolean so the steps below can be gated without
+      # exporting the key to the whole job, where dependency installs, builds
+      # and every third-party action would inherit it.
+      - name: Check for release-notes key
+        id: notes_key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${OPENAI_API_KEY}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate AI release notes
         id: notes
-        if: ${{ env.OPENAI_API_KEY != '' }}
+        if: ${{ steps.notes_key.outputs.available == 'true' }}
         uses: everydaydevopsio/castoff/castoff@v2
         env:
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
@@ -159,7 +169,7 @@ jobs:
 
       - name: Update CHANGELOG.md
         id: changelog
-        if: ${{ env.OPENAI_API_KEY != '' && steps.notes.outputs.changelog_entry != '' }}
+        if: ${{ steps.notes_key.outputs.available == 'true' && steps.notes.outputs.changelog_entry != '' }}
         uses: everydaydevopsio/castoff/changelog@v2
         with:
           version: ${{ steps.version.outputs.version }}
