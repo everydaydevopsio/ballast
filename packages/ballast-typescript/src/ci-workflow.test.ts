@@ -154,7 +154,9 @@ describe('CI workflow', () => {
     // (`publish-cli-${{ github.ref }}`) is safe; this only rejects the
     // interpolated form.
     const offenders: string[] = [];
-    for (const entry of fs.readdirSync(path.join(repoRoot, '.github/workflows'))) {
+    for (const entry of fs.readdirSync(
+      path.join(repoRoot, '.github/workflows')
+    )) {
       if (!entry.endsWith('.yml') && !entry.endsWith('.yaml')) continue;
       const relative = `.github/workflows/${entry}`;
       const raw = readRepoFile(relative);
