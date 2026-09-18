@@ -16,8 +16,18 @@ permission:
     'git diff*': allow
     'git log*': allow
     'git show*': allow
-    'git branch*': allow
-    'git fetch*': allow
+    # Inspection forms only: `git branch*` would also authorize `git branch -D`
+    # and `-m`, and `git fetch*` would authorize `--prune`, all of which mutate
+    # refs and must stay behind the protected-operation prompt.
+    'git branch': allow
+    'git branch --list*': allow
+    'git branch --show-current': allow
+    'git branch -a': allow
+    'git branch --all': allow
+    'git branch -r': allow
+    'git branch --remotes': allow
+    'git fetch': allow
+    'git fetch --dry-run*': allow
     'npm test*': allow
     'npm run test*': allow
     'npm run lint*': allow
