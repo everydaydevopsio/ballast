@@ -4383,7 +4383,7 @@ func buildMonorepoSupportFile(root string, plan *monorepoPlan, target string) st
 // configuredRuleSuffixesForAgent to honor configured publishing profiles.
 func ruleSuffixesForAgent(agent string) []string {
 	if agent == "local-dev" {
-		return []string{"badges", "env", "license"}
+		return []string{"autonomy", "badges", "env", "license"}
 	}
 	if agent == "publishing" {
 		return []string{"", "api", "apps", "cli", "libraries", "sdks", "web"}
@@ -4399,7 +4399,7 @@ func ruleSuffixesForAgent(agent string) []string {
 // located and cleaned up.
 func allRuleSuffixesForAgent(agent string) []string {
 	if agent == "local-dev" {
-		return []string{"badges", "env", "license", "mcp"}
+		return []string{"autonomy", "badges", "env", "license", "mcp"}
 	}
 	if agent == "publishing" {
 		return []string{"", "api", "apps", "apt", "brew", "cli", "libraries", "sdks", "web"}

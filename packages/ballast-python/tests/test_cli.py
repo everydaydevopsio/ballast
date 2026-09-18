@@ -346,7 +346,7 @@ class PatchInstallTests(unittest.TestCase):
     def test_local_dev_has_no_mcp_suffix(self) -> None:
         suffixes = cli.list_rule_suffixes("local-dev", "python")
 
-        self.assertEqual(suffixes, ["badges", "env", "license"])
+        self.assertEqual(suffixes, ["autonomy", "badges", "env", "license"])
 
     def test_minimal_rule_profile_emits_only_core_rule(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1505,6 +1505,7 @@ class PatchInstallTests(unittest.TestCase):
                 "github-health-check",
                 "github-pr-copilot-cycle",
                 "ballast-audit",
+                "agent-performance-audit",
                 "ballast-project-maintenance",
                 "docker-registry-publish",
                 "speckit-bootstrap",

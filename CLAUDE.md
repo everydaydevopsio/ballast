@@ -40,6 +40,7 @@ Created by Ballast. Do not edit this section.
 
 Read and follow these rule files in `.claude/rules/` when they apply:
 
+- `.claude/rules/common/local-dev-autonomy.md` — Rules for common/local-dev-autonomy
 - `.claude/rules/common/local-dev-badges.md` — Rules for common/local-dev-badges
 - `.claude/rules/common/local-dev-env.md` — Rules for common/local-dev-env
 - `.claude/rules/common/local-dev-license.md` — Rules for common/local-dev-license
@@ -85,6 +86,7 @@ Read and use these skill files in `.claude/skills/` when they are relevant:
 - `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 - `.claude/skills/github-pr-copilot-cycle.skill` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
 - `.claude/skills/ballast-audit.skill` — audit AI rule and skill files for context density, duplication, and bloat
+- `.claude/skills/agent-performance-audit.skill` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
 - `.claude/skills/ballast-project-maintenance.skill` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
 - `.claude/skills/speckit-bootstrap.skill` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
 - `.claude/skills/speckit-reverse-engineer.skill` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline

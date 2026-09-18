@@ -104,8 +104,9 @@ describe('build', () => {
       expect(listRuleSuffixes('testing')).toEqual(['']);
     });
 
-    test('returns env, license, and badges for local-dev in sorted order', () => {
+    test('returns autonomy, badges, env, and license for local-dev in sorted order', () => {
       expect(listRuleSuffixes('local-dev')).toEqual([
+        'autonomy',
         'badges',
         'env',
         'license'

@@ -44,6 +44,7 @@ var (
 		"github-health-check",
 		"github-pr-copilot-cycle",
 		"ballast-audit",
+		"agent-performance-audit",
 		"ballast-project-maintenance",
 		"docker-registry-publish",
 		"speckit-bootstrap",
