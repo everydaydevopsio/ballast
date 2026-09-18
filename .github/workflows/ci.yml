@@ -193,7 +193,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
 
       - name: Check gofmt
         working-directory: packages/ballast-go
@@ -220,7 +220,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
 
       - name: Run ballast-go unit tests with coverage
         working-directory: packages/ballast-go
@@ -246,11 +246,13 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
 
       - name: Build ballast-go language pack
         working-directory: packages/ballast-go
-        run: go build ./cmd/ballast-go
+        # Compile check only: write to /tmp so this never leaves an unstamped
+        # ballast-go in the module directory, which the wrapper would prefer.
+        run: go build -o /tmp/ballast-go-build-check ./cmd/ballast-go
 
   cli-lint:
     name: CLI lint
@@ -263,7 +265,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
 
       - name: Check gofmt
         working-directory: cli/ballast
@@ -290,7 +292,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
 
       - name: Run ballast wrapper unit tests with coverage
         working-directory: cli/ballast
@@ -316,7 +318,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
 
       - name: Build ballast wrapper
         working-directory: cli/ballast

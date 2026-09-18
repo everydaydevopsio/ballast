@@ -24,8 +24,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Gate the release on the same cross-language validation the single-language
+  # publish workflows run, so a broken tree is never tagged or published.
+  validate:
+    uses: ./.github/workflows/cross-language-validate.yml
+
   bump_and_tag:
     if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs:
+      - validate
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,6 +54,11 @@ jobs:
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: packages/ballast-go/go.mod
 
       - name: Get Previous tag
         id: previoustag
@@ -82,6 +94,50 @@ jobs:
           uv version --directory packages/ballast-python "${{ steps.version.outputs.version }}" --frozen
           uv lock --directory packages/ballast-python
 
+      # Managed rule/skill outputs carry the version of the Ballast that wrote
+      # them. Without this the release ships outputs stamped with the previous
+      # version, and the gap widens every release. A source-built wrapper is a
+      # dev build, so it installs backends from this tree -- which is the only
+      # way to regenerate at a version that has not been published yet.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6.1.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate managed agent outputs at the release version
+        run: |
+          set -euo pipefail
+          pnpm run build
+          mkdir -p .ci/bin
+          go build -C cli/ballast -o "${PWD}/.ci/bin/ballast" .
+          .ci/bin/ballast upgrade --patch
+
+      # Rule markers record which version generated that content, so a rule
+      # whose body did not change keeps its older stamp -- patch mode
+      # deliberately leaves pristine files alone. Requiring every marker to
+      # equal the release version would fail every release. What must hold is
+      # that the config records this release and that nothing claims a version
+      # newer than it, which would mean a stale or hand-edited artifact.
+      - name: Verify regenerated outputs record the release version
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          grep -q "\"ballastVersion\": \"${VERSION}\"" .rulesrc.json
+          NEWER="$(grep -rho 'version="[^"]*"' .claude/rules .codex/rules \
+            --include='*.md' | sort -u | sed 's/version="//; s/"$//' \
+            | while read -r marker; do
+                [ "${marker}" = "${VERSION}" ] && continue
+                if [ "$(printf '%s\n%s\n' "${VERSION}" "${marker}" | sort -V | tail -1)" = "${marker}" ]; then
+                  echo "${marker}"
+                fi
+              done)"
+          if [ -n "${NEWER}" ]; then
+            echo "Rules claim versions newer than ${VERSION}:" >&2
+            echo "${NEWER}" >&2
+            exit 1
+          fi
+
       - name: Commit and create tag
         run: |
           set -euo pipefail
@@ -90,7 +146,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          rm -rf .ci
           git add packages/ballast-typescript/package.json packages/ballast-python/pyproject.toml packages/ballast-python/uv.lock
+          git add .rulesrc.json .claude .codex AGENTS.md CLAUDE.md
           git commit -m "chore(release): bump version to ${VERSION} [skip ci]"
 
           git tag "v${VERSION}"
@@ -102,8 +160,9 @@ jobs:
           git push origin "v${{ steps.version.outputs.version }}"
 
   publish_typescript:
-    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
+    if: ${{ always() && needs.validate.result == 'success' && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
     needs:
+      - validate
       - bump_and_tag
     runs-on: ubuntu-latest
     permissions:
@@ -137,8 +196,9 @@ jobs:
         run: npm publish --access public --provenance
 
   publish_python:
-    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
+    if: ${{ always() && needs.validate.result == 'success' && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
     needs:
+      - validate
       - bump_and_tag
     runs-on: ubuntu-latest
     permissions:
@@ -172,8 +232,9 @@ jobs:
             packages/ballast-python/dist/*.tar.gz
 
   publish_go:
-    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
+    if: ${{ always() && needs.validate.result == 'success' && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
     needs:
+      - validate
       - bump_and_tag
     runs-on: ubuntu-latest
     permissions:
@@ -189,7 +250,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
           cache-dependency-path: packages/ballast-go/go.mod
 
       - name: Verify build
@@ -208,8 +269,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish_cli:
-    if: ${{ always() && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
+    if: ${{ always() && needs.validate.result == 'success' && ((github.event_name == 'workflow_dispatch' && needs.bump_and_tag.result == 'success') || (github.event_name == 'push' && github.actor != 'github-actions[bot]')) }}
     needs:
+      - validate
       - bump_and_tag
     runs-on: macos-latest
     permissions:
@@ -225,7 +287,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.24.x'
+          go-version: '1.26.x'
           cache-dependency-path: cli/ballast/go.mod
 
       - name: Import Developer ID certificate

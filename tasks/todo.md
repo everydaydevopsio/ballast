@@ -1,225 +1,101 @@
-# Task: Issues #158 and #159 task template and TDD rule guidance
+# Task: Setup and Toolchain Reliability — Next Steps
 
 ## Context
-- Owner: Codex
-- Date: 2026-08-16
+
+- Owner: Mark / Claude
+- Date: 2026-09-17
 - Mode: Autonomous
-- PRD Section: Structured Task Templates And TDD Rule Discipline
-- Requirement IDs: #158, #159
+- Plan: `plans/plan-setup-toolchain.md` (merged via PR #337)
+- Requirement IDs: #339, #128, #94
+
+Prior branch work in this file (issues #158/#159 task templates, #278 root selection, #144 skill refresh, doctor reporting, Dart/Flutter support) is complete and merged; its one unpromoted item — integration-test framework detection and Playwright guidance — was already filed and closed as #145, so nothing carried forward.
 
 ## Scope
-- In scope: canonical task TODO guidance, task/lessons/issue templates, testing rule TDD discipline, generated/package mirrors, focused tests, PR creation.
-- Out of scope: changing AWS health review `TODO.md` integration semantics and unrelated task-system behavior.
+
+- In scope: Go 1.26 toolchain bump (#339), package-manager guidance alignment (#128), doctor tool prerequisite checks with Homebrew remediation (#94).
+- Out of scope: rule-to-skill conversion for a `standard` rule profile (deferred on #295); dynamic Cursor globs from `.rulesrc.json` `paths` (noted in ARCHITECTURE.md); Spec Kit baseline adoption (#303) and the process doc (#340 covers only the broken review reference).
 
 ## Acceptance Criteria
-- AC1: `tasks/todo.md` filename is standardized to lowercase across Ballast task guidance.
-- AC2: Task TODO guidance uses the structured template while allowing lightweight optional sections as a subset.
-- AC3: Canonical `tasks/todo.md`, `tasks/lessons.md`, and issue output templates are available in generated task guidance.
-- AC4: TypeScript, Python, and Go testing rules require acceptance criteria, failing test first, minimum implementation, green/refactor, proof, failure-path coverage, and traceability.
-- AC5: Package mirrors and generated `.codex`/`.claude` outputs are refreshed.
+
+- AC1 (#339) **met**: both Go modules and all CI jobs build and test on Go 1.26; no `1.24` pins remain in go.mod files, workflows, release config, or Docker base images. Dependabot #325 was closed rather than merged — #342 landed the same dependency bump, so a rebase dropped its commit as already-upstream.
+- AC2 (#128): no generated content advises pinning a package-manager version when `package.json#packageManager` is present; this repo's own CI stops pinning `version: 10.27.0`; detection order is documented.
+- AC3 (#94): `ballast doctor` reports each configured tool as present or missing on `PATH` with an actionable install command; Homebrew guidance is skipped when `brew` is absent; missing tools are recommendations, not failures.
 
 ## Constraints
-- Preserve unrelated user changes.
-- Update canonical sources first, then mirrors/generated outputs.
-- Keep persistent rules concise.
+
+- Keep behavior consistent across the wrapper and the TypeScript, Python, and Go backends.
+- Regenerate and commit `.claude/` and `.codex/` outputs in the same PR whenever `agents/`, `skills/`, or root config change.
+- Emitted rules stay within the size gate (≤ 5 KB per rule, ≤ 80 KB per target).
 
 ## Risks and Tradeoffs
-- Risk: generated mirrors drift if sync/regeneration is incomplete.
-- Tradeoff: templates make task guidance longer, so optional-section language must keep lightweight tasks ergonomic.
+
+- Risk: a Go toolchain bump can break release builds for some targets; verify GoReleaser and publish workflows, not just CI.
+- Risk: doctor tool checks could be noisy on machines that deliberately lack optional tooling; classify mandatory vs optional and never fail the command.
+- Tradeoff: leaving the `standard` rule profile unimplemented keeps `ruleProfile` simpler now at the cost of a follow-up later.
 
 ## Execution Checklist
-- [x] Read `AGENTS.md`, task rules, testing rules, execution framework, execution templates, and issue details.
-- [x] Confirm operating mode and governing PRD section.
-- [x] Add failing generated-content tests for task templates and TDD guidance.
-- [x] Update canonical task and testing rule sources.
-- [x] Sync package mirrors and regenerate checked-in generated outputs.
-- [x] Run focused tests and generated-artifact checks.
-- [x] Push branch and create PR against `main`.
+
+- [x] #339 Phase 1: both modules declare `go 1.26.0`, all pinned CI `go-version` raised to `1.26.x`; stance documented in README and the plan's Decisions section (explicit directive, no `toolchain` line, since `actions/setup-go` runs `GOTOOLCHAIN=local`).
+- [x] #339: all GoReleaser targets cross-compile on 1.26 (linux/darwin/windows x amd64/arm64, windows/arm64 ignored); `golang.org/x/term` 0.34.0 -> 0.46.0 and `x/sys` 0.35.0 -> 0.48.0 applied in #342.
+- [x] #339: `Dockerfile.smoke` raised to `golang:1.26-bookworm` — it builds `cli/ballast`, so the directive bump would otherwise have broken the smoke image with the same `go.mod requires go >= 1.26.0` error (Copilot finding).
+- [x] #339: regression guard `packages/ballast-typescript/src/go-toolchain.test.ts` discovers every `go.mod` (unlisted = production, `examples/` fixtures allowlisted with reason), parses workflow YAML rather than regex so any quoting style is caught, and asserts golang Docker base images match.
+- [x] #325 closed as superseded by #342 (`@dependabot close` did not take; closed directly).
+- [ ] #128 Phase 2 (**next up**): rewrite `agents/typescript/linting/content.md:30` — "If the repo uses pnpm, configure `pnpm/action-setup` with an explicit version." Replace with: omit `version` when `package.json#packageManager` is declared (`pnpm/action-setup@v4+` reads it); pin explicitly only when no declaration exists.
+- [ ] #128: regenerate **every** checked-in copy, not just `.claude/` and `.codex/`. The same stale sentence ships inside the packaged backends at `packages/ballast-python/ballast/agents/typescript/linting/content.md:30`, `packages/ballast-go/cmd/ballast/agents/typescript/linting/content.md:30`, and `packages/ballast-go/cmd/ballast-go/agents/typescript/linting/content.md:30`. Updating only the source plus the two rule trees would leave published backends emitting the old advice.
+- [ ] #128: add a generated-content assertion so the old "explicit version" advice cannot come back, and document the detection order (`packageManager` -> `pnpm-lock.yaml` -> `yarn.lock` -> `package-lock.json` -> npm) in `docs/`.
+- [ ] #128: fix the detection itself — this is **not** documentation-only, correcting an earlier note in this file. `detectNodePackageManager` (`cli/ballast/main.go:916`) does implement the documented precedence, but it is not the function that feeds generated output: `discoverRepositoryFactsSection` calls `detectPackageManager` (`cli/ballast/main.go:2505`, defined at `:2576`), which checks lockfiles **before** `package.json#packageManager`. A repo declaring one manager while carrying another's lockfile therefore gets the wrong manager written into its Repository Facts. Also decide whether `detectNodePackageManager` returning `""` when neither a `package.json` nor a lockfile exists should instead be the documented npm fallback.
+- [ ] #128: dogfood — this repo declares `packageManager: pnpm@10.27.0` yet 10 of its 14 `pnpm/action-setup` steps also hardcode `version: 10.27.0`: `ci.yml` (3), `examples-smoke.yml` (5), `cross-language-validate.yml` (1), `generated-agent-artifacts.yml` (1). Drop those pins and let the action read `packageManager`. The 4 already-unpinned uses — `publish.yml` (2) and `publish.typescript.yml` (2) — are the proof the unpinned path works, so this is removing an inconsistency rather than taking a risk. (Counts verified 2026-09-17 on `main`; `publish.yml` gained one unpinned step in #344.)
+- [ ] #94 Phase 3: add `PATH` presence checks for configured `tools` to `ballast doctor`, with a Homebrew remediation map and non-brew alternatives.
+- [ ] #94: surface the same remediation from `ballast setup-dev` before it runs commands.
+- [ ] Regenerate managed outputs and update `plans/plan-setup-toolchain.md` phase checkboxes with evidence.
 
 ## Test Strategy
-- Unit: targeted Jest tests for generated content in `packages/ballast-typescript/src/build.test.ts`.
-- Integration: generated artifact sync test with enforcement enabled after regeneration.
-- E2E: not required; no runtime CLI behavior changes.
-- Failure-path tests: assertions fail if guidance drops lowercase path, structured templates, failure-path coverage, or traceability.
-- Requirement-to-test mapping: #158 maps to task TODO template assertions; #159 maps to TypeScript/Python/Go TDD assertions.
+
+- Unit: wrapper tests for tool presence/absence and the no-Homebrew path; backend tests for any changed generated content.
+- Integration: generated-artifact and size-gate tests after regeneration.
+- E2E: existing smoke scripts for install/upgrade flows; Go CI matrix on 1.26.
+- Failure-path tests: missing tool, missing `brew`, unknown tool with no Homebrew mapping.
+- Requirement-to-test mapping: #339 → Go build/test matrix; #128 → generated-content assertions; #94 → doctor tool-status tests.
 
 ## Rollback Strategy
-- Trigger: generated output drift, failing tests, or PR feedback showing rule guidance conflicts with existing policy.
-- Rollback steps: revert this branch's source, test, mirror, and generated-output changes only.
-- Validation after rollback: rerun the focused Jest tests and generated-artifact check.
+
+- Trigger: release builds fail on Go 1.26, or doctor tool checks produce false negatives on supported platforms.
+- Rollback steps: revert the toolchain bump commit (restoring 1.24 pins) or the doctor change independently; the three phases are separable.
+- Validation after rollback: `go test ./...` in both modules, full CI matrix, and `ballast doctor` on a clean checkout.
 
 ## Outcome
-- Result: Implemented structured `tasks/todo.md` guidance, task/lessons/issue templates, and TDD process discipline across TypeScript, Python, and Go testing rules.
-- Evidence links/commands: `pnpm --filter @everydaydevopsio/ballast exec jest src/build.test.ts --runInBand`; `BALLAST_ENFORCE_REPO_GENERATED_ARTIFACTS=1 pnpm --filter @everydaydevopsio/ballast exec jest src/repo-generated-artifacts.test.ts --runInBand`; `pnpm --filter @everydaydevopsio/ballast run test`; `pnpm --filter @everydaydevopsio/ballast run lint`; `go test ./...` in `packages/ballast-go`; `uv run python -m unittest discover -s tests` in `packages/ballast-python`; `uv run ruff check .` in `packages/ballast-python`; `scripts/smoke-tasks.sh`; `git diff --check`.
-- PRD updates: Added `Structured Task Templates And TDD Rule Discipline`.
 
-## Current Task: Issue #278 safe root selection for unmarked nested projects
+- Result: **Phase 1 (#339) complete and merged** (PR #342, merged into `main` as 9918d50). Phases 2 (#128) and 3 (#94) not started.
+- Evidence:
+  - `go vet ./...`, `go build ./...`, `go test ./...` green for both modules on go1.26.2.
+  - Release-target cross-compile sweep: 10/10 GoReleaser combinations built with `CGO_ENABLED=0` and release ldflags.
+  - Smoke image verified by running its exact build step in the new base: `docker run --rm -v "$PWD":/opt/ballast:ro golang:1.26-bookworm sh -c 'go build -C /opt/ballast/cli/ballast -o /tmp/ballast . && /tmp/ballast --version'` -> builds and runs on go1.26.8.
+  - `pnpm test` 368 passed / 14 suites; `pnpm lint` clean; PR CI 22 checks pass, 0 fail.
+  - Guard mutation-tested in four directions (reverted Docker base; emptied fixture allowlist; double-quoted `"1.25.x"`; unquoted `1.26`) — each fails the intended test; sources restored, `git diff` empty.
+- Copilot cycle 1 raised 3 findings, all real, all fixed: the `Dockerfile.smoke` base, the guard's hardcoded module list, and its single-quote-only `go-version` matching. Cycle 2 was requested but the PR was merged before it settled.
+- PRD updates: none required; the toolchain decision is recorded in `plans/plan-setup-toolchain.md` under Decisions and in the README Development section.
 
-## Context
-- Owner: Codex
-- Date: 2026-08-24
-- Mode: Autonomous
-- PRD Section: Git Repository Boundary Root Resolution
-- Requirement IDs: #278
+## What To Do Next
 
-## Scope
-- In scope: priority plan rewrite, PRD clarification, root-resolution tests, TypeScript/Python/Go backend root resolution, wrapper root resolution, focused smoke coverage.
-- Out of scope: package-manager/toolchain reliability work for #128/#94 and adding a separate explicit `--root` flag.
+1. **Phase 2 (#128)** — the unchecked `#128` items above. Recon found one line of stale agent guidance (`agents/typescript/linting/content.md:30`), three packaged copies of it inside the backends, this repo's own inconsistent pnpm pins, and one real detection defect in `detectPackageManager`. The Node half of #128 is already correct — `agents/common/local-dev/content-env.md:58` already says "prefer the current LTS for `.nvmrc`", and no stale `node-version` examples exist in `agents/`, so that part of the issue can be closed as already-satisfied rather than reworked.
+2. **Phase 3 (#94)** — doctor `PATH` checks with the Homebrew remediation map. Largest remaining piece; wrapper-only by default, with backend parity noted as a follow-up.
+3. **Then** close out the plan: regenerate managed outputs, tick `plans/plan-setup-toolchain.md` phase boxes with evidence, and graduate the plan to an ADR.
+4. **Adopt castoff** once it supports `CHANGELOG.md` modification — see the blocked section below.
 
-## Acceptance Criteria
-- AC1: #278 replaces stale #175 as the active priority in `plans/issue-priority-plan.md`.
-- AC2: An unmarked cwd under a marked non-git ancestor resolves to the cwd and does not write managed files to the ancestor.
-- AC3: A nested cwd inside a marked git repository still resolves to the marked repository root.
-- AC4: TypeScript, Python, Go backend, wrapper, and smoke coverage exercise the new root-selection contract.
+Unrelated to this workstream but open: **#340** (one-line `AGENTS.md` fix, good filler task) and **PR #320** (agent performance analyzer — green with 3 clean Copilot cycles, awaiting merge; merging it should close #321 and #323). **PR #319** (Crew verification contract) has still never been reviewed.
 
-## Constraints
-- Preserve unrelated generated-output changes.
-- Keep behavior consistent across backends.
-- Do not widen this into #128/#94 setup/toolchain work.
+## Blocked: Adopt Castoff For Release Notes
 
-## Risks and Tradeoffs
-- Risk: non-git projects that relied on running Ballast from subdirectories now need to run from the intended project root.
-- Tradeoff: avoiding writes to unintended ancestor workspaces is more important than implicit non-git ancestor discovery.
+Castoff (`everydaydevopsio/castoff`) generates AI release notes from `git log <previous-tag>..HEAD` and returns a `release_notes` string. Adopt it **once it can also write `CHANGELOG.md`** — today it only produces a release body, so it cannot close the changelog gap on its own.
 
-## Execution Checklist
-- [x] Review current priority plan and live issue state.
-- [x] Confirm operating mode and governing PRD section.
-- [x] Update priority plan and PRD for #278.
-- [x] Add failing regression tests for unmarked nested project root selection.
-- [x] Implement consistent root-resolution behavior across backends and wrapper.
-- [x] Update smoke coverage for the reported ancestor-write scenario.
-- [x] Run focused tests and smoke verification.
+- Blocker: castoff has no CHANGELOG.md output. Until it does, adopting it leaves `CHANGELOG.md` stale (newest documented release is `[3.0.0] - 2026-01-30` against a 5.18.3 project) even though GitHub Releases would look correct.
+- When unblocked, wire it into `publish.yml`, not a `softprops/action-gh-release` step: this repo's releases are created by **GoReleaser** (twice — `packages/ballast-go/.goreleaser.yaml` and `cli/ballast/.goreleaser.yaml`, each with its own `changelog:` block), so the hook is `goreleaser release --release-notes=<file>` rather than the snippet in castoff's README.
+- Prerequisites: add an `OPENAI_API_KEY` secret (absent — the repo has only Apple, Codecov, and Homebrew secrets); pin `everydaydevopsio/castoff/castoff@v2` (castoff is at v2.0.0; its README still documents `@v1`).
+- Already satisfied: `bump_and_tag` checks out with `fetch-depth: 0`, which castoff's `git describe` needs, and the commit range fits castoff's default `max_commits: 200`.
 
-## Test Strategy
-- Unit: TypeScript `findProjectRoot`, Python `resolve_project_root`, Go backend `findProjectRoot`, wrapper `findProjectRoot`.
-- Integration: Python install smoke script verifies managed files land in the child and parent is unchanged.
-- E2E: `scripts/smoke-git-boundary.sh`.
-- Failure-path tests: unmarked child under marked non-git parent must not resolve to or write into parent.
-- Requirement-to-test mapping: #278 maps to root-resolution unit tests and the smoke ancestor-write assertion.
+## Follow-ups Tracked Elsewhere
 
-## Rollback Strategy
-- Trigger: focused tests show legitimate nested repo workflows break unexpectedly.
-- Rollback steps: revert this task's PRD, plan, test, smoke, and root-resolution changes.
-- Validation after rollback: rerun focused root-resolution tests.
-
-## Outcome
-- Result: Implemented #278 root-selection safety. Unmarked nested projects under marked non-git ancestors now resolve to the current directory instead of inheriting the ancestor, while nested paths inside marked git repositories still resolve to the repo root.
-- Evidence links/commands: `pnpm --filter @everydaydevopsio/ballast exec jest src/config.test.ts --runInBand`; `uv run python -m unittest packages.ballast-python.tests.test_cli`; `go test ./cmd/ballast-go` in `packages/ballast-go`; `go test .` in `cli/ballast`; `scripts/smoke-git-boundary.sh`.
-- PRD updates: Clarified Git Repository Boundary Root Resolution for unmarked nested projects.
-
-## Previous Tasks
-
-- [x] Confirm issue #166 scope, operating mode, and governing PRD requirements.
-- [x] Add PRD requirements for managed rule markers, doctor categorization, and stale cleanup safety.
-- [x] Add focused failing tests for marker parsing, checksum comparison, report formatting, stale cleanup, and safety.
-- [x] Implement TypeScript rule marker generation and doctor rule-file status reporting.
-- [x] Mirror marker generation and focused coverage across Python and Go rule-generation surfaces as appropriate.
-- [x] Run focused tests, formatting, and relevant cross-surface checks.
-- [ ] Push branch, open PR against `main`, request Copilot review, and check CI/review state.
-
-## Previous Tasks
-
-- [x] Confirm issue #154 scope, operating mode, and governing PRD requirements.
-- [x] Add PRD requirements for distributing plan-lifecycle guidance through Ballast.
-- [x] Add failing generated-content coverage for the plan-lifecycle rule and installed support-file entries.
-- [x] Add canonical plan-lifecycle task rule content and platform headers.
-- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
-- [x] Run focused tests and required sync/generation checks.
-- [x] Push branch, open PR for #154, request Copilot review, and resolve actionable review comments. No actionable review comments were present at the latest poll.
-
-- [x] Confirm issue #145 scope, operating mode, and governing PRD gap.
-- [x] Add PRD requirements for integration-framework detection and Playwright preference across supported languages.
-- [x] Add failing generated-content coverage for framework detection markers and browser E2E framework selection.
-- [x] Update canonical testing guidance sources and docs.
-- [x] Sync package mirrors and corresponding `.codex`/`.claude` testing outputs from the updated source templates.
-- [x] Run focused tests.
-- [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
-
-- [x] Confirm issue #160 scope, operating mode, and Terraform/OpenTofu tooling sources.
-- [x] Add PRD requirements for Terraform linting, testing, CI, security scanner, and OpenTofu guidance.
-- [x] Add failing generated-content coverage for Terraform best-practice guidance.
-- [x] Update canonical Terraform rule content, docs, and backend git-hook snippets.
-- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
-- [x] Run focused tests and required sync/generation checks.
-- [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
-
-- [x] Confirm issue #215 broader deployment-model scope, operating mode, and PRD requirements.
-- [x] Add PRD requirements for deployment model prompts, flags, persistence, doctor output, and publishing guidance.
-- [x] Add failing tests for deployment model config parsing, CLI flags, install prompting, wrapper forwarding, and doctor output.
-- [x] Implement deployment model support across TypeScript backend, wrapper, and Python/Go metadata surfaces as needed.
-- [x] Update canonical publishing guidance for Kubernetes, serverless, server, and hosted deployment models.
-- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
-- [x] Run focused tests and required sync/generation checks.
-- [x] Update `tasks/lessons.md` if implementation reveals a repeatable failure pattern. No new repeatable failure pattern found.
-
-- [x] Confirm issue #214 scope, approval, and coordination boundary with #145.
-- [x] Add PRD requirements for web smoke/E2E and CLI packaged-command smoke guidance.
-- [x] Add generated guidance tests for web smoke/E2E, Playwright preference, placement, and CLI packaged-command smoke checks.
-- [x] Update canonical testing and publishing guidance sources plus docs.
-- [x] Sync package mirrors and regenerate checked-in `.codex`/`.claude` outputs.
-- [x] Run focused tests and required sync/generation checks.
-- [x] Push branch, open PR for #214, request Copilot review, and monitor CI/review comments.
-
-- [x] Confirm issue #213 scope, operating mode, and governing PRD gap.
-- [x] Add PRD requirements for Copilot review polling and per-thread replies.
-- [x] Add failing generated rule text coverage for the Copilot review loop.
-- [x] Update local-dev PR workflow guidance and package mirrors.
-- [x] Regenerate checked-in `.codex/` and `.claude/` local outputs.
-- [x] Run focused verification and capture evidence.
-- [x] Push branch, open PR, request Copilot review, and resolve actionable comments.
-
-- [x] Confirm issue #209/#210 scope, operating mode, and governing PRD gap.
-- [x] Add PRD requirements for TypeScript Husky YAML/YML formatting and pre-push tests.
-- [x] Add failing coverage for Husky YAML/YML and pre-push test guidance while preserving multi-language pre-commit output.
-- [x] Implement generated Husky guidance and documentation updates.
-- [x] Confirm repo-local `.codex` and `.claude` outputs remain unchanged because this repo is multi-language and should keep pre-commit guidance.
-- [x] Run focused tests and E2E hook policy smoke coverage.
-- [x] Push branch, open PR, request Copilot review, and resolve actionable review comments.
-
-- [x] Confirm current issue-priority plan against live GitHub issue state.
-- [x] Close stale #211 after verifying PR #217 implemented `ballast setup-dev`.
-- [x] Verify #144 managed skill refresh behavior on current `main`.
-- [x] Close stale #144 with verification evidence.
-- [x] Update `plans/issue-priority-plan.md` so #209/#210 are the next implementation workstream.
-- [x] Push branch, open PR, request Copilot review, and check CI.
-
-- [x] Confirm issue #208 scope, operating mode, and governing PRD gap.
-- [x] Add PRD requirements for generated `.ballast/` state and Ballast repair skill support.
-- [x] Add failing coverage for missing `.ballast/` doctor/install-cli behavior and the new skill registry entry.
-- [x] Implement wrapper state reporting/remediation and the Ballast maintenance skill.
-- [x] Update docs, agent guidance, package mirrors, and generated local target outputs.
-- [x] Run targeted verification and capture evidence.
-
-- [x] Confirm issue #211 scope and governing operating mode.
-- [x] Add PRD requirements and acceptance criteria for `ballast setup-dev`.
-- [x] Add failing wrapper tests for Corepack/package-manager setup behavior.
-- [x] Implement the canonical wrapper `setup-dev` command.
-- [x] Update local-dev agent guidance and regenerated Ballast-managed outputs.
-- [x] Run targeted and full verification commands.
-- [x] Push branch, open PR, and request Copilot review.
-
-- [x] Confirm issue #144 root cause and affected backends.
-- [x] Add PRD acceptance criteria for managed skill refresh.
-- [x] Add failing unit coverage for TypeScript, Python, and Go skill refresh behavior.
-- [x] Add failing wrapper smoke coverage for upgrade refreshing stale skill files.
-- [x] Implement the minimal cross-backend fix while preserving agent rule overwrite semantics.
-- [x] Run targeted and full verification commands.
-- [x] Push branch, open PR, and request Copilot review.
-
-- [x] Confirm the operator-visible behavior gap in `ballast doctor`.
-- [x] Identify the governing requirements for the CLI output change.
-- [x] Add failing tests for `languages` and `paths` in `doctor` output.
-- [x] Implement the minimal reporting change across CLIs.
-- [x] Run targeted tests and capture evidence.
-- [x] Document the `novnc-desktop` language-detection root cause and recommended fix.
-- [x] Add wrapper tests for JavaScript package warnings.
-- [x] Implement JavaScript package warning logic in single-language and monorepo detection.
-- [x] Add smoke coverage for JavaScript package warnings.
-- [ ] File a GitHub issue for integration-test framework detection and Playwright guidance. Blocked here by GitHub token permissions and network access.
-
-- [x] Confirm governing PRD requirements for Dart/Flutter language support.
-- [x] Add failing tests for Flutter/Dart project-root detection, monorepo profile detection, backend dispatch, and generated Dart rules.
-- [x] Add canonical Dart linting, logging, testing, and git-hook guidance based on current Dart/Flutter docs.
-- [x] Sync package mirrors and regenerate checked-in Ballast-managed outputs.
-- [x] Create a Flutter example app in `../ballast-examples` using `../flutter-setup`.
-- [x] Run focused tests and record evidence.
+- #340: `AGENTS.md` references a nonexistent `docs/code_review.md`.
+- #303: Spec Kit baseline adoption, plus the process-doc placement decision from `plans/plan-spec-kit-development-process.md`.
+- #321 / #323: agent performance analyzer — delivered by PR #320, close on merge. Note #323's "query the telemetry aggregator" contradicts the boundary #321 sets; reconcile before implementing further.
+- #295 follow-up: rule-to-skill conversion for a `standard` rule profile.

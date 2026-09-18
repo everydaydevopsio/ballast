@@ -55,7 +55,8 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
 
-          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+          BALLAST_VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
+          go build -C packages/ballast-go -ldflags "-X main.ballastVersion=${BALLAST_VERSION}" -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
           echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
 
       - name: Run smoke install
@@ -95,7 +96,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
-          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+          BALLAST_VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
+          go build -C packages/ballast-go -ldflags "-X main.ballastVersion=${BALLAST_VERSION}" -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
           echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
 
       - name: Checkout ballast-examples repo
@@ -239,7 +241,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
-          go build -C packages/ballast-go -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+          BALLAST_VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
+          go build -C packages/ballast-go -ldflags "-X main.ballastVersion=${BALLAST_VERSION}" -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
           echo "$GITHUB_WORKSPACE/.ci/bin" >> "$GITHUB_PATH"
 
       - name: Build ballast wrapper

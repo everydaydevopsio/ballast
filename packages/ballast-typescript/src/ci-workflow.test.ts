@@ -82,4 +82,85 @@ describe('CI workflow', () => {
       fs.existsSync(path.join(repoRoot, '.github/workflows/language-packs.yml'))
     ).toBe(false);
   });
+  test('source builds of the Go backend carry a version stamp', () => {
+    // The wrapper prefers a `ballast-go` sitting next to it over the installer
+    // path, so an unstamped source build emits rules marked `dev`. The wrapper
+    // itself must NOT be stamped: a wrapper reporting a release version
+    // installs published backends instead of building from the tree.
+    const shellScripts: string[] = [];
+    const collectScripts = (dir: string): void => {
+      for (const entry of fs.readdirSync(path.join(repoRoot, dir), {
+        withFileTypes: true
+      })) {
+        const relative = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) collectScripts(relative);
+        else if (entry.name.endsWith('.sh')) shellScripts.push(relative);
+      }
+    };
+    collectScripts('scripts');
+
+    const sources: Array<{ path: string; content: string }> = [
+      { path: 'Makefile', content: readRepoFile('Makefile') },
+      { path: 'Dockerfile.smoke', content: readRepoFile('Dockerfile.smoke') },
+      ...shellScripts.map((relative) => ({
+        path: relative,
+        content: readRepoFile(relative)
+      })),
+      ...fs
+        .readdirSync(path.join(repoRoot, '.github/workflows'))
+        .filter((entry) => entry.endsWith('.yml') || entry.endsWith('.yaml'))
+        .map((entry) => {
+          const relative = `.github/workflows/${entry}`;
+          return { path: relative, content: readRepoFile(relative) };
+        })
+    ];
+
+    const unstamped: string[] = [];
+    for (const source of sources) {
+      for (const line of source.content.split('\n')) {
+        if (!/go build\b/.test(line)) continue;
+        if (!/ballast-go/.test(line)) continue;
+        // Only an explicit /tmp output is exempt. A build with no `-o` still
+        // writes a usable binary into the module directory, which the wrapper
+        // prefers over the installer path.
+        const output = line.match(/-o\s+("?)([^\s"]+)\1/);
+        if (output && output[2].includes('/tmp/')) continue;
+        if (
+          !line.includes('-X main.ballastVersion=') &&
+          !line.includes('${ldflags[@]}')
+        ) {
+          unstamped.push(`${source.path}: ${line.trim()}`);
+        }
+      }
+    }
+
+    expect(unstamped).toEqual([]);
+
+    // The smoke bootstrap builds the backend through shell variables, so the
+    // line-based scan above cannot see it. Dockerfile.smoke runs this script
+    // and links the result beside the source-built wrapper, which the wrapper
+    // then prefers -- so it needs the stamp just as much.
+    const bootstrap = readRepoFile(
+      'scripts/smoke/bootstrap-language-binaries.sh'
+    );
+    expect(bootstrap).toContain('-X main.ballastVersion=');
+  });
+
+  test('the cross-language gate is wired into every publishing workflow', () => {
+    const gate = '.github/workflows/cross-language-validate.yml';
+    const publishing = fs
+      .readdirSync(path.join(repoRoot, '.github/workflows'))
+      .filter((entry) => entry.startsWith('publish'))
+      .map((entry) => `.github/workflows/${entry}`);
+
+    expect(publishing.length).toBeGreaterThan(0);
+    const missing = publishing.filter(
+      (workflowPath) =>
+        !readRepoFile(workflowPath).includes(
+          gate.replace('.github/workflows/', '')
+        )
+    );
+
+    expect(missing).toEqual([]);
+  });
 });
