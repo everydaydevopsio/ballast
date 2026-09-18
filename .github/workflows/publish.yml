@@ -39,6 +39,7 @@ jobs:
 
     outputs:
       version: ${{ steps.version.outputs.version }}
+      release_notes: ${{ steps.notes.outputs.release_notes }}
 
     steps:
       - name: Checkout
@@ -138,6 +139,42 @@ jobs:
             exit 1
           fi
 
+      # castoff reads `git describe --tags --abbrev=0 HEAD^` and logs from there
+      # to HEAD, so it runs before the release commit is made and the tag is
+      # created. Skipped entirely when OPENAI_API_KEY is absent.
+      # Publishes a non-secret boolean so the steps below can be gated without
+      # exporting the key to the whole job, where dependency installs, builds
+      # and every third-party action would inherit it.
+      - name: Check for release-notes key
+        id: notes_key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${OPENAI_API_KEY}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate AI release notes
+        id: notes
+        if: ${{ steps.notes_key.outputs.available == 'true' }}
+        uses: everydaydevopsio/castoff/castoff@v2
+        env:
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          tag: v${{ steps.version.outputs.version }}
+
+      - name: Update CHANGELOG.md
+        id: changelog
+        if: ${{ steps.notes_key.outputs.available == 'true' && steps.notes.outputs.changelog_entry != '' }}
+        uses: everydaydevopsio/castoff/changelog@v2
+        with:
+          version: ${{ steps.version.outputs.version }}
+          entry: ${{ steps.notes.outputs.changelog_entry }}
+
       - name: Commit and create tag
         run: |
           set -euo pipefail
@@ -149,6 +186,8 @@ jobs:
           rm -rf .ci
           git add packages/ballast-typescript/package.json packages/ballast-python/pyproject.toml packages/ballast-python/uv.lock
           git add .rulesrc.json .claude .codex AGENTS.md CLAUDE.md
+          # Present only when castoff ran and inserted a new entry.
+          git add CHANGELOG.md 2>/dev/null || true
           git commit -m "chore(release): bump version to ${VERSION} [skip ci]"
 
           git tag "v${VERSION}"
@@ -258,13 +297,29 @@ jobs:
           cd packages/ballast-go
           go build -o /tmp/ballast-go-verify ./cmd/ballast-go
 
+      # GoReleaser writes the GitHub Release body. Hand it the castoff notes
+      # when they exist; fall back to GoReleaser's own changelog otherwise, so
+      # tag-triggered runs (where bump_and_tag is skipped) still publish.
+      - name: Prepare release notes
+        id: release_notes
+        env:
+          NOTES: ${{ needs.bump_and_tag.outputs.release_notes }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NOTES}" ]; then
+            printf '%s\n' "${NOTES}" > "${RUNNER_TEMP}/release-notes.md"
+            echo "args=--release-notes=${RUNNER_TEMP}/release-notes.md" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: 'v2.14.0'
           workdir: packages/ballast-go
-          args: release --clean --config .goreleaser.yaml
+          args: release --clean --config .goreleaser.yaml ${{ steps.release_notes.outputs.args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -311,12 +366,28 @@ jobs:
           cd cli/ballast
           go build -o /tmp/ballast-verify .
 
+      # GoReleaser writes the GitHub Release body. Hand it the castoff notes
+      # when they exist; fall back to GoReleaser's own changelog otherwise, so
+      # tag-triggered runs (where bump_and_tag is skipped) still publish.
+      - name: Prepare release notes
+        id: release_notes
+        env:
+          NOTES: ${{ needs.bump_and_tag.outputs.release_notes }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NOTES}" ]; then
+            printf '%s\n' "${NOTES}" > "${RUNNER_TEMP}/release-notes.md"
+            echo "args=--release-notes=${RUNNER_TEMP}/release-notes.md" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: 'v2.14.0'
-          args: release --clean --config cli/ballast/.goreleaser.yaml
+          args: release --clean --config cli/ballast/.goreleaser.yaml ${{ steps.release_notes.outputs.args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

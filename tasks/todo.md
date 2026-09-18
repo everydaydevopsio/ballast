@@ -80,18 +80,21 @@ Prior branch work in this file (issues #158/#159 task templates, #278 root selec
 1. **Phase 2 (#128)** — the unchecked `#128` items above. Recon found one line of stale agent guidance (`agents/typescript/linting/content.md:30`), three packaged copies of it inside the backends, this repo's own inconsistent pnpm pins, and one real detection defect in `detectPackageManager`. The Node half of #128 is already correct — `agents/common/local-dev/content-env.md:58` already says "prefer the current LTS for `.nvmrc`", and no stale `node-version` examples exist in `agents/`, so that part of the issue can be closed as already-satisfied rather than reworked.
 2. **Phase 3 (#94)** — doctor `PATH` checks with the Homebrew remediation map. Largest remaining piece; wrapper-only by default, with backend parity noted as a follow-up.
 3. **Then** close out the plan: regenerate managed outputs, tick `plans/plan-setup-toolchain.md` phase boxes with evidence, and graduate the plan to an ADR.
-4. **Adopt castoff** once it supports `CHANGELOG.md` modification — see the blocked section below.
+4. **Add the `OPENAI_API_KEY` repository secret** so the castoff release-notes and changelog steps actually run — see the castoff section below. Until then the release succeeds but skips them.
 
 Unrelated to this workstream but open: **#340** (one-line `AGENTS.md` fix, good filler task) and **PR #320** (agent performance analyzer — green with 3 clean Copilot cycles, awaiting merge; merging it should close #321 and #323). **PR #319** (Crew verification contract) has still never been reviewed.
 
-## Blocked: Adopt Castoff For Release Notes
+## Done: Castoff Release Notes And Changelog
 
-Castoff (`everydaydevopsio/castoff`) generates AI release notes from `git log <previous-tag>..HEAD` and returns a `release_notes` string. Adopt it **once it can also write `CHANGELOG.md`** — today it only produces a release body, so it cannot close the changelog gap on its own.
+Castoff gained a second action (`everydaydevopsio/castoff/changelog@v2`) that writes `CHANGELOG.md` from the `changelog_entry` output, which was the blocker. Both are now wired into `publish.yml`:
 
-- Blocker: castoff has no CHANGELOG.md output. Until it does, adopting it leaves `CHANGELOG.md` stale (newest documented release is `[3.0.0] - 2026-01-30` against a 5.18.3 project) even though GitHub Releases would look correct.
-- When unblocked, wire it into `publish.yml`, not a `softprops/action-gh-release` step: this repo's releases are created by **GoReleaser** (twice — `packages/ballast-go/.goreleaser.yaml` and `cli/ballast/.goreleaser.yaml`, each with its own `changelog:` block), so the hook is `goreleaser release --release-notes=<file>` rather than the snippet in castoff's README.
-- Prerequisites: add an `OPENAI_API_KEY` secret (absent — the repo has only Apple, Codecov, and Homebrew secrets); pin `everydaydevopsio/castoff/castoff@v2` (castoff is at v2.0.0; its README still documents `@v1`).
-- Already satisfied: `bump_and_tag` checks out with `fetch-depth: 0`, which castoff's `git describe` needs, and the commit range fits castoff's default `max_commits: 200`.
+- `bump_and_tag` runs `castoff/castoff@v2` after regeneration and before the release commit — castoff reads `git describe --tags --abbrev=0 HEAD^` and logs from there to `HEAD`, so it must run before the tag exists.
+- `castoff/changelog@v2` inserts the entry, and `CHANGELOG.md` is staged into the same release commit.
+- `release_notes` is exposed as a job output and handed to both GoReleaser invocations via `--release-notes`, since this repo's releases come from GoReleaser rather than a `softprops/action-gh-release` step.
+
+**Outstanding — requires a repository secret:** every castoff step is gated on `env.OPENAI_API_KEY != ''`, so releases still work without it, but AI notes and changelog updates are silently skipped until `OPENAI_API_KEY` is added to the repository secrets. Optionally set the `OPENAI_MODEL` repository variable to override the default model.
+
+Note: `CHANGELOG.md` still carries a stale `## [Unreleased]` section describing Gemini support that shipped long ago, and no entries between `[3.0.0]` and now. Castoff inserts new entries below `## [Unreleased]`, so the gap and the stale section persist until someone backfills or clears them deliberately.
 
 ## Follow-ups Tracked Elsewhere
 
