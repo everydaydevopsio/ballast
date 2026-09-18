@@ -5,12 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Entries from `3.0.1` through `5.18.3` were not recorded here. See the
-[GitHub Releases](https://github.com/everydaydevopsio/ballast/releases) page for
-that history. From the next release onward `publish.yml` writes entries here
-automatically, provided an `OPENAI_API_KEY` secret is available to the
-repository; releases made without it are published but not recorded here, and
-GitHub Releases remains the complete history.
+Entries from `3.0.1` through `5.18.3` were not recorded here. From the next
+release onward, `publish.yml` writes an entry here for releases cut through its
+`workflow_dispatch` input, when an `OPENAI_API_KEY` secret is available to the
+repository. Releases published from an existing `v*` tag, or without that
+secret, are not recorded here.
+[GitHub Releases](https://github.com/everydaydevopsio/ballast/releases) remains
+the complete history.
 
 ## [Unreleased]
 
