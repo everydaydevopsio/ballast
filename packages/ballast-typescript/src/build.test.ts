@@ -347,43 +347,39 @@ describe('build', () => {
       expect(content).not.toContain('{{taskSystem}}');
     });
 
-    test('keeps tasks todo guidance without inlining the templates', () => {
-      // The skeletons moved to docs/agents/tasks.md so they cost nothing until
-      // an agent actually writes one of those files. The rule must still carry
-      // the decision and the trigger.
+    test('returns structured tasks todo templates aligned with execution templates', () => {
       const content = getContent('tasks', 'todo');
-      expect(content).toContain('docs/agents/tasks.md');
+      expect(content).toContain('# Task: <title>');
+      expect(content).toContain('## Acceptance Criteria');
+      expect(content).toContain('## Test Strategy');
+      expect(content).toContain('Failure-path tests:');
+      expect(content).toContain('Requirement-to-test mapping:');
+      expect(content).toContain('## Rollback Strategy');
+      expect(content).toContain('## Outcome');
       expect(content).toContain('Lightweight tasks may omit optional sections');
       expect(content).toContain(
         'must remain a subset of the structured template'
       );
-      expect(content).toContain('tasks/lessons.md');
-      expect(content).not.toContain('# Task: <title>');
-      expect(content).not.toContain('### Issue #N: <Short Description>');
     });
 
-    test('tasks todo rule points at a docs file that really holds the templates', () => {
-      // A rule that tells an agent to read a file is worse than useless if that
-      // file lacks the content, so assert the pointer resolves.
+    test('returns canonical lessons and issue output templates in task guidance', () => {
       const content = getContent('tasks', 'todo');
-      const referenced = content.match(/`(docs\/agents\/[\w-]+\.md)`/);
-      expect(referenced).not.toBeNull();
-      const docPath = path.resolve(__dirname, '../../..', referenced![1]);
-      expect(fs.existsSync(docPath)).toBe(true);
-      const doc = fs.readFileSync(docPath, 'utf8');
-      expect(doc).toContain('# Task: <title>');
-      expect(doc).toContain('## Acceptance Criteria');
-      expect(doc).toContain('## Test Strategy');
-      expect(doc).toContain('Failure-path tests:');
-      expect(doc).toContain('Requirement-to-test mapping:');
-      expect(doc).toContain('## Rollback Strategy');
-      expect(doc).toContain('## Outcome');
-      expect(doc).toContain('# Lessons');
-      expect(doc).toContain('Root cause pattern:');
-      expect(doc).toContain('### Issue #N: <Short Description>');
-      expect(doc).toContain('**Severity:** <Critical|High|Medium|Low>');
-      expect(doc).toContain('**Option A (Recommended)**');
-      expect(doc).toContain('**Decision Request**');
+      expect(content).toContain('tasks/lessons.md');
+      expect(content).toContain('# Lessons');
+      expect(content).toContain('Root cause pattern:');
+      expect(content).toContain('### Issue #N: <Short Description>');
+      expect(content).toContain('**Severity:** <Critical|High|Medium|Low>');
+      expect(content).toContain('**Option A (Recommended)**');
+      expect(content).toContain('**Decision Request**');
+    });
+
+    test('tasks rule does not depend on a docs file consumers never receive', () => {
+      // Install writes rules and support files, never docs/. A rule that tells
+      // an agent to copy a template verbatim must therefore carry that template
+      // itself; pointing at docs/agents/*.md leaves consuming repositories with
+      // an instruction to read a file that does not exist there.
+      const content = getContent('tasks', 'todo');
+      expect(content).not.toMatch(/`docs\/agents\/[\w-]+\.md`/);
     });
 
     test('returns plan-lifecycle content', () => {

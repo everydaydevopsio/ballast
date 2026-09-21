@@ -4491,13 +4491,34 @@ func normalizeWrapperRuleProfile(value string) string {
 	return ""
 }
 
+// deploymentPublishingSuffixes mirrors the backends: these publishing variants
+// only apply once the repository owns a deployment target, so they leave the
+// default set when deploymentModel is "none". The wrapper has to agree, or
+// cleanup keeps rules the backends no longer emit and they linger on disk
+// without a manifest entry.
+var deploymentPublishingSuffixes = []string{"web", "api"}
+
 func configuredRuleSuffixesForAgent(agent string, config *monorepoConfig) []string {
-	if agent == "publishing" && config != nil {
-		if profiles := normalizePublishingProfiles(config.PublishingProfiles); len(profiles) > 0 {
-			return append([]string{""}, profiles...)
-		}
+	if agent != "publishing" || config == nil {
+		return ruleSuffixesForAgent(agent)
 	}
-	return ruleSuffixesForAgent(agent)
+	// An explicit profile list always wins, including over the deployment-model
+	// default below.
+	if profiles := normalizePublishingProfiles(config.PublishingProfiles); len(profiles) > 0 {
+		return append([]string{""}, profiles...)
+	}
+	suffixes := ruleSuffixesForAgent(agent)
+	if strings.ToLower(strings.TrimSpace(config.DeploymentModel)) != "none" {
+		return suffixes
+	}
+	filtered := make([]string, 0, len(suffixes))
+	for _, suffix := range suffixes {
+		if slices.Contains(deploymentPublishingSuffixes, suffix) {
+			continue
+		}
+		filtered = append(filtered, suffix)
+	}
+	return filtered
 }
 
 func agentBaseName(agent string, suffix string) string {

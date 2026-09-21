@@ -265,15 +265,26 @@ Set `publishingProfiles` in `.rulesrc.json` to the channels the repository actua
 | `brew`      | `publishing-brew.md`      | Homebrew formulae (opt-in only)                                   |
 
 The shared release pattern (`publishing.md`) is always emitted alongside the selected profiles.
-Leaving `publishingProfiles` unset emits every profile except the opt-in `apt` and `brew`
-variants.
+
+Leaving `publishingProfiles` unset emits every profile except:
+
+- `apt` and `brew`, which are always opt-in; and
+- `web` and `api`, when `deploymentModel` is `none`. Those two rules only apply once the
+  repository owns a deployment target, so with no deployment model they would render an
+  "inactive" banner over their full body and spend always-loaded context saying nothing applies.
+
+Listing a profile explicitly always wins over both exclusions, so
+`publishingProfiles: ["cli", "web"]` keeps `publishing-web.md` even when `deploymentModel` is
+`none`. That is the escape hatch for a repository that wants the deployment reference text
+without owning a deployment target.
 
 Scope publishing before reaching for `ruleProfile: "minimal"`: on a repository publishing a CLI
 and libraries, `["cli", "libraries"]` removes four rules and roughly 16% of the always-loaded
 rule context without dropping any guidance that applies.
 
-Profiles are independent of `deploymentModel`. `deploymentModel` controls what the deployment
-rules _say_; `publishingProfiles` controls which publishing rules are _emitted at all_.
+`deploymentModel` also controls what the deployment rules _say_; `publishingProfiles` controls
+which publishing rules are _emitted at all_. They interact only through the `none` default
+described above.
 
 ## Wrapper Commands
 

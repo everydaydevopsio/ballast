@@ -2607,10 +2607,6 @@ Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. D
         self.assertIn("`.codex/rules/python-linting.md`", merged)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class PublishingDeploymentProfileTests(unittest.TestCase):
     """Deployment-only publishing rules declare themselves inactive when no
     deployment model is configured, so they stay out of the always-loaded rule
@@ -2639,3 +2635,7 @@ class PublishingDeploymentProfileTests(unittest.TestCase):
         suffixes = cli.list_rule_suffixes("publishing", "python", None, "kubernetes")
         self.assertNotIn("apt", suffixes)
         self.assertNotIn("brew", suffixes)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -6621,3 +6621,66 @@ func TestResolveMonorepoPlanPreservesPublishingProfiles(t *testing.T) {
 		}
 	}
 }
+
+// TestRefreshCleanupPrunesDeploymentRulesWhenModelIsNone covers the inverse of
+// the orphan bug: when deploymentModel drops to "none" the backends stop
+// emitting publishing-web/publishing-api, so the wrapper's cleanup must stop
+// treating them as current. Otherwise they linger on disk, absent from the
+// manifest and no longer regenerated.
+func TestRefreshCleanupPrunesDeploymentRulesWhenModelIsNone(t *testing.T) {
+	root := resolvedTempDir(t)
+	marker := "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->\n"
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["publishing"],
+  "languages": ["typescript"],
+  "paths": { "typescript": ["."] },
+  "deploymentModel": "none"
+}`)
+
+	kept := []string{"publishing.md", "publishing-cli.md", "publishing-apps.md", "publishing-libraries.md", "publishing-sdks.md"}
+	pruned := []string{"publishing-web.md", "publishing-api.md"}
+	for _, name := range append(append([]string{}, kept...), pruned...) {
+		mustWriteFile(t, filepath.Join(root, ".claude", "rules", name), marker)
+	}
+
+	if err := cleanupSingleLanguageManagedSelections(root, language("typescript")); err != nil {
+		t.Fatalf("cleanupSingleLanguageManagedSelections returned error: %v", err)
+	}
+
+	for _, name := range kept {
+		if !fileExists(filepath.Join(root, ".claude", "rules", name)) {
+			t.Fatalf("expected %s to survive with deploymentModel none", name)
+		}
+	}
+	for _, name := range pruned {
+		if fileExists(filepath.Join(root, ".claude", "rules", name)) {
+			t.Fatalf("expected %s to be pruned with deploymentModel none", name)
+		}
+	}
+}
+
+// TestConfiguredRuleSuffixesHonorDeploymentModel keeps the wrapper's view of the
+// current rule set aligned with what the backends emit.
+func TestConfiguredRuleSuffixesHonorDeploymentModel(t *testing.T) {
+	none := &monorepoConfig{Agents: []string{"publishing"}, DeploymentModel: "none"}
+	if got := configuredRuleSuffixesForAgent("publishing", none); slices.Contains(got, "web") || slices.Contains(got, "api") {
+		t.Fatalf("deploymentModel none should drop web/api, got %v", got)
+	}
+
+	k8s := &monorepoConfig{Agents: []string{"publishing"}, DeploymentModel: "kubernetes"}
+	got := configuredRuleSuffixesForAgent("publishing", k8s)
+	if !slices.Contains(got, "web") || !slices.Contains(got, "api") {
+		t.Fatalf("deploymentModel kubernetes should keep web/api, got %v", got)
+	}
+
+	// An explicit profile list wins over the deployment-model default.
+	explicit := &monorepoConfig{
+		Agents:             []string{"publishing"},
+		DeploymentModel:    "none",
+		PublishingProfiles: []string{"cli", "web"},
+	}
+	if got := configuredRuleSuffixesForAgent("publishing", explicit); !slices.Contains(got, "web") {
+		t.Fatalf("explicit profiles should keep web, got %v", got)
+	}
+}
