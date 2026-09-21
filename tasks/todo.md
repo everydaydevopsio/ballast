@@ -5,7 +5,7 @@
 - Owner: Mark C Allen
 - Date: 2026-09-21
 - Mode: Approval-Required (default-behaviour changes confirmed before implementing)
-- Plan: `plans/plan-refresh-config-and-context-budget.md`
+- Plan: graduated to [ADR-001](../adr/001-scope-generated-rules-to-repository-shape.md)
 
 ## Scope
 
