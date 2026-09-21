@@ -110,6 +110,13 @@ jobs:
         run: |
           set -euo pipefail
           pnpm run build
+          # The wrapper resolves every backend from this source tree. The Go
+          # backend binary is gitignored and no other step produces it, so
+          # without this build `upgrade` falls through to a $PATH lookup for
+          # ballast-go that cannot succeed on a clean checkout. build-go
+          # stamps the bumped version, keeping the rules it emits in step with
+          # the TypeScript and Python backends.
+          make build-go
           mkdir -p .ci/bin
           go build -C cli/ballast -o "${PWD}/.ci/bin/ballast" .
           .ci/bin/ballast upgrade --patch
