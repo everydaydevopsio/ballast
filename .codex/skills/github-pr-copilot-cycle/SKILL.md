@@ -9,7 +9,7 @@ description: >
   cycles have completed.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.18.0. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->
 
 # GitHub PR Copilot Cycle Skill
 

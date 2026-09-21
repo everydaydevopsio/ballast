@@ -554,6 +554,7 @@ func printUsage() {
 	fmt.Println("Install target behavior: `--target` adds to the saved targets in `.rulesrc.json`; use `--remove-target` to stop managing a target and clean up Ballast-managed files for it.")
 	fmt.Println("Install language behavior: `--remove-language` removes languages from `.rulesrc.json`, removes their `paths`, and prunes stale Ballast-managed rule files.")
 	fmt.Println("Publishing deployment model behavior: `--deployment-model` stores app/service deployment guidance as one of none, kubernetes, serverless, server, docker, or hosted. Use `none` for CLI, library, or SDK-only projects.")
+	fmt.Printf("Publishing scope behavior: set `publishingProfiles` in `.rulesrc.json` to limit which publishing rules load into every session (%s). Unset emits every variant except `apt` and `brew`, which are always opt-in, and `web`/`api`, which are excluded when `deploymentModel` is `none`. Listing a profile explicitly overrides both exclusions. Example: \"publishingProfiles\": [\"cli\", \"libraries\"] for a repo that ships a CLI and libraries but no web app or API.\n", strings.Join(supportedPublishingProfiles, ", "))
 	fmt.Println("Single-language repos are forwarded to the matching backend CLI.")
 	fmt.Println("Mixed TypeScript/Python/Go/Ansible/Terraform/Dart repos install all rules at the repo root under per-language directories (for example `.claude/rules/typescript/`, `.gemini/rules/python/`, and `.codex/rules/dart/`).")
 }
@@ -3013,6 +3014,10 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	}
 	if config != nil {
 		configToSave.RuleProfile = normalizeWrapperRuleProfile(config.RuleProfile)
+		// publishingProfiles scopes which publishing rules reach the
+		// always-loaded rule set. Rebuilding the config without it silently
+		// erases the setting and re-emits every publishing variant.
+		configToSave.PublishingProfiles = normalizePublishingProfiles(config.PublishingProfiles)
 	}
 	for _, profile := range profiles {
 		configToSave.Languages = append(configToSave.Languages, string(profile.Language))
@@ -3161,7 +3166,10 @@ func cleanupSingleLanguageManagedSelections(root string, selectedLanguage langua
 		config.Languages = []string{string(selectedLanguage)}
 	}
 	for _, target := range config.Targets {
-		if err := removeStaleManagedFiles(root, target, nil, config); err != nil {
+		// Single-language repositories are forwarded straight to their backend,
+		// which writes rules flat under the rules root. Accept both layouts so a
+		// refresh never deletes the rules the same command just installed.
+		if err := removeStaleManagedFilesForLayout(root, target, nil, config, ruleLayoutEither); err != nil {
 			return err
 		}
 	}
@@ -3884,11 +3892,21 @@ func cleanupStaleManagedSelections(root string, plan *monorepoPlan) error {
 }
 
 func removeStaleManagedFiles(root string, target string, previous *monorepoConfig, next *monorepoConfig) error {
+	return removeStaleManagedFilesForLayout(root, target, previous, next, ruleLayoutNested)
+}
+
+func removeStaleManagedFilesForLayout(
+	root string,
+	target string,
+	previous *monorepoConfig,
+	next *monorepoConfig,
+	layout ruleLayout,
+) error {
 	if next == nil {
 		return nil
 	}
 	trackedPaths := ballastManagedPathsFromSupportFile(root, target)
-	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePaths(root, target, next)) {
+	for _, file := range stringDifference(allManagedRulePaths(root, target), managedRulePathsForLayout(root, target, next, layout)) {
 		if !ballastOwnsManagedFile(file) && !trackedPaths[file] {
 			continue
 		}
@@ -3897,7 +3915,7 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 		}
 		pruneEmptyParents(filepath.Dir(file), targetRootDir(root, target))
 	}
-	if err := removeUnlistedManagedRuleFiles(root, target, next); err != nil {
+	if err := removeUnlistedManagedRuleFiles(root, target, next, layout); err != nil {
 		return err
 	}
 	for _, file := range stringDifference(allManagedSkillPaths(root, target), managedSkillPaths(root, target, next.Skills)) {
@@ -3911,10 +3929,10 @@ func removeStaleManagedFiles(root string, target string, previous *monorepoConfi
 	return nil
 }
 
-func removeUnlistedManagedRuleFiles(root string, target string, next *monorepoConfig) error {
+func removeUnlistedManagedRuleFiles(root string, target string, next *monorepoConfig, layout ruleLayout) error {
 	rulesRoot := targetRulesRoot(root, target)
 	expected := map[string]bool{}
-	for _, file := range managedRulePaths(root, target, next) {
+	for _, file := range managedRulePathsForLayout(root, target, next, layout) {
 		expected[filepath.Clean(file)] = true
 	}
 	for _, file := range managedSkillPaths(root, target, next.Skills) {
@@ -4053,18 +4071,63 @@ func removeManagedTargetFiles(root string, target string, config *monorepoConfig
 	return nil
 }
 
+// ruleLayout describes where a target's generated rule files live.
+//
+// Multi-language repositories nest rules under common/ and per-language
+// directories. Single-language repositories are forwarded straight to their
+// backend, which writes them flat under the rules root. Cleanup must expect the
+// layout the backend actually produced, or it treats every generated rule as
+// stale and deletes it.
+type ruleLayout int
+
+const (
+	// ruleLayoutNested matches multi-language output: common/<base>.md and
+	// <lang>/<lang>-<base>.md.
+	ruleLayoutNested ruleLayout = iota
+	// ruleLayoutFlat matches single-language backend output: <base>.md and
+	// <lang>-<base>.md directly under the rules root.
+	ruleLayoutFlat
+	// ruleLayoutEither accepts both. Used when refreshing a single-language
+	// repository that may still hold nested output from an earlier
+	// multi-language install; deselected agents are still pruned in both
+	// layouts, but nothing a backend legitimately wrote is destroyed.
+	ruleLayoutEither
+)
+
+func (layout ruleLayout) includesNested() bool {
+	return layout == ruleLayoutNested || layout == ruleLayoutEither
+}
+
+func (layout ruleLayout) includesFlat() bool {
+	return layout == ruleLayoutFlat || layout == ruleLayoutEither
+}
+
 func managedRulePaths(root string, target string, config *monorepoConfig) []string {
+	return managedRulePathsForLayout(root, target, config, ruleLayoutNested)
+}
+
+func managedRulePathsForLayout(root string, target string, config *monorepoConfig, layout ruleLayout) []string {
 	if config != nil && normalizeWrapperRuleProfile(config.RuleProfile) == "minimal" {
 		minimal := *config
 		minimal.Agents = []string{"core"}
 		config = &minimal
 	}
-	return managedRulePathsWithSuffixes(root, target, config, func(agent string) []string {
+	return managedRulePathsWithSuffixesForLayout(root, target, config, func(agent string) []string {
 		return configuredRuleSuffixesForAgent(agent, config)
-	})
+	}, layout)
 }
 
 func managedRulePathsWithSuffixes(root string, target string, config *monorepoConfig, suffixesFor func(string) []string) []string {
+	return managedRulePathsWithSuffixesForLayout(root, target, config, suffixesFor, ruleLayoutNested)
+}
+
+func managedRulePathsWithSuffixesForLayout(
+	root string,
+	target string,
+	config *monorepoConfig,
+	suffixesFor func(string) []string,
+	layout ruleLayout,
+) []string {
 	paths := []string{}
 	ext := targetRuleExtension(target)
 	rulesRoot := targetRulesRoot(root, target)
@@ -4073,14 +4136,24 @@ func managedRulePathsWithSuffixes(root string, target string, config *monorepoCo
 	for _, agent := range commonSelection {
 		for _, suffix := range suffixesFor(agent) {
 			base := agentBaseName(agent, suffix)
-			paths = append(paths, filepath.Join(rulesRoot, "common", base+ext))
+			if layout.includesNested() {
+				paths = append(paths, filepath.Join(rulesRoot, "common", base+ext))
+			}
+			if layout.includesFlat() {
+				paths = append(paths, filepath.Join(rulesRoot, base+ext))
+			}
 		}
 	}
 	for _, lang := range config.Languages {
 		for _, agent := range languageSelection {
 			for _, suffix := range suffixesFor(agent) {
 				base := agentBaseName(agent, suffix)
-				paths = append(paths, filepath.Join(rulesRoot, lang, lang+"-"+base+ext))
+				if layout.includesNested() {
+					paths = append(paths, filepath.Join(rulesRoot, lang, lang+"-"+base+ext))
+				}
+				if layout.includesFlat() {
+					paths = append(paths, filepath.Join(rulesRoot, lang+"-"+base+ext))
+				}
 			}
 		}
 	}
@@ -4418,13 +4491,34 @@ func normalizeWrapperRuleProfile(value string) string {
 	return ""
 }
 
+// deploymentPublishingSuffixes mirrors the backends: these publishing variants
+// only apply once the repository owns a deployment target, so they leave the
+// default set when deploymentModel is "none". The wrapper has to agree, or
+// cleanup keeps rules the backends no longer emit and they linger on disk
+// without a manifest entry.
+var deploymentPublishingSuffixes = []string{"web", "api"}
+
 func configuredRuleSuffixesForAgent(agent string, config *monorepoConfig) []string {
-	if agent == "publishing" && config != nil {
-		if profiles := normalizePublishingProfiles(config.PublishingProfiles); len(profiles) > 0 {
-			return append([]string{""}, profiles...)
-		}
+	if agent != "publishing" || config == nil {
+		return ruleSuffixesForAgent(agent)
 	}
-	return ruleSuffixesForAgent(agent)
+	// An explicit profile list always wins, including over the deployment-model
+	// default below.
+	if profiles := normalizePublishingProfiles(config.PublishingProfiles); len(profiles) > 0 {
+		return append([]string{""}, profiles...)
+	}
+	suffixes := ruleSuffixesForAgent(agent)
+	if strings.ToLower(strings.TrimSpace(config.DeploymentModel)) != "none" {
+		return suffixes
+	}
+	filtered := make([]string, 0, len(suffixes))
+	for _, suffix := range suffixes {
+		if slices.Contains(deploymentPublishingSuffixes, suffix) {
+			continue
+		}
+		filtered = append(filtered, suffix)
+	}
+	return filtered
 }
 
 func agentBaseName(agent string, suffix string) string {

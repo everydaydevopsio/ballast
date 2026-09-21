@@ -238,6 +238,54 @@ For single-language TypeScript installs, the `git-hooks` rules should use Husky 
 
 When `tasks` or `publishing` is selected and `.rulesrc.json` has no saved value, interactive installs prompt for `taskSystem` and app `deploymentModel`; `--yes` and CI mode use defaults. For CLI, library, or SDK-only projects, choose `none` for `deploymentModel`.
 
+### Scoping publishing rules with `publishingProfiles`
+
+The `publishing` agent emits one rule per distribution channel, and every emitted rule loads
+into the agent's context in every session. Most repositories ship through one or two channels,
+so the default is usually wider than it needs to be.
+
+Set `publishingProfiles` in `.rulesrc.json` to the channels the repository actually publishes:
+
+```json
+{
+  "agents": ["publishing"],
+  "publishingProfiles": ["cli", "libraries"]
+}
+```
+
+| Profile     | Rule emitted              | Use when the repo publishes                                       |
+| ----------- | ------------------------- | ----------------------------------------------------------------- |
+| `cli`       | `publishing-cli.md`       | a command-line tool (GoReleaser, npm `bin`, PyPI console scripts) |
+| `libraries` | `publishing-libraries.md` | reusable packages to npmjs, PyPI, or Go modules                   |
+| `sdks`      | `publishing-sdks.md`      | API clients or generated SDKs                                     |
+| `apps`      | `publishing-apps.md`      | installable applications or container images                      |
+| `web`       | `publishing-web.md`       | a deployed web application                                        |
+| `api`       | `publishing-api.md`       | a deployed REST API                                               |
+| `apt`       | `publishing-apt.md`       | Debian/APT packages (opt-in only)                                 |
+| `brew`      | `publishing-brew.md`      | Homebrew formulae (opt-in only)                                   |
+
+The shared release pattern (`publishing.md`) is always emitted alongside the selected profiles.
+
+Leaving `publishingProfiles` unset emits every profile except:
+
+- `apt` and `brew`, which are always opt-in; and
+- `web` and `api`, when `deploymentModel` is `none`. Those two rules only apply once the
+  repository owns a deployment target, so with no deployment model they would render an
+  "inactive" banner over their full body and spend always-loaded context saying nothing applies.
+
+Listing a profile explicitly always wins over both exclusions, so
+`publishingProfiles: ["cli", "web"]` keeps `publishing-web.md` even when `deploymentModel` is
+`none`. That is the escape hatch for a repository that wants the deployment reference text
+without owning a deployment target.
+
+Scope publishing before reaching for `ruleProfile: "minimal"`: on a repository publishing a CLI
+and libraries, `["cli", "libraries"]` removes four rules and roughly 16% of the always-loaded
+rule context without dropping any guidance that applies.
+
+`deploymentModel` also controls what the deployment rules _say_; `publishingProfiles` controls
+which publishing rules are _emitted at all_. They interact only through the `none` default
+described above.
+
 ## Wrapper Commands
 
 - `ballast install`: install rules for the detected or selected language; `--target` merges into saved targets, `--remove-target` removes saved targets with Ballast-managed cleanup, `--remove-language` removes language surfaces plus saved `paths` with cleanup, and `--refresh-config` reapplies saved `.rulesrc.json` settings

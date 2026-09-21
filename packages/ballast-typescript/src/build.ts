@@ -11,8 +11,11 @@ import {
   getSkillDir,
   SKILL_IDS
 } from './agents';
-import { OPT_IN_PUBLISHING_PROFILES } from './config';
-import type { PublishingProfile, Target } from './config';
+import {
+  DEPLOYMENT_PUBLISHING_PROFILES,
+  OPT_IN_PUBLISHING_PROFILES
+} from './config';
+import type { DeploymentModel, PublishingProfile, Target } from './config';
 import type { Language } from './agents';
 import pkg from '../package.json';
 
@@ -687,7 +690,8 @@ const CONTENT_MAIN = `${CONTENT_PREFIX}.md`;
 export function listRuleSuffixes(
   agentId: string,
   language: Language = 'typescript',
-  publishingProfiles?: readonly PublishingProfile[]
+  publishingProfiles?: readonly PublishingProfile[],
+  deploymentModel?: DeploymentModel
 ): string[] {
   const dir = getPreferredAgentDir(agentId, language);
   if (!fs.existsSync(dir)) {
@@ -720,7 +724,9 @@ export function listRuleSuffixes(
     if (publishingProfiles !== undefined && publishingProfiles.length > 0) {
       const available = new Set(suffixes);
       // The shared release-pattern rule (empty suffix) is always emitted
-      // alongside the selected variants.
+      // alongside the selected variants. An explicit profile list always wins,
+      // including over the deployment-model default below, so a repository can
+      // deliberately keep the deployment reference text.
       return [
         ...(available.has('') ? [''] : []),
         ...publishingProfiles.filter((profile) => available.has(profile))
@@ -728,10 +734,16 @@ export function listRuleSuffixes(
     }
     // Opt-in variants are reference-only unless explicitly configured; do not
     // emit them into the always-loaded rule set by default.
-    return suffixes.filter(
-      (suffix) =>
-        !(OPT_IN_PUBLISHING_PROFILES as readonly string[]).includes(suffix)
-    );
+    const excluded = new Set<string>(OPT_IN_PUBLISHING_PROFILES);
+    // The deployment variants open by declaring themselves inactive when no
+    // deployment model is configured. Emitting them costs always-loaded context
+    // to tell the agent the content does not apply, so leave them out by
+    // default and let publishingProfiles opt back in.
+    if (deploymentModel === 'none') {
+      for (const profile of DEPLOYMENT_PUBLISHING_PROFILES)
+        excluded.add(profile);
+    }
+    return suffixes.filter((suffix) => !excluded.has(suffix));
   }
   return suffixes;
 }
@@ -1411,7 +1423,8 @@ export function buildCodexAgentsMd(
   skills: string[] = [],
   language: Language = 'typescript',
   publishingProfiles?: readonly PublishingProfile[],
-  tools?: Record<string, string[]>
+  tools?: Record<string, string[]>,
+  deploymentModel?: DeploymentModel
 ): string {
   const lines: string[] = [];
   lines.push('# AGENTS.md');
@@ -1432,7 +1445,12 @@ export function buildCodexAgentsMd(
   );
   lines.push('');
   for (const agentId of agents) {
-    const suffixes = listRuleSuffixes(agentId, language, publishingProfiles);
+    const suffixes = listRuleSuffixes(
+      agentId,
+      language,
+      publishingProfiles,
+      deploymentModel
+    );
     for (const ruleSuffix of suffixes) {
       const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =
@@ -1466,7 +1484,8 @@ export function buildClaudeMd(
   skills: string[] = [],
   language: Language = 'typescript',
   publishingProfiles?: readonly PublishingProfile[],
-  tools?: Record<string, string[]>
+  tools?: Record<string, string[]>,
+  deploymentModel?: DeploymentModel
 ): string {
   const lines: string[] = [];
   lines.push('# CLAUDE.md');
@@ -1487,7 +1506,12 @@ export function buildClaudeMd(
   );
   lines.push('');
   for (const agentId of agents) {
-    const suffixes = listRuleSuffixes(agentId, language, publishingProfiles);
+    const suffixes = listRuleSuffixes(
+      agentId,
+      language,
+      publishingProfiles,
+      deploymentModel
+    );
     for (const ruleSuffix of suffixes) {
       const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =
@@ -1535,7 +1559,8 @@ export function buildGeminiMd(
   skills: string[] = [],
   language: Language = 'typescript',
   publishingProfiles?: readonly PublishingProfile[],
-  tools?: Record<string, string[]>
+  tools?: Record<string, string[]>,
+  deploymentModel?: DeploymentModel
 ): string {
   const lines: string[] = [];
   lines.push('# GEMINI.md');
@@ -1574,7 +1599,12 @@ export function buildGeminiMd(
   );
   lines.push('');
   for (const agentId of agents) {
-    const suffixes = listRuleSuffixes(agentId, language, publishingProfiles);
+    const suffixes = listRuleSuffixes(
+      agentId,
+      language,
+      publishingProfiles,
+      deploymentModel
+    );
     for (const ruleSuffix of suffixes) {
       const basename = getRuleBasename(agentId, language, ruleSuffix);
       const description =

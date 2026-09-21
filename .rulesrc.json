@@ -30,7 +30,8 @@
     "ballast-project-maintenance",
     "speckit-bootstrap",
     "speckit-reverse-engineer",
-    "speckit-delivery"
+    "speckit-delivery",
+    "docker-registry-publish"
   ],
   "ballastVersion": "5.19.0",
   "languages": [
@@ -80,5 +81,9 @@
     ]
   },
   "taskSystem": "github",
-  "deploymentModel": "none"
+  "deploymentModel": "none",
+  "publishingProfiles": [
+    "cli",
+    "libraries"
+  ]
 }

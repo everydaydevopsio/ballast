@@ -44,6 +44,14 @@ export type PublishingProfile = (typeof PUBLISHING_PROFILES)[number];
 /** Reference-only variants that are emitted only when explicitly configured. */
 export const OPT_IN_PUBLISHING_PROFILES = ['apt', 'brew'] as const;
 
+/**
+ * Publishing variants whose guidance only applies once the repository owns a
+ * deployment target. With `deploymentModel: none` these rules render an
+ * "inactive" banner over their full body, so they are excluded from the default
+ * profile set; an explicit `publishingProfiles` entry opts them back in.
+ */
+export const DEPLOYMENT_PUBLISHING_PROFILES = ['web', 'api'] as const;
+
 export const RULE_PROFILES = ['full', 'minimal'] as const;
 export type RuleProfile = (typeof RULE_PROFILES)[number];
 

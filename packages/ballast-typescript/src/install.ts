@@ -691,7 +691,8 @@ export function install(options: InstallOptions): InstallResult {
       const suffixes = listRuleSuffixes(
         agentId,
         language,
-        resolvedPublishingProfiles
+        resolvedPublishingProfiles,
+        resolvedDeploymentModel
       );
       for (const ruleSuffix of suffixes) {
         const { dir, file } = getDestination(
@@ -846,7 +847,8 @@ export function install(options: InstallOptions): InstallResult {
           supportSelections.skills,
           language,
           supportSelections.publishingProfiles,
-          effectiveTools
+          effectiveTools,
+          resolvedDeploymentModel
         );
         const nextContent =
           fs.existsSync(claudeMdPath) && !force && shouldPatchClaudeMd
@@ -882,7 +884,8 @@ export function install(options: InstallOptions): InstallResult {
           supportSelections.skills,
           language,
           supportSelections.publishingProfiles,
-          effectiveTools
+          effectiveTools,
+          resolvedDeploymentModel
         );
         const nextContent =
           fs.existsSync(geminiMdPath) && !force && shouldPatchGeminiMd
@@ -916,7 +919,8 @@ export function install(options: InstallOptions): InstallResult {
           supportSelections.skills,
           language,
           supportSelections.publishingProfiles,
-          effectiveTools
+          effectiveTools,
+          resolvedDeploymentModel
         );
         const nextContent =
           fs.existsSync(agentsMdPath) && !force
