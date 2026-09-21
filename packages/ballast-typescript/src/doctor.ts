@@ -2,6 +2,7 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import {
+  DEFAULT_DEPLOYMENT_MODEL,
   DEPLOYMENT_MODELS,
   findProjectRoot,
   getRulesrcFilename,
@@ -220,14 +221,19 @@ const APP_TYPE_PUBLISH_RULE: Record<AppType, string | null> = {
 
 /**
  * Narrows the loosely typed deploymentModel carried in doctor's config view so
- * rule-suffix resolution sees the same value install does. Unknown values fall
- * back to undefined, which keeps the full default profile set.
+ * rule-suffix resolution sees the same value install does.
+ *
+ * install() resolves an omitted or unrecognized deploymentModel to
+ * DEFAULT_DEPLOYMENT_MODEL, so doctor must apply the same fallback. Returning
+ * undefined here would keep the full default profile set and make doctor
+ * classify publishing-web/publishing-api as active for a legacy config that
+ * install no longer emits them for.
  */
-function asDeploymentModel(value?: string | null): DeploymentModel | undefined {
-  if (!value) return undefined;
+function asDeploymentModel(value?: string | null): DeploymentModel {
+  if (!value) return DEFAULT_DEPLOYMENT_MODEL;
   return (DEPLOYMENT_MODELS as readonly string[]).includes(value)
     ? (value as DeploymentModel)
-    : undefined;
+    : DEFAULT_DEPLOYMENT_MODEL;
 }
 
 function refreshConfigCommand(

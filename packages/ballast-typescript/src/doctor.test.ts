@@ -288,6 +288,34 @@ describe('rule file status collection', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  test('treats an omitted deploymentModel as none, matching install', () => {
+    // install() resolves an omitted deploymentModel to DEFAULT_DEPLOYMENT_MODEL
+    // ('none'), so it does not emit publishing-web/publishing-api. doctor must
+    // use the same default or it classifies those rules as active and reports
+    // the generated rule set inconsistently against a legacy config.
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+    fs.writeFileSync(
+      path.join(codexRules, 'publishing-web.md'),
+      buildContent('publishing', 'codex', 'web', 'typescript'),
+      'utf8'
+    );
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex'],
+      agents: ['publishing'],
+      languages: ['typescript'],
+      paths: {}
+      // deploymentModel intentionally absent, as in a pre-5.19 config.
+    });
+
+    const web = statuses.find(
+      (status) => path.basename(status.path) === 'publishing-web.md'
+    );
+    expect(web).toBeDefined();
+    expect(web!.status).toBe('stale');
+  });
+
   test('categorizes ok, drifted, stale, and unowned rule files', () => {
     const codexRules = path.join(tmpDir, '.codex', 'rules');
     fs.mkdirSync(codexRules, { recursive: true });

@@ -27,9 +27,10 @@
 - [x] Set `publishingProfiles: ["cli", "libraries"]` for this repo
 - [x] Document `publishingProfiles` in `ballast --help` and `docs/installation.md`
 - [x] Gate `web`/`api` on `deploymentModel` in the TypeScript, Go, and Python backends
-- [x] Move the three `tasks-todo` templates to `docs/agents/tasks.md` with a pointer-resolves test
+- [x] Move the three `tasks-todo` templates to `docs/agents/tasks.md` — reverted after review; templates inline, guard test added, #363 filed
 - [x] Remove the stale `.cursor/` output; register `docker-registry-publish`
 - [x] File issues for deferred and pre-existing problems
+- [x] Address Copilot review: wrapper deployment pruning, Go/Python profile persistence, test guard placement, docs accuracy
 
 ## Test Strategy
 
@@ -46,7 +47,8 @@
 
 ## Outcome
 
-- Result: always-on rule context 18,610 → 15,231 tokens (−3,379, −18.2%) with no applicable guidance lost.
+- Result: always-on rule context 18,610 → 15,639 tokens (−2,971, −16.0%) with no applicable guidance lost.
+- Review: Copilot raised six findings across two cycles; all six verified real and fixed. Phase 6 was reverted — the `docs/agents/*.md` pattern it copied turns out to dangle in every consuming repo (#363).
 - Evidence: `go test ./...` (wrapper + ballast-go), `pnpm test` (374 passed), `uv run pytest` (122 passed; 7 pre-existing macOS failures, see #359), 17/18 e2e scripts (1 pre-existing failure, see #360).
-- Follow-ups: #356, #357, #358, #359, #360, #361.
+- Follow-ups: #356, #357, #358, #359, #360, #361, #363.
 - Commit used `--no-verify`: the root pre-commit hook cannot run `tsc-files` (#361, pre-existing since the monorepo split). Its checks were run manually instead — `tsc --noEmit`, `prettier --check`, and `eslint` all clean.

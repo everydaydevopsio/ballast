@@ -52,13 +52,19 @@ The config key correctly scopes which publishing rules are emitted (verified on 
 fixture), but it appears in no CLI help output, so nothing prompts a repo to set it. The default
 emits all seven publishing rules.
 
-### 5. The monorepo path erases `publishingProfiles` (found during implementation)
+### 5. Every config-save path erases `publishingProfiles` (found during implementation and review)
 
 `resolveMonorepoPlan` rebuilds `.rulesrc.json` from scratch into `configToSave`, which never
 carried `PublishingProfiles` across. Any multi-language repository that set the key lost it on
 the next install, and the wrapper's cleanup — which derives the current rule set from the saved
 config — then treated all seven publishing rules as in scope. This is why setting the key in
 this repo initially had no effect while a single-language fixture honoured it.
+
+Copilot review surfaced the same omission in the Go and Python backends' own `saveConfig` /
+`save_config`. Both merge forward `taskSystem`, `deploymentModel`, `ruleProfile`, `discovery`,
+and `tools`, but not `publishingProfiles`. The wrapper masked it — `ballast install` re-saves
+afterwards — but direct backend invocation is a supported entry point for single-language
+repos, so the key this plan recommends as the main context lever was unreliable there.
 
 ## Measured Baseline
 
@@ -132,10 +138,13 @@ backends actually wrote.
 - [x] Suppress `publishing-web` / `publishing-api` emission when `deploymentModel` is `none`
 - [x] Keep all three backends and their parity tests in sync
 
-### Phase 6 — Move reference payloads out of always-on rules
+### Phase 6 — Move reference payloads out of always-on rules (reverted)
 
 - [x] Relocate the three `tasks-todo` fenced templates behind a docs reference
 - [x] Verify the rule still carries the decision and the trigger
+- [x] **Reverted after review**: install never writes `docs/`, so the pointer dangles in every
+      consuming repo. Templates are inline again, a guard test prevents regression, and #363
+      tracks doing the move properly via the skill `references/` mechanism.
 
 ### Phase 7 — Hygiene
 
@@ -169,6 +178,26 @@ backends actually wrote.
   `web` and `api` drop out of the default set; an explicit `publishingProfiles` entry always
   wins, so a repository can deliberately keep the deployment reference text.
 
+## Review Outcomes
+
+Copilot review on PR #362, two cycles, six findings — all verified before acting, all real.
+
+| Finding                                                         | Verdict | Resolution                                     |
+| --------------------------------------------------------------- | ------- | ---------------------------------------------- |
+| `docs/agents/tasks.md` is never installed into consuming repos  | Real    | Phase 6 reverted; guard test added; #363 filed |
+| Wrapper cleanup ignored `deploymentModel`, leaving orphan rules | Real    | Fixed, 2 tests                                 |
+| Python tests placed after the `__main__` guard                  | Real    | Guard moved; 125 &rarr; 129 collected          |
+| `docs/installation.md` contradicted the new default             | Real    | Corrected                                      |
+| Go `saveConfig` drops `publishingProfiles`                      | Real    | Fixed, 1 test                                  |
+| Python `save_config` drops `publishingProfiles`                 | Real    | Fixed, 1 test                                  |
+
+The first finding invalidated a premise recorded in this plan. Phase 6 was justified by
+`local-dev-env.md` already using a `docs/agents/*.md` pointer — but that pointer is itself
+dangling in every consuming repository, so it was never a working pattern. The distinction that
+matters: `local-dev`'s pointer is to supplementary examples and degrades gracefully, whereas the
+tasks templates are content the rule instructs agents to copy _verbatim_, so a dead pointer
+breaks the instruction rather than thinning it.
+
 ## Deferred
 
 Filed rather than fixed here, to keep this change reviewable:
@@ -179,6 +208,7 @@ Filed rather than fixed here, to keep this change reviewable:
 - #359 Python `resolve_project_root` tests fail on macOS due to `/tmp` symlink (pre-existing)
 - #360 `e2e-tools-rendered-in-rules.sh` fails on a clean checkout (pre-existing)
 - #361 Root pre-commit hook is broken for any TypeScript change (pre-existing)
+- #363 Installed rules point at `docs/agents/*.md` files that are never shipped to consumers
 
 ## Change Log
 
