@@ -32,7 +32,7 @@
     "speckit-reverse-engineer",
     "speckit-delivery"
   ],
-  "ballastVersion": "5.18.3",
+  "ballastVersion": "5.19.0",
   "languages": [
     "typescript",
     "python",

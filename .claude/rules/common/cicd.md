@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/cicd" version="5.18.3" checksum="0d00ceec604a3482e49df171777201f8b363fa77a814ccb4a08cdcd2b778e49b" -->
+<!-- ballast:rule id="typescript/cicd" version="5.19.0" checksum="0d00ceec604a3482e49df171777201f8b363fa77a814ccb4a08cdcd2b778e49b" -->
 # CI/CD Rules
 
 These rules help design and maintain CI/CD pipelines for the repository's configured languages and runtimes.

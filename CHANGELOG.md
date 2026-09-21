@@ -15,6 +15,36 @@ the complete history.
 
 ## [Unreleased]
 
+## [5.19.0] - 2026-09-21
+
+## v5.19.0
+
+This release adds Spec Kit workflow support, reduces generated rule clutter, and improves configuration diagnostics and release reliability.
+
+### Highlights
+
+- **Spec Kit workflows:** Added bootstrap, reverse-engineering, and delivery-orchestration skills, plus a lightweight governance rule and supporting documentation.
+- **Leaner generated context:** Added a minimal core-rule profile through `ruleProfile`. Inactive and reference-only rules are no longer emitted, task-system rules reflect the configured system and target, and repository tool policy is emitted once per target manifest.
+- **Reusable rule content:** Added shared-fragment includes and consolidated common testing and publishing guidance. Trimmed repeated headings, persona preambles, and reference boilerplate.
+- **Rule-size checks:** Added rule-size budget enforcement in CI and checks in `doctor` to help keep generated context manageable.
+- **Smarter refresh and agent guidance:** Refresh now fills placeholder repository facts. Agent guidance reduces low-information questions, and a new performance-audit skill supports performance reviews.
+
+### Fixes
+
+- **Configuration and diagnostics:** Improved `doctor` detection and remediation for JavaScript profiles configured as TypeScript, minimal JavaScript setups, and removal of the final language. Language cleanup now clears stale tool selections without discarding saved profiles.
+- **Profile handling:** Preserved `ruleProfile` when saving configuration through the Go backend, made TypeScript diagnostics profile-aware, tightened core-command language validation, and included Docker in language checks.
+- **Cross-platform generation:** Treats pristine rules with CRLF line endings correctly, normalizes line endings before patching Python support files, and produces deterministic TypeScript rule ordering.
+- **Include safety:** Hardened shared-fragment path validation against Windows-style paths and distinguished nesting-depth failures from recursive includes.
+- **Tool-policy cleanup:** Restricted removal to sections matching the generated signature, protecting unrelated content.
+- **Release pipeline:** Fixed the release gate and reusable-workflow concurrency collision, ensured generated outputs use the release version, and built the Go backend before regenerating release artifacts.
+
+### Changes
+
+- **Release notes automation:** Release notes and changelog entries are now generated with Castoff. Release-note generation requires `OPENAI_API_KEY` rather than silently skipping when it is missing.
+- **Go toolchain:** Raised the Go toolchain to **1.26**, updated `x/term`, and expanded version checks to cover all modules, the smoke image, and workflow YAML.
+- **Dependencies:** Updated YAML, Jest, ESLint, Prettier, lint-staged, globals, Node.js types, and `pnpm/action-setup`; removed duplicate lockfile entries.
+- **Documentation and examples:** Refreshed the README and project icon, documented Spec Kit and setup/toolchain plans, clarified publishing guidance, and replaced an API-key-like value in an OWASP example.
+
 ## [3.0.0] - 2026-01-30
 
 ### Added

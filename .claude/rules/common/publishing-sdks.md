@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing/sdks" version="5.18.3" checksum="fcb239455363d0772910f9ff21f9d199ab6ae2a0b554035859300ef0fb8eb630" -->
+<!-- ballast:rule id="typescript/publishing/sdks" version="5.19.0" checksum="fcb239455363d0772910f9ff21f9d199ab6ae2a0b554035859300ef0fb8eb630" -->
 # Publishing SDKs Agent
 
 ## Goals

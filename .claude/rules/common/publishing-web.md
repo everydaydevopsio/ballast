@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing/web" version="5.18.3" checksum="864caa1bcc7e634c02cb30242c82878320da383814df889fa58ccbf7047869c3" -->
+<!-- ballast:rule id="typescript/publishing/web" version="5.19.0" checksum="864caa1bcc7e634c02cb30242c82878320da383814df889fa58ccbf7047869c3" -->
 # Web App Publishing Agent
 
 Keep this rule focused on release decisions, quality gates, artifact identity, and deployment handoff. Do not paste full workflow templates unless the user explicitly asks for one.

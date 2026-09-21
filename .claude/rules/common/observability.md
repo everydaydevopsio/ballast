@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/observability" version="5.18.3" checksum="208c1d26ff7e212e3f9b30511bd8e38d6d15a7462095b57208b4183d7d0fc1c9" -->
+<!-- ballast:rule id="typescript/observability" version="5.19.0" checksum="208c1d26ff7e212e3f9b30511bd8e38d6d15a7462095b57208b4183d7d0fc1c9" -->
 # Observability Rules
 
 These rules help add logging, tracing, metrics, and SLOs to applications and services in the repository's configured languages and runtimes.

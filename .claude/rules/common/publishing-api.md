@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing/api" version="5.18.3" checksum="afdde1e9231f897e28b4b11255de73be540b5880105183f534ef90e978431723" -->
+<!-- ballast:rule id="typescript/publishing/api" version="5.19.0" checksum="afdde1e9231f897e28b4b11255de73be540b5880105183f534ef90e978431723" -->
 # REST API Publishing Agent
 
 ## Goals

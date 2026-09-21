@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing/apps" version="5.18.3" checksum="1eeb1d916634d9ca9a62b60707e659dc83081fd177f1c09dbbc2c9a3cb8339ed" -->
+<!-- ballast:rule id="typescript/publishing/apps" version="5.19.0" checksum="1eeb1d916634d9ca9a62b60707e659dc83081fd177f1c09dbbc2c9a3cb8339ed" -->
 # Publishing Apps Agent
 
 ## Goals
