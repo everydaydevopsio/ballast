@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/linting" version="5.18.3" checksum="19ec02bf536f9aeddc38f0e778cfd8a5f9ba9bc1c3fb30b6efd8c912b8b7fe0f" -->
+<!-- ballast:rule id="typescript/linting" version="5.19.0" checksum="19ec02bf536f9aeddc38f0e778cfd8a5f9ba9bc1c3fb30b6efd8c912b8b7fe0f" -->
 # TypeScript Linting Rules
 
 These rules provide TypeScript linting setup instructions following Everyday DevOps best practices from https://www.markcallen.com/typescript-linting/

@@ -1,8 +1,14 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { findProjectRoot, getRulesrcFilename, loadConfig } from './config';
-import type { PublishingProfile, Target } from './config';
+import {
+  DEFAULT_DEPLOYMENT_MODEL,
+  DEPLOYMENT_MODELS,
+  findProjectRoot,
+  getRulesrcFilename,
+  loadConfig
+} from './config';
+import type { DeploymentModel, PublishingProfile, Target } from './config';
 import { LANGUAGES } from './agents';
 import type { Language } from './agents';
 import {
@@ -213,6 +219,23 @@ const APP_TYPE_PUBLISH_RULE: Record<AppType, string | null> = {
   unknown: null
 };
 
+/**
+ * Narrows the loosely typed deploymentModel carried in doctor's config view so
+ * rule-suffix resolution sees the same value install does.
+ *
+ * install() resolves an omitted or unrecognized deploymentModel to
+ * DEFAULT_DEPLOYMENT_MODEL, so doctor must apply the same fallback. Returning
+ * undefined here would keep the full default profile set and make doctor
+ * classify publishing-web/publishing-api as active for a legacy config that
+ * install no longer emits them for.
+ */
+function asDeploymentModel(value?: string | null): DeploymentModel {
+  if (!value) return DEFAULT_DEPLOYMENT_MODEL;
+  return (DEPLOYMENT_MODELS as readonly string[]).includes(value)
+    ? (value as DeploymentModel)
+    : DEFAULT_DEPLOYMENT_MODEL;
+}
+
 function refreshConfigCommand(
   report: Pick<
     DoctorReport,
@@ -402,7 +425,8 @@ function configuredRuleKeys(config: RuleConfig): Set<string> {
           for (const suffix of listRuleSuffixes(
             agentId,
             language,
-            config.publishingProfiles
+            config.publishingProfiles,
+            asDeploymentModel(config.deploymentModel)
           )) {
             active.add(
               `${target}:${getRuleMarkerId(agentId, language, suffix || undefined)}`

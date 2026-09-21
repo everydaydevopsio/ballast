@@ -49,12 +49,8 @@ Read and follow these rule files in `.codex/rules/` when they apply:
 - `.codex/rules/common/cicd.md` — Rules for common/cicd
 - `.codex/rules/common/observability.md` — Rules for common/observability
 - `.codex/rules/common/publishing.md` — Rules for common/publishing
-- `.codex/rules/common/publishing-api.md` — Rules for common/publishing-api
-- `.codex/rules/common/publishing-apps.md` — Rules for common/publishing-apps
 - `.codex/rules/common/publishing-cli.md` — Rules for common/publishing-cli
 - `.codex/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
-- `.codex/rules/common/publishing-sdks.md` — Rules for common/publishing-sdks
-- `.codex/rules/common/publishing-web.md` — Rules for common/publishing-web
 - `.codex/rules/common/git-hooks.md` — Rules for common/git-hooks
 - `.codex/rules/common/plan-lifecycle.md` — Rules for common/plan-lifecycle
 - `.codex/rules/common/tasks-task-system.md` — Rules for common/tasks-task-system
@@ -92,6 +88,7 @@ Read and use these skill files in `.codex/skills/` when they are relevant:
 - `.codex/skills/speckit-bootstrap/SKILL.md` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
 - `.codex/skills/speckit-reverse-engineer/SKILL.md` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
 - `.codex/skills/speckit-delivery/SKILL.md` — orchestrate GitHub Spec Kit's native skills for a bounded product change
+- `.codex/skills/docker-registry-publish/SKILL.md` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility
 
 ## Codex code review expectations
 

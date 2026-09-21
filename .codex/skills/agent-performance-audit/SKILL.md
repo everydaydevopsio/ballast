@@ -3,7 +3,7 @@ name: agent-performance-audit
 description: use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.18.3. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->
 
 # Agent Performance Audit Skill
 

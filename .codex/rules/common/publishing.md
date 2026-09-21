@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing" version="5.18.3" checksum="aec70ee6384a0ca93b2b47247024169d0b145d62e7433697132de81b2cb39d60" -->
+<!-- ballast:rule id="typescript/publishing" version="5.19.0" checksum="aec70ee6384a0ca93b2b47247024169d0b145d62e7433697132de81b2cb39d60" -->
 # Publishing Rules
 
 Shared release pattern for every publishing variant in this repository. The `publishing-<variant>` rules add artifact-specific requirements on top of this pattern.

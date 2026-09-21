@@ -1792,7 +1792,16 @@ Keep my custom responsibilities.
         saveConfig: false
       });
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules.length).toBe(7);
+      // No deployment model configured, so the deployment-only web/api variants
+      // are left out of the always-loaded rule set.
+      expect(result.installedRules.length).toBe(5);
+      for (const suffix of ['web', 'api']) {
+        expect(
+          fs.existsSync(
+            path.join(tmpDir, '.cursor', 'rules', `publishing-${suffix}.mdc`)
+          )
+        ).toBe(false);
+      }
       expect(
         fs.existsSync(
           path.join(tmpDir, '.cursor', 'rules', 'publishing-apt.mdc')
@@ -1843,8 +1852,8 @@ Keep my custom responsibilities.
       expect(fs.existsSync(sdksFile)).toBe(true);
       expect(fs.existsSync(appsFile)).toBe(true);
       expect(fs.existsSync(cliFile)).toBe(true);
-      expect(fs.existsSync(webFile)).toBe(true);
-      expect(fs.existsSync(apiFile)).toBe(true);
+      expect(fs.existsSync(webFile)).toBe(false);
+      expect(fs.existsSync(apiFile)).toBe(false);
       expect(fs.readFileSync(librariesFile, 'utf8')).toContain(
         'Publishing Libraries Agent'
       );
@@ -1930,15 +1939,15 @@ Keep my custom responsibilities.
       });
 
       expect(result.installed).toEqual(['publishing']);
-      expect(result.installedRules).toHaveLength(7);
-      for (const suffix of ['api', 'apps', 'cli', 'libraries', 'sdks', 'web']) {
+      expect(result.installedRules).toHaveLength(5);
+      for (const suffix of ['apps', 'cli', 'libraries', 'sdks']) {
         expect(
           fs.existsSync(
             path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
           )
         ).toBe(true);
       }
-      for (const suffix of ['apt', 'brew']) {
+      for (const suffix of ['apt', 'brew', 'web', 'api']) {
         expect(
           fs.existsSync(
             path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
@@ -1948,9 +1957,10 @@ Keep my custom responsibilities.
 
       const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
       expect(agentsMd).toContain('`.codex/rules/publishing-cli.md`');
-      expect(agentsMd).toContain('`.codex/rules/publishing-web.md`');
-      expect(agentsMd).toContain('`.codex/rules/publishing-api.md`');
       expect(agentsMd).toContain('`.codex/rules/publishing-libraries.md`');
+      // The manifest must never reference a rule that was not emitted.
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-api.md`');
     });
 
     test('adds to errors for unknown agent and continues with valid ones', () => {
@@ -2576,15 +2586,17 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         yes: true
       });
 
+      // --yes defaults deploymentModel to 'none', so the deployment-only
+      // variants are excluded alongside the opt-in ones.
       expect(exitCode).toBe(0);
-      for (const suffix of ['cli', 'apps', 'web', 'api', 'libraries', 'sdks']) {
+      for (const suffix of ['cli', 'apps', 'libraries', 'sdks']) {
         expect(
           fs.existsSync(
             path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
           )
         ).toBe(true);
       }
-      for (const suffix of ['apt', 'brew']) {
+      for (const suffix of ['apt', 'brew', 'web', 'api']) {
         expect(
           fs.existsSync(
             path.join(tmpDir, '.codex', 'rules', `publishing-${suffix}.md`)
@@ -2592,7 +2604,9 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         ).toBe(false);
       }
       const agentsMd = fs.readFileSync(path.join(tmpDir, 'AGENTS.md'), 'utf8');
-      expect(agentsMd).toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).toContain('`.codex/rules/publishing-cli.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-web.md`');
+      expect(agentsMd).not.toContain('`.codex/rules/publishing-api.md`');
       expect(agentsMd).not.toContain('`.codex/rules/publishing-brew.md`');
       expect(agentsMd).not.toContain('`.codex/rules/publishing-apt.md`');
     });

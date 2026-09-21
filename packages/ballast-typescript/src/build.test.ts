@@ -141,6 +141,46 @@ describe('build', () => {
       expect(suffixes.length).toBe(7);
     });
 
+    test('drops deployment-only profiles when no deployment model is configured', () => {
+      // publishing-web.md and publishing-api.md open by telling the agent the
+      // content is inactive when deploymentModel is 'none'. Emitting them costs
+      // ~2,000 always-loaded tokens to say nothing applies.
+      const suffixes = listRuleSuffixes(
+        'publishing',
+        'typescript',
+        undefined,
+        'none'
+      );
+      expect(suffixes).toEqual(
+        expect.arrayContaining(['', 'cli', 'libraries', 'sdks', 'apps'])
+      );
+      expect(suffixes).not.toContain('web');
+      expect(suffixes).not.toContain('api');
+      expect(suffixes.length).toBe(5);
+    });
+
+    test('keeps deployment profiles when a deployment model is configured', () => {
+      const suffixes = listRuleSuffixes(
+        'publishing',
+        'typescript',
+        undefined,
+        'kubernetes'
+      );
+      expect(suffixes).toEqual(expect.arrayContaining(['web', 'api']));
+      expect(suffixes.length).toBe(7);
+    });
+
+    test('explicit profiles override the deployment-model default', () => {
+      // A repo that deliberately wants the deployment reference text keeps it.
+      const suffixes = listRuleSuffixes(
+        'publishing',
+        'typescript',
+        ['cli', 'web'],
+        'none'
+      );
+      expect(suffixes).toEqual(['', 'cli', 'web']);
+    });
+
     test('returns opt-in publishing variants when explicitly configured', () => {
       const suffixes = listRuleSuffixes('publishing', 'typescript', [
         'apt',
@@ -331,6 +371,15 @@ describe('build', () => {
       expect(content).toContain('**Severity:** <Critical|High|Medium|Low>');
       expect(content).toContain('**Option A (Recommended)**');
       expect(content).toContain('**Decision Request**');
+    });
+
+    test('tasks rule does not depend on a docs file consumers never receive', () => {
+      // Install writes rules and support files, never docs/. A rule that tells
+      // an agent to copy a template verbatim must therefore carry that template
+      // itself; pointing at docs/agents/*.md leaves consuming repositories with
+      // an instruction to read a file that does not exist there.
+      const content = getContent('tasks', 'todo');
+      expect(content).not.toMatch(/`docs\/agents\/[\w-]+\.md`/);
     });
 
     test('returns plan-lifecycle content', () => {

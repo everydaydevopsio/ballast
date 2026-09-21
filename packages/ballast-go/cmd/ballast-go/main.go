@@ -964,10 +964,14 @@ func install(opts installOptions) installResult {
 	supportAgents = uniqueStrings(supportAgents)
 	supportSkills = uniqueStrings(supportSkills)
 	rulePublishingProfiles := []string{}
+	ruleDeploymentModel := normalizeDeploymentModel(opts.deploymentModel)
 	ruleProfile := "full"
 	configuredLanguages := []string{opts.language}
 	if configForInstall != nil {
 		rulePublishingProfiles = normalizePublishingProfiles(configForInstall.PublishingProfiles)
+		if ruleDeploymentModel == "" {
+			ruleDeploymentModel = normalizeDeploymentModel(configForInstall.DeploymentModel)
+		}
 		if configForInstall.RuleProfile != "" {
 			ruleProfile = configForInstall.RuleProfile
 		}
@@ -1011,7 +1015,7 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 				continue
 			}
-			suffixes = filterPublishingSuffixes(agentID, suffixes, rulePublishingProfiles)
+			suffixes = filterPublishingSuffixes(agentID, suffixes, rulePublishingProfiles, ruleDeploymentModel)
 
 			agentInstalled := false
 			agentSkipped := false
@@ -1174,7 +1178,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, agentsPath)
 				}
 			} else {
-				content, err := buildCodexAgentsMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles)
+				content, err := buildCodexAgentsMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles, ruleDeploymentModel)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "codex", err: err.Error()})
 				} else {
@@ -1208,7 +1212,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, claudePath)
 				}
 			} else {
-				content, err := buildClaudeMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles)
+				content, err := buildClaudeMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles, ruleDeploymentModel)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "claude", err: err.Error()})
 				} else {
@@ -1242,7 +1246,7 @@ func install(opts installOptions) installResult {
 					result.declinedSupportFiles = append(result.declinedSupportFiles, geminiPath)
 				}
 			} else {
-				content, err := buildGeminiMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles)
+				content, err := buildGeminiMD(supportAgents, supportSkills, opts.language, effectiveTools, rulePublishingProfiles, ruleDeploymentModel)
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: "gemini", err: err.Error()})
 				} else {
@@ -1272,7 +1276,7 @@ func install(opts installOptions) installResult {
 	return result
 }
 
-func buildCodexAgentsMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string) (string, error) {
+func buildCodexAgentsMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string, deploymentModel string) (string, error) {
 	lines := []string{
 		"# AGENTS.md",
 		"",
@@ -1297,7 +1301,7 @@ func buildCodexAgentsMD(agents []string, skills []string, language string, tools
 		if err != nil {
 			return "", err
 		}
-		suffixes = filterPublishingSuffixes(agentID, suffixes, publishingProfiles)
+		suffixes = filterPublishingSuffixes(agentID, suffixes, publishingProfiles, deploymentModel)
 		for _, suffix := range suffixes {
 			base := ruleBaseName(agentID, language, suffix)
 			description, _ := codexRuleDescription(agentID, language, suffix)
@@ -1344,7 +1348,7 @@ func renderGeminiMandates() string {
 	}, "\n")
 }
 
-func buildGeminiMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string) (string, error) {
+func buildGeminiMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string, deploymentModel string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("# GEMINI.md\n\n")
 	sb.WriteString("This file provides guidance to Gemini CLI for working in this repository.\n\n")
@@ -1373,7 +1377,7 @@ func buildGeminiMD(agents []string, skills []string, language string, tools map[
 		if err != nil {
 			return "", err
 		}
-		suffixes = filterPublishingSuffixes(agent, suffixes, publishingProfiles)
+		suffixes = filterPublishingSuffixes(agent, suffixes, publishingProfiles, deploymentModel)
 		for _, suffix := range suffixes {
 			basename := ruleBaseName(agent, language, suffix)
 			description, _ := codexRuleDescription(agent, language, suffix)
@@ -1399,7 +1403,7 @@ func buildGeminiMD(agents []string, skills []string, language string, tools map[
 	return sb.String(), nil
 }
 
-func buildClaudeMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string) (string, error) {
+func buildClaudeMD(agents []string, skills []string, language string, tools map[string][]string, publishingProfiles []string, deploymentModel string) (string, error) {
 	lines := []string{
 		"# CLAUDE.md",
 		"",
@@ -1424,7 +1428,7 @@ func buildClaudeMD(agents []string, skills []string, language string, tools map[
 		if err != nil {
 			return "", err
 		}
-		suffixes = filterPublishingSuffixes(agentID, suffixes, publishingProfiles)
+		suffixes = filterPublishingSuffixes(agentID, suffixes, publishingProfiles, deploymentModel)
 		for _, suffix := range suffixes {
 			base := ruleBaseName(agentID, language, suffix)
 			description, _ := codexRuleDescription(agentID, language, suffix)
@@ -2593,10 +2597,19 @@ func applyHookTemplateVariables(content, agentID, language, hookMode string) str
 
 var optInPublishingProfiles = []string{"apt", "brew"}
 
+// deploymentPublishingProfiles are publishing variants whose guidance only
+// applies once the repository owns a deployment target. With
+// deploymentModel "none" these rules render an "inactive" banner over their
+// full body, so they are excluded from the default profile set; an explicit
+// publishingProfiles entry opts them back in.
+var deploymentPublishingProfiles = []string{"web", "api"}
+
 // filterPublishingSuffixes narrows publishing rule suffixes to the configured
 // profiles, or excludes reference-only opt-in variants when no profiles are
-// configured.
-func filterPublishingSuffixes(agentID string, suffixes, profiles []string) []string {
+// configured. When no deployment model is configured it also drops the
+// deployment-only variants rather than emitting rules that declare themselves
+// inactive.
+func filterPublishingSuffixes(agentID string, suffixes, profiles []string, deploymentModel string) []string {
 	if agentID != "publishing" {
 		return suffixes
 	}
@@ -2621,6 +2634,9 @@ func filterPublishingSuffixes(agentID string, suffixes, profiles []string) []str
 	filtered := make([]string, 0, len(suffixes))
 	for _, suffix := range suffixes {
 		if contains(optInPublishingProfiles, suffix) {
+			continue
+		}
+		if deploymentModel == "none" && contains(deploymentPublishingProfiles, suffix) {
 			continue
 		}
 		filtered = append(filtered, suffix)
@@ -3107,6 +3123,12 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		}
 		if strings.TrimSpace(cfg.RuleProfile) == "" {
 			cfg.RuleProfile = existing.RuleProfile
+		}
+		// publishingProfiles scopes which publishing rules load into every
+		// session. Rebuilding the config without it silently restores the full
+		// default publishing set.
+		if len(cfg.PublishingProfiles) == 0 {
+			cfg.PublishingProfiles = existing.PublishingProfiles
 		}
 		cfg.Targets = mergeStringLists(existing.Targets, cfg.Targets)
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)

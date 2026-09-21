@@ -450,6 +450,7 @@ def save_config(
     existing_task_system: str | None = None
     existing_deployment_model: str | None = None
     existing_rule_profile: str | None = None
+    existing_publishing_profiles: list[str] = []
     tools: dict[str, list[str]] = {}
     if file_path.exists():
         try:
@@ -477,6 +478,9 @@ def save_config(
                     existing_deployment_model = raw["deploymentModel"].strip().lower()
                 if isinstance(raw.get("ruleProfile"), str):
                     existing_rule_profile = raw["ruleProfile"].strip().lower()
+                existing_publishing_profiles = normalize_publishing_profiles(
+                    raw.get("publishingProfiles")
+                )
         except (OSError, json.JSONDecodeError):
             # Invalid/unreadable existing config should fall back to defaults
             # while preserving current save behavior.
@@ -531,6 +535,10 @@ def save_config(
         payload["deploymentModel"] = normalized_deployment_model
     if existing_rule_profile in ("full", "minimal"):
         payload["ruleProfile"] = existing_rule_profile
+    # publishingProfiles scopes which publishing rules load into every session.
+    # Rebuilding the config without it silently restores the full default set.
+    if existing_publishing_profiles:
+        payload["publishingProfiles"] = existing_publishing_profiles
 
     file_path.write_text(
         json.dumps(payload, indent=2),
@@ -818,9 +826,18 @@ def is_valid_skill(skill: str, language: str) -> bool:
 
 OPT_IN_PUBLISHING_PROFILES = ("apt", "brew")
 
+# Publishing variants whose guidance only applies once the repository owns a
+# deployment target. With deploymentModel "none" these rules render an
+# "inactive" banner over their full body, so they are excluded from the default
+# profile set; an explicit publishingProfiles entry opts them back in.
+DEPLOYMENT_PUBLISHING_PROFILES = ("web", "api")
+
 
 def list_rule_suffixes(
-    agent: str, language: str, publishing_profiles: list[str] | None = None
+    agent: str,
+    language: str,
+    publishing_profiles: list[str] | None = None,
+    deployment_model: str | None = None,
 ) -> list[str]:
     directory = agent_dir(agent, language)
     suffixes: list[str] = []
@@ -836,16 +853,19 @@ def list_rule_suffixes(
         if publishing_profiles:
             available = set(suffixes)
             # The shared release-pattern rule (empty suffix) is always emitted
-            # alongside the selected variants.
+            # alongside the selected variants. An explicit profile list always
+            # wins, including over the deployment-model default below, so a
+            # repository can deliberately keep the deployment reference text.
             selected = [
                 profile for profile in publishing_profiles if profile in available
             ]
             return ([""] if "" in available else []) + selected
         # Opt-in variants are reference-only unless explicitly configured; do
         # not emit them into the always-loaded rule set by default.
-        return [
-            suffix for suffix in suffixes if suffix not in OPT_IN_PUBLISHING_PROFILES
-        ]
+        excluded = set(OPT_IN_PUBLISHING_PROFILES)
+        if (deployment_model or "").strip().lower() == "none":
+            excluded.update(DEPLOYMENT_PUBLISHING_PROFILES)
+        return [suffix for suffix in suffixes if suffix not in excluded]
     return suffixes
 
 
@@ -1841,6 +1861,7 @@ def build_codex_agents_md(
     language: str,
     tools: dict[str, list[str]] | None = None,
     publishing_profiles: list[str] | None = None,
+    deployment_model: str | None = None,
 ) -> str:
     lines = [
         "# AGENTS.md",
@@ -1858,7 +1879,9 @@ def build_codex_agents_md(
         "",
     ]
     for agent in agents:
-        for suffix in list_rule_suffixes(agent, language, publishing_profiles):
+        for suffix in list_rule_suffixes(
+            agent, language, publishing_profiles, deployment_model
+        ):
             basename = rule_basename(agent, language, suffix)
             description = (
                 get_codex_rule_description(agent, language, suffix)
@@ -1893,6 +1916,7 @@ def build_claude_md(
     language: str,
     tools: dict[str, list[str]] | None = None,
     publishing_profiles: list[str] | None = None,
+    deployment_model: str | None = None,
 ) -> str:
     lines = [
         "# CLAUDE.md",
@@ -1910,7 +1934,9 @@ def build_claude_md(
         "",
     ]
     for agent in agents:
-        for suffix in list_rule_suffixes(agent, language, publishing_profiles):
+        for suffix in list_rule_suffixes(
+            agent, language, publishing_profiles, deployment_model
+        ):
             basename = rule_basename(agent, language, suffix)
             description = (
                 get_codex_rule_description(agent, language, suffix)
@@ -1945,6 +1971,7 @@ def build_gemini_md(
     language: str,
     tools: dict[str, list[str]] | None = None,
     publishing_profiles: list[str] | None = None,
+    deployment_model: str | None = None,
 ) -> str:
     lines = [
         "# GEMINI.md",
@@ -1976,7 +2003,9 @@ def build_gemini_md(
         ]
     )
     for agent in agents:
-        for suffix in list_rule_suffixes(agent, language, publishing_profiles):
+        for suffix in list_rule_suffixes(
+            agent, language, publishing_profiles, deployment_model
+        ):
             basename = rule_basename(agent, language, suffix)
             description = (
                 get_codex_rule_description(agent, language, suffix)
@@ -2638,6 +2667,11 @@ def install(
         if config_for_support_files
         else []
     )
+    rule_deployment_model = (
+        config_for_support_files.get("deploymentModel")
+        if config_for_support_files
+        else None
+    )
     rule_profile = (
         config_for_support_files.get("ruleProfile")
         if config_for_support_files
@@ -2691,7 +2725,9 @@ def install(
         agent_processed = False
 
         try:
-            for suffix in list_rule_suffixes(agent, language, rule_publishing_profiles):
+            for suffix in list_rule_suffixes(
+                agent, language, rule_publishing_profiles, rule_deployment_model
+            ):
                 basename = rule_basename(agent, language, suffix)
                 dst = destination(root, target, basename)
                 content = build_content(
@@ -2796,6 +2832,7 @@ def install(
                     language,
                     tools=rule_tools,
                     publishing_profiles=rule_publishing_profiles,
+                    deployment_model=rule_deployment_model,
                 )
                 next_content = (
                     patch_codex_agents_md(
@@ -2826,6 +2863,7 @@ def install(
                     language,
                     tools=rule_tools,
                     publishing_profiles=rule_publishing_profiles,
+                    deployment_model=rule_deployment_model,
                 )
                 next_content = (
                     patch_codex_agents_md(
@@ -2853,6 +2891,7 @@ def install(
                     language,
                     tools=rule_tools,
                     publishing_profiles=rule_publishing_profiles,
+                    deployment_model=rule_deployment_model,
                 )
                 next_content = (
                     patch_codex_agents_md(

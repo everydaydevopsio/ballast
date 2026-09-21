@@ -1,4 +1,4 @@
-<!-- ballast:rule id="python/testing" version="5.18.3" checksum="d85d4fbb572cdaefbfc6f544da56472a175a7d53ad25ed5c48bee5a3417cb573" -->
+<!-- ballast:rule id="python/testing" version="5.19.0" checksum="d85d4fbb572cdaefbfc6f544da56472a175a7d53ad25ed5c48bee5a3417cb573" -->
 # Python Testing Rules
 
 Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations. This rule owns only the language-specific concerns: runner selection, commands, framework markers, and the coverage gate.

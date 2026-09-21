@@ -110,6 +110,13 @@ jobs:
         run: |
           set -euo pipefail
           pnpm run build
+          # The wrapper resolves every backend from this source tree. The Go
+          # backend binary is gitignored and no other step produces it, so
+          # without this build `upgrade` falls through to a $PATH lookup for
+          # ballast-go that cannot succeed on a clean checkout. build-go
+          # stamps the bumped version, keeping the rules it emits in step with
+          # the TypeScript and Python backends.
+          make build-go
           mkdir -p .ci/bin
           go build -C cli/ballast -o "${PWD}/.ci/bin/ballast" .
           .ci/bin/ballast upgrade --patch
@@ -141,25 +148,24 @@ jobs:
 
       # castoff reads `git describe --tags --abbrev=0 HEAD^` and logs from there
       # to HEAD, so it runs before the release commit is made and the tag is
-      # created. Skipped entirely when OPENAI_API_KEY is absent.
-      # Publishes a non-secret boolean so the steps below can be gated without
-      # exporting the key to the whole job, where dependency installs, builds
-      # and every third-party action would inherit it.
-      - name: Check for release-notes key
-        id: notes_key
+      # created. OPENAI_API_KEY is an organization secret, so a missing key
+      # means misconfiguration, not an opt-out: fail here rather than tag a
+      # release whose changelog and release notes were quietly skipped.
+      # Scoped to this step so the key is never exported to the whole job,
+      # where dependency installs, builds and every third-party action would
+      # inherit it.
+      - name: Require OpenAI API key
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -euo pipefail
-          if [ -n "${OPENAI_API_KEY}" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
+          if [ -z "${OPENAI_API_KEY//[[:space:]]/}" ]; then
+            echo "::error::OPENAI_API_KEY is not available to this repository. Grant the organization secret to everydaydevopsio/ballast." >&2
+            exit 1
           fi
 
       - name: Generate AI release notes
         id: notes
-        if: ${{ steps.notes_key.outputs.available == 'true' }}
         uses: everydaydevopsio/castoff/castoff@v2
         env:
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
@@ -167,9 +173,10 @@ jobs:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           tag: v${{ steps.version.outputs.version }}
 
+      # No guard on changelog_entry: the action rejects an empty entry, which
+      # is the signal that castoff produced nothing usable.
       - name: Update CHANGELOG.md
         id: changelog
-        if: ${{ steps.notes_key.outputs.available == 'true' && steps.notes.outputs.changelog_entry != '' }}
         uses: everydaydevopsio/castoff/changelog@v2
         with:
           version: ${{ steps.version.outputs.version }}
@@ -186,8 +193,7 @@ jobs:
           rm -rf .ci
           git add packages/ballast-typescript/package.json packages/ballast-python/pyproject.toml packages/ballast-python/uv.lock
           git add .rulesrc.json .claude .codex AGENTS.md CLAUDE.md
-          # Present only when castoff ran and inserted a new entry.
-          git add CHANGELOG.md 2>/dev/null || true
+          git add CHANGELOG.md
           git commit -m "chore(release): bump version to ${VERSION} [skip ci]"
 
           git tag "v${VERSION}"

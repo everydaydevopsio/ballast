@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/testing-process" version="5.18.3" checksum="672cbbb73dbf662950180e3fc8ff71e87194fe23b49f3d5ee6bc0e48fdd30ea3" -->
+<!-- ballast:rule id="typescript/testing-process" version="5.19.0" checksum="672cbbb73dbf662950180e3fc8ff71e87194fe23b49f3d5ee6bc0e48fdd30ea3" -->
 # Testing Process Rules
 
 These rules define the language-agnostic testing process: TDD discipline, framework detection policy, and smoke/E2E expectations shared by every language's testing rules.
