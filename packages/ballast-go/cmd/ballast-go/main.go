@@ -3124,6 +3124,12 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		if strings.TrimSpace(cfg.RuleProfile) == "" {
 			cfg.RuleProfile = existing.RuleProfile
 		}
+		// publishingProfiles scopes which publishing rules load into every
+		// session. Rebuilding the config without it silently restores the full
+		// default publishing set.
+		if len(cfg.PublishingProfiles) == 0 {
+			cfg.PublishingProfiles = existing.PublishingProfiles
+		}
 		cfg.Targets = mergeStringLists(existing.Targets, cfg.Targets)
 		cfg.Languages = mergeLanguageList(existing.Languages, cfg.Languages)
 		cfg.Paths = mergeLanguagePaths(existing.Paths, cfg.Languages)

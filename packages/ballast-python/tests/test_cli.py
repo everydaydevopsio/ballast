@@ -2637,5 +2637,36 @@ class PublishingDeploymentProfileTests(unittest.TestCase):
         self.assertNotIn("brew", suffixes)
 
 
+class PublishingProfilePersistenceTests(unittest.TestCase):
+    """save_config rebuilds .rulesrc.json from scratch, so every field it does
+    not explicitly carry across is erased. publishingProfiles scopes which
+    publishing rules load into every session, so losing it silently restores the
+    full default set on the next install."""
+
+    def test_save_config_preserves_existing_publishing_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["claude"],
+                        "agents": ["publishing"],
+                        "languages": ["python"],
+                        "paths": {"python": ["."]},
+                        "publishingProfiles": ["cli", "libraries"],
+                        "deploymentModel": "none",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            cli.save_config(root, "python", "claude", ["publishing"], [])
+
+            saved = json.loads((root / ".rulesrc.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved.get("publishingProfiles"), ["cli", "libraries"])
+            # The neighbouring preserved fields must keep working too.
+            self.assertEqual(saved.get("deploymentModel"), "none")
+
+
 if __name__ == "__main__":
     unittest.main()

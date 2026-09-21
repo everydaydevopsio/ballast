@@ -3411,3 +3411,42 @@ func TestFilterPublishingSuffixesDropsDeploymentVariantsWithoutDeploymentModel(t
 		t.Fatalf("tasks: got %v, want %v", got, other)
 	}
 }
+
+// TestSaveConfigPreservesPublishingProfiles guards the config field that scopes
+// which publishing rules load into every session. saveConfig merges forward the
+// other cross-cutting settings (taskSystem, deploymentModel, ruleProfile,
+// discovery); omitting publishingProfiles silently restores the full default
+// publishing set on the next install.
+func TestSaveConfigPreservesPublishingProfiles(t *testing.T) {
+	root := t.TempDir()
+	existing := rulesConfig{
+		Targets:            []string{"claude"},
+		Agents:             []string{"publishing"},
+		Languages:          []string{"go"},
+		PublishingProfiles: []string{"cli", "libraries"},
+		DeploymentModel:    "none",
+	}
+	if err := saveConfig(root, "go", existing); err != nil {
+		t.Fatalf("seed saveConfig: %v", err)
+	}
+
+	// A later install that does not itself carry the profiles must not erase them.
+	if err := saveConfig(root, "go", rulesConfig{
+		Targets:   []string{"claude"},
+		Agents:    []string{"publishing"},
+		Languages: []string{"go"},
+	}); err != nil {
+		t.Fatalf("saveConfig: %v", err)
+	}
+
+	saved := loadConfig(root, "go")
+	if saved == nil {
+		t.Fatal("expected a saved config")
+	}
+	if !slices.Equal(saved.PublishingProfiles, []string{"cli", "libraries"}) {
+		t.Fatalf("publishingProfiles not preserved: got %v", saved.PublishingProfiles)
+	}
+	if saved.DeploymentModel != "none" {
+		t.Fatalf("deploymentModel not preserved: got %q", saved.DeploymentModel)
+	}
+}

@@ -450,6 +450,7 @@ def save_config(
     existing_task_system: str | None = None
     existing_deployment_model: str | None = None
     existing_rule_profile: str | None = None
+    existing_publishing_profiles: list[str] = []
     tools: dict[str, list[str]] = {}
     if file_path.exists():
         try:
@@ -477,6 +478,9 @@ def save_config(
                     existing_deployment_model = raw["deploymentModel"].strip().lower()
                 if isinstance(raw.get("ruleProfile"), str):
                     existing_rule_profile = raw["ruleProfile"].strip().lower()
+                existing_publishing_profiles = normalize_publishing_profiles(
+                    raw.get("publishingProfiles")
+                )
         except (OSError, json.JSONDecodeError):
             # Invalid/unreadable existing config should fall back to defaults
             # while preserving current save behavior.
@@ -531,6 +535,10 @@ def save_config(
         payload["deploymentModel"] = normalized_deployment_model
     if existing_rule_profile in ("full", "minimal"):
         payload["ruleProfile"] = existing_rule_profile
+    # publishingProfiles scopes which publishing rules load into every session.
+    # Rebuilding the config without it silently restores the full default set.
+    if existing_publishing_profiles:
+        payload["publishingProfiles"] = existing_publishing_profiles
 
     file_path.write_text(
         json.dumps(payload, indent=2),
