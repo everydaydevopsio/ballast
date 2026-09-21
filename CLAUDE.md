@@ -48,12 +48,8 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/common/cicd.md` — Rules for common/cicd
 - `.claude/rules/common/observability.md` — Rules for common/observability
 - `.claude/rules/common/publishing.md` — Rules for common/publishing
-- `.claude/rules/common/publishing-api.md` — Rules for common/publishing-api
-- `.claude/rules/common/publishing-apps.md` — Rules for common/publishing-apps
 - `.claude/rules/common/publishing-cli.md` — Rules for common/publishing-cli
 - `.claude/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
-- `.claude/rules/common/publishing-sdks.md` — Rules for common/publishing-sdks
-- `.claude/rules/common/publishing-web.md` — Rules for common/publishing-web
 - `.claude/rules/common/git-hooks.md` — Rules for common/git-hooks
 - `.claude/rules/common/plan-lifecycle.md` — Rules for common/plan-lifecycle
 - `.claude/rules/common/tasks-task-system.md` — Rules for common/tasks-task-system
@@ -91,3 +87,4 @@ Read and use these skill files in `.claude/skills/` when they are relevant:
 - `.claude/skills/speckit-bootstrap.skill` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
 - `.claude/skills/speckit-reverse-engineer.skill` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
 - `.claude/skills/speckit-delivery.skill` — orchestrate GitHub Spec Kit's native skills for a bounded product change
+- `.claude/skills/docker-registry-publish.skill` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility

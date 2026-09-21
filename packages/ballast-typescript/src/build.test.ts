@@ -141,6 +141,46 @@ describe('build', () => {
       expect(suffixes.length).toBe(7);
     });
 
+    test('drops deployment-only profiles when no deployment model is configured', () => {
+      // publishing-web.md and publishing-api.md open by telling the agent the
+      // content is inactive when deploymentModel is 'none'. Emitting them costs
+      // ~2,000 always-loaded tokens to say nothing applies.
+      const suffixes = listRuleSuffixes(
+        'publishing',
+        'typescript',
+        undefined,
+        'none'
+      );
+      expect(suffixes).toEqual(
+        expect.arrayContaining(['', 'cli', 'libraries', 'sdks', 'apps'])
+      );
+      expect(suffixes).not.toContain('web');
+      expect(suffixes).not.toContain('api');
+      expect(suffixes.length).toBe(5);
+    });
+
+    test('keeps deployment profiles when a deployment model is configured', () => {
+      const suffixes = listRuleSuffixes(
+        'publishing',
+        'typescript',
+        undefined,
+        'kubernetes'
+      );
+      expect(suffixes).toEqual(expect.arrayContaining(['web', 'api']));
+      expect(suffixes.length).toBe(7);
+    });
+
+    test('explicit profiles override the deployment-model default', () => {
+      // A repo that deliberately wants the deployment reference text keeps it.
+      const suffixes = listRuleSuffixes(
+        'publishing',
+        'typescript',
+        ['cli', 'web'],
+        'none'
+      );
+      expect(suffixes).toEqual(['', 'cli', 'web']);
+    });
+
     test('returns opt-in publishing variants when explicitly configured', () => {
       const suffixes = listRuleSuffixes('publishing', 'typescript', [
         'apt',
@@ -307,30 +347,43 @@ describe('build', () => {
       expect(content).not.toContain('{{taskSystem}}');
     });
 
-    test('returns structured tasks todo templates aligned with execution templates', () => {
+    test('keeps tasks todo guidance without inlining the templates', () => {
+      // The skeletons moved to docs/agents/tasks.md so they cost nothing until
+      // an agent actually writes one of those files. The rule must still carry
+      // the decision and the trigger.
       const content = getContent('tasks', 'todo');
-      expect(content).toContain('# Task: <title>');
-      expect(content).toContain('## Acceptance Criteria');
-      expect(content).toContain('## Test Strategy');
-      expect(content).toContain('Failure-path tests:');
-      expect(content).toContain('Requirement-to-test mapping:');
-      expect(content).toContain('## Rollback Strategy');
-      expect(content).toContain('## Outcome');
+      expect(content).toContain('docs/agents/tasks.md');
       expect(content).toContain('Lightweight tasks may omit optional sections');
       expect(content).toContain(
         'must remain a subset of the structured template'
       );
+      expect(content).toContain('tasks/lessons.md');
+      expect(content).not.toContain('# Task: <title>');
+      expect(content).not.toContain('### Issue #N: <Short Description>');
     });
 
-    test('returns canonical lessons and issue output templates in task guidance', () => {
+    test('tasks todo rule points at a docs file that really holds the templates', () => {
+      // A rule that tells an agent to read a file is worse than useless if that
+      // file lacks the content, so assert the pointer resolves.
       const content = getContent('tasks', 'todo');
-      expect(content).toContain('tasks/lessons.md');
-      expect(content).toContain('# Lessons');
-      expect(content).toContain('Root cause pattern:');
-      expect(content).toContain('### Issue #N: <Short Description>');
-      expect(content).toContain('**Severity:** <Critical|High|Medium|Low>');
-      expect(content).toContain('**Option A (Recommended)**');
-      expect(content).toContain('**Decision Request**');
+      const referenced = content.match(/`(docs\/agents\/[\w-]+\.md)`/);
+      expect(referenced).not.toBeNull();
+      const docPath = path.resolve(__dirname, '../../..', referenced![1]);
+      expect(fs.existsSync(docPath)).toBe(true);
+      const doc = fs.readFileSync(docPath, 'utf8');
+      expect(doc).toContain('# Task: <title>');
+      expect(doc).toContain('## Acceptance Criteria');
+      expect(doc).toContain('## Test Strategy');
+      expect(doc).toContain('Failure-path tests:');
+      expect(doc).toContain('Requirement-to-test mapping:');
+      expect(doc).toContain('## Rollback Strategy');
+      expect(doc).toContain('## Outcome');
+      expect(doc).toContain('# Lessons');
+      expect(doc).toContain('Root cause pattern:');
+      expect(doc).toContain('### Issue #N: <Short Description>');
+      expect(doc).toContain('**Severity:** <Critical|High|Medium|Low>');
+      expect(doc).toContain('**Option A (Recommended)**');
+      expect(doc).toContain('**Decision Request**');
     });
 
     test('returns plan-lifecycle content', () => {

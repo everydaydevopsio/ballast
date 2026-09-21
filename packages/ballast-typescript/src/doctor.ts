@@ -1,8 +1,13 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { findProjectRoot, getRulesrcFilename, loadConfig } from './config';
-import type { PublishingProfile, Target } from './config';
+import {
+  DEPLOYMENT_MODELS,
+  findProjectRoot,
+  getRulesrcFilename,
+  loadConfig
+} from './config';
+import type { DeploymentModel, PublishingProfile, Target } from './config';
 import { LANGUAGES } from './agents';
 import type { Language } from './agents';
 import {
@@ -213,6 +218,18 @@ const APP_TYPE_PUBLISH_RULE: Record<AppType, string | null> = {
   unknown: null
 };
 
+/**
+ * Narrows the loosely typed deploymentModel carried in doctor's config view so
+ * rule-suffix resolution sees the same value install does. Unknown values fall
+ * back to undefined, which keeps the full default profile set.
+ */
+function asDeploymentModel(value?: string | null): DeploymentModel | undefined {
+  if (!value) return undefined;
+  return (DEPLOYMENT_MODELS as readonly string[]).includes(value)
+    ? (value as DeploymentModel)
+    : undefined;
+}
+
 function refreshConfigCommand(
   report: Pick<
     DoctorReport,
@@ -402,7 +419,8 @@ function configuredRuleKeys(config: RuleConfig): Set<string> {
           for (const suffix of listRuleSuffixes(
             agentId,
             language,
-            config.publishingProfiles
+            config.publishingProfiles,
+            asDeploymentModel(config.deploymentModel)
           )) {
             active.add(
               `${target}:${getRuleMarkerId(agentId, language, suffix || undefined)}`

@@ -1324,7 +1324,7 @@ func TestPublishingSuffixesExcludeOptInVariantsByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listRuleSuffixes: %v", err)
 	}
-	suffixes = filterPublishingSuffixes("publishing", suffixes, nil)
+	suffixes = filterPublishingSuffixes("publishing", suffixes, nil, "")
 
 	if contains(suffixes, "apt") || contains(suffixes, "brew") {
 		t.Fatalf("expected opt-in variants excluded by default, got %v", suffixes)
@@ -1339,7 +1339,7 @@ func TestPublishingSuffixesHonorExplicitProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listRuleSuffixes: %v", err)
 	}
-	selected := filterPublishingSuffixes("publishing", suffixes, []string{"cli", "apt", "brew"})
+	selected := filterPublishingSuffixes("publishing", suffixes, []string{"cli", "apt", "brew"}, "")
 
 	if len(selected) != 4 || selected[0] != "" || !contains(selected, "apt") || !contains(selected, "brew") {
 		t.Fatalf("expected explicit opt-in profiles honored plus the shared pattern rule, got %v", selected)
@@ -1611,7 +1611,7 @@ func TestDestinationReturnsGeminiRulePath(t *testing.T) {
 }
 
 func TestBuildGeminiMDIncludesRepositoryFactsAndSkills(t *testing.T) {
-	content, err := buildGeminiMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil, nil)
+	content, err := buildGeminiMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil, nil, "")
 	if err != nil {
 		t.Fatalf("buildGeminiMD: %v", err)
 	}
@@ -3230,7 +3230,7 @@ func TestSkillOnlyPatchKeepsCodexRuleReferencesFromRulesrc(t *testing.T) {
 	}
 
 	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
-	initial, err := buildCodexAgentsMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil, nil)
+	initial, err := buildCodexAgentsMD([]string{"linting"}, []string{"owasp-security-scan"}, "go", nil, nil, "")
 	if err != nil {
 		t.Fatalf("build AGENTS.md: %v", err)
 	}
@@ -3374,5 +3374,40 @@ func TestPatchCodexAgentsMDUsesSingleFinalNewline(t *testing.T) {
 	}
 	if !strings.Contains(merged, "- new\n") {
 		t.Fatalf("expected canonical skill section, got %q", merged)
+	}
+}
+
+// TestFilterPublishingSuffixesDropsDeploymentVariantsWithoutDeploymentModel
+// mirrors the TypeScript and Python backends: publishing-web.md and
+// publishing-api.md open by declaring themselves inactive when no deployment
+// model is configured, so they stay out of the always-loaded rule set unless
+// publishingProfiles opts them back in.
+func TestFilterPublishingSuffixesDropsDeploymentVariantsWithoutDeploymentModel(t *testing.T) {
+	all := []string{"", "api", "apps", "apt", "brew", "cli", "libraries", "sdks", "web"}
+
+	got := filterPublishingSuffixes("publishing", all, nil, "none")
+	want := []string{"", "apps", "cli", "libraries", "sdks"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("deploymentModel none: got %v, want %v", got, want)
+	}
+
+	got = filterPublishingSuffixes("publishing", all, nil, "kubernetes")
+	want = []string{"", "api", "apps", "cli", "libraries", "sdks", "web"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("deploymentModel kubernetes: got %v, want %v", got, want)
+	}
+
+	// An explicit profile list always wins, so a repository can deliberately
+	// keep the deployment reference text.
+	got = filterPublishingSuffixes("publishing", all, []string{"cli", "web"}, "none")
+	want = []string{"", "cli", "web"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("explicit profiles: got %v, want %v", got, want)
+	}
+
+	// Non-publishing agents are untouched.
+	other := []string{"", "todo"}
+	if got := filterPublishingSuffixes("tasks", other, nil, "none"); !slices.Equal(got, other) {
+		t.Fatalf("tasks: got %v, want %v", got, other)
 	}
 }

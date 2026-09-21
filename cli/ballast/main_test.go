@@ -6403,3 +6403,221 @@ func TestDoctorFixPersistsExplicitReleaseVersion(t *testing.T) {
 		t.Fatalf("expected the explicit release version, got %q", got)
 	}
 }
+
+// TestCleanupSingleLanguageManagedSelectionsPreservesFlatRules guards against
+// --refresh-config deleting the rules it just installed. Single-language repos
+// write a flat rule layout (.claude/rules/publishing.md) while multi-language
+// repos write a nested one (.claude/rules/common/publishing.md). The cleanup
+// path must expect the layout the backend actually produced.
+func TestCleanupSingleLanguageManagedSelectionsPreservesFlatRules(t *testing.T) {
+	root := resolvedTempDir(t)
+	marker := "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->\n"
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["publishing", "linting"],
+  "languages": ["typescript"],
+  "paths": { "typescript": ["."] }
+}`)
+
+	flatRules := []string{
+		filepath.Join(root, ".claude", "rules", "publishing.md"),
+		filepath.Join(root, ".claude", "rules", "publishing-cli.md"),
+		filepath.Join(root, ".claude", "rules", "publishing-libraries.md"),
+		filepath.Join(root, ".claude", "rules", "typescript-linting.md"),
+	}
+	for _, path := range flatRules {
+		mustWriteFile(t, path, marker)
+	}
+
+	if err := cleanupSingleLanguageManagedSelections(root, language("typescript")); err != nil {
+		t.Fatalf("cleanupSingleLanguageManagedSelections returned error: %v", err)
+	}
+
+	for _, path := range flatRules {
+		if !fileExists(path) {
+			t.Fatalf("expected flat single-language rule to survive refresh cleanup: %s", path)
+		}
+	}
+}
+
+// TestCleanupSingleLanguageManagedSelectionsRemovesDeselectedFlatRules keeps the
+// cleanup honest: rules for agents no longer selected must still be pruned.
+func TestCleanupSingleLanguageManagedSelectionsRemovesDeselectedFlatRules(t *testing.T) {
+	root := resolvedTempDir(t)
+	marker := "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->\n"
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["linting"],
+  "languages": ["typescript"],
+  "paths": { "typescript": ["."] }
+}`)
+
+	kept := filepath.Join(root, ".claude", "rules", "typescript-linting.md")
+	stale := filepath.Join(root, ".claude", "rules", "publishing-cli.md")
+	mustWriteFile(t, kept, marker)
+	mustWriteFile(t, stale, marker)
+
+	if err := cleanupSingleLanguageManagedSelections(root, language("typescript")); err != nil {
+		t.Fatalf("cleanupSingleLanguageManagedSelections returned error: %v", err)
+	}
+
+	if !fileExists(kept) {
+		t.Fatalf("expected selected flat rule to survive: %s", kept)
+	}
+	if fileExists(stale) {
+		t.Fatalf("expected deselected flat rule to be pruned: %s", stale)
+	}
+}
+
+// TestCleanupNeverOrphansManifestReferencedRules encodes the invariant that
+// broke in v5.19.0: whatever the cleanup pass prunes, it must never leave the
+// generated manifest pointing at a rule file that no longer exists. An agent
+// told to "read and follow" a missing file is worse off than one given no rule
+// at all, so this is checked for both rule layouts and both manifest targets.
+func TestCleanupNeverOrphansManifestReferencedRules(t *testing.T) {
+	marker := "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->\n"
+	config := &monorepoConfig{
+		Targets:   []string{"claude", "codex"},
+		Agents:    []string{"publishing", "linting", "testing"},
+		Languages: []string{"typescript"},
+	}
+
+	cases := []struct {
+		name   string
+		layout ruleLayout
+	}{
+		{"flat single-language layout", ruleLayoutEither},
+		{"nested multi-language layout", ruleLayoutNested},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			for _, target := range config.Targets {
+				root := resolvedTempDir(t)
+				rulePaths := managedRulePathsForLayout(root, target, config, testCase.layout)
+				if len(rulePaths) == 0 {
+					t.Fatalf("expected %s layout to produce rule paths", testCase.name)
+				}
+
+				manifest := "# Manifest\n\n## Installed agent rules\n\n" +
+					ballastManagedSectionNotice + "\n\n"
+				for _, rulePath := range rulePaths {
+					mustWriteFile(t, rulePath, marker)
+					relative, err := filepath.Rel(root, rulePath)
+					if err != nil {
+						t.Fatalf("relativize %s: %v", rulePath, err)
+					}
+					manifest += "- `" + filepath.ToSlash(relative) + "` — rule\n"
+				}
+				mustWriteFile(t, supportFilePath(root, target), manifest)
+
+				if err := removeStaleManagedFilesForLayout(root, target, nil, config, testCase.layout); err != nil {
+					t.Fatalf("removeStaleManagedFilesForLayout(%s): %v", target, err)
+				}
+
+				for reference := range ballastManagedPathsFromSupportFile(root, target) {
+					if !fileExists(reference) {
+						t.Fatalf(
+							"%s manifest references a rule that cleanup removed: %s",
+							target,
+							reference,
+						)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestRefreshCleanupNeverOrphansManifestReferencedRules exercises the real
+// entry point rather than a helper called with the correct layout. The v5.19.0
+// bug was in this wiring: cleanupSingleLanguageManagedSelections asked for the
+// nested layout while the single-language backend had written flat files.
+func TestRefreshCleanupNeverOrphansManifestReferencedRules(t *testing.T) {
+	root := resolvedTempDir(t)
+	marker := "<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->\n"
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["publishing", "linting"],
+  "languages": ["typescript"],
+  "paths": { "typescript": ["."] }
+}`)
+
+	// Exactly what a single-language backend install writes.
+	flatRules := []string{
+		".claude/rules/publishing.md",
+		".claude/rules/publishing-cli.md",
+		".claude/rules/publishing-libraries.md",
+		".claude/rules/typescript-linting.md",
+	}
+	manifest := "# CLAUDE.md\n\n## Installed agent rules\n\n" + ballastManagedSectionNotice + "\n\n"
+	for _, relative := range flatRules {
+		mustWriteFile(t, filepath.Join(root, filepath.FromSlash(relative)), marker)
+		manifest += "- `" + relative + "` — rule\n"
+	}
+	mustWriteFile(t, filepath.Join(root, "CLAUDE.md"), manifest)
+
+	if err := cleanupSingleLanguageManagedSelections(root, language("typescript")); err != nil {
+		t.Fatalf("cleanupSingleLanguageManagedSelections returned error: %v", err)
+	}
+
+	for reference := range ballastManagedPathsFromSupportFile(root, "claude") {
+		if !fileExists(reference) {
+			t.Fatalf("CLAUDE.md references a rule that refresh cleanup removed: %s", reference)
+		}
+	}
+}
+
+// TestResolveMonorepoPlanPreservesPublishingProfiles guards the config key that
+// scopes which publishing rules reach the always-loaded rule set. The monorepo
+// path rebuilt .rulesrc.json from scratch and never carried publishingProfiles
+// across, so saving the config silently erased the setting and every publishing
+// variant was emitted again on the next run.
+func TestResolveMonorepoPlanPreservesPublishingProfiles(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["publishing"],
+  "languages": ["typescript", "go"],
+  "paths": { "typescript": ["web"], "go": ["svc"] },
+  "publishingProfiles": ["cli", "libraries"],
+  "taskSystem": "github",
+  "deploymentModel": "none"
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected a monorepo plan for a typescript + go repository")
+	}
+
+	got := plan.Config.PublishingProfiles
+	if len(got) != 2 || got[0] != "cli" || got[1] != "libraries" {
+		t.Fatalf("expected publishingProfiles to survive the plan, got %v", got)
+	}
+
+	// The saved config drives cleanup, so scoped profiles must also narrow the
+	// set of publishing rules the wrapper considers current.
+	paths := managedRulePaths(root, "claude", &plan.Config)
+	for _, unwanted := range []string{"publishing-web.md", "publishing-api.md", "publishing-sdks.md", "publishing-apps.md"} {
+		for _, path := range paths {
+			if filepath.Base(path) == unwanted {
+				t.Fatalf("expected %s to be out of scope for profiles %v", unwanted, got)
+			}
+		}
+	}
+	for _, wanted := range []string{"publishing.md", "publishing-cli.md", "publishing-libraries.md"} {
+		found := false
+		for _, path := range paths {
+			if filepath.Base(path) == wanted {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected %s to remain in scope for profiles %v", wanted, got)
+		}
+	}
+}

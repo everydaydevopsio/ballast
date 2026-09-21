@@ -2609,3 +2609,33 @@ Created by [Ballast](https://github.com/everydaydevopsio/ballast) v9.9.9-test. D
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PublishingDeploymentProfileTests(unittest.TestCase):
+    """Deployment-only publishing rules declare themselves inactive when no
+    deployment model is configured, so they stay out of the always-loaded rule
+    set unless publishingProfiles opts them back in. Mirrors the TypeScript and
+    Go backends."""
+
+    def test_drops_deployment_variants_without_deployment_model(self) -> None:
+        suffixes = cli.list_rule_suffixes("publishing", "python", None, "none")
+        self.assertNotIn("web", suffixes)
+        self.assertNotIn("api", suffixes)
+        for expected in ("", "cli", "libraries", "sdks", "apps"):
+            self.assertIn(expected, suffixes)
+
+    def test_keeps_deployment_variants_with_deployment_model(self) -> None:
+        suffixes = cli.list_rule_suffixes("publishing", "python", None, "kubernetes")
+        self.assertIn("web", suffixes)
+        self.assertIn("api", suffixes)
+
+    def test_explicit_profiles_override_deployment_default(self) -> None:
+        suffixes = cli.list_rule_suffixes(
+            "publishing", "python", ["cli", "web"], "none"
+        )
+        self.assertEqual(suffixes, ["", "cli", "web"])
+
+    def test_opt_in_variants_still_excluded_by_default(self) -> None:
+        suffixes = cli.list_rule_suffixes("publishing", "python", None, "kubernetes")
+        self.assertNotIn("apt", suffixes)
+        self.assertNotIn("brew", suffixes)
