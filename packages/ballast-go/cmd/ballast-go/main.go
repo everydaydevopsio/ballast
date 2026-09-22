@@ -1086,6 +1086,11 @@ func install(opts installOptions) installResult {
 			if exists(file) && !opts.force && !opts.patch && !refreshManagedSkills {
 				continue
 			}
+			// Skills are entirely Ballast-authored, so every branch replaces
+			// the file wholesale. Section-merging a skill (as --patch does for
+			// rules, to preserve user-authored sections) keeps stale text for
+			// headings that still exist upstream and re-appends sections that
+			// upstream deleted.
 			switch target {
 			case "cursor":
 				content, buildErr := buildCursorSkillFormat(skillID, opts.language)
@@ -1093,70 +1098,26 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				nextContent := content
-				if exists(file) && !opts.force && opts.patch {
-					existing, readErr := os.ReadFile(file)
-					if readErr != nil {
-						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-						continue
-					}
-					nextContent = patchRuleContent(string(existing), content, target)
-				}
-				err = os.WriteFile(file, []byte(nextContent), 0o644)
-			case "claude":
-				skillContent, readErr := readSkillContent(skillID, opts.language)
-				if readErr != nil {
-					result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-					continue
-				}
-				nextContent := skillContent
-				if exists(file) && !opts.force && opts.patch {
-					existing, readErr := readClaudeSkillContent(file)
-					if readErr != nil {
-						nextContent = skillContent
-					} else {
-						nextContent = patchRuleContent(existing, skillContent, target)
-					}
-				}
-				content, buildErr := buildClaudeSkill(skillID, opts.language, nextContent)
-				if buildErr != nil {
-					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
-					continue
-				}
-				err = os.WriteFile(file, content, 0o644)
+				err = os.WriteFile(file, []byte(content), 0o644)
 			case "opencode", "gemini":
 				content, buildErr := buildSkillMarkdown(skillID, opts.language)
 				if buildErr != nil {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				nextContent := content
-				if exists(file) && !opts.force && opts.patch {
-					existing, readErr := os.ReadFile(file)
-					if readErr != nil {
-						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-						continue
-					}
-					nextContent = patchRuleContent(string(existing), content, target)
-				}
-				err = os.WriteFile(file, []byte(nextContent), 0o644)
-			case "codex":
-				content, buildErr := buildCodexSkillMarkdown(skillID, opts.language)
+				err = os.WriteFile(file, []byte(content), 0o644)
+			case "codex", "claude":
+				// Both targets discover skills as <name>/SKILL.md directories.
+				content, buildErr := buildSkillDirectoryMarkdown(skillID, opts.language)
 				if buildErr != nil {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				nextContent := content
-				if exists(file) && !opts.force && opts.patch {
-					existing, readErr := os.ReadFile(file)
-					if readErr != nil {
-						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-						continue
-					}
-					nextContent = patchRuleContent(string(existing), content, target)
+				if err = os.WriteFile(file, []byte(content), 0o644); err == nil {
+					err = copySkillResources(skillID, opts.language, dir)
 				}
-				if err = os.WriteFile(file, []byte(nextContent), 0o644); err == nil {
-					err = copyCodexSkillResources(skillID, opts.language, dir)
+				if err == nil && target == "claude" {
+					err = removeLegacyClaudeSkillArchive(opts.projectRoot, skillID)
 				}
 			default:
 				err = fmt.Errorf("unknown target: %s", target)
@@ -1445,11 +1406,11 @@ func buildClaudeMD(agents []string, skills []string, language string, tools map[
 			"",
 			ballastNotice(),
 			"",
-			"Read and use these skill files in `.claude/skills/` when they are relevant:",
+			"These skills are registered with Claude Code. Invoke one by name (for example `/ballast-audit`) when it is relevant:",
 			"",
 		)
 		for _, skillID := range skills {
-			lines = append(lines, fmt.Sprintf("- `.claude/skills/%s.skill` — %s", skillID, skillDescription(skillID, language)))
+			lines = append(lines, fmt.Sprintf("- `/%s` — %s", skillID, skillDescription(skillID, language)))
 		}
 	}
 	lines = append(lines, "")
@@ -1634,7 +1595,7 @@ func buildSkillMarkdown(skillID, language string) (string, error) {
 	return "<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
 }
 
-func buildCodexSkillMarkdown(skillID, language string) (string, error) {
+func buildSkillDirectoryMarkdown(skillID, language string) (string, error) {
 	content, err := readSkillContent(skillID, language)
 	if err != nil {
 		return "", err
@@ -1646,7 +1607,7 @@ func buildCodexSkillMarkdown(skillID, language string) (string, error) {
 	return frontmatter + "\n\n<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
 }
 
-func copyCodexSkillResources(skillID, language, destinationDir string) error {
+func copySkillResources(skillID, language, destinationDir string) error {
 	sourceDir := skillDir(skillID, language)
 	return copyCodexSkillResourceDir(sourceDir, destinationDir)
 }
@@ -1685,6 +1646,9 @@ func copyCodexSkillResourceDir(sourceDir, destinationDir string) error {
 	return nil
 }
 
+// buildClaudeSkill packages a skill as a claude.ai Agent Skills zip bundle.
+// This is not what Claude Code installs -- it discovers directories, see
+// skillDestination -- and is kept for publishing bundles to claude.ai.
 func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte, error) {
 	content := ""
 	if len(skillContent) > 0 {
@@ -1757,33 +1721,6 @@ func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte,
 		return nil, err
 	}
 	return buffer.Bytes(), nil
-}
-
-func readClaudeSkillContent(archivePath string) (string, error) {
-	content, err := os.ReadFile(archivePath)
-	if err != nil {
-		return "", err
-	}
-	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
-	if err != nil {
-		return "", err
-	}
-	for _, file := range reader.File {
-		if file.Name != "SKILL.md" {
-			continue
-		}
-		rc, err := file.Open()
-		if err != nil {
-			return "", err
-		}
-		defer rc.Close()
-		data, err := io.ReadAll(rc)
-		if err != nil {
-			return "", err
-		}
-		return string(data), nil
-	}
-	return "", fmt.Errorf("skill archive missing SKILL.md")
 }
 
 func normalizeLineEndings(content string) string {
@@ -3796,8 +3733,10 @@ func skillDestination(projectRoot, target, skillID string) (string, string, erro
 		dir := filepath.Join(root, ".cursor", "rules")
 		return dir, filepath.Join(dir, skillID+".mdc"), nil
 	case "claude":
-		dir := filepath.Join(root, ".claude", "skills")
-		return dir, filepath.Join(dir, skillID+".skill"), nil
+		// Claude Code discovers project skills at .claude/skills/<name>/SKILL.md
+		// and exposes each as /<name>; the old <name>.skill zip was never read.
+		dir := filepath.Join(root, ".claude", "skills", skillID)
+		return dir, filepath.Join(dir, "SKILL.md"), nil
 	case "opencode":
 		dir := filepath.Join(root, ".opencode", "skills")
 		return dir, filepath.Join(dir, skillID+".md"), nil
@@ -3810,6 +3749,22 @@ func skillDestination(projectRoot, target, skillID string) (string, string, erro
 	default:
 		return "", "", fmt.Errorf("unknown target: %s", target)
 	}
+}
+
+// removeLegacyClaudeSkillArchive deletes the pre-directory
+// .claude/skills/<name>.skill bundle. Claude Code ignores it, but leaving it
+// behind shows the skill twice and nothing would prune it, since the archive
+// path is no longer in the expected set.
+func removeLegacyClaudeSkillArchive(projectRoot, skillID string) error {
+	legacy := filepath.Join(filepath.Clean(projectRoot), ".claude", "skills", skillID+".skill")
+	info, err := os.Stat(legacy)
+	if err != nil || info.IsDir() {
+		return nil
+	}
+	if err := os.Remove(legacy); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func legacyCodexSkillDestination(projectRoot, skillID string) string {

@@ -52,7 +52,7 @@ assert_file_absent "${PROJECT}/.codex/rules/owasp-security-scan.md"
 assert_contains '"owasp-security-scan"' "${PROJECT}/.rulesrc.json"
 assert_not_contains '"ballastVersion": "0.0.1"' "${PROJECT}/.rulesrc.json"
 assert_contains '`.codex/skills/owasp-security-scan/SKILL.md`' "${PROJECT}/AGENTS.md"
-assert_contains '`.claude/skills/owasp-security-scan.skill`' "${PROJECT}/CLAUDE.md"
+assert_contains '`/owasp-security-scan`' "${PROJECT}/CLAUDE.md"
 assert_contains "existing linting rule" "${PROJECT}/.codex/rules/go-linting.md"
 
 echo "PASS: upgrade-refresh-skills-e2e"

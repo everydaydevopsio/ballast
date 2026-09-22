@@ -41,7 +41,7 @@ EOF
   assert_file_absent "${project}/.codex/skills/owasp-security-scan"
   assert_not_contains '`.codex/rules/' "${project}/AGENTS.md"
   assert_contains '`.claude/rules/python/python-linting.md`' "${project}/CLAUDE.md"
-  assert_file_exists "${project}/.claude/skills/owasp-security-scan.skill"
+  assert_file_exists "${project}/.claude/skills/owasp-security-scan/SKILL.md"
 }
 
 run_opencode_case() {
@@ -88,7 +88,7 @@ EOF
   assert_file_exists "${project}/.opencode/rules/go/manual.md"
   assert_file_absent "${project}/.opencode/skills/owasp-security-scan.md"
   assert_file_exists "${project}/.claude/rules/python/python-linting.md"
-  assert_file_exists "${project}/.claude/skills/owasp-security-scan.skill"
+  assert_file_exists "${project}/.claude/skills/owasp-security-scan/SKILL.md"
 }
 
 run_codex_case

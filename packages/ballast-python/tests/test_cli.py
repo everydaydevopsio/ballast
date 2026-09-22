@@ -1327,9 +1327,11 @@ class PatchInstallTests(unittest.TestCase):
             )
 
             self.assertIn("owasp-security-scan", result.installed_skills)
-            skill = root / ".claude" / "skills" / "owasp-security-scan.skill"
+            skill = root / ".claude" / "skills" / "owasp-security-scan" / "SKILL.md"
             self.assertTrue(skill.exists())
-            self.assertTrue(skill.read_bytes().startswith(b"PK\x03\x04"))
+            self.assertIn(
+                "name: owasp-security-scan", skill.read_text(encoding="utf-8")
+            )
 
     def test_install_skips_existing_managed_skill_without_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1571,7 +1573,7 @@ class PatchInstallTests(unittest.TestCase):
         )
         self.assertEqual(
             cli.skill_destination(root, "claude", "owasp-security-scan"),
-            root / ".claude" / "skills" / "owasp-security-scan.skill",
+            root / ".claude" / "skills" / "owasp-security-scan" / "SKILL.md",
         )
         self.assertEqual(
             cli.skill_destination(root, "opencode", "owasp-security-scan"),
@@ -1776,7 +1778,7 @@ class PatchInstallTests(unittest.TestCase):
                 skill_path.read_text(encoding="utf-8"),
             )
 
-    def test_install_patch_merges_existing_skill(self) -> None:
+    def test_install_patch_replaces_existing_skill_wholesale(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             skill_path = root / ".cursor" / "rules" / "owasp-security-scan.mdc"
@@ -1789,9 +1791,9 @@ alwaysApply: true
 
 Team intro.
 
-## Usage
+## Retired Upstream Section
 
-Keep team-specific usage notes.
+Content upstream deleted that must not survive a patch.
 """,
                 encoding="utf-8",
             )
@@ -1809,27 +1811,18 @@ Keep team-specific usage notes.
 
             self.assertEqual(result.installed_skills, ["owasp-security-scan"])
             content = skill_path.read_text(encoding="utf-8")
-            self.assertIn("description: Team customized skill", content)
-            self.assertIn("alwaysApply: true", content)
-            self.assertIn("Keep team-specific usage notes.", content)
+            self.assertNotIn("Retired Upstream Section", content)
+            self.assertNotIn("description: Team customized skill", content)
             self.assertIn("## Scan Architecture", content)
 
-    def test_install_patch_merges_claude_skill_archive(self) -> None:
+    def test_install_migrates_legacy_claude_skill_archive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            skill_path = root / ".claude" / "skills" / "owasp-security-scan.skill"
-            skill_path.parent.mkdir(parents=True, exist_ok=True)
-            existing_skill_content = (
-                "# owasp-security-scan\n\n"
-                "Team intro preserved by patch.\n\n"
-                "## Team Custom Section\n\n"
-                "Keep this team-specific section.\n"
-            )
-            skill_path.write_bytes(
-                cli.build_claude_skill(
-                    "owasp-security-scan", "python", existing_skill_content
-                )
-            )
+            legacy = root / ".claude" / "skills" / "owasp-security-scan.skill"
+            legacy.parent.mkdir(parents=True, exist_ok=True)
+            # A corrupt bundle is still just a bundle: Claude Code never read
+            # it, so install replaces it rather than repairing it.
+            legacy.write_bytes(b"not-a-zip-archive")
 
             result = cli.install(
                 root,
@@ -1843,68 +1836,13 @@ Keep team-specific usage notes.
             )
 
             self.assertEqual(result.installed_skills, ["owasp-security-scan"])
-            skill_md = cli.read_claude_skill_content(skill_path)
-            self.assertIn("Team intro preserved by patch.", skill_md)
-            self.assertIn("Team Custom Section", skill_md)
-            self.assertIn("## Scan Architecture", skill_md)
-
-    def test_install_patch_overwrites_unreadable_claude_skill_archive(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            skill_path = root / ".claude" / "skills" / "owasp-security-scan.skill"
-            skill_path.parent.mkdir(parents=True, exist_ok=True)
-            skill_path.write_bytes(b"not-a-zip-archive")
-
-            result = cli.install(
-                root,
-                "claude",
-                [],
-                ["owasp-security-scan"],
-                "python",
-                False,
-                True,
-                False,
+            skill_md = root / ".claude" / "skills" / "owasp-security-scan" / "SKILL.md"
+            self.assertTrue(skill_md.exists())
+            self.assertIn(
+                "name: owasp-security-scan", skill_md.read_text(encoding="utf-8")
             )
-
-            self.assertEqual(result.errors, [])
-            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
-            skill_md = cli.read_claude_skill_content(skill_path)
-            self.assertIn("## Scan Architecture", skill_md)
-            self.assertNotIn("not-a-zip-archive", skill_md)
-
-    def test_install_force_overwrites_existing_claude_skill_archive(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            skill_path = root / ".claude" / "skills" / "owasp-security-scan.skill"
-            skill_path.parent.mkdir(parents=True, exist_ok=True)
-            existing_skill_content = (
-                "# owasp-security-scan\n\n"
-                "Team intro that should be discarded on force.\n\n"
-                "## Team Custom Section\n\n"
-                "This section should be gone after force.\n"
-            )
-            skill_path.write_bytes(
-                cli.build_claude_skill(
-                    "owasp-security-scan", "python", existing_skill_content
-                )
-            )
-
-            result = cli.install(
-                root,
-                "claude",
-                [],
-                ["owasp-security-scan"],
-                "python",
-                True,
-                False,
-                False,
-            )
-
-            self.assertEqual(result.installed_skills, ["owasp-security-scan"])
-            skill_md = cli.read_claude_skill_content(skill_path)
-            self.assertNotIn("Team intro that should be discarded on force.", skill_md)
-            self.assertNotIn("Team Custom Section", skill_md)
-            self.assertIn("## Scan Architecture", skill_md)
+            self.assertFalse(legacy.exists())
+            self.assertTrue((skill_md.parent / "references").exists())
 
     def test_install_force_overwrites_existing_skill(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

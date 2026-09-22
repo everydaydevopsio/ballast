@@ -138,10 +138,12 @@ assert_not_contains() {
   fi
 }
 
-assert_valid_claude_skill_archive() {
-  local path="$1"
-  unzip -tqq "${path}" >/dev/null || fail "expected valid zip archive at ${path}"
-  unzip -l "${path}" | grep -Fq "SKILL.md" || fail "expected SKILL.md inside ${path}"
+# Claude Code installs skills as directories; this asserts the installed
+# layout, not the claude.ai zip bundle that buildClaudeSkill still produces.
+assert_valid_claude_skill_dir() {
+  local skill_md="$1"
+  [[ -f "${skill_md}" ]] || fail "expected SKILL.md at ${skill_md}"
+  grep -q "^name: " "${skill_md}" || fail "expected skill frontmatter in ${skill_md}"
 }
 
 assert_doctor_contains() {
