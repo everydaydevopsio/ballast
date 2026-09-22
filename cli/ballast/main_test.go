@@ -2033,6 +2033,83 @@ func TestBrewUpgradeArgsUsesFullyQualifiedName(t *testing.T) {
 	}
 }
 
+func TestBrewCaskCollisionWarning(t *testing.T) {
+	warningLines := brewCaskCollisionWarning(true, func() bool { return true }, func() (bool, error) {
+		return true, nil
+	})
+
+	tests := []struct {
+		name          string
+		isDarwin      bool
+		brewInstalled bool
+		wrongCask     bool
+		wrongCaskErr  error
+		wantWarning   bool
+	}{
+		{name: "hijacked token on brew-installed macOS warns", isDarwin: true, brewInstalled: true, wrongCask: true, wantWarning: true},
+		{name: "correct tap cask stays quiet", isDarwin: true, brewInstalled: true, wrongCask: false},
+		{name: "non-brew install stays quiet", isDarwin: true, brewInstalled: false, wrongCask: true},
+		{name: "non-darwin stays quiet", isDarwin: false, brewInstalled: true, wrongCask: true},
+		{name: "brew lookup failure stays quiet", isDarwin: true, brewInstalled: true, wrongCask: true, wrongCaskErr: errors.New("brew exploded")},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := brewCaskCollisionWarning(
+				testCase.isDarwin,
+				func() bool { return testCase.brewInstalled },
+				func() (bool, error) { return testCase.wrongCask, testCase.wrongCaskErr },
+			)
+			if testCase.wantWarning {
+				if len(got) == 0 {
+					t.Fatal("expected a warning, got none")
+				}
+				return
+			}
+			if got != nil {
+				t.Fatalf("expected no warning, got %#v", got)
+			}
+		})
+	}
+
+	joined := strings.Join(warningLines, "\n")
+	if !strings.Contains(joined, "everydaydevopsio/ballast/ballast") {
+		t.Fatalf("expected the fully-qualified remediation command, got %q", joined)
+	}
+	if !strings.Contains(joined, "ballast update") {
+		t.Fatalf("expected the self-healing command in the remediation, got %q", joined)
+	}
+}
+
+func TestDetectWrongBrewCaskDetectsHijackedTokenWithOurPayload(t *testing.T) {
+	originalOutput := runCommandOutputFunc
+	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
+
+	// Real-world shape: our 5.20.0 is what is installed in the Caskroom, but
+	// the bare token now resolves to the unrelated core cask, which brew
+	// reports as an "upgrade" to 2.0.0 and refuses because it is disabled.
+	runCommandOutputFunc = func(name string, args []string) (string, error) {
+		return strings.Join([]string{
+			"==> ballast (ballast): 5.20.0 → 2.0.0",
+			"Status Bar app to keep the audio balance from drifting",
+			"https://jamsinclair.nz/ballast",
+			"Disabled because it does not pass the macOS Gatekeeper check! It was disabled on 2026-09-01.",
+			"Installed (on request)",
+			"/opt/homebrew/Caskroom/ballast/5.20.0 (3MB)",
+			"  Installed on 2026-09-21 at 18:22:04",
+			"From: https://github.com/Homebrew/homebrew-cask/blob/HEAD/Casks/b/ballast.rb",
+		}, "\n"), nil
+	}
+
+	wrong, err := detectWrongBrewCask()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wrong {
+		t.Fatal("expected the hijacked bare cask token to be detected")
+	}
+}
+
 func TestDetectWrongBrewCaskReturnsTrueForCoreCask(t *testing.T) {
 	originalOutput := runCommandOutputFunc
 	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
@@ -4431,6 +4508,45 @@ func TestRunMonorepoInstallPrefersSiblingBackendsNextToWrapper(t *testing.T) {
 	}
 	if invocations[3].Binary != filepath.Join(sourceRoot, ".ci", "bin", "ballast-go") {
 		t.Fatalf("expected sibling Go backend binary, got %#v", invocations[3])
+	}
+}
+
+func TestRunSingleLanguageInstallChecksPinnedProjectBackendVersion(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
+	mustWriteFile(t, filepath.Join(root, "tsconfig.json"), "{}")
+	// A pinned project-local backend already exists. It may be older than the
+	// wrapper, so its version must still be verified before it is used.
+	backend := filepath.Join(root, ".ballast", "tools", "typescript", "node_modules", ".bin", "ballast-typescript")
+	mustWriteFile(t, backend, "#!/bin/sh\necho 5.0.0\n")
+	if err := os.Chmod(backend, 0o755); err != nil {
+		t.Fatalf("chmod backend: %v", err)
+	}
+
+	originalEnsure := ensureInstalledFunc
+	originalExec := execToolFunc
+	t.Cleanup(func() {
+		ensureInstalledFunc = originalEnsure
+		execToolFunc = originalExec
+	})
+
+	ensureCalled := 0
+	ensureInstalledFunc = func(tool toolConfig) error {
+		ensureCalled++
+		return nil
+	}
+	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
+		return 0, nil
+	}
+
+	withWorkingDir(t, root, func() {
+		if exitCode := run([]string{"install", "--target", "codex", "--all", "--yes"}); exitCode != 0 {
+			t.Fatalf("expected exit code 0, got %d", exitCode)
+		}
+	})
+
+	if ensureCalled == 0 {
+		t.Fatal("expected ensureInstalled to run for a pinned project-local backend")
 	}
 }
 

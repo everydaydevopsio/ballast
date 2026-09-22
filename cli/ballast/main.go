@@ -354,6 +354,7 @@ func run(args []string) int {
 			return 1
 		}
 		if plan != nil {
+			ensuredLanguages := map[language]bool{}
 			for _, invocation := range plan.Invocations {
 				tool, ok := toolsByLanguage[invocation.Language]
 				if !ok {
@@ -367,11 +368,17 @@ func run(args []string) int {
 				}
 				invocation.Env = mergeResolvedEnv(invocation.Env, repositoryFactsEnv)
 				resolved := resolveBackendCommand(invocation.Language, tool, invocation.Args, invocation.Env)
-				if !resolved.UseLocal {
+				// A pinned .ballast/ backend older than the wrapper silently
+				// emits stale rules and skills, so check its version too —
+				// once per language, not once per invocation.
+				needsEnsure := !resolved.UseLocal ||
+					(resolved.FromProjectLocal && !ensuredLanguages[invocation.Language])
+				if needsEnsure {
 					if err := ensureInstalledFunc(tool); err != nil {
 						fmt.Println(err)
 						return 1
 					}
+					ensuredLanguages[invocation.Language] = true
 					resolved = resolveBackendCommand(invocation.Language, tool, invocation.Args, invocation.Env)
 				}
 				exitCode, err := execToolFunc(resolved.Binary, resolved.Args, invocation.Dir, resolved.Env)
@@ -435,7 +442,9 @@ func run(args []string) int {
 	}
 	singleEnv = mergeResolvedEnv(singleEnv, repositoryFactsEnv)
 	resolved := resolveBackendCommand(selectedLanguage, tool, forwardedArgs, singleEnv)
-	if !resolved.UseLocal {
+	// A pinned .ballast/ backend older than the wrapper silently emits stale
+	// rules and skills, so check its version as well as its presence.
+	if !resolved.UseLocal || resolved.FromProjectLocal {
 		if err := ensureInstalledFunc(tool); err != nil {
 			fmt.Println(err)
 			return 1
@@ -1190,6 +1199,7 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	fmt.Println()
 
 	printDoctorLocalState(root)
+	printDoctorBrewCaskWarning()
 
 	fmt.Println("Config:")
 	configPath := filepath.Join(root, ".rulesrc.json")
@@ -1561,6 +1571,44 @@ func stringSliceContains(values []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// brewCaskCollisionWarning returns the doctor warning lines for the hijacked
+// Homebrew cask token, or nil when the collision does not apply. The core tap
+// ships an unrelated app also called "ballast", so the bare token resolves
+// there once that cask is tapped, and `brew upgrade --cask ballast` then
+// targets the wrong package entirely. Inputs are injected so the message logic
+// is testable off macOS.
+func brewCaskCollisionWarning(
+	isDarwin bool,
+	brewInstalled func() bool,
+	wrongCask func() (bool, error),
+) []string {
+	if !isDarwin || !brewInstalled() {
+		return nil
+	}
+	wrong, err := wrongCask()
+	if err != nil || !wrong {
+		return nil
+	}
+	return []string{
+		"Homebrew:",
+		`- warning: the cask token "ballast" resolves to homebrew/cask, an unrelated audio-balance app.`,
+		"- Upgrading by the bare token targets that package, not this CLI.",
+		"- remediation: Run `ballast update`, or fully qualify the tap:",
+		"    brew upgrade --cask everydaydevopsio/ballast/ballast",
+	}
+}
+
+func printDoctorBrewCaskWarning() {
+	lines := brewCaskCollisionWarning(runtime.GOOS == "darwin", detectBrewInstall, detectWrongBrewCask)
+	if len(lines) == 0 {
+		return
+	}
+	for _, line := range lines {
+		fmt.Println(line)
+	}
+	fmt.Println()
 }
 
 func printDoctorLocalState(root string) {
@@ -2163,6 +2211,10 @@ type resolvedBackendCommand struct {
 	Args     []string
 	Env      map[string]string
 	UseLocal bool
+	// FromProjectLocal marks a backend resolved from the project's .ballast/
+	// directory, which is version-pinned and can fall behind the wrapper. The
+	// ballast source tree also sets UseLocal but must never be reinstalled.
+	FromProjectLocal bool
 }
 
 func resolveBackendCommand(lang language, tool toolConfig, args []string, env map[string]string) resolvedBackendCommand {
@@ -2176,6 +2228,7 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 			local.Args = append(local.Args, dispatchedArgs...)
 			local.Env = mergeResolvedEnv(mergedEnv, local.Env)
 			local.UseLocal = true
+			local.FromProjectLocal = true
 			return local
 		}
 		return resolvedBackendCommand{
@@ -2200,6 +2253,7 @@ func resolveBackendCommand(lang language, tool toolConfig, args []string, env ma
 		projectLocal.Args = append(projectLocal.Args, dispatchedArgs...)
 		projectLocal.Env = mergeResolvedEnv(mergedEnv, projectLocal.Env)
 		projectLocal.UseLocal = true
+		projectLocal.FromProjectLocal = true
 		return projectLocal
 	}
 

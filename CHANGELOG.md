@@ -15,6 +15,12 @@ the complete history.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A pinned `.ballast/` backend older than the wrapper no longer emits stale output silently.** The version check in `ensureInstalled` was unreachable: both call sites ran it only when no local backend existed, so an outdated one was used as-is. `ballast install --refresh-config` would report installing every skill while writing the old backend's content and leaving `ballastVersion` behind. Backend resolution now distinguishes a version-pinned `.ballast/` backend from the ballast source tree, and verifies the former's version before forwarding.
+- **`--patch` no longer corrupts skills.** Skills were section-merged like rules, which kept stale text for headings that still existed upstream and re-appended sections upstream had deleted — a patched skill could contain both the current guidance and the removed guidance it replaced. Skills are entirely Ballast-authored, so every write path now replaces them wholesale. This also fixes releases shipping skill files stamped with the previous version, since the release regenerates via `upgrade --patch`.
+- **`doctor` now warns when the Homebrew cask token is hijacked.** `homebrew/cask` ships an unrelated app also called `ballast`, so the bare token resolves there and `brew upgrade --cask ballast` targets the wrong package. `ballast update` already self-healed this; `doctor` now surfaces it before a manual `brew` command hits it.
+
 ### Changed
 
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.

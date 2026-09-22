@@ -7,6 +7,7 @@ import { install, resolveTargetAndAgents, runInstall } from './install';
 import {
   buildClaudeSkill,
   buildCodexAgentsMd,
+  buildCursorSkillFormat,
   getClaudeMdPath,
   getDestination,
   getGeminiMdPath
@@ -551,7 +552,10 @@ describe('install', () => {
       );
     });
 
-    test('patches an existing skill file when patch is true', () => {
+    test('patch replaces a locally modified skill file wholesale', () => {
+      // Skills are entirely Ballast-authored. Section-merging them kept stale
+      // text for headings that still existed upstream and re-appended sections
+      // upstream had deleted, so --patch replaces the file instead.
       const skillFile = path.join(
         tmpDir,
         '.cursor',
@@ -568,9 +572,9 @@ alwaysApply: true
 
 Team intro.
 
-## Usage
+## Retired Upstream Section
 
-Keep team-specific usage notes.
+Content upstream deleted that must not survive a patch.
 `,
         'utf8'
       );
@@ -587,10 +591,10 @@ Keep team-specific usage notes.
 
       expect(result.installedSkills).toContain('owasp-security-scan');
       const content = fs.readFileSync(skillFile, 'utf8');
-      expect(content).toContain('description: Team customized skill');
-      expect(content).toContain('alwaysApply: true');
-      expect(content).toContain('Keep team-specific usage notes.');
       expect(content).toContain('## Scan Architecture');
+      expect(content).not.toContain('Retired Upstream Section');
+      expect(content).not.toContain('description: Team customized skill');
+      expect(content).toBe(buildCursorSkillFormat('owasp-security-scan'));
     });
 
     test('overwrites an existing skill file when force is true', () => {
@@ -768,76 +772,9 @@ Keep team-specific usage notes.
       expect(content).not.toContain('Use jira as the system of record');
     });
 
-    test('patches SKILL.md inside an existing claude .skill archive when patch is true', () => {
-      const skillFile = path.join(
-        tmpDir,
-        '.claude',
-        'skills',
-        'owasp-security-scan.skill'
-      );
-      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
-      const existingSkillContent = `# owasp-security-scan
-
-Team intro preserved by patch.
-
-## Team Custom Section
-
-Keep this team-specific section.
-`;
-      fs.writeFileSync(
-        skillFile,
-        buildClaudeSkill('owasp-security-scan', existingSkillContent)
-      );
-
-      const result = install({
-        projectRoot: tmpDir,
-        target: 'claude',
-        agents: [],
-        skills: ['owasp-security-scan'],
-        patch: true,
-        force: false,
-        saveConfig: false
-      });
-
-      expect(result.installedSkills).toContain('owasp-security-scan');
-
-      const archive = fs.readFileSync(skillFile);
-      const skillMd = readSkillMdFromArchive(archive);
-      expect(skillMd).toContain('Team intro preserved by patch.');
-      expect(skillMd).toContain('Team Custom Section');
-      expect(skillMd).toContain('## Scan Architecture');
-    });
-
-    test('patch falls back to overwrite when an existing claude .skill archive is unreadable', () => {
-      const skillFile = path.join(
-        tmpDir,
-        '.claude',
-        'skills',
-        'owasp-security-scan.skill'
-      );
-      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
-      fs.writeFileSync(skillFile, Buffer.from('not-a-zip-archive', 'utf8'));
-
-      const result = install({
-        projectRoot: tmpDir,
-        target: 'claude',
-        agents: [],
-        skills: ['owasp-security-scan'],
-        patch: true,
-        force: false,
-        saveConfig: false
-      });
-
-      expect(result.errors).toEqual([]);
-      expect(result.installedSkills).toContain('owasp-security-scan');
-
-      const archive = fs.readFileSync(skillFile);
-      const skillMd = readSkillMdFromArchive(archive);
-      expect(skillMd).toContain('## Scan Architecture');
-      expect(skillMd).not.toContain('not-a-zip-archive');
-    });
-
-    test('patch falls back to overwrite when reading an existing claude archive throws', () => {
+    test('patch replaces an existing claude .skill archive wholesale', () => {
+      // The claude target ships a zip; --patch previously merged the SKILL.md
+      // inside it, which resurrected deleted sections. It now rewrites it.
       const skillFile = path.join(
         tmpDir,
         '.claude',
@@ -847,100 +784,16 @@ Keep this team-specific section.
       fs.mkdirSync(path.dirname(skillFile), { recursive: true });
       fs.writeFileSync(
         skillFile,
-        buildClaudeSkill('owasp-security-scan', '# existing skill\n')
-      );
-
-      const originalReadFileSync = fs.readFileSync;
-      let injectedFailure = false;
-      jest.spyOn(fs, 'readFileSync').mockImplementation(((
-        file: fs.PathOrFileDescriptor,
-        options?: unknown
-      ) => {
-        if (file === skillFile && options === undefined && !injectedFailure) {
-          injectedFailure = true;
-          throw new Error('permission denied');
-        }
-        return originalReadFileSync(file as never, options as never);
-      }) as typeof fs.readFileSync);
-
-      const result = install({
-        projectRoot: tmpDir,
-        target: 'claude',
-        agents: [],
-        skills: ['owasp-security-scan'],
-        patch: true,
-        force: false,
-        saveConfig: false
-      });
-
-      expect(result.errors).toEqual([]);
-      expect(result.installedSkills).toContain('owasp-security-scan');
-
-      const archive = fs.readFileSync(skillFile);
-      const skillMd = readSkillMdFromArchive(archive);
-      expect(skillMd).toContain('## Scan Architecture');
-    });
-
-    test('patch preserves team content from valid claude archives that use data descriptors', () => {
-      const skillFile = path.join(
-        tmpDir,
-        '.claude',
-        'skills',
-        'owasp-security-scan.skill'
-      );
-      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
-      fs.writeFileSync(
-        skillFile,
-        buildClaudeSkillWithDataDescriptor(`# owasp-security-scan
-
-Team intro preserved by patch.
-
-## Team Custom Section
-
-Keep this team-specific section.
-`)
-      );
-
-      const result = install({
-        projectRoot: tmpDir,
-        target: 'claude',
-        agents: [],
-        skills: ['owasp-security-scan'],
-        patch: true,
-        force: false,
-        saveConfig: false
-      });
-
-      expect(result.errors).toEqual([]);
-      expect(result.installedSkills).toContain('owasp-security-scan');
-
-      const archive = fs.readFileSync(skillFile);
-      const skillMd = readSkillMdFromArchive(archive);
-      expect(skillMd).toContain('Team intro preserved by patch.');
-      expect(skillMd).toContain('Team Custom Section');
-      expect(skillMd).toContain('## Scan Architecture');
-    });
-
-    test('patch preserves team content when the zip comment contains an EOCD signature', () => {
-      const skillFile = path.join(
-        tmpDir,
-        '.claude',
-        'skills',
-        'owasp-security-scan.skill'
-      );
-      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
-      fs.writeFileSync(
-        skillFile,
-        buildClaudeSkillWithDataDescriptorComment(
+        buildClaudeSkill(
+          'owasp-security-scan',
           `# owasp-security-scan
 
-Team intro preserved by patch.
+Team intro.
 
-## Team Custom Section
+## Retired Upstream Section
 
-Keep this team-specific section.
-`,
-          Buffer.from('comment-\x50\x4b\x05\x06-tail', 'binary')
+Content upstream deleted that must not survive a patch.
+`
         )
       );
 
@@ -957,9 +810,9 @@ Keep this team-specific section.
       expect(result.errors).toEqual([]);
       expect(result.installedSkills).toContain('owasp-security-scan');
       const skillMd = readSkillMdFromArchive(fs.readFileSync(skillFile));
-      expect(skillMd).toContain('Team intro preserved by patch.');
-      expect(skillMd).toContain('Team Custom Section');
       expect(skillMd).toContain('## Scan Architecture');
+      expect(skillMd).not.toContain('Retired Upstream Section');
+      expect(skillMd).not.toContain('Team intro.');
     });
 
     test('force-overwrites an existing claude .skill archive without patching', () => {
