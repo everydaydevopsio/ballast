@@ -1815,6 +1815,34 @@ Content upstream deleted that must not survive a patch.
             self.assertNotIn("description: Team customized skill", content)
             self.assertIn("## Scan Architecture", content)
 
+    def test_install_reconciles_skill_resources_when_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # SKILL.md existing does not mean the directory is complete: a run
+            # interrupted before resources were copied, or a resource deleted
+            # upstream, must both be repaired by an ordinary install.
+            skill_dir = root / ".claude" / "skills" / "owasp-security-scan"
+            (skill_dir / "references").mkdir(parents=True, exist_ok=True)
+            (skill_dir / "SKILL.md").write_text(
+                "---\nname: owasp-security-scan\n---\n", encoding="utf-8"
+            )
+            orphan = skill_dir / "references" / "retired-upstream.md"
+            orphan.write_text("deleted upstream\n", encoding="utf-8")
+
+            cli.install(
+                root,
+                "claude",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertFalse(orphan.exists())
+            self.assertTrue((skill_dir / "references" / "owasp-mapping.md").exists())
+
     def test_install_migrates_legacy_archive_when_skill_skipped(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

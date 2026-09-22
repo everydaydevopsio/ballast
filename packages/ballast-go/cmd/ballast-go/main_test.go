@@ -2217,6 +2217,75 @@ Content upstream deleted that must not survive a patch.
 	}
 }
 
+func TestCopySkillResourcesReconcilesDestination(t *testing.T) {
+	tmpDir := t.TempDir()
+	dest := filepath.Join(tmpDir, "owasp-security-scan")
+	if err := os.MkdirAll(filepath.Join(dest, "references"), 0o755); err != nil {
+		t.Fatalf("create destination: %v", err)
+	}
+	// A resource upstream no longer ships, nested inside a managed directory
+	// so a top-level sweep alone would not see it.
+	orphan := filepath.Join(dest, "references", "retired-upstream.md")
+	if err := os.WriteFile(orphan, []byte("deleted upstream\n"), 0o644); err != nil {
+		t.Fatalf("seed orphan: %v", err)
+	}
+	// And an unmanaged top-level entry.
+	topOrphan := filepath.Join(dest, "stale-dir")
+	if err := os.MkdirAll(topOrphan, 0o755); err != nil {
+		t.Fatalf("seed top-level orphan: %v", err)
+	}
+
+	if err := copySkillResources("owasp-security-scan", "go", dest); err != nil {
+		t.Fatalf("copySkillResources: %v", err)
+	}
+
+	if _, err := os.Stat(orphan); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected nested orphan removed, got err=%v", err)
+	}
+	if _, err := os.Stat(topOrphan); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected top-level orphan removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "references", "owasp-mapping.md")); err != nil {
+		t.Fatalf("expected canonical resource copied: %v", err)
+	}
+}
+
+func TestCopySkillResourcesSurfacesMissingSource(t *testing.T) {
+	// An unknown skill has no source directory, so listing its resources must
+	// fail loudly rather than silently reconciling the destination to empty.
+	err := copySkillResources("not-a-real-skill", "go", t.TempDir())
+	if err == nil {
+		t.Fatal("expected an error for a skill with no source directory")
+	}
+}
+
+func TestReconcileSkillResourcesTreatsMissingDestinationAsDone(t *testing.T) {
+	sourceDir := skillDir("owasp-security-scan", "go")
+	missing := filepath.Join(t.TempDir(), "never-created")
+	if err := reconcileSkillResources(sourceDir, missing); err != nil {
+		t.Fatalf("expected a missing destination to be a no-op, got %v", err)
+	}
+}
+
+func TestRemoveLegacyClaudeSkillArchiveTolerance(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Missing archive is the normal case and must not error.
+	if err := removeLegacyClaudeSkillArchive(tmpDir, "owasp-security-scan"); err != nil {
+		t.Fatalf("expected no error for a missing archive, got %v", err)
+	}
+	// A directory at the legacy path is not the bundle; leave it alone.
+	legacyDir := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+		t.Fatalf("create legacy dir: %v", err)
+	}
+	if err := removeLegacyClaudeSkillArchive(tmpDir, "owasp-security-scan"); err != nil {
+		t.Fatalf("expected no error for a directory at the legacy path, got %v", err)
+	}
+	if _, err := os.Stat(legacyDir); err != nil {
+		t.Fatalf("expected directory at legacy path preserved: %v", err)
+	}
+}
+
 func TestInstallMigratesLegacyClaudeSkillArchiveWhenSkillSkipped(t *testing.T) {
 	tmpDir := t.TempDir()
 	// An interrupted migration leaves both layouts. A plain install skips
