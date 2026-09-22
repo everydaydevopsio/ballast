@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/tasks/todo" version="5.19.1" checksum="778e88e963db52a410a2114d94eee46c52ab83989318ead9135efd4b71d3c56a" -->
+<!-- ballast:rule id="typescript/tasks/todo" version="5.20.0" checksum="778e88e963db52a410a2114d94eee46c52ab83989318ead9135efd4b71d3c56a" -->
 # Branch-Local TODO Tracking
 
 Manage `tasks/todo.md` during branch work. Triage all unchecked items before creating a PR.

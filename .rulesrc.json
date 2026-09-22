@@ -33,7 +33,7 @@
     "speckit-delivery",
     "docker-registry-publish"
   ],
-  "ballastVersion": "5.19.1",
+  "ballastVersion": "5.20.0",
   "languages": [
     "typescript",
     "python",

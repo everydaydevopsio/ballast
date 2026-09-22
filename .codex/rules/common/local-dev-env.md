@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/local-dev/env" version="5.19.1" checksum="667dbd55a164d504c300f62591417df21086f68a40cb4215702bcf3e1541eca5" -->
+<!-- ballast:rule id="typescript/local-dev/env" version="5.20.0" checksum="667dbd55a164d504c300f62591417df21086f68a40cb4215702bcf3e1541eca5" -->
 # Local Development Environment Rules
 
 These rules help set up and maintain a consistent local development environment for the repository's configured languages and runtimes, including Dockerfile and Docker Compose when they fit the project.

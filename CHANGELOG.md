@@ -20,6 +20,19 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.20.0] - 2026-09-22
+
+### Highlights
+- **`ballast-audit` is now installed by default**, making it available without a separate installation step. (#364)
+
+### Fixes
+- No standalone fixes in this release.
+
+### Changes
+- Reworked `ballast-audit` to base its auditing on installed state. (#364)
+
+**Previous release:** v5.19.1
+
 ## [5.19.1] - 2026-09-22
 
 ### Highlights

@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing/cli" version="5.19.1" checksum="3ffbcbd0bfe95a7677ffacf1473054ca49cb9cbe68eb3652eec2620bd06a387f" -->
+<!-- ballast:rule id="typescript/publishing/cli" version="5.20.0" checksum="3ffbcbd0bfe95a7677ffacf1473054ca49cb9cbe68eb3652eec2620bd06a387f" -->
 # CLI Publishing Agent
 
 ## Goals

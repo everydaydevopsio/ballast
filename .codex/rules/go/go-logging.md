@@ -1,4 +1,4 @@
-<!-- ballast:rule id="go/logging" version="5.19.1" checksum="3f4724b3b46167f23e16c0b17cb87efe6ce41577db407c4e67b6be9269bf6a24" -->
+<!-- ballast:rule id="go/logging" version="5.20.0" checksum="3f4724b3b46167f23e16c0b17cb87efe6ce41577db407c4e67b6be9269bf6a24" -->
 # Go Logging Rules
 
 ## Your Responsibilities
