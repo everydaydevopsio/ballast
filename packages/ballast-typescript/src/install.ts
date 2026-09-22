@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
-import zlib from 'zlib';
 import {
   buildContent,
   buildClaudeSkill,
@@ -360,112 +359,6 @@ function resolveSupportFileSelections(
   };
 }
 
-function readStoredZipEntry(
-  archive: Buffer,
-  entryName: string
-): string | undefined {
-  const eocdSignature = 0x06054b50;
-  const centralDirectorySignature = 0x02014b50;
-  const localFileHeaderSignature = 0x04034b50;
-  const minEocdSize = 22;
-  const maxCommentLength = 0xffff;
-  const searchStart = Math.max(
-    0,
-    archive.length - minEocdSize - maxCommentLength
-  );
-
-  eocdLoop: for (
-    let eocdOffset = archive.length - minEocdSize;
-    eocdOffset >= searchStart;
-    eocdOffset--
-  ) {
-    if (archive.readUInt32LE(eocdOffset) !== eocdSignature) {
-      continue;
-    }
-
-    const centralDirectorySize = archive.readUInt32LE(eocdOffset + 12);
-    const centralDirectoryOffset = archive.readUInt32LE(eocdOffset + 16);
-    const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
-    if (
-      centralDirectoryOffset < 0 ||
-      centralDirectoryEnd > archive.length ||
-      centralDirectoryOffset > centralDirectoryEnd
-    ) {
-      continue;
-    }
-
-    let entryOffset = centralDirectoryOffset;
-    while (entryOffset + 46 <= centralDirectoryEnd) {
-      if (archive.readUInt32LE(entryOffset) !== centralDirectorySignature) {
-        break;
-      }
-
-      const compressionMethod = archive.readUInt16LE(entryOffset + 10);
-      const compressedSize = archive.readUInt32LE(entryOffset + 20);
-      const fileNameLength = archive.readUInt16LE(entryOffset + 28);
-      const extraLength = archive.readUInt16LE(entryOffset + 30);
-      const commentLength = archive.readUInt16LE(entryOffset + 32);
-      const localHeaderOffset = archive.readUInt32LE(entryOffset + 42);
-      const fileNameStart = entryOffset + 46;
-      const fileNameEnd = fileNameStart + fileNameLength;
-      if (fileNameEnd > centralDirectoryEnd) {
-        continue eocdLoop;
-      }
-      const fileName = archive.toString('utf8', fileNameStart, fileNameEnd);
-      if (fileName === entryName) {
-        if (localHeaderOffset + 30 > archive.length) {
-          continue eocdLoop;
-        }
-        if (
-          archive.readUInt32LE(localHeaderOffset) !== localFileHeaderSignature
-        ) {
-          continue eocdLoop;
-        }
-        const localFileNameLength = archive.readUInt16LE(
-          localHeaderOffset + 26
-        );
-        const localExtraLength = archive.readUInt16LE(localHeaderOffset + 28);
-        const dataStart =
-          localHeaderOffset + 30 + localFileNameLength + localExtraLength;
-        const dataEnd = dataStart + compressedSize;
-        if (dataEnd > archive.length) {
-          continue eocdLoop;
-        }
-        const data = archive.subarray(dataStart, dataEnd);
-        if (compressionMethod === 0) {
-          return data.toString('utf8');
-        }
-        if (compressionMethod === 8) {
-          return zlib.inflateRawSync(data).toString('utf8');
-        }
-        return undefined;
-      }
-
-      entryOffset = fileNameEnd + extraLength + commentLength;
-    }
-  }
-
-  return undefined;
-}
-
-function patchClaudeSkillContent(
-  archivePath: string,
-  canonicalSkillContent: string,
-  target: Target
-): string {
-  try {
-    const archive = fs.readFileSync(archivePath);
-    return patchRuleContent(
-      readStoredZipEntry(archive, 'SKILL.md') ?? '',
-      canonicalSkillContent,
-      target
-    );
-  } catch {
-    // Fall back to a clean overwrite when an existing archive is unreadable.
-    return canonicalSkillContent;
-  }
-}
-
 function getSupportFilePath(
   target: Target,
   projectRoot: string
@@ -772,23 +665,21 @@ export function install(options: InstallOptions): InstallResult {
       if (fileExists && !force && !patch && !refreshManagedSkills) {
         continue;
       }
+      // Skills are entirely Ballast-authored, so every write path below
+      // replaces the file wholesale. Section-merging a skill (as --patch does
+      // for rules, to preserve user-authored sections) both keeps stale text
+      // for headings that still exist upstream and re-appends sections that
+      // upstream deleted, producing a hybrid that contradicts itself.
       switch (target) {
         case 'cursor': {
-          const content = buildCursorSkillFormat(skillId);
-          const nextContent =
-            fileExists && !force && patch
-              ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
-              : content;
-          fs.writeFileSync(file, nextContent, 'utf8');
+          fs.writeFileSync(file, buildCursorSkillFormat(skillId), 'utf8');
           break;
         }
         case 'claude': {
-          const skillContent = getSkillContent(skillId);
-          const nextSkillContent =
-            fileExists && !force && patch
-              ? patchClaudeSkillContent(file, skillContent, target)
-              : skillContent;
-          fs.writeFileSync(file, buildClaudeSkill(skillId, nextSkillContent));
+          fs.writeFileSync(
+            file,
+            buildClaudeSkill(skillId, getSkillContent(skillId))
+          );
           const skillSettings = getSkillClaudeSettings(skillId);
           if (skillSettings) {
             try {
@@ -804,21 +695,11 @@ export function install(options: InstallOptions): InstallResult {
         }
         case 'opencode':
         case 'gemini': {
-          const content = buildSkillMarkdown(skillId);
-          const nextContent =
-            fileExists && !force && patch
-              ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
-              : content;
-          fs.writeFileSync(file, nextContent, 'utf8');
+          fs.writeFileSync(file, buildSkillMarkdown(skillId), 'utf8');
           break;
         }
         case 'codex': {
-          const content = buildCodexSkillMarkdown(skillId);
-          const nextContent =
-            fileExists && !force && patch
-              ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
-              : content;
-          fs.writeFileSync(file, nextContent, 'utf8');
+          fs.writeFileSync(file, buildCodexSkillMarkdown(skillId), 'utf8');
           copyCodexSkillResources(skillId, dir);
           break;
         }

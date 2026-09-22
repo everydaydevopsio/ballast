@@ -6,7 +6,7 @@ description: >
   for brownfield adoption before normal spec-driven development begins.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.20.0. Do not edit this section. -->
 
 # Spec Kit Reverse Engineer
 
