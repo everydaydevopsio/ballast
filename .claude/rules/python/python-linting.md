@@ -1,4 +1,4 @@
-<!-- ballast:rule id="python/linting" version="5.19.0" checksum="f3269bbed397901ce4939c52e76e4523a4f09a9a49474fb00d3d3346772c84a6" -->
+<!-- ballast:rule id="python/linting" version="5.19.1" checksum="f3269bbed397901ce4939c52e76e4523a4f09a9a49474fb00d3d3346772c84a6" -->
 # Python Linting Rules
 
 ## Your Responsibilities

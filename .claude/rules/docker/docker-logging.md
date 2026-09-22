@@ -1,4 +1,4 @@
-<!-- ballast:rule id="docker/logging" version="5.19.0" checksum="08636b1f3501353de6f9e595af51e1d1de3261b75f638ca4992e2277698b9bc8" -->
+<!-- ballast:rule id="docker/logging" version="5.19.1" checksum="08636b1f3501353de6f9e595af51e1d1de3261b75f638ca4992e2277698b9bc8" -->
 # Docker Logging Rules
 
 ## Responsibilities

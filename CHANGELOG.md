@@ -15,6 +15,25 @@ the complete history.
 
 ## [Unreleased]
 
+## [5.19.1] - 2026-09-22
+
+### Highlights
+
+- **Safer configuration refreshes:** `--refresh-config` no longer deletes generated rules.
+- **Backend configuration preservation:** Go and Python configuration saves now retain `publishingProfiles`.
+
+### Fixes
+
+- Aligned `doctor` with `install` so both use the same default deployment model, and corrected the related help text.
+- Scoped always-on rule context as part of the configuration-refresh and context-budget improvements.
+
+### Changes
+
+- Promoted the configuration-refresh and context-budget plan to architecture decision record **ADR-001**.
+- Updated the development dependency `@types/node` from `22.20.2` to `22.20.3`.
+
+**Full changelog:** [v5.19.0...v5.19.1](https://github.com/everydaydevopsio/ballast/compare/v5.19.0...v5.19.1)
+
 ## [5.19.0] - 2026-09-21
 
 ## v5.19.0
