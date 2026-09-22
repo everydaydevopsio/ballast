@@ -827,6 +827,46 @@ Content upstream deleted that must not survive a patch.
       ).toBe(true);
     });
 
+    test('migrates a legacy archive even when the skill is skipped', () => {
+      // An interrupted migration leaves both layouts. A plain install skips
+      // rewriting SKILL.md, so the cleanup must run before the skip guard or
+      // the archive survives forever.
+      const skillDir = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan'
+      );
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(skillDir, 'SKILL.md'),
+        '---\nname: owasp-security-scan\ndescription: x\n---\n',
+        'utf8'
+      );
+      const legacyArchive = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan.skill'
+      );
+      fs.writeFileSync(
+        legacyArchive,
+        buildClaudeSkill('owasp-security-scan', '# stale bundle\n')
+      );
+
+      install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        force: false,
+        patch: false,
+        saveConfig: false
+      });
+
+      expect(fs.existsSync(legacyArchive)).toBe(false);
+    });
+
     test('force replaces a modified claude skill directory', () => {
       const skillMd = path.join(
         tmpDir,

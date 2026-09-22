@@ -1815,6 +1815,33 @@ Content upstream deleted that must not survive a patch.
             self.assertNotIn("description: Team customized skill", content)
             self.assertIn("## Scan Architecture", content)
 
+    def test_install_migrates_legacy_archive_when_skill_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # An interrupted migration leaves both layouts. A plain install
+            # skips rewriting SKILL.md, so the cleanup must run before the skip
+            # guard or the archive survives forever.
+            skill_dir = root / ".claude" / "skills" / "owasp-security-scan"
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            (skill_dir / "SKILL.md").write_text(
+                "---\nname: owasp-security-scan\n---\n", encoding="utf-8"
+            )
+            legacy = root / ".claude" / "skills" / "owasp-security-scan.skill"
+            legacy.write_bytes(b"stale bundle")
+
+            cli.install(
+                root,
+                "claude",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertFalse(legacy.exists())
+
     def test_install_migrates_legacy_claude_skill_archive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

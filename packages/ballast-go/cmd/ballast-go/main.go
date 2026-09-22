@@ -1083,6 +1083,16 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
 				continue
 			}
+			// Migrate before the skip guard. A project that already has
+			// SKILL.md alongside the old bundle (an interrupted migration, or
+			// an older CLI run after a newer one) would otherwise skip the
+			// whole skill and keep the archive forever.
+			if target == "claude" {
+				if err := removeLegacyClaudeSkillArchive(opts.projectRoot, skillID); err != nil {
+					result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
+					continue
+				}
+			}
 			if exists(file) && !opts.force && !opts.patch && !refreshManagedSkills {
 				continue
 			}
@@ -1115,9 +1125,6 @@ func install(opts installOptions) installResult {
 				}
 				if err = os.WriteFile(file, []byte(content), 0o644); err == nil {
 					err = copySkillResources(skillID, opts.language, dir)
-				}
-				if err == nil && target == "claude" {
-					err = removeLegacyClaudeSkillArchive(opts.projectRoot, skillID)
 				}
 			default:
 				err = fmt.Errorf("unknown target: %s", target)

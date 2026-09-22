@@ -2217,6 +2217,37 @@ Content upstream deleted that must not survive a patch.
 	}
 }
 
+func TestInstallMigratesLegacyClaudeSkillArchiveWhenSkillSkipped(t *testing.T) {
+	tmpDir := t.TempDir()
+	// An interrupted migration leaves both layouts. A plain install skips
+	// rewriting SKILL.md, so the cleanup must run before the skip guard or the
+	// archive survives forever.
+	skillDir := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: owasp-security-scan\n---\n"), 0o644); err != nil {
+		t.Fatalf("seed SKILL.md: %v", err)
+	}
+	legacy := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.WriteFile(legacy, []byte("stale bundle"), 0o644); err != nil {
+		t.Fatalf("seed legacy archive: %v", err)
+	}
+
+	install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		saveConfig:  false,
+	})
+
+	if _, err := os.Stat(legacy); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy archive removed on a skipped install, got err=%v", err)
+	}
+}
+
 func TestInstallMigratesLegacyClaudeSkillArchive(t *testing.T) {
 	tmpDir := t.TempDir()
 	legacy := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")

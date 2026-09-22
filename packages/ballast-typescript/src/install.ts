@@ -686,6 +686,13 @@ export function install(options: InstallOptions): InstallResult {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
+      // Migrate before the skip guard. A project that already has SKILL.md
+      // alongside the old bundle (an interrupted migration, or an older CLI
+      // run after a newer one) would otherwise skip the whole skill and keep
+      // the archive forever.
+      if (target === 'claude') {
+        removeLegacyClaudeSkillArchive(projectRoot, skillId);
+      }
       if (fileExists && !force && !patch && !refreshManagedSkills) {
         continue;
       }
@@ -702,7 +709,6 @@ export function install(options: InstallOptions): InstallResult {
         case 'claude': {
           fs.writeFileSync(file, buildSkillDirectoryMarkdown(skillId), 'utf8');
           copySkillResources(skillId, dir);
-          removeLegacyClaudeSkillArchive(projectRoot, skillId);
           const skillSettings = getSkillClaudeSettings(skillId);
           if (skillSettings) {
             try {

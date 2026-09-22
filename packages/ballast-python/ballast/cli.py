@@ -2772,6 +2772,12 @@ def install(
             dst = skill_destination(root, target, skill)
             file_exists = dst.exists()
             dst.parent.mkdir(parents=True, exist_ok=True)
+            # Migrate before the skip guard. A project that already has
+            # SKILL.md alongside the old bundle (an interrupted migration, or
+            # an older CLI run after a newer one) would otherwise skip the
+            # whole skill and keep the archive forever.
+            if target == "claude":
+                legacy_claude_skill_destination(root, skill).unlink(missing_ok=True)
             if file_exists and not force and not patch and not refresh_managed_skills:
                 continue
             # Skills are entirely Ballast-authored, so every branch replaces
@@ -2789,8 +2795,6 @@ def install(
                     build_skill_directory_markdown(skill, language), encoding="utf-8"
                 )
                 copy_skill_resources(skill, language, dst.parent)
-                if target == "claude":
-                    legacy_claude_skill_destination(root, skill).unlink(missing_ok=True)
             else:
                 dst.write_text(build_skill_markdown(skill, language), encoding="utf-8")
             result.installed_skills.append(skill)
