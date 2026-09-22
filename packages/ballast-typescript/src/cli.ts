@@ -164,6 +164,7 @@ Options:
   --language, -l <lang>     Language profile: ${LANGUAGES.join(', ')} (default: typescript)
   --agent, -a <agents>      Agent(s) to install (comma-separated); run 'list' to see available agents
   --skill, -s <skills>      Skill(s) to install (comma-separated); run 'list' to see available skills
+                            ballast-audit is installed by default with every install
   --all                     Install all agents
   --all-skills              Install all skills
   --task-system <system>    Task system for the tasks agent: ${TASK_SYSTEMS.join(', ')} (default: github)

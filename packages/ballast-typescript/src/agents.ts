@@ -88,6 +88,14 @@ export const SKILL_IDS = [...COMMON_SKILL_IDS] as const;
 export type SkillId = (typeof SKILL_IDS)[number];
 
 /**
+ * Skills every install adds automatically, even when the caller selects none.
+ * Reserved for skills that audit or repair Ballast's own managed state: an
+ * installation that has drifted cannot be detected by the rules it emits.
+ * Mirrors DefaultInstall in cli/ballast/registry.go.
+ */
+export const DEFAULT_SKILL_IDS = ['ballast-audit'] as const;
+
+/**
  * Resolve path to an agent directory
  */
 /** Root directory containing agent content (packaged or BALLAST_REPO_ROOT). */

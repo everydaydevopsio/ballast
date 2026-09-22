@@ -7,6 +7,7 @@ import {
   resolveAgents,
   AGENT_IDS,
   SKILL_IDS,
+  DEFAULT_SKILL_IDS,
   listSkills,
   isValidSkill,
   resolveSkills
@@ -141,6 +142,14 @@ describe('agents', () => {
   });
 
   describe('skills', () => {
+    test('default-install skills are real, supported skills', () => {
+      expect(DEFAULT_SKILL_IDS).toContain('ballast-audit');
+      for (const id of DEFAULT_SKILL_IDS) {
+        expect(isValidSkill(id)).toBe(true);
+        expect(SKILL_IDS as readonly string[]).toContain(id);
+      }
+    });
+
     test('returns all skill ids', () => {
       expect(listSkills()).toEqual([...SKILL_IDS]);
       expect(listSkills()).toContain('owasp-security-scan');

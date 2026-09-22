@@ -81,7 +81,7 @@ Read and use these skill files in `.claude/skills/` when they are relevant:
 - `.claude/skills/aws-weekly-security-review.skill` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 - `.claude/skills/github-pr-copilot-cycle.skill` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
-- `.claude/skills/ballast-audit.skill` — audit AI rule and skill files for context density, duplication, and bloat
+- `.claude/skills/ballast-audit.skill` — audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
 - `.claude/skills/agent-performance-audit.skill` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
 - `.claude/skills/ballast-project-maintenance.skill` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
 - `.claude/skills/speckit-bootstrap.skill` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills

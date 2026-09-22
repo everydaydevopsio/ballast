@@ -138,7 +138,7 @@ A **skill** describes a focused task with a clear workflow. Examples include:
 - `aws-health-review`
 - `github-health-check`
 - `github-pr-copilot-cycle`
-- `ballast-audit`
+- `ballast-audit` (installed by default)
 - `docker-registry-publish`
 - `speckit-bootstrap`
 - `speckit-delivery`

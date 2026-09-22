@@ -46,7 +46,8 @@ Ballast ships reusable skill guides alongside its agent rules.
 
 - Type: common skill
 - Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
-- Installed by: `--skill ballast-audit` or `--all-skills`
+- Installed by: every install, by default; `--skill ballast-audit` and `--all-skills` also select it explicitly
+- Focus: stale, unowned, orphaned, oversized, and irrelevant rules and skills; baseline diff against a clean install; the narrowest config that still covers the repository
 
 `ballast-project-maintenance`
 

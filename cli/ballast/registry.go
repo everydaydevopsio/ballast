@@ -46,6 +46,10 @@ type skillEntry struct {
 	Description string
 	Status      entryStatus
 	Deprecated  *deprecationNote // non-nil when Status == statusDeprecated
+	// DefaultInstall marks a skill that every install adds automatically,
+	// even when the caller selects no skills. Reserved for skills that audit
+	// or repair Ballast's own managed state.
+	DefaultInstall bool
 }
 
 // agentRegistry is the authoritative list of all agents.
@@ -107,8 +111,11 @@ var skillRegistry = []skillEntry{
 	},
 	{
 		ID:          "ballast-audit",
-		Description: "audit AI rule and skill files for context density, duplication, and bloat",
+		Description: "audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository",
 		Status:      statusActive,
+		// Installed by default: an installation that has drifted cannot be
+		// detected by the rules it emits, so the audit must always be present.
+		DefaultInstall: true,
 	},
 	{
 		ID:          "agent-performance-audit",
@@ -212,6 +219,19 @@ func supportedSkillIDs() []string {
 	var ids []string
 	for _, e := range skillRegistry {
 		if e.Status != statusRemoved {
+			ids = append(ids, e.ID)
+		}
+	}
+	return ids
+}
+
+// defaultSkillIDs returns non-removed skill IDs marked DefaultInstall. These
+// are added to every install selection so the repository always carries a way
+// to audit its own Ballast-managed state.
+func defaultSkillIDs() []string {
+	var ids []string
+	for _, e := range skillRegistry {
+		if e.DefaultInstall && e.Status != statusRemoved {
 			ids = append(ids, e.ID)
 		}
 	}
