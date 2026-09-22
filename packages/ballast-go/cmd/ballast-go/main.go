@@ -1093,6 +1093,16 @@ func install(opts installOptions) installResult {
 					continue
 				}
 			}
+			// Reconcile resources before the skip guard too. SKILL.md existing
+			// does not mean the directory is complete: a run interrupted
+			// between writing it and copying resources would never be
+			// repaired, and resources deleted upstream would survive.
+			if target == "claude" || target == "codex" {
+				if err := copySkillResources(skillID, opts.language, dir); err != nil {
+					result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
+					continue
+				}
+			}
 			if exists(file) && !opts.force && !opts.patch && !refreshManagedSkills {
 				continue
 			}
@@ -1123,9 +1133,7 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				if err = os.WriteFile(file, []byte(content), 0o644); err == nil {
-					err = copySkillResources(skillID, opts.language, dir)
-				}
+				err = os.WriteFile(file, []byte(content), 0o644)
 			default:
 				err = fmt.Errorf("unknown target: %s", target)
 			}
@@ -1616,7 +1624,81 @@ func buildSkillDirectoryMarkdown(skillID, language string) (string, error) {
 
 func copySkillResources(skillID, language, destinationDir string) error {
 	sourceDir := skillDir(skillID, language)
-	return copyCodexSkillResourceDir(sourceDir, destinationDir)
+	// Clear managed entries first so each is replaced rather than merged into:
+	// copying into an existing directory leaves files deleted upstream inside
+	// it, which a top-level sweep cannot see.
+	if err := clearManagedSkillResources(sourceDir, destinationDir); err != nil {
+		return err
+	}
+	if err := copyCodexSkillResourceDir(sourceDir, destinationDir); err != nil {
+		return err
+	}
+	return reconcileSkillResources(sourceDir, destinationDir)
+}
+
+// managedSkillResourceNames lists a skill's resource entries. Skill content is
+// served from the embedded FS unless BALLAST_REPO_ROOT overrides it, so this
+// must resolve the same way copyCodexSkillResourceDir does rather than
+// stat'ing the embedded path on disk.
+func managedSkillResourceNames(sourceDir string) ([]string, error) {
+	entries, err := fs.ReadDir(embeddedSkillsFS, sourceDir)
+	if overrideRoot := repoRootOverride(); overrideRoot != "" {
+		entries, err = os.ReadDir(filepath.Join(overrideRoot, filepath.FromSlash(sourceDir)))
+	}
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Name() == "SKILL.md" || entry.Name() == "claude-settings.json" {
+			continue
+		}
+		names = append(names, entry.Name())
+	}
+	return names, nil
+}
+
+func clearManagedSkillResources(sourceDir, destinationDir string) error {
+	names, err := managedSkillResourceNames(sourceDir)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		if err := os.RemoveAll(filepath.Join(destinationDir, name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reconcileSkillResources removes destination entries the source no longer
+// has. A skill directory is Ballast-managed output, so copying alone would
+// leave a resource deleted upstream in place on every future refresh.
+func reconcileSkillResources(sourceDir, destinationDir string) error {
+	names, err := managedSkillResourceNames(sourceDir)
+	if err != nil {
+		return err
+	}
+	managed := map[string]bool{}
+	for _, name := range names {
+		managed[name] = true
+	}
+	destEntries, err := os.ReadDir(destinationDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range destEntries {
+		if entry.Name() == "SKILL.md" || managed[entry.Name()] {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(destinationDir, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func copyCodexSkillResourceDir(sourceDir, destinationDir string) error {
@@ -3765,7 +3847,16 @@ func skillDestination(projectRoot, target, skillID string) (string, string, erro
 func removeLegacyClaudeSkillArchive(projectRoot, skillID string) error {
 	legacy := filepath.Join(filepath.Clean(projectRoot), ".claude", "skills", skillID+".skill")
 	info, err := os.Stat(legacy)
-	if err != nil || info.IsDir() {
+	if err != nil {
+		// A missing archive is the normal case. Any other stat failure means
+		// the migration could not be verified, so surface it rather than
+		// reporting a successful install over a surviving bundle.
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if info.IsDir() {
 		return nil
 	}
 	if err := os.Remove(legacy); err != nil && !errors.Is(err, os.ErrNotExist) {

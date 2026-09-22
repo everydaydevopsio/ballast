@@ -1137,16 +1137,33 @@ export function copySkillResources(
   destinationDir: string
 ): void {
   const sourceDir = getPreferredSkillDir(skillId);
+  const managed = new Set<string>();
   for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
     if (entry.name === 'SKILL.md' || entry.name === 'claude-settings.json') {
       continue;
     }
+    managed.add(entry.name);
     const source = path.join(sourceDir, entry.name);
     const destination = path.join(destinationDir, entry.name);
+    // Replace rather than merge. Copying into an existing directory leaves
+    // files deleted upstream sitting inside it, which a top-level sweep
+    // cannot see.
+    fs.rmSync(destination, { recursive: true, force: true });
     fs.cpSync(source, destination, {
       recursive: true,
       force: true,
       errorOnExist: false
+    });
+  }
+  // Reconcile, do not just overlay. A skill directory is Ballast-managed
+  // output, so a resource deleted upstream must disappear here too; copying
+  // alone would leave it behind on every future refresh.
+  if (!fs.existsSync(destinationDir)) return;
+  for (const entry of fs.readdirSync(destinationDir, { withFileTypes: true })) {
+    if (entry.name === 'SKILL.md' || managed.has(entry.name)) continue;
+    fs.rmSync(path.join(destinationDir, entry.name), {
+      recursive: true,
+      force: true
     });
   }
 }

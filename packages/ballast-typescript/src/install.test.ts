@@ -867,6 +867,44 @@ Content upstream deleted that must not survive a patch.
       expect(fs.existsSync(legacyArchive)).toBe(false);
     });
 
+    test('reconciles skill resources even when the skill is skipped', () => {
+      // SKILL.md existing does not mean the directory is complete. A run
+      // interrupted before resources were copied, or a resource deleted
+      // upstream, must both be repaired by an ordinary install.
+      const skillDir = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan'
+      );
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(skillDir, 'SKILL.md'),
+        '---\nname: owasp-security-scan\ndescription: x\n---\n',
+        'utf8'
+      );
+      const orphan = path.join(skillDir, 'references', 'retired-upstream.md');
+      fs.mkdirSync(path.dirname(orphan), { recursive: true });
+      fs.writeFileSync(orphan, 'deleted upstream\n', 'utf8');
+
+      install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        force: false,
+        patch: false,
+        saveConfig: false
+      });
+
+      // missing resources restored despite the skipped SKILL.md write
+      expect(
+        fs.existsSync(path.join(skillDir, 'references', 'owasp-mapping.md'))
+      ).toBe(true);
+      // and a resource upstream no longer ships is removed, not left behind
+      expect(fs.existsSync(orphan)).toBe(false);
+    });
+
     test('force replaces a modified claude skill directory', () => {
       const skillMd = path.join(
         tmpDir,

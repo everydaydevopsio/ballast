@@ -228,6 +228,12 @@ describe('repo generated artifacts', () => {
       if (ALLOWED_NON_GENERATED.has(relPath)) {
         return false;
       }
+      // Skill directories ship resources beyond Markdown -- scripts/*.py and
+      // agents/*.yaml among them. Filtering to md|skill let those installed
+      // files drift or go missing without failing this parity check.
+      if (/^\.(claude|codex)\/skills\//.test(relPath)) {
+        return true;
+      }
       return /\.(md|skill)$/.test(relPath);
     });
 

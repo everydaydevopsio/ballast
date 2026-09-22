@@ -374,12 +374,14 @@ function removeLegacyClaudeSkillArchive(
     `${skillId}.skill`
   );
   try {
-    if (fs.existsSync(legacy) && fs.statSync(legacy).isFile()) {
+    if (fs.statSync(legacy).isFile()) {
       fs.rmSync(legacy);
     }
-  } catch {
-    // A skill that installed correctly must not fail on cleanup of the old
-    // bundle; a leftover archive is inert to Claude Code.
+  } catch (err) {
+    // A missing archive is the normal case. Anything else -- a permission
+    // error, an unreadable filesystem -- means the migration did not happen,
+    // so it must not be reported as a successful install.
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err;
   }
 }
 
@@ -693,6 +695,13 @@ export function install(options: InstallOptions): InstallResult {
       if (target === 'claude') {
         removeLegacyClaudeSkillArchive(projectRoot, skillId);
       }
+      // Reconcile resources before the skip guard too. SKILL.md existing does
+      // not mean the directory is complete: a run interrupted between writing
+      // it and copying references/ would never be repaired, and resources
+      // deleted upstream would survive every refresh.
+      if (target === 'claude' || target === 'codex') {
+        copySkillResources(skillId, dir);
+      }
       if (fileExists && !force && !patch && !refreshManagedSkills) {
         continue;
       }
@@ -708,7 +717,6 @@ export function install(options: InstallOptions): InstallResult {
         }
         case 'claude': {
           fs.writeFileSync(file, buildSkillDirectoryMarkdown(skillId), 'utf8');
-          copySkillResources(skillId, dir);
           const skillSettings = getSkillClaudeSettings(skillId);
           if (skillSettings) {
             try {
@@ -729,7 +737,6 @@ export function install(options: InstallOptions): InstallResult {
         }
         case 'codex': {
           fs.writeFileSync(file, buildSkillDirectoryMarkdown(skillId), 'utf8');
-          copySkillResources(skillId, dir);
           break;
         }
         default:

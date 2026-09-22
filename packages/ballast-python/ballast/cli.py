@@ -1612,14 +1612,35 @@ def build_skill_directory_markdown(skill: str, language: str) -> str:
 
 def copy_skill_resources(skill: str, language: str, destination_dir: Path) -> None:
     source_dir = skill_dir(skill, language)
+    managed: set[str] = set()
     for child in source_dir.iterdir():
         if child.name in {"SKILL.md", "claude-settings.json"}:
             continue
+        managed.add(child.name)
         destination = destination_dir / child.name
+        # Replace rather than merge. Copying into an existing directory leaves
+        # files deleted upstream sitting inside it, which a top-level sweep
+        # cannot see.
+        if destination.is_dir():
+            shutil.rmtree(destination)
+        elif destination.exists():
+            destination.unlink()
         if child.is_dir():
-            shutil.copytree(child, destination, dirs_exist_ok=True)
+            shutil.copytree(child, destination)
         elif child.is_file():
             shutil.copy2(child, destination)
+    # Reconcile, do not just overlay. A skill directory is Ballast-managed
+    # output, so a resource deleted upstream must disappear here too; copying
+    # alone would leave it behind on every future refresh.
+    if not destination_dir.is_dir():
+        return
+    for child in destination_dir.iterdir():
+        if child.name == "SKILL.md" or child.name in managed:
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
 
 
 def build_claude_skill(
@@ -2778,6 +2799,12 @@ def install(
             # whole skill and keep the archive forever.
             if target == "claude":
                 legacy_claude_skill_destination(root, skill).unlink(missing_ok=True)
+            # Reconcile resources before the skip guard too. SKILL.md existing
+            # does not mean the directory is complete: a run interrupted
+            # between writing it and copying resources would never be repaired,
+            # and resources deleted upstream would survive.
+            if target in ("codex", "claude"):
+                copy_skill_resources(skill, language, dst.parent)
             if file_exists and not force and not patch and not refresh_managed_skills:
                 continue
             # Skills are entirely Ballast-authored, so every branch replaces
@@ -2794,7 +2821,6 @@ def install(
                 dst.write_text(
                     build_skill_directory_markdown(skill, language), encoding="utf-8"
                 )
-                copy_skill_resources(skill, language, dst.parent)
             else:
                 dst.write_text(build_skill_markdown(skill, language), encoding="utf-8")
             result.installed_skills.append(skill)
