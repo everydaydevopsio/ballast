@@ -31,8 +31,7 @@ ballast/
 │   ├── python/                 # linting, logging, testing
 │   └── go/                     # linting, logging, testing
 ├── skills/
-│   └── common/
-│       └── owasp-security-scan/
+│   └── common/                 # 13 shared skills, one directory each
 ├── cli/
 │   └── ballast/                # Go wrapper CLI used for install/upgrade/doctor flows
 ├── packages/
@@ -127,11 +126,15 @@ Skill installation paths:
 | Codex | `.codex/skills/<skill>/` | `SKILL.md` plus resources, invoked as `$<skill>` |
 | Gemini | `.gemini/rules/` | `.md` |
 
-Claude and Codex discover skills as directories and register each one, so the
-generated manifest lists invocations rather than file paths. The pre-directory
-`.claude/skills/<skill>.skill` zip bundle is removed on install; `buildClaudeSkill`
-still produces that format for publishing bundles to claude.ai, but it is no
-longer what gets installed.
+Claude and Codex both discover skills as directories and register each one. The
+generated manifests differ today: `CLAUDE.md` lists invocations (`/<skill>`),
+while `AGENTS.md` still lists Codex skill file paths. Rendering the Codex
+manifest as `$<skill>` invocations would be consistent, but that is a separate
+change to the Codex contract and is not made here.
+
+The pre-directory `.claude/skills/<skill>.skill` zip bundle is removed on
+install; `buildClaudeSkill` still produces that format for publishing bundles to
+claude.ai, but it is no longer what gets installed.
 
 Support files:
 
@@ -164,9 +167,13 @@ The TypeScript build layer assembles output by combining agent content with targ
 `build.ts` also builds skills per target:
 
 - Cursor: frontmatter + skill body from `SKILL.md`
-- Claude: stored zip archive containing `SKILL.md` and any `references/*`
+- Claude: native skill directory containing `SKILL.md` and copied skill resources
 - OpenCode: Markdown body from `SKILL.md`
-- Codex: native skill directories containing `SKILL.md` and copied skill resources
+- Codex: native skill directory containing `SKILL.md` and copied skill resources
+
+`buildClaudeSkill` still builds a stored zip archive of `SKILL.md` and any
+`references/*` for publishing bundles to claude.ai, but the install path no
+longer uses it.
 
 ### Support file assembly
 
