@@ -1,4 +1,4 @@
-<!-- ballast:rule id="docker/testing" version="5.19.0" checksum="e07643480e63cc337594d15fc4ba89553eda1b22eb532aae79e00a7b792ac596" -->
+<!-- ballast:rule id="docker/testing" version="5.19.1" checksum="e07643480e63cc337594d15fc4ba89553eda1b22eb532aae79e00a7b792ac596" -->
 # Docker Testing Rules
 
 ## Responsibilities

@@ -3,7 +3,7 @@ name: ballast-audit
 description: audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.0. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.19.1. Do not edit this section. -->
 
 # Ballast Audit Skill
 

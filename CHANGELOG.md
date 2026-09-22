@@ -20,6 +20,25 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.19.1] - 2026-09-22
+
+### Highlights
+
+- **Safer configuration refreshes:** `--refresh-config` no longer deletes generated rules.
+- **Backend configuration preservation:** Go and Python configuration saves now retain `publishingProfiles`.
+
+### Fixes
+
+- Aligned `doctor` with `install` so both use the same default deployment model, and corrected the related help text.
+- Scoped always-on rule context as part of the configuration-refresh and context-budget improvements.
+
+### Changes
+
+- Promoted the configuration-refresh and context-budget plan to architecture decision record **ADR-001**.
+- Updated the development dependency `@types/node` from `22.20.2` to `22.20.3`.
+
+**Full changelog:** [v5.19.0...v5.19.1](https://github.com/everydaydevopsio/ballast/compare/v5.19.0...v5.19.1)
+
 ## [5.19.0] - 2026-09-21
 
 ## v5.19.0
