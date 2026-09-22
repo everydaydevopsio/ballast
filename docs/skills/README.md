@@ -89,7 +89,7 @@ Ballast ships reusable skill guides alongside its agent rules.
 Skills install to the target tool's expected location:
 
 - Cursor: `.cursor/rules/<skill>.mdc`
-- Claude: `.claude/skills/<skill>.skill`
+- Claude: `.claude/skills/<skill>/SKILL.md`, invoked as `/<skill>`
 - Gemini: `.gemini/rules/<skill>.md`
 - OpenCode: `.opencode/skills/<skill>.md`
 - Codex: `.codex/skills/<skill>/SKILL.md`

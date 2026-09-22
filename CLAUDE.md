@@ -73,18 +73,18 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 
 Created by Ballast. Do not edit this section.
 
-Read and use these skill files in `.claude/skills/` when they are relevant:
+These skills are registered with Claude Code. Invoke one by name (for example `/ballast-audit`) when it is relevant:
 
-- `.claude/skills/owasp-security-scan.skill` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
-- `.claude/skills/aws-health-review.skill` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
-- `.claude/skills/aws-live-health-review.skill` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
-- `.claude/skills/aws-weekly-security-review.skill` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
-- `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
-- `.claude/skills/github-pr-copilot-cycle.skill` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
-- `.claude/skills/ballast-audit.skill` — audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
-- `.claude/skills/agent-performance-audit.skill` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
-- `.claude/skills/ballast-project-maintenance.skill` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
-- `.claude/skills/speckit-bootstrap.skill` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
-- `.claude/skills/speckit-reverse-engineer.skill` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
-- `.claude/skills/speckit-delivery.skill` — orchestrate GitHub Spec Kit's native skills for a bounded product change
-- `.claude/skills/docker-registry-publish.skill` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility
+- `/owasp-security-scan` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
+- `/aws-health-review` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
+- `/aws-live-health-review` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
+- `/aws-weekly-security-review` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
+- `/github-health-check` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
+- `/github-pr-copilot-cycle` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
+- `/ballast-audit` — audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
+- `/agent-performance-audit` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
+- `/ballast-project-maintenance` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
+- `/speckit-bootstrap` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
+- `/speckit-reverse-engineer` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
+- `/speckit-delivery` — orchestrate GitHub Spec Kit's native skills for a bounded product change
+- `/docker-registry-publish` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility

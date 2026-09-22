@@ -3,16 +3,14 @@ import path from 'path';
 import readline from 'readline';
 import {
   buildContent,
-  buildClaudeSkill,
   buildClaudeMd,
-  buildCodexSkillMarkdown,
+  buildSkillDirectoryMarkdown,
   buildGeminiMd,
   buildCursorSkillFormat,
   buildCodexAgentsMd,
   buildSkillMarkdown,
-  copyCodexSkillResources,
+  copySkillResources,
   getAllSkillIds,
-  getSkillContent,
   getClaudeMdPath,
   getGeminiMdPath,
   getCodexAgentsMdPath,
@@ -359,6 +357,32 @@ function resolveSupportFileSelections(
   };
 }
 
+/**
+ * Delete the pre-directory `.claude/skills/<name>.skill` bundle. Claude Code
+ * ignores it, but leaving it behind means the skill appears twice in the
+ * directory and never gets cleaned up, since the archive path is no longer in
+ * the expected set that prunes stale managed files.
+ */
+function removeLegacyClaudeSkillArchive(
+  projectRoot: string,
+  skillId: string
+): void {
+  const legacy = path.join(
+    path.resolve(projectRoot),
+    '.claude',
+    'skills',
+    `${skillId}.skill`
+  );
+  try {
+    if (fs.existsSync(legacy) && fs.statSync(legacy).isFile()) {
+      fs.rmSync(legacy);
+    }
+  } catch {
+    // A skill that installed correctly must not fail on cleanup of the old
+    // bundle; a leftover archive is inert to Claude Code.
+  }
+}
+
 function getSupportFilePath(
   target: Target,
   projectRoot: string
@@ -676,10 +700,9 @@ export function install(options: InstallOptions): InstallResult {
           break;
         }
         case 'claude': {
-          fs.writeFileSync(
-            file,
-            buildClaudeSkill(skillId, getSkillContent(skillId))
-          );
+          fs.writeFileSync(file, buildSkillDirectoryMarkdown(skillId), 'utf8');
+          copySkillResources(skillId, dir);
+          removeLegacyClaudeSkillArchive(projectRoot, skillId);
           const skillSettings = getSkillClaudeSettings(skillId);
           if (skillSettings) {
             try {
@@ -699,8 +722,8 @@ export function install(options: InstallOptions): InstallResult {
           break;
         }
         case 'codex': {
-          fs.writeFileSync(file, buildCodexSkillMarkdown(skillId), 'utf8');
-          copyCodexSkillResources(skillId, dir);
+          fs.writeFileSync(file, buildSkillDirectoryMarkdown(skillId), 'utf8');
+          copySkillResources(skillId, dir);
           break;
         }
         default:

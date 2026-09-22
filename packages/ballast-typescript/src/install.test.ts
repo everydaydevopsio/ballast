@@ -772,29 +772,20 @@ Content upstream deleted that must not survive a patch.
       expect(content).not.toContain('Use jira as the system of record');
     });
 
-    test('patch replaces an existing claude .skill archive wholesale', () => {
-      // The claude target ships a zip; --patch previously merged the SKILL.md
-      // inside it, which resurrected deleted sections. It now rewrites it.
-      const skillFile = path.join(
+    test('installs claude skills as a directory Claude Code can discover', () => {
+      // Claude Code scans .claude/skills/<name>/SKILL.md and exposes it as
+      // /<name>. The old <name>.skill zip was never scanned, so it is
+      // migrated away rather than left to shadow the directory.
+      const legacyArchive = path.join(
         tmpDir,
         '.claude',
         'skills',
         'owasp-security-scan.skill'
       );
-      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      fs.mkdirSync(path.dirname(legacyArchive), { recursive: true });
       fs.writeFileSync(
-        skillFile,
-        buildClaudeSkill(
-          'owasp-security-scan',
-          `# owasp-security-scan
-
-Team intro.
-
-## Retired Upstream Section
-
-Content upstream deleted that must not survive a patch.
-`
-        )
+        legacyArchive,
+        buildClaudeSkill('owasp-security-scan', '# stale bundle\n')
       );
 
       const result = install({
@@ -802,38 +793,60 @@ Content upstream deleted that must not survive a patch.
         target: 'claude',
         agents: [],
         skills: ['owasp-security-scan'],
-        patch: true,
         force: false,
         saveConfig: false
       });
 
       expect(result.errors).toEqual([]);
       expect(result.installedSkills).toContain('owasp-security-scan');
-      const skillMd = readSkillMdFromArchive(fs.readFileSync(skillFile));
-      expect(skillMd).toContain('## Scan Architecture');
-      expect(skillMd).not.toContain('Retired Upstream Section');
-      expect(skillMd).not.toContain('Team intro.');
-    });
 
-    test('force-overwrites an existing claude .skill archive without patching', () => {
-      const skillFile = path.join(
+      const skillMd = path.join(
         tmpDir,
         '.claude',
         'skills',
-        'owasp-security-scan.skill'
+        'owasp-security-scan',
+        'SKILL.md'
       );
-      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
-      const existingSkillContent = `# owasp-security-scan
+      const content = fs.readFileSync(skillMd, 'utf8');
+      expect(content).toMatch(/^---\nname: owasp-security-scan/m);
+      expect(content).toContain('description:');
+      expect(content).toContain('## Scan Architecture');
+      expect(fs.existsSync(legacyArchive)).toBe(false);
+      // Reference material ships alongside SKILL.md, as it does for codex.
+      expect(
+        fs.existsSync(
+          path.join(
+            tmpDir,
+            '.claude',
+            'skills',
+            'owasp-security-scan',
+            'references',
+            'owasp-mapping.md'
+          )
+        )
+      ).toBe(true);
+    });
+
+    test('force replaces a modified claude skill directory', () => {
+      const skillMd = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan',
+        'SKILL.md'
+      );
+      fs.mkdirSync(path.dirname(skillMd), { recursive: true });
+      fs.writeFileSync(
+        skillMd,
+        `# owasp-security-scan
 
 Team intro that should be discarded on force.
 
 ## Team Custom Section
 
 This section should be gone after force.
-`;
-      fs.writeFileSync(
-        skillFile,
-        buildClaudeSkill('owasp-security-scan', existingSkillContent)
+`,
+        'utf8'
       );
 
       const result = install({
@@ -847,13 +860,12 @@ This section should be gone after force.
       });
 
       expect(result.installedSkills).toContain('owasp-security-scan');
-
-      const skillMd = readSkillMdFromArchive(fs.readFileSync(skillFile));
-      expect(skillMd).not.toContain(
+      const content = fs.readFileSync(skillMd, 'utf8');
+      expect(content).not.toContain(
         'Team intro that should be discarded on force.'
       );
-      expect(skillMd).not.toContain('Team Custom Section');
-      expect(skillMd).toContain('## Scan Architecture');
+      expect(content).not.toContain('Team Custom Section');
+      expect(content).toContain('## Scan Architecture');
     });
 
     test('writes ansible language rules when requested', () => {

@@ -1115,7 +1115,12 @@ export function buildSkillMarkdown(skillId: string): string {
   );
 }
 
-export function buildCodexSkillMarkdown(skillId: string): string {
+/**
+ * Render a skill as a filesystem SKILL.md: frontmatter, the Ballast managed
+ * notice, then the body. Used by every target that discovers skills as a
+ * directory on disk (codex and claude).
+ */
+export function buildSkillDirectoryMarkdown(skillId: string): string {
   const content = getSkillContent(skillId).trimEnd();
   const frontmatterMatch = content.match(/^---\n[\s\S]*?\n---\n?/);
   if (!frontmatterMatch) {
@@ -1126,7 +1131,8 @@ export function buildCodexSkillMarkdown(skillId: string): string {
   return [frontmatter, '', BALLAST_MANAGED_COMMENT, '', body, ''].join('\n');
 }
 
-export function copyCodexSkillResources(
+/** Copy a skill's non-SKILL.md resources (references/, scripts/, ...). */
+export function copySkillResources(
   skillId: string,
   destinationDir: string
 ): void {
@@ -1145,6 +1151,11 @@ export function copyCodexSkillResources(
   }
 }
 
+/**
+ * Package a skill as a claude.ai Agent Skills zip bundle. This is NOT what
+ * Claude Code installs -- it discovers directories, see getSkillDestination --
+ * and is kept for publishing bundles to claude.ai.
+ */
 export function buildClaudeSkill(
   skillId: string,
   skillContent?: string
@@ -1527,13 +1538,11 @@ export function buildClaudeMd(
     lines.push(getCreatedByBallastLine());
     lines.push('');
     lines.push(
-      'Read and use these skill files in `.claude/skills/` when they are relevant:'
+      'These skills are registered with Claude Code. Invoke one by name (for example `/ballast-audit`) when it is relevant:'
     );
     lines.push('');
     for (const skillId of skills) {
-      lines.push(
-        `- \`.claude/skills/${skillId}.skill\` — ${getSkillDescription(skillId)}`
-      );
+      lines.push(`- \`/${skillId}\` — ${getSkillDescription(skillId)}`);
     }
   }
   lines.push('');
@@ -1755,8 +1764,11 @@ export function getSkillDestination(
       return { dir, file: path.join(dir, `${skillId}.mdc`) };
     }
     case 'claude': {
-      const dir = path.join(root, '.claude', 'skills');
-      return { dir, file: path.join(dir, `${skillId}.skill`) };
+      // Claude Code discovers project skills at .claude/skills/<name>/SKILL.md
+      // and exposes them as /<name>. The previous `<name>.skill` zip is the
+      // claude.ai upload bundle, which Claude Code never scans.
+      const dir = path.join(root, '.claude', 'skills', skillId);
+      return { dir, file: path.join(dir, 'SKILL.md') };
     }
     case 'gemini': {
       const dir = path.join(root, '.gemini', 'rules');

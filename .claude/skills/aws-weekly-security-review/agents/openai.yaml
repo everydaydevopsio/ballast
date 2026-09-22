@@ -1,0 +1,4 @@
+interface:
+  display_name: "AWS Weekly Security Review"
+  short_description: "Run a simple weekly AWS security baseline and report findings."
+  default_prompt: "Use $aws-weekly-security-review to generate this week's AWS security baseline report with prioritized findings. If needed, set PROFILE first or pass --profile explicitly."

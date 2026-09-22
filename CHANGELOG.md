@@ -15,6 +15,11 @@ the complete history.
 
 ## [Unreleased]
 
+### Changed
+
+- **Claude skills install as directories, so they are finally invocable.** Claude Code discovers project skills at `.claude/skills/<name>/SKILL.md` and exposes each as `/<name>`. Ballast wrote `.claude/skills/<name>.skill`, a zip in the claude.ai Agent Skills bundle format, which Claude Code never scans — so no Ballast skill was ever registered, and they worked only because the generated `CLAUDE.md` told the model to go read the files. Skills now install in the same directory layout the Codex target already used (which is why `$<name>` worked there), with reference material copied alongside `SKILL.md`. The generated manifest lists invocations (`/<name>`) instead of paths to read.
+- **Existing installs migrate automatically.** The legacy `<name>.skill` bundle is removed whenever the Claude target is installed or refreshed, so a skill never appears twice in the directory, and a deselected skill's bundle is now removable for the `claude` target like the other directory-format targets. `buildClaudeSkill` remains for packaging claude.ai bundles; it is no longer what gets installed.
+
 ### Fixed
 
 - **A pinned `.ballast/` backend older than the wrapper no longer emits stale output silently.** The version check in `ensureInstalled` was unreachable: both call sites ran it only when no local backend existed, so an outdated one was used as-is. `ballast install --refresh-config` would report installing every skill while writing the old backend's content and leaving `ballastVersion` behind. Backend resolution now distinguishes a version-pinned `.ballast/` backend from the ballast source tree, and verifies the former's version before forwarding.

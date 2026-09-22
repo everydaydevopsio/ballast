@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import {
   buildClaudeSkill,
-  buildCodexSkillMarkdown,
+  buildSkillDirectoryMarkdown,
   buildContent,
   getDestination,
   getSkillDestination,
@@ -54,7 +54,7 @@ function collectFiles(dir: string): string[] {
   return files;
 }
 
-function collectCodexSkillResourceFiles(skillId: string): string[] {
+function collectSkillResourceFiles(skillId: string): string[] {
   const root = getSkillDir(skillId);
   const files: string[] = [];
   const walk = (currentDir: string, prefix = ''): void => {
@@ -202,24 +202,21 @@ describe('repo generated artifacts', () => {
       for (const skillId of resolveSkills(configuredSkills, 'typescript')) {
         const destination = getSkillDestination(skillId, target, REPO_ROOT);
         const relPath = path.relative(REPO_ROOT, destination.file);
+        // Both directory-format targets emit the same SKILL.md plus the
+        // skill's resource files alongside it.
         addCandidate(candidates, relPath, {
-          content:
-            target === 'claude'
-              ? buildClaudeSkill(skillId)
-              : Buffer.from(buildCodexSkillMarkdown(skillId), 'utf8')
+          content: Buffer.from(buildSkillDirectoryMarkdown(skillId), 'utf8')
         });
-        if (target === 'codex') {
-          for (const resourcePath of collectCodexSkillResourceFiles(skillId)) {
-            addCandidate(
-              candidates,
-              path.join(path.dirname(relPath), resourcePath),
-              {
-                content: fs.readFileSync(
-                  path.join(getSkillDir(skillId), resourcePath)
-                )
-              }
-            );
-          }
+        for (const resourcePath of collectSkillResourceFiles(skillId)) {
+          addCandidate(
+            candidates,
+            path.join(path.dirname(relPath), resourcePath),
+            {
+              content: fs.readFileSync(
+                path.join(getSkillDir(skillId), resourcePath)
+              )
+            }
+          );
         }
       }
     }
