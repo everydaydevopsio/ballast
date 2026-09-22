@@ -33,6 +33,7 @@ import {
   resolveSkills,
   isValidAgent,
   isValidSkill,
+  DEFAULT_SKILL_IDS,
   type Language
 } from './agents';
 import {
@@ -1056,7 +1057,10 @@ export async function runInstall(
     return 1;
   }
 
-  const { targets, agents, skills } = resolved;
+  const { targets, agents } = resolved;
+  // Default-install skills ride along with any selection so every managed
+  // repository carries a way to audit its own Ballast state.
+  const skills = [...new Set([...resolved.skills, ...DEFAULT_SKILL_IDS])];
 
   // Resolve taskSystem: flag overrides config; prompt interactively when tasks agent is selected and not in CI.
   const normalizedTaskSystem = options.taskSystem?.trim().toLowerCase();

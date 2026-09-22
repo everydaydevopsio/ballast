@@ -787,10 +787,12 @@ describe('build', () => {
       expect(content).toContain('# OWASP Security Scan Skill');
     });
 
-    test('ballast audit skill documents both 5 KB and 10 KB thresholds', () => {
+    test('ballast audit skill documents unowned files and the size threshold', () => {
       const content = buildSkillMarkdown('ballast-audit');
-      expect(content).toContain('-size +5k');
-      expect(content).toContain('-size +10k');
+      expect(content).toContain('ballast:rule');
+      expect(content).toContain('unowned');
+      expect(content).toContain('5120');
+      expect(content).toContain('--refresh-config');
       expect(content).not.toContain('name: ballast-audit');
     });
 
@@ -828,7 +830,7 @@ describe('build', () => {
 
     test('gets ballast audit skill description', () => {
       expect(getSkillDescription('ballast-audit')).toContain(
-        'audit AI rule and skill files for context density, duplication, and bloat'
+        'audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills'
       );
     });
   });

@@ -3601,7 +3601,7 @@ func TestResolveMonorepoPlanSupportsSkillOnlyConfig(t *testing.T) {
 	if strings.Contains(got, "--agent") {
 		t.Fatalf("expected no agent flags in skill-only invocation, got %q", got)
 	}
-	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan"}) {
+	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan", "ballast-audit"}) {
 		t.Fatalf("expected saved config skills, got %#v", plan.Config.Skills)
 	}
 }
@@ -3651,7 +3651,7 @@ func TestResolveMonorepoPlanSkillOnlyInstallPreservesConfigAgents(t *testing.T) 
 	if !reflect.DeepEqual(plan.Config.Agents, []string{"local-dev", "linting"}) {
 		t.Fatalf("expected saved config to preserve existing agents, got %#v", plan.Config.Agents)
 	}
-	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan"}) {
+	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan", "ballast-audit"}) {
 		t.Fatalf("expected saved config skills, got %#v", plan.Config.Skills)
 	}
 }
@@ -3680,14 +3680,81 @@ func TestResolveMonorepoPlanAgentOnlyInstallPreservesConfigSkills(t *testing.T) 
 		t.Fatal("expected monorepo plan, got nil")
 	}
 	got := strings.Join(plan.Invocations[0].Args, " ")
-	if strings.Contains(got, "--skill") {
+	if strings.Contains(got, "owasp-security-scan") {
 		t.Fatalf("expected configured skills not to be inherited, got %q", got)
+	}
+	if !strings.Contains(got, "--skill ballast-audit") {
+		t.Fatalf("expected default-install skill in agent-only invocation, got %q", got)
 	}
 	if !strings.Contains(got, "--agent local-dev") {
 		t.Fatalf("expected explicit agent selection, got %q", got)
 	}
-	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan"}) {
-		t.Fatalf("expected saved config to preserve existing skills, got %#v", plan.Config.Skills)
+	if !reflect.DeepEqual(plan.Config.Skills, []string{"owasp-security-scan", "ballast-audit"}) {
+		t.Fatalf("expected saved config to preserve existing skills and add the default, got %#v", plan.Config.Skills)
+	}
+}
+
+func TestDefaultSkillIDsIncludesBallastAudit(t *testing.T) {
+	got := defaultSkillIDs()
+	if !slices.Contains(got, "ballast-audit") {
+		t.Fatalf("expected ballast-audit to be default-installed, got %#v", got)
+	}
+	for _, id := range got {
+		if !isValidSkill(id) {
+			t.Fatalf("default skill %q is not a supported skill", id)
+		}
+	}
+}
+
+func TestResolveMonorepoPlanInstallsDefaultSkillWhenNoneSelected(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["claude"],
+  "agents": ["local-dev"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	got := strings.Join(plan.Invocations[0].Args, " ")
+	if !strings.Contains(got, "--skill ballast-audit") {
+		t.Fatalf("expected default skill in invocation with no skill selection, got %q", got)
+	}
+	if !reflect.DeepEqual(plan.Config.Skills, []string{"ballast-audit"}) {
+		t.Fatalf("expected default skill persisted to config, got %#v", plan.Config.Skills)
+	}
+}
+
+func TestResolveMonorepoPlanCleanupOnlyDoesNotAddDefaultSkill(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets": ["codex"],
+  "agents": ["local-dev"],
+  "languages": ["typescript", "python"],
+  "paths": {
+    "typescript": ["apps/frontend"],
+    "python": ["services/api"]
+  }
+}`)
+
+	plan, err := resolveMonorepoPlan(root, []string{"install", "--remove-target", "codex", "--yes"})
+	if err != nil {
+		t.Fatalf("resolveMonorepoPlan returned error: %v", err)
+	}
+	if plan == nil {
+		t.Fatal("expected monorepo plan, got nil")
+	}
+	if len(plan.Config.Skills) != 0 {
+		t.Fatalf("expected cleanup-only plan to leave skills untouched, got %#v", plan.Config.Skills)
 	}
 }
 

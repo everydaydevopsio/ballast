@@ -2781,6 +2781,35 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
       expect(fs.existsSync(path.join(tmpDir, '.rulesrc.json'))).toBe(true);
     });
 
+    test('installs the default skill when no skills are selected', async () => {
+      saveConfig(
+        {
+          targets: ['cursor'],
+          agents: ['linting'],
+          skills: []
+        },
+        tmpDir
+      );
+
+      const exitCode = await runInstall({
+        projectRoot: tmpDir,
+        target: 'cursor',
+        agents: ['linting'],
+        yes: true
+      });
+
+      expect(exitCode).toBe(0);
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
+      );
+      expect(raw.skills).toContain('ballast-audit');
+      expect(
+        fs.existsSync(
+          path.join(tmpDir, '.cursor', 'rules', 'ballast-audit.mdc')
+        )
+      ).toBe(true);
+    });
+
     test('retains configured agents when adding a skill without agent flags', async () => {
       saveConfig(
         {
@@ -2803,7 +2832,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
       );
       expect(raw.agents).toEqual(['linting', 'git-hooks']);
-      expect(raw.skills).toEqual(['owasp-security-scan']);
+      expect(raw.skills).toEqual(['owasp-security-scan', 'ballast-audit']);
       expect(
         fs.existsSync(
           path.join(tmpDir, '.cursor', 'rules', 'owasp-security-scan.mdc')
@@ -2834,7 +2863,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
         fs.readFileSync(path.join(tmpDir, '.rulesrc.json'), 'utf8')
       );
       expect(raw.agents).toEqual(['linting', 'git-hooks']);
-      expect(raw.skills).toEqual(['owasp-security-scan']);
+      expect(raw.skills).toEqual(['owasp-security-scan', 'ballast-audit']);
     });
 
     test('uses saved config when CLI passes empty agent and skill arrays', async () => {

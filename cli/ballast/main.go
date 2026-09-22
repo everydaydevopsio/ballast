@@ -520,6 +520,7 @@ func printUsage() {
 	fmt.Println("  -t, --target string     AI platform(s): cursor, claude, opencode, codex, gemini")
 	fmt.Println("  -a, --agent string      Agent(s) to install, comma-separated or repeated")
 	fmt.Println("  -s, --skill string      Skill(s) to install, comma-separated or repeated")
+	fmt.Println("                          (ballast-audit is installed by default with every install)")
 	fmt.Println("      --all               Install all agents")
 	fmt.Println("      --all-skills        Install all skills")
 	fmt.Println("      --yes               Run non-interactively")
@@ -2943,6 +2944,12 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	selectedSkills := installSkills
 	if installAllSkills {
 		selectedSkills = supportedSkillIDs()
+	}
+	// Default-install skills ride along with any real install so every managed
+	// repository can audit its own Ballast state. Cleanup-only invocations are
+	// exempt: they exist to remove managed files, not to add them.
+	if !cleanupOnly && !languageCleanupOnly {
+		selectedSkills = uniqueStrings(append(slices.Clone(selectedSkills), defaultSkillIDs()...))
 	}
 	if err := validateSelectedAgents(selectedAgents); err != nil {
 		return nil, err

@@ -59,7 +59,7 @@ Common skills:
 
 `github-health-check` covers CI status, pull request hygiene, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings.
 
-`ballast-audit` audits AI rule and skill files for context density, duplication, and bloat.
+`ballast-audit` audits a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and reports the narrowest config that still covers the repository. It is installed by default.
 
 `ballast-project-maintenance` covers Ballast-managed repository status, `.ballast/` local tool repair, and config refresh workflows.
 
