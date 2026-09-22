@@ -2033,6 +2033,54 @@ func TestBrewUpgradeArgsUsesFullyQualifiedName(t *testing.T) {
 	}
 }
 
+func TestBrewCaskCollisionWarning(t *testing.T) {
+	warningLines := brewCaskCollisionWarning(true, func() bool { return true }, func() (bool, error) {
+		return true, nil
+	})
+
+	tests := []struct {
+		name          string
+		isDarwin      bool
+		brewInstalled bool
+		wrongCask     bool
+		wrongCaskErr  error
+		wantWarning   bool
+	}{
+		{name: "hijacked token on brew-installed macOS warns", isDarwin: true, brewInstalled: true, wrongCask: true, wantWarning: true},
+		{name: "correct tap cask stays quiet", isDarwin: true, brewInstalled: true, wrongCask: false},
+		{name: "non-brew install stays quiet", isDarwin: true, brewInstalled: false, wrongCask: true},
+		{name: "non-darwin stays quiet", isDarwin: false, brewInstalled: true, wrongCask: true},
+		{name: "brew lookup failure stays quiet", isDarwin: true, brewInstalled: true, wrongCask: true, wrongCaskErr: errors.New("brew exploded")},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := brewCaskCollisionWarning(
+				testCase.isDarwin,
+				func() bool { return testCase.brewInstalled },
+				func() (bool, error) { return testCase.wrongCask, testCase.wrongCaskErr },
+			)
+			if testCase.wantWarning {
+				if len(got) == 0 {
+					t.Fatal("expected a warning, got none")
+				}
+				return
+			}
+			if got != nil {
+				t.Fatalf("expected no warning, got %#v", got)
+			}
+		})
+	}
+
+	joined := strings.Join(warningLines, "\n")
+	if !strings.Contains(joined, "everydaydevopsio/ballast/ballast") {
+		t.Fatalf("expected the fully-qualified remediation command, got %q", joined)
+	}
+	if !strings.Contains(joined, "ballast update") {
+		t.Fatalf("expected the self-healing command in the remediation, got %q", joined)
+	}
+}
+
 func TestDetectWrongBrewCaskDetectsHijackedTokenWithOurPayload(t *testing.T) {
 	originalOutput := runCommandOutputFunc
 	t.Cleanup(func() { runCommandOutputFunc = originalOutput })

@@ -1573,23 +1573,41 @@ func stringSliceContains(values []string, needle string) bool {
 	return false
 }
 
-// printDoctorBrewCaskWarning surfaces the homebrew/cask token collision before
-// a user trips over it. The core tap ships an unrelated app also called
-// "ballast", so the bare token resolves there once that cask is tapped, and
-// `brew upgrade --cask ballast` then targets the wrong package entirely.
-func printDoctorBrewCaskWarning() {
-	if runtime.GOOS != "darwin" || !detectBrewInstall() {
-		return
+// brewCaskCollisionWarning returns the doctor warning lines for the hijacked
+// Homebrew cask token, or nil when the collision does not apply. The core tap
+// ships an unrelated app also called "ballast", so the bare token resolves
+// there once that cask is tapped, and `brew upgrade --cask ballast` then
+// targets the wrong package entirely. Inputs are injected so the message logic
+// is testable off macOS.
+func brewCaskCollisionWarning(
+	isDarwin bool,
+	brewInstalled func() bool,
+	wrongCask func() (bool, error),
+) []string {
+	if !isDarwin || !brewInstalled() {
+		return nil
 	}
-	wrong, err := detectWrongBrewCask()
+	wrong, err := wrongCask()
 	if err != nil || !wrong {
+		return nil
+	}
+	return []string{
+		"Homebrew:",
+		`- warning: the cask token "ballast" resolves to homebrew/cask, an unrelated audio-balance app.`,
+		"- Upgrading by the bare token targets that package, not this CLI.",
+		"- remediation: Run `ballast update`, or fully qualify the tap:",
+		"    brew upgrade --cask everydaydevopsio/ballast/ballast",
+	}
+}
+
+func printDoctorBrewCaskWarning() {
+	lines := brewCaskCollisionWarning(runtime.GOOS == "darwin", detectBrewInstall, detectWrongBrewCask)
+	if len(lines) == 0 {
 		return
 	}
-	fmt.Println("Homebrew:")
-	fmt.Println("- warning: the cask token \"ballast\" resolves to homebrew/cask, an unrelated audio-balance app.")
-	fmt.Println("- Upgrading by the bare token targets that package, not this CLI.")
-	fmt.Println("- remediation: Run `ballast update`, or fully qualify the tap:")
-	fmt.Println("    brew upgrade --cask everydaydevopsio/ballast/ballast")
+	for _, line := range lines {
+		fmt.Println(line)
+	}
 	fmt.Println()
 }
 
