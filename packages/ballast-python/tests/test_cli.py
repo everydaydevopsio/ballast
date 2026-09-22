@@ -1843,6 +1843,35 @@ Content upstream deleted that must not survive a patch.
             self.assertFalse(orphan.exists())
             self.assertTrue((skill_dir / "references" / "owasp-mapping.md").exists())
 
+    def test_install_tolerates_directory_at_legacy_skill_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # Only a file at this path is the old bundle. unlink() raises
+            # IsADirectoryError on a directory, which would fail the install;
+            # the Go and TypeScript backends leave a directory here alone.
+            legacy_dir = root / ".claude" / "skills" / "owasp-security-scan.skill"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+
+            result = cli.install(
+                root,
+                "claude",
+                [],
+                ["owasp-security-scan"],
+                "python",
+                False,
+                False,
+                False,
+            )
+
+            self.assertEqual(result.errors, [])
+            self.assertIn("owasp-security-scan", result.installed_skills)
+            self.assertTrue(legacy_dir.is_dir())
+            self.assertTrue(
+                (
+                    root / ".claude" / "skills" / "owasp-security-scan" / "SKILL.md"
+                ).exists()
+            )
+
     def test_install_migrates_legacy_archive_when_skill_skipped(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

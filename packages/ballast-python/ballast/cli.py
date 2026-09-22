@@ -2798,7 +2798,13 @@ def install(
             # an older CLI run after a newer one) would otherwise skip the
             # whole skill and keep the archive forever.
             if target == "claude":
-                legacy_claude_skill_destination(root, skill).unlink(missing_ok=True)
+                # Only a file at this path is the old bundle. unlink() raises
+                # IsADirectoryError on a directory, which would fail the
+                # install before SKILL.md is written; the Go and TypeScript
+                # backends both leave a directory here alone.
+                legacy_archive = legacy_claude_skill_destination(root, skill)
+                if legacy_archive.is_file():
+                    legacy_archive.unlink()
             # Reconcile resources before the skip guard too. SKILL.md existing
             # does not mean the directory is complete: a run interrupted
             # between writing it and copying resources would never be repaired,

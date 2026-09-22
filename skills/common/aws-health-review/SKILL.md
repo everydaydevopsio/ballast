@@ -20,10 +20,13 @@ The bundled script runs read-only checks and writes a Markdown report with:
 
 ## Command
 
-Run from repository root:
+`scripts/aws_health_review.py` ships inside this skill's own directory. Run it from the
+repository root, resolving `<skill-dir>` against the directory this SKILL.md is in
+(`.claude/skills/aws-health-review/` for Claude Code, `.codex/skills/aws-health-review/`
+for Codex):
 
 ```bash
-uv run skills/aws-health-review/scripts/aws_health_review.py
+uv run <skill-dir>/scripts/aws_health_review.py
 ```
 
 Optional flags:
