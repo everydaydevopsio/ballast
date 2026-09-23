@@ -4279,6 +4279,22 @@ func removeManagedSkillPath(root string, target string, file string) error {
 		pruneEmptyParents(filepath.Dir(filepath.Dir(file)), targetRootDir(root, target))
 		return nil
 	}
+	// A directory sitting at the file-shaped legacy `<name>.skill` path is not
+	// the old bundle. os.Remove returns EISDIR on it, which would abort a
+	// Claude refresh or target removal before the new directory is installed.
+	// Every backend leaves such a directory alone; the wrapper must match.
+	if target == "claude" && filepath.Ext(file) == ".skill" {
+		info, err := os.Stat(file)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+	}
 	if err := os.Remove(file); err != nil {
 		return err
 	}

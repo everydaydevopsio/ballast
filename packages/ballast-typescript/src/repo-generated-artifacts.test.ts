@@ -198,6 +198,12 @@ describe('repo generated artifacts', () => {
 
     delete process.env.BALLAST_RULE_SUBDIR;
 
+    // Skill destinations are deterministic -- one SKILL.md per skill/target
+    // plus its resources -- so every one of them must exist on disk. Rule
+    // candidates cannot be checked this way because the loop above emits
+    // speculative subdir variants that legitimately never get written.
+    const requiredSkillPaths = new Set<string>();
+
     for (const target of ['codex', 'claude'] as const) {
       for (const skillId of resolveSkills(configuredSkills, 'typescript')) {
         const destination = getSkillDestination(skillId, target, REPO_ROOT);
@@ -207,16 +213,18 @@ describe('repo generated artifacts', () => {
         addCandidate(candidates, relPath, {
           content: Buffer.from(buildSkillDirectoryMarkdown(skillId), 'utf8')
         });
+        requiredSkillPaths.add(relPath);
         for (const resourcePath of collectSkillResourceFiles(skillId)) {
-          addCandidate(
-            candidates,
-            path.join(path.dirname(relPath), resourcePath),
-            {
-              content: fs.readFileSync(
-                path.join(getSkillDir(skillId), resourcePath)
-              )
-            }
+          const resourceRelPath = path.join(
+            path.dirname(relPath),
+            resourcePath
           );
+          addCandidate(candidates, resourceRelPath, {
+            content: fs.readFileSync(
+              path.join(getSkillDir(skillId), resourcePath)
+            )
+          });
+          requiredSkillPaths.add(resourceRelPath);
         }
       }
     }
@@ -239,6 +247,10 @@ describe('repo generated artifacts', () => {
 
     const drift: string[] = [];
     const unexpected: string[] = [];
+    const actualSet = new Set(actualFiles);
+    const missing = [...requiredSkillPaths]
+      .filter((relPath) => !actualSet.has(relPath))
+      .sort();
 
     for (const relPath of actualFiles) {
       const expected = candidates.get(relPath);
@@ -257,10 +269,14 @@ describe('repo generated artifacts', () => {
     }
 
     if (process.env.BALLAST_ENFORCE_REPO_GENERATED_ARTIFACTS === '1') {
-      expect({ drift, unexpected }).toEqual({ drift: [], unexpected: [] });
+      expect({ drift, unexpected, missing }).toEqual({
+        drift: [],
+        unexpected: [],
+        missing: []
+      });
       return;
     }
 
-    expect(unexpected).toEqual([]);
+    expect({ unexpected, missing }).toEqual({ unexpected: [], missing: [] });
   });
 });

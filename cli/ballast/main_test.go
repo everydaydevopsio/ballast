@@ -2081,6 +2081,42 @@ func TestBrewCaskCollisionWarning(t *testing.T) {
 	}
 }
 
+func TestRemoveManagedSkillPathLeavesDirectoryAtLegacyClaudePath(t *testing.T) {
+	root := resolvedTempDir(t)
+	// A directory sitting at the file-shaped legacy path is not the old
+	// bundle. os.Remove returns EISDIR on it, which would abort a Claude
+	// refresh or target removal; every backend leaves it alone.
+	legacyDir := filepath.Join(root, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+		t.Fatalf("create legacy dir: %v", err)
+	}
+
+	if err := removeManagedSkillPath(root, "claude", legacyDir); err != nil {
+		t.Fatalf("expected a directory at the legacy path to be tolerated, got %v", err)
+	}
+	if _, err := os.Stat(legacyDir); err != nil {
+		t.Fatalf("expected directory preserved: %v", err)
+	}
+
+	// A missing legacy path is also a no-op, not an error.
+	absent := filepath.Join(root, ".claude", "skills", "not-installed.skill")
+	if err := removeManagedSkillPath(root, "claude", absent); err != nil {
+		t.Fatalf("expected a missing legacy path to be tolerated, got %v", err)
+	}
+
+	// A real bundle is still removed.
+	bundle := filepath.Join(root, ".claude", "skills", "github-health-check.skill")
+	if err := os.WriteFile(bundle, []byte("PK\x03\x04"), 0o644); err != nil {
+		t.Fatalf("seed bundle: %v", err)
+	}
+	if err := removeManagedSkillPath(root, "claude", bundle); err != nil {
+		t.Fatalf("removeManagedSkillPath(bundle): %v", err)
+	}
+	if _, err := os.Stat(bundle); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy bundle removed, got err=%v", err)
+	}
+}
+
 func TestDetectWrongBrewCaskDetectsHijackedTokenWithOurPayload(t *testing.T) {
 	originalOutput := runCommandOutputFunc
 	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
