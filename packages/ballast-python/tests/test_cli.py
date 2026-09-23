@@ -1540,7 +1540,7 @@ class PatchInstallTests(unittest.TestCase):
 
         self.assertIn("alwaysApply: false", content)
         self.assertIn(
-            'description: "audit AI rule and skill files for context density, duplication, and bloat"',
+            'description: "audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository"',
             content,
         )
         self.assertIn("# Ballast Audit Skill", content)
