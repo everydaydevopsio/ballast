@@ -109,6 +109,12 @@ jobs:
       - name: Regenerate managed agent outputs at the release version
         run: |
           set -euo pipefail
+          # The backends read skill and agent content from packaged copies under
+          # packages/*. Without this sync they serve whatever was last committed
+          # there, so regeneration silently reverts any change made to the
+          # repo-root skills/ or agents/ in this release. That is exactly what
+          # happened in v5.21.0, which reverted a skill fix merged days earlier.
+          pnpm --filter @everydaydevopsio/ballast run sync:content
           pnpm run build
           # The wrapper resolves every backend from this source tree. The Go
           # backend binary is gitignored and no other step produces it, so

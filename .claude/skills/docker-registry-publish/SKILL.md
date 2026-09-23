@@ -3,7 +3,7 @@ name: docker-registry-publish
 description: Set up Docker image publishing to GHCR or Docker Hub, with public or private visibility and release-safe tags.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.20.0. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.21.0. Do not edit this section. -->
 
 # Docker Registry Publish
 

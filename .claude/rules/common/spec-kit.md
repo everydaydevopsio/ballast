@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/spec-kit" version="5.20.0" checksum="cce38dd14b8a3d87d34796ccfa7ecd09e90aa44797eee95a9ff48949eaa1d2e5" -->
+<!-- ballast:rule id="typescript/spec-kit" version="5.21.0" checksum="cce38dd14b8a3d87d34796ccfa7ecd09e90aa44797eee95a9ff48949eaa1d2e5" -->
 # Spec Kit Rules
 
 Use GitHub Spec Kit when a repository contains `.specify/` or the user asks for spec-driven development.

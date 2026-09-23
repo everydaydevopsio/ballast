@@ -1,4 +1,4 @@
-<!-- ballast:rule id="go/linting" version="5.20.0" checksum="6d168717b7339cb9d5848cc6ddceb9d0c234bfab545d5dfde3d18348ea9e81a4" -->
+<!-- ballast:rule id="go/linting" version="5.21.0" checksum="6d168717b7339cb9d5848cc6ddceb9d0c234bfab545d5dfde3d18348ea9e81a4" -->
 # Go Linting Rules
 
 ## Your Responsibilities

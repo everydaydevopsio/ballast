@@ -1,4 +1,4 @@
-<!-- ballast:rule id="go/testing" version="5.20.0" checksum="0f3be24e8be7dd33cd4521e2076b5e3c18b8d49f1b1df88248171d47ace9b305" -->
+<!-- ballast:rule id="go/testing" version="5.21.0" checksum="0f3be24e8be7dd33cd4521e2076b5e3c18b8d49f1b1df88248171d47ace9b305" -->
 # Go Testing Rules
 
 Follow the shared `testing-process` rules for TDD discipline, framework detection policy, and smoke/E2E expectations. This rule owns only the language-specific concerns: runner selection, commands, framework markers, and the coverage gate.
