@@ -39,7 +39,7 @@ assert_file_exists "${PROJECT}/.codex/rules/python/python-linting.md"
 assert_file_exists "${PROJECT}/.codex/rules/go/go-linting.md"
 assert_file_exists "${PROJECT}/.codex/skills/owasp-security-scan/SKILL.md"
 assert_file_exists "${PROJECT}/.claude/rules/python/python-linting.md"
-assert_file_exists "${PROJECT}/.claude/skills/owasp-security-scan.skill"
+assert_file_exists "${PROJECT}/.claude/skills/owasp-security-scan/SKILL.md"
 assert_contains '`.codex/rules/python/python-linting.md`' "${PROJECT}/AGENTS.md"
 assert_contains '`.claude/rules/python/python-linting.md`' "${PROJECT}/CLAUDE.md"
 

@@ -39,6 +39,6 @@ assert_not_contains '"codex"' "${PROJECT}/.rulesrc.json"
 assert_file_absent "${PROJECT}/.codex/rules/python/python-linting.md"
 assert_file_absent "${PROJECT}/.codex/skills/owasp-security-scan"
 assert_file_exists "${PROJECT}/.claude/rules/python/python-linting.md"
-assert_file_exists "${PROJECT}/.claude/skills/owasp-security-scan.skill"
+assert_file_exists "${PROJECT}/.claude/skills/owasp-security-scan/SKILL.md"
 
 echo "PASS: refresh-after-target-removal-e2e"

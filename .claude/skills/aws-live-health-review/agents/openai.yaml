@@ -1,0 +1,4 @@
+interface:
+  display_name: "AWS Live Health Review"
+  short_description: "Generate a read-only current-state AWS health snapshot and status report."
+  default_prompt: "Use $aws-live-health-review to check current EC2, RDS, ALB, CloudWatch alarms, and CloudWatch logs health and produce a concise Markdown status report. If needed, set PROFILE first or pass --profile explicitly."

@@ -36,12 +36,12 @@ assert_file() {
   test -f "$path"
 }
 
-assert_claude_skill_zip() {
-  local path="$1"
-  unzip -l "$path" | grep -q "SKILL.md"
-  if [[ "$path" == *"owasp-security-scan.skill" ]]; then
-    unzip -l "$path" | grep -q "references/owasp-mapping.md"
-  fi
+# Claude Code discovers skills as directories, so verify the SKILL.md and the
+# reference material that ships beside it rather than a zip listing.
+assert_claude_skill_dir() {
+  local skill_md="$1"
+  grep -q "^name: " "$skill_md"
+  test -f "$(dirname "$skill_md")/references/owasp-mapping.md"
 }
 
 run_target() {
@@ -68,9 +68,10 @@ run_target() {
       grep -q "alwaysApply: false" "$dir/.cursor/rules/owasp-security-scan.mdc"
       ;;
     claude)
-      assert_file "$dir/.claude/skills/owasp-security-scan.skill"
-      assert_claude_skill_zip "$dir/.claude/skills/owasp-security-scan.skill"
+      assert_file "$dir/.claude/skills/owasp-security-scan/SKILL.md"
+      assert_claude_skill_dir "$dir/.claude/skills/owasp-security-scan/SKILL.md"
       grep -q "## Installed skills" "$dir/CLAUDE.md"
+      grep -q '`/owasp-security-scan`' "$dir/CLAUDE.md"
       ;;
     opencode)
       assert_file "$dir/.opencode/skills/owasp-security-scan.md"

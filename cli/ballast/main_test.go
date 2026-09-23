@@ -2081,6 +2081,42 @@ func TestBrewCaskCollisionWarning(t *testing.T) {
 	}
 }
 
+func TestRemoveManagedSkillPathLeavesDirectoryAtLegacyClaudePath(t *testing.T) {
+	root := resolvedTempDir(t)
+	// A directory sitting at the file-shaped legacy path is not the old
+	// bundle. os.Remove returns EISDIR on it, which would abort a Claude
+	// refresh or target removal; every backend leaves it alone.
+	legacyDir := filepath.Join(root, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+		t.Fatalf("create legacy dir: %v", err)
+	}
+
+	if err := removeManagedSkillPath(root, "claude", legacyDir); err != nil {
+		t.Fatalf("expected a directory at the legacy path to be tolerated, got %v", err)
+	}
+	if _, err := os.Stat(legacyDir); err != nil {
+		t.Fatalf("expected directory preserved: %v", err)
+	}
+
+	// A missing legacy path is also a no-op, not an error.
+	absent := filepath.Join(root, ".claude", "skills", "not-installed.skill")
+	if err := removeManagedSkillPath(root, "claude", absent); err != nil {
+		t.Fatalf("expected a missing legacy path to be tolerated, got %v", err)
+	}
+
+	// A real bundle is still removed.
+	bundle := filepath.Join(root, ".claude", "skills", "github-health-check.skill")
+	if err := os.WriteFile(bundle, []byte("PK\x03\x04"), 0o644); err != nil {
+		t.Fatalf("seed bundle: %v", err)
+	}
+	if err := removeManagedSkillPath(root, "claude", bundle); err != nil {
+		t.Fatalf("removeManagedSkillPath(bundle): %v", err)
+	}
+	if _, err := os.Stat(bundle); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy bundle removed, got err=%v", err)
+	}
+}
+
 func TestDetectWrongBrewCaskDetectsHijackedTokenWithOurPayload(t *testing.T) {
 	originalOutput := runCommandOutputFunc
 	t.Cleanup(func() { runCommandOutputFunc = originalOutput })
@@ -4958,8 +4994,11 @@ func TestRemoveStaleManagedFilesSkipsUnmanagedCanonicalFiles(t *testing.T) {
 	if _, err := os.Stat(rulePath); err != nil {
 		t.Fatalf("expected unmanaged rule file to remain, got %v", err)
 	}
-	if _, err := os.Stat(skillPath); err != nil {
-		t.Fatalf("expected unmanaged skill archive to remain, got %v", err)
+	// The claude archive sits at the canonical legacy path for a skill that was
+	// in the previous config and is no longer selected, so it is config-backed
+	// removable like the other directory-format targets.
+	if _, err := os.Stat(skillPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected deselected claude skill archive to be removed, got err=%v", err)
 	}
 }
 
@@ -5212,8 +5251,10 @@ func TestRunMonorepoRemoveTargetCleansOpencodeManagedRulesAndSkills(t *testing.T
 	if _, err := os.Stat(filepath.Join(root, ".claude", "rules", "python", "python-linting.md")); err != nil {
 		t.Fatalf("expected claude rule to remain, got %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".claude", "skills", "owasp-security-scan.skill")); err != nil {
-		t.Fatalf("expected claude skill to remain, got %v", err)
+	// The legacy .claude/skills/<name>.skill bundle is migrated away whenever
+	// the claude target is refreshed, even by an unrelated target removal.
+	if _, err := os.Stat(filepath.Join(root, ".claude", "skills", "owasp-security-scan.skill")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy claude skill archive to be migrated away, got err=%v", err)
 	}
 
 	config, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
@@ -5866,8 +5907,13 @@ func TestBuildMonorepoSupportFileIncludesSkillsForClaude(t *testing.T) {
 	if !strings.Contains(content, "## Installed skills") {
 		t.Fatalf("expected installed skills section in claude support file, got %q", content)
 	}
-	if !strings.Contains(content, "`.claude/skills/owasp-security-scan.skill`") {
-		t.Fatalf("expected claude skill entry in support file, got %q", content)
+	// Claude Code registers directory-format skills as slash commands, so the
+	// manifest names the invocation rather than a path to read.
+	if !strings.Contains(content, "`/owasp-security-scan`") {
+		t.Fatalf("expected claude skill invocation in support file, got %q", content)
+	}
+	if strings.Contains(content, ".skill`") {
+		t.Fatalf("expected no legacy .skill entry in support file, got %q", content)
 	}
 }
 

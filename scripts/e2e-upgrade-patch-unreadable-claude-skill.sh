@@ -31,6 +31,8 @@ cat > "${PROJECT}/.rulesrc.json" <<'EOF'
 }
 EOF
 
+# A pre-directory bundle, and a corrupt one at that. Claude Code never read
+# these; the upgrade must migrate it away rather than try to repair it.
 printf 'not-a-zip-archive' > "${PROJECT}/.claude/skills/owasp-security-scan.skill"
 
 (
@@ -38,8 +40,10 @@ printf 'not-a-zip-archive' > "${PROJECT}/.claude/skills/owasp-security-scan.skil
   ballast --language go upgrade --patch >/dev/null
 )
 
-assert_valid_claude_skill_archive "${PROJECT}/.claude/skills/owasp-security-scan.skill"
+assert_file_exists "${PROJECT}/.claude/skills/owasp-security-scan/SKILL.md"
+assert_contains 'name: owasp-security-scan' "${PROJECT}/.claude/skills/owasp-security-scan/SKILL.md"
+assert_file_absent "${PROJECT}/.claude/skills/owasp-security-scan.skill"
 assert_contains '"owasp-security-scan"' "${PROJECT}/.rulesrc.json"
-assert_contains '`.claude/skills/owasp-security-scan.skill`' "${PROJECT}/CLAUDE.md"
+assert_contains '`/owasp-security-scan`' "${PROJECT}/CLAUDE.md"
 
 echo "PASS: upgrade-patch-unreadable-claude-skill-e2e"

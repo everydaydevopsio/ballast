@@ -13,7 +13,7 @@ import {
   buildCodexFormat,
   buildContent,
   buildClaudeSkill,
-  buildCodexSkillMarkdown,
+  buildSkillDirectoryMarkdown,
   buildCursorSkillFormat,
   buildSkillMarkdown,
   buildClaudeMd,
@@ -781,7 +781,7 @@ describe('build', () => {
     });
 
     test('builds native codex skill markdown with frontmatter preserved', () => {
-      const content = buildCodexSkillMarkdown('owasp-security-scan');
+      const content = buildSkillDirectoryMarkdown('owasp-security-scan');
       expect(content).toMatch(/^---\nname: owasp-security-scan/m);
       expect(content).toContain('Created by [Ballast]');
       expect(content).toContain('# OWASP Security Scan Skill');
@@ -809,15 +809,23 @@ describe('build', () => {
       expect(getSkillDescription('owasp-security-scan')).toContain(
         'Run OWASP-aligned security scans'
       );
+      // Claude Code discovers .claude/skills/<name>/SKILL.md and exposes it
+      // as /<name>; the old <name>.skill zip was never scanned.
       expect(
         getSkillDestination('owasp-security-scan', 'claude', '/tmp/project')
       ).toEqual({
-        dir: path.join('/tmp/project', '.claude', 'skills'),
+        dir: path.join(
+          '/tmp/project',
+          '.claude',
+          'skills',
+          'owasp-security-scan'
+        ),
         file: path.join(
           '/tmp/project',
           '.claude',
           'skills',
-          'owasp-security-scan.skill'
+          'owasp-security-scan',
+          'SKILL.md'
         )
       });
     });
@@ -1101,7 +1109,9 @@ alwaysApply: false
       expect(content).toContain('`.claude/rules/typescript-linting.md`');
       expect(content).toContain('TypeScript linting specialist');
       expect(content).toContain('## Installed skills');
-      expect(content).toContain('`.claude/skills/owasp-security-scan.skill`');
+      // Registered skills are invoked by name, not read as files.
+      expect(content).toContain('`/owasp-security-scan`');
+      expect(content).not.toContain('.skill`');
     });
 
     test('lists plan-lifecycle rule for claude', () => {

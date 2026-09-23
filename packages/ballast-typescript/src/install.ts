@@ -3,16 +3,14 @@ import path from 'path';
 import readline from 'readline';
 import {
   buildContent,
-  buildClaudeSkill,
   buildClaudeMd,
-  buildCodexSkillMarkdown,
+  buildSkillDirectoryMarkdown,
   buildGeminiMd,
   buildCursorSkillFormat,
   buildCodexAgentsMd,
   buildSkillMarkdown,
-  copyCodexSkillResources,
+  copySkillResources,
   getAllSkillIds,
-  getSkillContent,
   getClaudeMdPath,
   getGeminiMdPath,
   getCodexAgentsMdPath,
@@ -359,6 +357,34 @@ function resolveSupportFileSelections(
   };
 }
 
+/**
+ * Delete the pre-directory `.claude/skills/<name>.skill` bundle. Claude Code
+ * ignores it, but leaving it behind means the skill appears twice in the
+ * directory and never gets cleaned up, since the archive path is no longer in
+ * the expected set that prunes stale managed files.
+ */
+function removeLegacyClaudeSkillArchive(
+  projectRoot: string,
+  skillId: string
+): void {
+  const legacy = path.join(
+    path.resolve(projectRoot),
+    '.claude',
+    'skills',
+    `${skillId}.skill`
+  );
+  try {
+    if (fs.statSync(legacy).isFile()) {
+      fs.rmSync(legacy);
+    }
+  } catch (err) {
+    // A missing archive is the normal case. Anything else -- a permission
+    // error, an unreadable filesystem -- means the migration did not happen,
+    // so it must not be reported as a successful install.
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err;
+  }
+}
+
 function getSupportFilePath(
   target: Target,
   projectRoot: string
@@ -662,6 +688,20 @@ export function install(options: InstallOptions): InstallResult {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
+      // Migrate before the skip guard. A project that already has SKILL.md
+      // alongside the old bundle (an interrupted migration, or an older CLI
+      // run after a newer one) would otherwise skip the whole skill and keep
+      // the archive forever.
+      if (target === 'claude') {
+        removeLegacyClaudeSkillArchive(projectRoot, skillId);
+      }
+      // Reconcile resources before the skip guard too. SKILL.md existing does
+      // not mean the directory is complete: a run interrupted between writing
+      // it and copying references/ would never be repaired, and resources
+      // deleted upstream would survive every refresh.
+      if (target === 'claude' || target === 'codex') {
+        copySkillResources(skillId, dir);
+      }
       if (fileExists && !force && !patch && !refreshManagedSkills) {
         continue;
       }
@@ -676,10 +716,7 @@ export function install(options: InstallOptions): InstallResult {
           break;
         }
         case 'claude': {
-          fs.writeFileSync(
-            file,
-            buildClaudeSkill(skillId, getSkillContent(skillId))
-          );
+          fs.writeFileSync(file, buildSkillDirectoryMarkdown(skillId), 'utf8');
           const skillSettings = getSkillClaudeSettings(skillId);
           if (skillSettings) {
             try {
@@ -699,8 +736,7 @@ export function install(options: InstallOptions): InstallResult {
           break;
         }
         case 'codex': {
-          fs.writeFileSync(file, buildCodexSkillMarkdown(skillId), 'utf8');
-          copyCodexSkillResources(skillId, dir);
+          fs.writeFileSync(file, buildSkillDirectoryMarkdown(skillId), 'utf8');
           break;
         }
         default:

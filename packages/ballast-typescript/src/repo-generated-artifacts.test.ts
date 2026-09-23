@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import {
   buildClaudeSkill,
-  buildCodexSkillMarkdown,
+  buildSkillDirectoryMarkdown,
   buildContent,
   getDestination,
   getSkillDestination,
@@ -54,7 +54,7 @@ function collectFiles(dir: string): string[] {
   return files;
 }
 
-function collectCodexSkillResourceFiles(skillId: string): string[] {
+function collectSkillResourceFiles(skillId: string): string[] {
   const root = getSkillDir(skillId);
   const files: string[] = [];
   const walk = (currentDir: string, prefix = ''): void => {
@@ -198,28 +198,33 @@ describe('repo generated artifacts', () => {
 
     delete process.env.BALLAST_RULE_SUBDIR;
 
+    // Skill destinations are deterministic -- one SKILL.md per skill/target
+    // plus its resources -- so every one of them must exist on disk. Rule
+    // candidates cannot be checked this way because the loop above emits
+    // speculative subdir variants that legitimately never get written.
+    const requiredSkillPaths = new Set<string>();
+
     for (const target of ['codex', 'claude'] as const) {
       for (const skillId of resolveSkills(configuredSkills, 'typescript')) {
         const destination = getSkillDestination(skillId, target, REPO_ROOT);
         const relPath = path.relative(REPO_ROOT, destination.file);
+        // Both directory-format targets emit the same SKILL.md plus the
+        // skill's resource files alongside it.
         addCandidate(candidates, relPath, {
-          content:
-            target === 'claude'
-              ? buildClaudeSkill(skillId)
-              : Buffer.from(buildCodexSkillMarkdown(skillId), 'utf8')
+          content: Buffer.from(buildSkillDirectoryMarkdown(skillId), 'utf8')
         });
-        if (target === 'codex') {
-          for (const resourcePath of collectCodexSkillResourceFiles(skillId)) {
-            addCandidate(
-              candidates,
-              path.join(path.dirname(relPath), resourcePath),
-              {
-                content: fs.readFileSync(
-                  path.join(getSkillDir(skillId), resourcePath)
-                )
-              }
-            );
-          }
+        requiredSkillPaths.add(relPath);
+        for (const resourcePath of collectSkillResourceFiles(skillId)) {
+          const resourceRelPath = path.join(
+            path.dirname(relPath),
+            resourcePath
+          );
+          addCandidate(candidates, resourceRelPath, {
+            content: fs.readFileSync(
+              path.join(getSkillDir(skillId), resourcePath)
+            )
+          });
+          requiredSkillPaths.add(resourceRelPath);
         }
       }
     }
@@ -231,11 +236,21 @@ describe('repo generated artifacts', () => {
       if (ALLOWED_NON_GENERATED.has(relPath)) {
         return false;
       }
+      // Skill directories ship resources beyond Markdown -- scripts/*.py and
+      // agents/*.yaml among them. Filtering to md|skill let those installed
+      // files drift or go missing without failing this parity check.
+      if (/^\.(claude|codex)\/skills\//.test(relPath)) {
+        return true;
+      }
       return /\.(md|skill)$/.test(relPath);
     });
 
     const drift: string[] = [];
     const unexpected: string[] = [];
+    const actualSet = new Set(actualFiles);
+    const missing = [...requiredSkillPaths]
+      .filter((relPath) => !actualSet.has(relPath))
+      .sort();
 
     for (const relPath of actualFiles) {
       const expected = candidates.get(relPath);
@@ -254,10 +269,14 @@ describe('repo generated artifacts', () => {
     }
 
     if (process.env.BALLAST_ENFORCE_REPO_GENERATED_ARTIFACTS === '1') {
-      expect({ drift, unexpected }).toEqual({ drift: [], unexpected: [] });
+      expect({ drift, unexpected, missing }).toEqual({
+        drift: [],
+        unexpected: [],
+        missing: []
+      });
       return;
     }
 
-    expect(unexpected).toEqual([]);
+    expect({ unexpected, missing }).toEqual({ unexpected: [], missing: [] });
   });
 });

@@ -1083,9 +1083,34 @@ func install(opts installOptions) installResult {
 				result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
 				continue
 			}
+			// Migrate before the skip guard. A project that already has
+			// SKILL.md alongside the old bundle (an interrupted migration, or
+			// an older CLI run after a newer one) would otherwise skip the
+			// whole skill and keep the archive forever.
+			if target == "claude" {
+				if err := removeLegacyClaudeSkillArchive(opts.projectRoot, skillID); err != nil {
+					result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
+					continue
+				}
+			}
+			// Reconcile resources before the skip guard too. SKILL.md existing
+			// does not mean the directory is complete: a run interrupted
+			// between writing it and copying resources would never be
+			// repaired, and resources deleted upstream would survive.
+			if target == "claude" || target == "codex" {
+				if err := copySkillResources(skillID, opts.language, dir); err != nil {
+					result.errors = append(result.errors, agentError{agent: skillID, err: err.Error()})
+					continue
+				}
+			}
 			if exists(file) && !opts.force && !opts.patch && !refreshManagedSkills {
 				continue
 			}
+			// Skills are entirely Ballast-authored, so every branch replaces
+			// the file wholesale. Section-merging a skill (as --patch does for
+			// rules, to preserve user-authored sections) keeps stale text for
+			// headings that still exist upstream and re-appends sections that
+			// upstream deleted.
 			switch target {
 			case "cursor":
 				content, buildErr := buildCursorSkillFormat(skillID, opts.language)
@@ -1093,71 +1118,22 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				nextContent := content
-				if exists(file) && !opts.force && opts.patch {
-					existing, readErr := os.ReadFile(file)
-					if readErr != nil {
-						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-						continue
-					}
-					nextContent = patchRuleContent(string(existing), content, target)
-				}
-				err = os.WriteFile(file, []byte(nextContent), 0o644)
-			case "claude":
-				skillContent, readErr := readSkillContent(skillID, opts.language)
-				if readErr != nil {
-					result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-					continue
-				}
-				nextContent := skillContent
-				if exists(file) && !opts.force && opts.patch {
-					existing, readErr := readClaudeSkillContent(file)
-					if readErr != nil {
-						nextContent = skillContent
-					} else {
-						nextContent = patchRuleContent(existing, skillContent, target)
-					}
-				}
-				content, buildErr := buildClaudeSkill(skillID, opts.language, nextContent)
-				if buildErr != nil {
-					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
-					continue
-				}
-				err = os.WriteFile(file, content, 0o644)
+				err = os.WriteFile(file, []byte(content), 0o644)
 			case "opencode", "gemini":
 				content, buildErr := buildSkillMarkdown(skillID, opts.language)
 				if buildErr != nil {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				nextContent := content
-				if exists(file) && !opts.force && opts.patch {
-					existing, readErr := os.ReadFile(file)
-					if readErr != nil {
-						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-						continue
-					}
-					nextContent = patchRuleContent(string(existing), content, target)
-				}
-				err = os.WriteFile(file, []byte(nextContent), 0o644)
-			case "codex":
-				content, buildErr := buildCodexSkillMarkdown(skillID, opts.language)
+				err = os.WriteFile(file, []byte(content), 0o644)
+			case "codex", "claude":
+				// Both targets discover skills as <name>/SKILL.md directories.
+				content, buildErr := buildSkillDirectoryMarkdown(skillID, opts.language)
 				if buildErr != nil {
 					result.errors = append(result.errors, agentError{agent: skillID, err: buildErr.Error()})
 					continue
 				}
-				nextContent := content
-				if exists(file) && !opts.force && opts.patch {
-					existing, readErr := os.ReadFile(file)
-					if readErr != nil {
-						result.errors = append(result.errors, agentError{agent: skillID, err: readErr.Error()})
-						continue
-					}
-					nextContent = patchRuleContent(string(existing), content, target)
-				}
-				if err = os.WriteFile(file, []byte(nextContent), 0o644); err == nil {
-					err = copyCodexSkillResources(skillID, opts.language, dir)
-				}
+				err = os.WriteFile(file, []byte(content), 0o644)
 			default:
 				err = fmt.Errorf("unknown target: %s", target)
 			}
@@ -1445,11 +1421,11 @@ func buildClaudeMD(agents []string, skills []string, language string, tools map[
 			"",
 			ballastNotice(),
 			"",
-			"Read and use these skill files in `.claude/skills/` when they are relevant:",
+			"These skills are registered with Claude Code. Invoke one by name (for example `/ballast-audit`) when it is relevant:",
 			"",
 		)
 		for _, skillID := range skills {
-			lines = append(lines, fmt.Sprintf("- `.claude/skills/%s.skill` — %s", skillID, skillDescription(skillID, language)))
+			lines = append(lines, fmt.Sprintf("- `/%s` — %s", skillID, skillDescription(skillID, language)))
 		}
 	}
 	lines = append(lines, "")
@@ -1634,7 +1610,7 @@ func buildSkillMarkdown(skillID, language string) (string, error) {
 	return "<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
 }
 
-func buildCodexSkillMarkdown(skillID, language string) (string, error) {
+func buildSkillDirectoryMarkdown(skillID, language string) (string, error) {
 	content, err := readSkillContent(skillID, language)
 	if err != nil {
 		return "", err
@@ -1646,9 +1622,83 @@ func buildCodexSkillMarkdown(skillID, language string) (string, error) {
 	return frontmatter + "\n\n<!-- " + ballastNotice() + " -->\n\n" + strings.TrimRight(body, "\n") + "\n", nil
 }
 
-func copyCodexSkillResources(skillID, language, destinationDir string) error {
+func copySkillResources(skillID, language, destinationDir string) error {
 	sourceDir := skillDir(skillID, language)
-	return copyCodexSkillResourceDir(sourceDir, destinationDir)
+	// Clear managed entries first so each is replaced rather than merged into:
+	// copying into an existing directory leaves files deleted upstream inside
+	// it, which a top-level sweep cannot see.
+	if err := clearManagedSkillResources(sourceDir, destinationDir); err != nil {
+		return err
+	}
+	if err := copyCodexSkillResourceDir(sourceDir, destinationDir); err != nil {
+		return err
+	}
+	return reconcileSkillResources(sourceDir, destinationDir)
+}
+
+// managedSkillResourceNames lists a skill's resource entries. Skill content is
+// served from the embedded FS unless BALLAST_REPO_ROOT overrides it, so this
+// must resolve the same way copyCodexSkillResourceDir does rather than
+// stat'ing the embedded path on disk.
+func managedSkillResourceNames(sourceDir string) ([]string, error) {
+	entries, err := fs.ReadDir(embeddedSkillsFS, sourceDir)
+	if overrideRoot := repoRootOverride(); overrideRoot != "" {
+		entries, err = os.ReadDir(filepath.Join(overrideRoot, filepath.FromSlash(sourceDir)))
+	}
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Name() == "SKILL.md" || entry.Name() == "claude-settings.json" {
+			continue
+		}
+		names = append(names, entry.Name())
+	}
+	return names, nil
+}
+
+func clearManagedSkillResources(sourceDir, destinationDir string) error {
+	names, err := managedSkillResourceNames(sourceDir)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		if err := os.RemoveAll(filepath.Join(destinationDir, name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reconcileSkillResources removes destination entries the source no longer
+// has. A skill directory is Ballast-managed output, so copying alone would
+// leave a resource deleted upstream in place on every future refresh.
+func reconcileSkillResources(sourceDir, destinationDir string) error {
+	names, err := managedSkillResourceNames(sourceDir)
+	if err != nil {
+		return err
+	}
+	managed := map[string]bool{}
+	for _, name := range names {
+		managed[name] = true
+	}
+	destEntries, err := os.ReadDir(destinationDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range destEntries {
+		if entry.Name() == "SKILL.md" || managed[entry.Name()] {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(destinationDir, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func copyCodexSkillResourceDir(sourceDir, destinationDir string) error {
@@ -1685,6 +1735,9 @@ func copyCodexSkillResourceDir(sourceDir, destinationDir string) error {
 	return nil
 }
 
+// buildClaudeSkill packages a skill as a claude.ai Agent Skills zip bundle.
+// This is not what Claude Code installs -- it discovers directories, see
+// skillDestination -- and is kept for publishing bundles to claude.ai.
 func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte, error) {
 	content := ""
 	if len(skillContent) > 0 {
@@ -1757,33 +1810,6 @@ func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte,
 		return nil, err
 	}
 	return buffer.Bytes(), nil
-}
-
-func readClaudeSkillContent(archivePath string) (string, error) {
-	content, err := os.ReadFile(archivePath)
-	if err != nil {
-		return "", err
-	}
-	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
-	if err != nil {
-		return "", err
-	}
-	for _, file := range reader.File {
-		if file.Name != "SKILL.md" {
-			continue
-		}
-		rc, err := file.Open()
-		if err != nil {
-			return "", err
-		}
-		defer rc.Close()
-		data, err := io.ReadAll(rc)
-		if err != nil {
-			return "", err
-		}
-		return string(data), nil
-	}
-	return "", fmt.Errorf("skill archive missing SKILL.md")
 }
 
 func normalizeLineEndings(content string) string {
@@ -3796,8 +3822,10 @@ func skillDestination(projectRoot, target, skillID string) (string, string, erro
 		dir := filepath.Join(root, ".cursor", "rules")
 		return dir, filepath.Join(dir, skillID+".mdc"), nil
 	case "claude":
-		dir := filepath.Join(root, ".claude", "skills")
-		return dir, filepath.Join(dir, skillID+".skill"), nil
+		// Claude Code discovers project skills at .claude/skills/<name>/SKILL.md
+		// and exposes each as /<name>; the old <name>.skill zip was never read.
+		dir := filepath.Join(root, ".claude", "skills", skillID)
+		return dir, filepath.Join(dir, "SKILL.md"), nil
 	case "opencode":
 		dir := filepath.Join(root, ".opencode", "skills")
 		return dir, filepath.Join(dir, skillID+".md"), nil
@@ -3810,6 +3838,31 @@ func skillDestination(projectRoot, target, skillID string) (string, string, erro
 	default:
 		return "", "", fmt.Errorf("unknown target: %s", target)
 	}
+}
+
+// removeLegacyClaudeSkillArchive deletes the pre-directory
+// .claude/skills/<name>.skill bundle. Claude Code ignores it, but leaving it
+// behind shows the skill twice and nothing would prune it, since the archive
+// path is no longer in the expected set.
+func removeLegacyClaudeSkillArchive(projectRoot, skillID string) error {
+	legacy := filepath.Join(filepath.Clean(projectRoot), ".claude", "skills", skillID+".skill")
+	info, err := os.Stat(legacy)
+	if err != nil {
+		// A missing archive is the normal case. Any other stat failure means
+		// the migration could not be verified, so surface it rather than
+		// reporting a successful install over a surviving bundle.
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if info.IsDir() {
+		return nil
+	}
+	if err := os.Remove(legacy); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func legacyCodexSkillDestination(projectRoot, skillID string) string {

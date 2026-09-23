@@ -4056,7 +4056,7 @@ func looksLikeLegacyGeneratedRule(path string) bool {
 }
 
 func allowConfigBackedStaleSkillRemoval(root string, target string, path string, previous *monorepoConfig) bool {
-	if target != "cursor" && target != "opencode" && target != "codex" {
+	if target != "cursor" && target != "opencode" && target != "codex" && target != "claude" {
 		return false
 	}
 	if previous == nil {
@@ -4261,16 +4261,39 @@ func managedSkillRemovalPaths(root string, target string, skills []string) []str
 			paths = append(paths, legacyCodexSkillPath(root, skill))
 		}
 	}
+	if target == "claude" {
+		for _, skill := range skills {
+			paths = append(paths, legacyClaudeSkillPath(root, skill))
+		}
+	}
 	return uniqueStrings(paths)
 }
 
 func removeManagedSkillPath(root string, target string, file string) error {
-	if target == "codex" && filepath.Base(file) == "SKILL.md" && filepath.Base(filepath.Dir(filepath.Dir(file))) == "skills" {
+	if (target == "codex" || target == "claude") &&
+		filepath.Base(file) == "SKILL.md" &&
+		filepath.Base(filepath.Dir(filepath.Dir(file))) == "skills" {
 		if err := os.RemoveAll(filepath.Dir(file)); err != nil {
 			return err
 		}
 		pruneEmptyParents(filepath.Dir(filepath.Dir(file)), targetRootDir(root, target))
 		return nil
+	}
+	// A directory sitting at the file-shaped legacy `<name>.skill` path is not
+	// the old bundle. os.Remove returns EISDIR on it, which would abort a
+	// Claude refresh or target removal before the new directory is installed.
+	// Every backend leaves such a directory alone; the wrapper must match.
+	if target == "claude" && filepath.Ext(file) == ".skill" {
+		info, err := os.Stat(file)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
 	}
 	if err := os.Remove(file); err != nil {
 		return err
@@ -4320,12 +4343,47 @@ func targetRuleExtension(target string) string {
 	return ".md"
 }
 
+// skillsManifestIntro describes how to reach the installed skills. Claude Code
+// registers directory-format skills and exposes each as a slash command, so
+// the manifest names the invocation rather than a path to read.
+func skillsManifestIntro(target string, skillDir string) string {
+	if target == "claude" {
+		return "These skills are registered with Claude Code. Invoke one by name (for example `/ballast-audit`) when it is relevant:"
+	}
+	return fmt.Sprintf("Read and use these skill files in `%s/` when they are relevant:", skillDir)
+}
+
+// skillsManifestEntry renders a skill as its invocation for claude, and as the
+// path to read for every other target.
+func skillsManifestEntry(target string, rootPlaceholder string, skill string) string {
+	if target == "claude" {
+		return fmt.Sprintf("`/%s`", skill)
+	}
+	return fmt.Sprintf("`%s`", strings.TrimPrefix(targetSkillPath(rootPlaceholder, target, skill), rootPlaceholder+"/"))
+}
+
+// targetSkillsDirLabel is the directory a target's skills live in, for the
+// generated manifest. Directory-format targets (codex, claude) nest each skill
+// in its own folder, so the label is the parent of that folder rather than the
+// parent of the skill file.
+func targetSkillsDirLabel(target string, rootPlaceholder string) string {
+	switch target {
+	case "codex", "claude":
+		return "." + target + "/skills"
+	default:
+		return strings.TrimPrefix(
+			filepath.Dir(targetSkillPath(rootPlaceholder, target, "example")),
+			rootPlaceholder+"/",
+		)
+	}
+}
+
 func targetSkillPath(root string, target string, skill string) string {
 	switch target {
 	case "cursor":
 		return filepath.Join(root, ".cursor", "rules", skill+".mdc")
 	case "claude":
-		return filepath.Join(root, ".claude", "skills", skill+".skill")
+		return filepath.Join(root, ".claude", "skills", skill, "SKILL.md")
 	case "gemini":
 		return filepath.Join(root, ".gemini", "rules", skill+".md")
 	case "opencode":
@@ -4339,6 +4397,13 @@ func targetSkillPath(root string, target string, skill string) string {
 
 func legacyCodexSkillPath(root string, skill string) string {
 	return filepath.Join(root, ".codex", "rules", skill+".md")
+}
+
+// legacyClaudeSkillPath is the pre-directory `.claude/skills/<name>.skill`
+// zip bundle. Claude Code never scanned it; it is removed on install so a
+// skill does not appear twice in the directory.
+func legacyClaudeSkillPath(root string, skill string) string {
+	return filepath.Join(root, ".claude", "skills", skill+".skill")
 }
 
 func pruneEmptyParents(dir string, stop string) {
@@ -4489,22 +4554,17 @@ func buildMonorepoSupportFile(root string, plan *monorepoPlan, target string) st
 		}
 	}
 	if len(plan.Config.Skills) > 0 {
-		skillDir := strings.TrimPrefix(filepath.Dir(targetSkillPath(rootPlaceholder, target, "example")), rootPlaceholder+"/")
-		if target == "codex" {
-			skillDir = ".codex/skills"
-		}
 		lines = append(lines,
 			"",
 			"## Installed skills",
 			"",
 			"Created by Ballast. Do not edit this section.",
 			"",
-			fmt.Sprintf("Read and use these skill files in `%s/` when they are relevant:", skillDir),
+			skillsManifestIntro(target, targetSkillsDirLabel(target, rootPlaceholder)),
 			"",
 		)
 		for _, skill := range plan.Config.Skills {
-			skillPath := fmt.Sprintf("`%s`", strings.TrimPrefix(targetSkillPath(rootPlaceholder, target, skill), rootPlaceholder+"/"))
-			lines = append(lines, fmt.Sprintf("- %s — %s", skillPath, skillDescription(skill)))
+			lines = append(lines, fmt.Sprintf("- %s — %s", skillsManifestEntry(target, rootPlaceholder, skill), skillDescription(skill)))
 		}
 	}
 	lines = append(lines, "")

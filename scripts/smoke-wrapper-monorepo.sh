@@ -178,7 +178,7 @@ verify_skills() {
   local monorepo="$1"
 
   test -f "${monorepo}/.cursor/rules/owasp-security-scan.mdc"
-  test -f "${monorepo}/.claude/skills/owasp-security-scan.skill"
+  test -f "${monorepo}/.claude/skills/owasp-security-scan/SKILL.md"
   test -f "${monorepo}/.opencode/skills/owasp-security-scan.md"
   test -f "${monorepo}/.codex/skills/owasp-security-scan/SKILL.md"
 }
@@ -187,7 +187,7 @@ verify_skill_patch_keeps_support_rules() {
   local monorepo="$1"
 
   grep -q '`.claude/rules/typescript/typescript-linting.md`' "${monorepo}/CLAUDE.md"
-  grep -q '`.claude/skills/github-health-check.skill`' "${monorepo}/CLAUDE.md"
+  grep -q '`/github-health-check`' "${monorepo}/CLAUDE.md"
   grep -q '`.codex/rules/typescript/typescript-linting.md`' "${monorepo}/AGENTS.md"
   grep -q '`.codex/skills/github-health-check/SKILL.md`' "${monorepo}/AGENTS.md"
 }

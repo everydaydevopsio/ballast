@@ -1601,7 +1601,7 @@ def build_skill_markdown(skill: str, language: str) -> str:
     return f"<!-- {ballast_notice()} -->\n\n" + body.rstrip() + "\n"
 
 
-def build_codex_skill_markdown(skill: str, language: str) -> str:
+def build_skill_directory_markdown(skill: str, language: str) -> str:
     frontmatter, body = split_skill_document(read_skill(skill, language))
     if not frontmatter:
         return f"<!-- {ballast_notice()} -->\n\n" + body.rstrip() + "\n"
@@ -1610,23 +1610,47 @@ def build_codex_skill_markdown(skill: str, language: str) -> str:
     )
 
 
-def copy_codex_skill_resources(
-    skill: str, language: str, destination_dir: Path
-) -> None:
+def copy_skill_resources(skill: str, language: str, destination_dir: Path) -> None:
     source_dir = skill_dir(skill, language)
+    managed: set[str] = set()
     for child in source_dir.iterdir():
         if child.name in {"SKILL.md", "claude-settings.json"}:
             continue
+        managed.add(child.name)
         destination = destination_dir / child.name
+        # Replace rather than merge. Copying into an existing directory leaves
+        # files deleted upstream sitting inside it, which a top-level sweep
+        # cannot see.
+        if destination.is_dir():
+            shutil.rmtree(destination)
+        elif destination.exists():
+            destination.unlink()
         if child.is_dir():
-            shutil.copytree(child, destination, dirs_exist_ok=True)
+            shutil.copytree(child, destination)
         elif child.is_file():
             shutil.copy2(child, destination)
+    # Reconcile, do not just overlay. A skill directory is Ballast-managed
+    # output, so a resource deleted upstream must disappear here too; copying
+    # alone would leave it behind on every future refresh.
+    if not destination_dir.is_dir():
+        return
+    for child in destination_dir.iterdir():
+        if child.name == "SKILL.md" or child.name in managed:
+            continue
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
 
 
 def build_claude_skill(
     skill: str, language: str, skill_content: str | None = None
 ) -> bytes:
+    """Package a skill as a claude.ai Agent Skills zip bundle.
+
+    This is not what Claude Code installs -- it discovers directories, see
+    ``skill_destination`` -- and is kept for publishing bundles to claude.ai.
+    """
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
         archive.writestr("SKILL.md", skill_content or read_skill(skill, language))
@@ -1638,23 +1662,6 @@ def build_claude_skill(
                         ref, f"references/{ref.relative_to(references).as_posix()}"
                     )
     return output.getvalue()
-
-
-def read_claude_skill_content(archive_path: Path) -> str:
-    with zipfile.ZipFile(archive_path) as archive:
-        with archive.open("SKILL.md") as skill_file:
-            return skill_file.read().decode("utf-8")
-
-
-def patch_claude_skill_content(
-    archive_path: Path, canonical_skill_content: str, target: str
-) -> str:
-    try:
-        existing_skill_content = read_claude_skill_content(archive_path)
-    except Exception:
-        # Fall back to a clean overwrite when an existing archive is unreadable.
-        return canonical_skill_content
-    return patch_rule_content(existing_skill_content, canonical_skill_content, target)
 
 
 def destination(root: Path, target: str, basename: str) -> Path:
@@ -1725,7 +1732,9 @@ def skill_destination(root: Path, target: str, skill: str) -> Path:
     if target == "cursor":
         return root / ".cursor" / "rules" / f"{skill}.mdc"
     if target == "claude":
-        return root / ".claude" / "skills" / f"{skill}.skill"
+        # Claude Code discovers project skills at .claude/skills/<name>/SKILL.md
+        # and exposes each as /<name>; the old <name>.skill zip was never read.
+        return root / ".claude" / "skills" / skill / "SKILL.md"
     if target == "gemini":
         return root / ".gemini" / "rules" / f"{skill}.md"
     if target == "opencode":
@@ -1737,6 +1746,15 @@ def skill_destination(root: Path, target: str, skill: str) -> Path:
 
 def legacy_codex_skill_destination(root: Path, skill: str) -> Path:
     return root / ".codex" / "rules" / f"{skill}.md"
+
+
+def legacy_claude_skill_destination(root: Path, skill: str) -> Path:
+    """Pre-directory ``.claude/skills/<name>.skill`` zip bundle.
+
+    Claude Code never scanned it. It is removed on install so a skill does not
+    appear twice in the directory and is not left behind unprunable.
+    """
+    return root / ".claude" / "skills" / f"{skill}.skill"
 
 
 def extract_description_from_frontmatter(frontmatter: str) -> str | None:
@@ -1953,14 +1971,12 @@ def build_claude_md(
                 "",
                 ballast_notice(),
                 "",
-                "Read and use these skill files in `.claude/skills/` when they are relevant:",
+                "These skills are registered with Claude Code. Invoke one by name (for example `/ballast-audit`) when it is relevant:",
                 "",
             ]
         )
         for skill in skills:
-            lines.append(
-                f"- `.claude/skills/{skill}.skill` — {skill_description(skill, language)}"
-            )
+            lines.append(f"- `/{skill}` — {skill_description(skill, language)}")
     lines.append("")
     return "\n".join(lines)
 
@@ -2777,41 +2793,42 @@ def install(
             dst = skill_destination(root, target, skill)
             file_exists = dst.exists()
             dst.parent.mkdir(parents=True, exist_ok=True)
+            # Migrate before the skip guard. A project that already has
+            # SKILL.md alongside the old bundle (an interrupted migration, or
+            # an older CLI run after a newer one) would otherwise skip the
+            # whole skill and keep the archive forever.
+            if target == "claude":
+                # Only a file at this path is the old bundle. unlink() raises
+                # IsADirectoryError on a directory, which would fail the
+                # install before SKILL.md is written; the Go and TypeScript
+                # backends both leave a directory here alone.
+                legacy_archive = legacy_claude_skill_destination(root, skill)
+                if legacy_archive.is_file():
+                    legacy_archive.unlink()
+            # Reconcile resources before the skip guard too. SKILL.md existing
+            # does not mean the directory is complete: a run interrupted
+            # between writing it and copying resources would never be repaired,
+            # and resources deleted upstream would survive.
+            if target in ("codex", "claude"):
+                copy_skill_resources(skill, language, dst.parent)
             if file_exists and not force and not patch and not refresh_managed_skills:
                 continue
+            # Skills are entirely Ballast-authored, so every branch replaces
+            # the file wholesale. Section-merging a skill (as --patch does for
+            # rules, to preserve user-authored sections) keeps stale text for
+            # headings that still exist upstream and re-appends sections that
+            # upstream deleted.
             if target == "cursor":
-                content = build_cursor_skill_format(skill, language)
-                next_content = (
-                    patch_rule_content(dst.read_text(encoding="utf-8"), content, target)
-                    if file_exists and not force and patch
-                    else content
+                dst.write_text(
+                    build_cursor_skill_format(skill, language), encoding="utf-8"
                 )
-                dst.write_text(next_content, encoding="utf-8")
-            elif target == "claude":
-                skill_content = read_skill(skill, language)
-                next_content = (
-                    patch_claude_skill_content(dst, skill_content, target)
-                    if file_exists and not force and patch
-                    else skill_content
+            elif target in ("codex", "claude"):
+                # Both targets discover skills as <name>/SKILL.md directories.
+                dst.write_text(
+                    build_skill_directory_markdown(skill, language), encoding="utf-8"
                 )
-                dst.write_bytes(build_claude_skill(skill, language, next_content))
-            elif target == "codex":
-                content = build_codex_skill_markdown(skill, language)
-                next_content = (
-                    patch_rule_content(dst.read_text(encoding="utf-8"), content, target)
-                    if file_exists and not force and patch
-                    else content
-                )
-                dst.write_text(next_content, encoding="utf-8")
-                copy_codex_skill_resources(skill, language, dst.parent)
             else:
-                content = build_skill_markdown(skill, language)
-                next_content = (
-                    patch_rule_content(dst.read_text(encoding="utf-8"), content, target)
-                    if file_exists and not force and patch
-                    else content
-                )
-                dst.write_text(next_content, encoding="utf-8")
+                dst.write_text(build_skill_markdown(skill, language), encoding="utf-8")
             result.installed_skills.append(skill)
             processed_skills.append(skill)
         except Exception as err:

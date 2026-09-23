@@ -24,6 +24,10 @@ Suggested facts to record:
 Update this section when those facts change. If live runtime state is required, discover it separately instead of treating it as a durable repo fact.
 
 - Root `.rulesrc.json` targets are repo policy. Keep them aligned with every checked-in Ballast-managed target surface.
+- Agent and skill registries are duplicated across generated backend packages. When adding, renaming, or removing `agents/common/*`, language agent directories, or `skills/common/*`, update every backend registry and keep parity tests that compare registries to packaged content directories passing.
+- Install behavior lives in four places, not one. `packages/ballast-typescript/src/{build,install}.ts`, `packages/ballast-go/cmd/ballast-go/main.go`, and `packages/ballast-python/ballast/cli.py` each independently decide where a rule or skill is written, what it contains, and how `--patch` treats it; `cli/ballast/main.go` owns the wrapper's own copies of those paths, its stale-file removal, and its manifest text. Any change to a destination path, emitted content, patch semantics, manifest wording, or legacy-path cleanup must land in all four. Which backend runs depends on the repository's languages, so a TypeScript-only change passes every TypeScript test while leaving Go, Python, Ansible, Terraform, Dart, and Docker repositories broken.
+- The e2e and smoke scripts under `scripts/` invoke a bare `ballast` resolved from `PATH`. Run them without putting the freshly built binaries first and they silently exercise the installed release instead of the working tree, reporting a pass that means nothing. Reproduce the CI wiring before trusting a local run: build with `pnpm run build` and `make build-go build-cli`, then place `ballast`, `ballast-go`, and shims for `ballast-typescript` and `ballast-python` in a directory prepended to `PATH` (see the `Create local backend shims` step in `.github/workflows/examples-smoke.yml`). `SKIP_BUILD=1` reuses whatever was built last, so drop it after editing a backend.
+- Skills are entirely Ballast-authored and every backend replaces them wholesale. Do not reintroduce section-merging for skills: heading names cannot distinguish a team-authored section from one upstream deleted, so merging both keeps stale text for headings that still exist and resurrects sections that were removed. Rules still merge under `--patch` to preserve user-authored sections.
 - Do not edit checked-in `.claude/` or `.codex/` generated rule outputs directly. Change the source templates/content under repo-root `agents/` and `skills/`, then regenerate the local Ballast-managed outputs.
 - When repo-root `agents/`, `skills/`, Ballast sync/build scripts, or root target config change, regenerate and commit the corresponding local Ballast-managed `.claude/` and `.codex/` outputs in the same PR.
 
@@ -73,18 +77,18 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 
 Created by Ballast. Do not edit this section.
 
-Read and use these skill files in `.claude/skills/` when they are relevant:
+These skills are registered with Claude Code. Invoke one by name (for example `/ballast-audit`) when it is relevant:
 
-- `.claude/skills/owasp-security-scan.skill` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
-- `.claude/skills/aws-health-review.skill` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
-- `.claude/skills/aws-live-health-review.skill` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
-- `.claude/skills/aws-weekly-security-review.skill` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
-- `.claude/skills/github-health-check.skill` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
-- `.claude/skills/github-pr-copilot-cycle.skill` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
-- `.claude/skills/ballast-audit.skill` — audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
-- `.claude/skills/agent-performance-audit.skill` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
-- `.claude/skills/ballast-project-maintenance.skill` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
-- `.claude/skills/speckit-bootstrap.skill` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
-- `.claude/skills/speckit-reverse-engineer.skill` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
-- `.claude/skills/speckit-delivery.skill` — orchestrate GitHub Spec Kit's native skills for a bounded product change
-- `.claude/skills/docker-registry-publish.skill` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility
+- `/owasp-security-scan` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
+- `/aws-health-review` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
+- `/aws-live-health-review` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
+- `/aws-weekly-security-review` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
+- `/github-health-check` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
+- `/github-pr-copilot-cycle` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
+- `/ballast-audit` — audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
+- `/agent-performance-audit` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
+- `/ballast-project-maintenance` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
+- `/speckit-bootstrap` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
+- `/speckit-reverse-engineer` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
+- `/speckit-delivery` — orchestrate GitHub Spec Kit's native skills for a bounded product change
+- `/docker-registry-publish` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility

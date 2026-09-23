@@ -48,10 +48,10 @@ EOF
 )
 
 assert_file_absent "${PROJECT}/.codex/skills/github-health-check"
-assert_file_absent "${PROJECT}/.claude/skills/github-health-check.skill"
+assert_file_absent "${PROJECT}/.claude/skills/github-health-check/SKILL.md"
 assert_not_contains '`.codex/skills/github-health-check/SKILL.md`' "${PROJECT}/AGENTS.md"
-assert_not_contains '`.claude/skills/github-health-check.skill`' "${PROJECT}/CLAUDE.md"
+assert_not_contains '`/github-health-check`' "${PROJECT}/CLAUDE.md"
 assert_file_exists "${PROJECT}/.codex/skills/owasp-security-scan/SKILL.md"
-assert_file_exists "${PROJECT}/.claude/skills/owasp-security-scan.skill"
+assert_file_exists "${PROJECT}/.claude/skills/owasp-security-scan/SKILL.md"
 
 echo "PASS: remove-skill-existing-install-e2e"

@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1575,7 +1576,7 @@ func TestSkillDestinationReturnsExpectedPaths(t *testing.T) {
 		file   string
 	}{
 		{target: "cursor", dir: filepath.Join(tmpDir, ".cursor", "rules"), file: filepath.Join(tmpDir, ".cursor", "rules", "owasp-security-scan.mdc")},
-		{target: "claude", dir: filepath.Join(tmpDir, ".claude", "skills"), file: filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")},
+		{target: "claude", dir: filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan"), file: filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan", "SKILL.md")},
 		{target: "opencode", dir: filepath.Join(tmpDir, ".opencode", "skills"), file: filepath.Join(tmpDir, ".opencode", "skills", "owasp-security-scan.md")},
 		{target: "codex", dir: filepath.Join(tmpDir, ".codex", "skills", "owasp-security-scan"), file: filepath.Join(tmpDir, ".codex", "skills", "owasp-security-scan", "SKILL.md")},
 		{target: "gemini", dir: filepath.Join(tmpDir, ".gemini", "rules"), file: filepath.Join(tmpDir, ".gemini", "rules", "owasp-security-scan.md")},
@@ -1964,7 +1965,7 @@ func TestInstallCreatesClaudeSkillAndPersistsConfig(t *testing.T) {
 		t.Fatalf("expected skill install result, got %+v", result.installedSkills)
 	}
 
-	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan", "SKILL.md")
 	if _, err := os.Stat(skillPath); err != nil {
 		t.Fatalf("expected skill file at %s: %v", skillPath, err)
 	}
@@ -1988,8 +1989,8 @@ func TestInstallCreatesClaudeSkillAndPersistsConfig(t *testing.T) {
 	if !strings.Contains(string(claudeContent), "## Installed skills") {
 		t.Fatalf("expected installed skills section in CLAUDE.md: %s", string(claudeContent))
 	}
-	if !strings.Contains(string(claudeContent), "`.claude/skills/owasp-security-scan.skill`") {
-		t.Fatalf("expected skill entry in CLAUDE.md: %s", string(claudeContent))
+	if !strings.Contains(string(claudeContent), "`/owasp-security-scan`") {
+		t.Fatalf("expected skill invocation in CLAUDE.md: %s", string(claudeContent))
 	}
 }
 
@@ -2168,7 +2169,7 @@ func TestInstallPatchCreatesMissingSkill(t *testing.T) {
 	}
 }
 
-func TestInstallPatchMergesExistingSkill(t *testing.T) {
+func TestInstallPatchReplacesExistingSkillWholesale(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillPath := filepath.Join(tmpDir, ".cursor", "rules", "owasp-security-scan.mdc")
 	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
@@ -2181,9 +2182,9 @@ alwaysApply: true
 
 Team intro.
 
-## Usage
+## Retired Upstream Section
 
-Keep team-specific usage notes.
+Content upstream deleted that must not survive a patch.
 `), 0o644); err != nil {
 		t.Fatalf("seed skill file: %v", err)
 	}
@@ -2202,36 +2203,130 @@ Keep team-specific usage notes.
 	}
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
-		t.Fatalf("read merged skill: %v", err)
+		t.Fatalf("read replaced skill: %v", err)
 	}
 	text := string(content)
-	if !strings.Contains(text, "description: Team customized skill") {
-		t.Fatalf("expected custom frontmatter to remain: %s", text)
+	if strings.Contains(text, "Retired Upstream Section") {
+		t.Fatalf("expected sections upstream deleted to be gone: %s", text)
 	}
-	if !strings.Contains(text, "alwaysApply: true") {
-		t.Fatalf("expected custom alwaysApply to remain: %s", text)
-	}
-	if !strings.Contains(text, "Keep team-specific usage notes.") {
-		t.Fatalf("expected custom section to remain: %s", text)
+	if strings.Contains(text, "description: Team customized skill") {
+		t.Fatalf("expected local frontmatter to be replaced: %s", text)
 	}
 	if !strings.Contains(text, "## Scan Architecture") {
-		t.Fatalf("expected canonical skill content to be merged: %s", text)
+		t.Fatalf("expected canonical skill content: %s", text)
 	}
 }
 
-func TestInstallPatchMergesClaudeSkillArchive(t *testing.T) {
+func TestCopySkillResourcesReconcilesDestination(t *testing.T) {
 	tmpDir := t.TempDir()
-	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
-	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
+	dest := filepath.Join(tmpDir, "owasp-security-scan")
+	if err := os.MkdirAll(filepath.Join(dest, "references"), 0o755); err != nil {
+		t.Fatalf("create destination: %v", err)
+	}
+	// A resource upstream no longer ships, nested inside a managed directory
+	// so a top-level sweep alone would not see it.
+	orphan := filepath.Join(dest, "references", "retired-upstream.md")
+	if err := os.WriteFile(orphan, []byte("deleted upstream\n"), 0o644); err != nil {
+		t.Fatalf("seed orphan: %v", err)
+	}
+	// And an unmanaged top-level entry.
+	topOrphan := filepath.Join(dest, "stale-dir")
+	if err := os.MkdirAll(topOrphan, 0o755); err != nil {
+		t.Fatalf("seed top-level orphan: %v", err)
+	}
+
+	if err := copySkillResources("owasp-security-scan", "go", dest); err != nil {
+		t.Fatalf("copySkillResources: %v", err)
+	}
+
+	if _, err := os.Stat(orphan); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected nested orphan removed, got err=%v", err)
+	}
+	if _, err := os.Stat(topOrphan); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected top-level orphan removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "references", "owasp-mapping.md")); err != nil {
+		t.Fatalf("expected canonical resource copied: %v", err)
+	}
+}
+
+func TestCopySkillResourcesSurfacesMissingSource(t *testing.T) {
+	// An unknown skill has no source directory, so listing its resources must
+	// fail loudly rather than silently reconciling the destination to empty.
+	err := copySkillResources("not-a-real-skill", "go", t.TempDir())
+	if err == nil {
+		t.Fatal("expected an error for a skill with no source directory")
+	}
+}
+
+func TestReconcileSkillResourcesTreatsMissingDestinationAsDone(t *testing.T) {
+	sourceDir := skillDir("owasp-security-scan", "go")
+	missing := filepath.Join(t.TempDir(), "never-created")
+	if err := reconcileSkillResources(sourceDir, missing); err != nil {
+		t.Fatalf("expected a missing destination to be a no-op, got %v", err)
+	}
+}
+
+func TestRemoveLegacyClaudeSkillArchiveTolerance(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Missing archive is the normal case and must not error.
+	if err := removeLegacyClaudeSkillArchive(tmpDir, "owasp-security-scan"); err != nil {
+		t.Fatalf("expected no error for a missing archive, got %v", err)
+	}
+	// A directory at the legacy path is not the bundle; leave it alone.
+	legacyDir := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(legacyDir, 0o755); err != nil {
+		t.Fatalf("create legacy dir: %v", err)
+	}
+	if err := removeLegacyClaudeSkillArchive(tmpDir, "owasp-security-scan"); err != nil {
+		t.Fatalf("expected no error for a directory at the legacy path, got %v", err)
+	}
+	if _, err := os.Stat(legacyDir); err != nil {
+		t.Fatalf("expected directory at legacy path preserved: %v", err)
+	}
+}
+
+func TestInstallMigratesLegacyClaudeSkillArchiveWhenSkillSkipped(t *testing.T) {
+	tmpDir := t.TempDir()
+	// An interrupted migration leaves both layouts. A plain install skips
+	// rewriting SKILL.md, so the cleanup must run before the skip guard or the
+	// archive survives forever.
+	skillDir := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		t.Fatalf("create skill dir: %v", err)
 	}
-	existingSkillContent := "# owasp-security-scan\n\nTeam intro preserved by patch.\n\n## Team Custom Section\n\nKeep this team-specific section.\n"
-	initialArchive, err := buildClaudeSkill("owasp-security-scan", "go", existingSkillContent)
-	if err != nil {
-		t.Fatalf("build initial skill archive: %v", err)
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: owasp-security-scan\n---\n"), 0o644); err != nil {
+		t.Fatalf("seed SKILL.md: %v", err)
 	}
-	if err := os.WriteFile(skillPath, initialArchive, 0o644); err != nil {
-		t.Fatalf("seed skill archive: %v", err)
+	legacy := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.WriteFile(legacy, []byte("stale bundle"), 0o644); err != nil {
+		t.Fatalf("seed legacy archive: %v", err)
+	}
+
+	install(installOptions{
+		projectRoot: tmpDir,
+		targets:     []string{"claude"},
+		skills:      []string{"owasp-security-scan"},
+		language:    "go",
+		force:       false,
+		saveConfig:  false,
+	})
+
+	if _, err := os.Stat(legacy); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy archive removed on a skipped install, got err=%v", err)
+	}
+}
+
+func TestInstallMigratesLegacyClaudeSkillArchive(t *testing.T) {
+	tmpDir := t.TempDir()
+	legacy := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatalf("create skill dir: %v", err)
+	}
+	// A corrupt bundle is still just a bundle: Claude Code never read it, so
+	// the install replaces it with the directory rather than repairing it.
+	if err := os.WriteFile(legacy, []byte("not-a-zip-archive"), 0o644); err != nil {
+		t.Fatalf("seed legacy archive: %v", err)
 	}
 
 	result := install(installOptions{
@@ -2243,138 +2338,23 @@ func TestInstallPatchMergesClaudeSkillArchive(t *testing.T) {
 		patch:       true,
 		saveConfig:  false,
 	})
-	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
-		t.Fatalf("expected patched skill install, got %+v", result.installedSkills)
+	if len(result.errors) > 0 {
+		t.Fatalf("unexpected install errors: %+v", result.errors)
 	}
-	skillMd, err := readClaudeSkillContent(skillPath)
+	skillMD := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan", "SKILL.md")
+	content, err := os.ReadFile(skillMD)
 	if err != nil {
-		t.Fatalf("read merged skill archive: %v", err)
+		t.Fatalf("expected SKILL.md at %s: %v", skillMD, err)
 	}
-	if !strings.Contains(skillMd, "Team intro preserved by patch.") {
-		t.Fatalf("expected user intro to remain: %s", skillMd)
+	if !strings.Contains(string(content), "name: owasp-security-scan") {
+		t.Fatalf("expected skill frontmatter: %s", string(content))
 	}
-	if !strings.Contains(skillMd, "Team Custom Section") {
-		t.Fatalf("expected custom section to remain: %s", skillMd)
+	if _, err := os.Stat(legacy); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy archive to be migrated away, got err=%v", err)
 	}
-	if !strings.Contains(skillMd, "## Scan Architecture") {
-		t.Fatalf("expected canonical skill content to be merged: %s", skillMd)
-	}
-}
-
-func TestInstallPatchOverwritesUnreadableClaudeSkillArchive(t *testing.T) {
-	tmpDir := t.TempDir()
-	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
-	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
-		t.Fatalf("create skill dir: %v", err)
-	}
-	if err := os.WriteFile(skillPath, []byte("not-a-zip-archive"), 0o644); err != nil {
-		t.Fatalf("seed unreadable skill archive: %v", err)
-	}
-
-	result := install(installOptions{
-		projectRoot: tmpDir,
-		targets:     []string{"claude"},
-		skills:      []string{"owasp-security-scan"},
-		language:    "go",
-		force:       false,
-		patch:       true,
-		saveConfig:  false,
-	})
-	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
-		t.Fatalf("expected patched skill install, got %+v", result.installedSkills)
-	}
-	skillMd, err := readClaudeSkillContent(skillPath)
-	if err != nil {
-		t.Fatalf("read overwritten skill archive: %v", err)
-	}
-	if strings.Contains(skillMd, "not-a-zip-archive") {
-		t.Fatalf("expected unreadable archive to be replaced with canonical content: %s", skillMd)
-	}
-	if !strings.Contains(skillMd, "## Scan Architecture") {
-		t.Fatalf("expected canonical skill content after overwrite fallback: %s", skillMd)
-	}
-}
-
-func TestInstallRefreshOverwritesExistingCodexSkill(t *testing.T) {
-	tmpDir := t.TempDir()
-	legacySkillPath := filepath.Join(tmpDir, ".codex", "rules", "owasp-security-scan.md")
-	if err := os.MkdirAll(filepath.Dir(legacySkillPath), 0o755); err != nil {
-		t.Fatalf("create skill dir: %v", err)
-	}
-	if err := os.WriteFile(legacySkillPath, []byte("<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast). Do not edit this section. -->\n\nstale skill content\n"), 0o644); err != nil {
-		t.Fatalf("seed stale skill: %v", err)
-	}
-
-	t.Setenv("BALLAST_REFRESH_SKILLS", "1")
-
-	result := install(installOptions{
-		projectRoot: tmpDir,
-		targets:     []string{"codex"},
-		skills:      []string{"owasp-security-scan"},
-		language:    "go",
-		force:       false,
-		patch:       false,
-		saveConfig:  false,
-	})
-	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
-		t.Fatalf("expected refreshed skill install, got %+v", result.installedSkills)
-	}
-	if _, err := os.Stat(legacySkillPath); !os.IsNotExist(err) {
-		t.Fatalf("expected legacy codex skill to be removed, stat err=%v", err)
-	}
-	skillPath := filepath.Join(tmpDir, ".codex", "skills", "owasp-security-scan", "SKILL.md")
-	content, err := os.ReadFile(skillPath)
-	if err != nil {
-		t.Fatalf("read refreshed skill: %v", err)
-	}
-	text := string(content)
-	if strings.Contains(text, "stale skill content") {
-		t.Fatalf("expected stale skill content to be replaced: %s", text)
-	}
-	if !strings.Contains(text, "# OWASP Security Scan Skill") {
-		t.Fatalf("expected canonical skill content after refresh: %s", text)
-	}
-}
-
-func TestInstallForceOverwritesExistingClaudeSkillArchive(t *testing.T) {
-	tmpDir := t.TempDir()
-	skillPath := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan.skill")
-	if err := os.MkdirAll(filepath.Dir(skillPath), 0o755); err != nil {
-		t.Fatalf("create skill dir: %v", err)
-	}
-	existingSkillContent := "# owasp-security-scan\n\nTeam-only intro that should be removed on force.\n\n## Team Custom Section\n\nThis section should not survive a force overwrite.\n"
-	initialArchive, err := buildClaudeSkill("owasp-security-scan", "go", existingSkillContent)
-	if err != nil {
-		t.Fatalf("build initial skill archive: %v", err)
-	}
-	if err := os.WriteFile(skillPath, initialArchive, 0o644); err != nil {
-		t.Fatalf("seed skill archive: %v", err)
-	}
-
-	result := install(installOptions{
-		projectRoot: tmpDir,
-		targets:     []string{"claude"},
-		skills:      []string{"owasp-security-scan"},
-		language:    "go",
-		force:       true,
-		patch:       false,
-		saveConfig:  false,
-	})
-	if !slices.Equal(result.installedSkills, []string{"owasp-security-scan"}) {
-		t.Fatalf("expected force install, got %+v", result.installedSkills)
-	}
-	skillMd, err := readClaudeSkillContent(skillPath)
-	if err != nil {
-		t.Fatalf("read overwritten skill archive: %v", err)
-	}
-	if strings.Contains(skillMd, "Team-only intro") {
-		t.Fatalf("expected team intro to be removed by force overwrite: %s", skillMd)
-	}
-	if strings.Contains(skillMd, "Team Custom Section") {
-		t.Fatalf("expected custom section to be removed by force overwrite: %s", skillMd)
-	}
-	if !strings.Contains(skillMd, "## Scan Architecture") {
-		t.Fatalf("expected canonical skill content after force overwrite: %s", skillMd)
+	references := filepath.Join(tmpDir, ".claude", "skills", "owasp-security-scan", "references")
+	if _, err := os.Stat(references); err != nil {
+		t.Fatalf("expected skill references copied alongside SKILL.md: %v", err)
 	}
 }
 

@@ -772,29 +772,20 @@ Content upstream deleted that must not survive a patch.
       expect(content).not.toContain('Use jira as the system of record');
     });
 
-    test('patch replaces an existing claude .skill archive wholesale', () => {
-      // The claude target ships a zip; --patch previously merged the SKILL.md
-      // inside it, which resurrected deleted sections. It now rewrites it.
-      const skillFile = path.join(
+    test('installs claude skills as a directory Claude Code can discover', () => {
+      // Claude Code scans .claude/skills/<name>/SKILL.md and exposes it as
+      // /<name>. The old <name>.skill zip was never scanned, so it is
+      // migrated away rather than left to shadow the directory.
+      const legacyArchive = path.join(
         tmpDir,
         '.claude',
         'skills',
         'owasp-security-scan.skill'
       );
-      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+      fs.mkdirSync(path.dirname(legacyArchive), { recursive: true });
       fs.writeFileSync(
-        skillFile,
-        buildClaudeSkill(
-          'owasp-security-scan',
-          `# owasp-security-scan
-
-Team intro.
-
-## Retired Upstream Section
-
-Content upstream deleted that must not survive a patch.
-`
-        )
+        legacyArchive,
+        buildClaudeSkill('owasp-security-scan', '# stale bundle\n')
       );
 
       const result = install({
@@ -802,38 +793,138 @@ Content upstream deleted that must not survive a patch.
         target: 'claude',
         agents: [],
         skills: ['owasp-security-scan'],
-        patch: true,
         force: false,
         saveConfig: false
       });
 
       expect(result.errors).toEqual([]);
       expect(result.installedSkills).toContain('owasp-security-scan');
-      const skillMd = readSkillMdFromArchive(fs.readFileSync(skillFile));
-      expect(skillMd).toContain('## Scan Architecture');
-      expect(skillMd).not.toContain('Retired Upstream Section');
-      expect(skillMd).not.toContain('Team intro.');
+
+      const skillMd = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan',
+        'SKILL.md'
+      );
+      const content = fs.readFileSync(skillMd, 'utf8');
+      expect(content).toMatch(/^---\nname: owasp-security-scan/m);
+      expect(content).toContain('description:');
+      expect(content).toContain('## Scan Architecture');
+      expect(fs.existsSync(legacyArchive)).toBe(false);
+      // Reference material ships alongside SKILL.md, as it does for codex.
+      expect(
+        fs.existsSync(
+          path.join(
+            tmpDir,
+            '.claude',
+            'skills',
+            'owasp-security-scan',
+            'references',
+            'owasp-mapping.md'
+          )
+        )
+      ).toBe(true);
     });
 
-    test('force-overwrites an existing claude .skill archive without patching', () => {
-      const skillFile = path.join(
+    test('migrates a legacy archive even when the skill is skipped', () => {
+      // An interrupted migration leaves both layouts. A plain install skips
+      // rewriting SKILL.md, so the cleanup must run before the skip guard or
+      // the archive survives forever.
+      const skillDir = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan'
+      );
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(skillDir, 'SKILL.md'),
+        '---\nname: owasp-security-scan\ndescription: x\n---\n',
+        'utf8'
+      );
+      const legacyArchive = path.join(
         tmpDir,
         '.claude',
         'skills',
         'owasp-security-scan.skill'
       );
-      fs.mkdirSync(path.dirname(skillFile), { recursive: true });
-      const existingSkillContent = `# owasp-security-scan
+      fs.writeFileSync(
+        legacyArchive,
+        buildClaudeSkill('owasp-security-scan', '# stale bundle\n')
+      );
+
+      install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        force: false,
+        patch: false,
+        saveConfig: false
+      });
+
+      expect(fs.existsSync(legacyArchive)).toBe(false);
+    });
+
+    test('reconciles skill resources even when the skill is skipped', () => {
+      // SKILL.md existing does not mean the directory is complete. A run
+      // interrupted before resources were copied, or a resource deleted
+      // upstream, must both be repaired by an ordinary install.
+      const skillDir = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan'
+      );
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(skillDir, 'SKILL.md'),
+        '---\nname: owasp-security-scan\ndescription: x\n---\n',
+        'utf8'
+      );
+      const orphan = path.join(skillDir, 'references', 'retired-upstream.md');
+      fs.mkdirSync(path.dirname(orphan), { recursive: true });
+      fs.writeFileSync(orphan, 'deleted upstream\n', 'utf8');
+
+      install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: [],
+        skills: ['owasp-security-scan'],
+        force: false,
+        patch: false,
+        saveConfig: false
+      });
+
+      // missing resources restored despite the skipped SKILL.md write
+      expect(
+        fs.existsSync(path.join(skillDir, 'references', 'owasp-mapping.md'))
+      ).toBe(true);
+      // and a resource upstream no longer ships is removed, not left behind
+      expect(fs.existsSync(orphan)).toBe(false);
+    });
+
+    test('force replaces a modified claude skill directory', () => {
+      const skillMd = path.join(
+        tmpDir,
+        '.claude',
+        'skills',
+        'owasp-security-scan',
+        'SKILL.md'
+      );
+      fs.mkdirSync(path.dirname(skillMd), { recursive: true });
+      fs.writeFileSync(
+        skillMd,
+        `# owasp-security-scan
 
 Team intro that should be discarded on force.
 
 ## Team Custom Section
 
 This section should be gone after force.
-`;
-      fs.writeFileSync(
-        skillFile,
-        buildClaudeSkill('owasp-security-scan', existingSkillContent)
+`,
+        'utf8'
       );
 
       const result = install({
@@ -847,13 +938,12 @@ This section should be gone after force.
       });
 
       expect(result.installedSkills).toContain('owasp-security-scan');
-
-      const skillMd = readSkillMdFromArchive(fs.readFileSync(skillFile));
-      expect(skillMd).not.toContain(
+      const content = fs.readFileSync(skillMd, 'utf8');
+      expect(content).not.toContain(
         'Team intro that should be discarded on force.'
       );
-      expect(skillMd).not.toContain('Team Custom Section');
-      expect(skillMd).toContain('## Scan Architecture');
+      expect(content).not.toContain('Team Custom Section');
+      expect(content).toContain('## Scan Architecture');
     });
 
     test('writes ansible language rules when requested', () => {
