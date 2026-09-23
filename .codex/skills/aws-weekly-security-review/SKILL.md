@@ -3,7 +3,7 @@ name: aws-weekly-security-review
 description: Run a weekly, read-only AWS security baseline review and generate a Markdown report with prioritized findings. Use when asked for recurring AWS security posture checks, quick risk triage, or a starting point for ongoing cloud hardening.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.20.0. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.21.0. Do not edit this section. -->
 
 # AWS Weekly Security Review
 
@@ -19,13 +19,10 @@ The bundled script runs read-only checks against AWS and writes a Markdown repor
 
 ## Command
 
-`scripts/aws_weekly_security_review.py` ships inside this skill's own directory. Run it from the
-repository root, resolving `<skill-dir>` against the directory this SKILL.md is in
-(`.claude/skills/aws-weekly-security-review/` for Claude Code, `.codex/skills/aws-weekly-security-review/`
-for Codex):
+Run from repository root:
 
 ```bash
-uv run <skill-dir>/scripts/aws_weekly_security_review.py
+uv run skills/aws-weekly-security-review/scripts/aws_weekly_security_review.py
 ```
 
 Optional flags:

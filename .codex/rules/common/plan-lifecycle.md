@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/plan-lifecycle" version="5.20.0" checksum="c410467aa1851e9910403f4fe074823dbf9df758eb7ad45da43bdc02d8e71880" -->
+<!-- ballast:rule id="typescript/plan-lifecycle" version="5.21.0" checksum="c410467aa1851e9910403f4fe074823dbf9df758eb7ad45da43bdc02d8e71880" -->
 # Plan Lifecycle
 
 Create and maintain plans for non-trivial work, then graduate completed plans to ADRs.

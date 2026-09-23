@@ -3,7 +3,7 @@ name: aws-health-review
 description: Run a weekly, read-only AWS health review covering configuration issues, performance problems, errors, and warnings. Generates a Markdown report and appends new P0/P1 tasks to TODO.md. Use when asked for AWS health checks, weekly infrastructure review, or configuration/performance triage.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.20.0. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.21.0. Do not edit this section. -->
 
 # AWS Health Review
 
@@ -22,13 +22,10 @@ The bundled script runs read-only checks and writes a Markdown report with:
 
 ## Command
 
-`scripts/aws_health_review.py` ships inside this skill's own directory. Run it from the
-repository root, resolving `<skill-dir>` against the directory this SKILL.md is in
-(`.claude/skills/aws-health-review/` for Claude Code, `.codex/skills/aws-health-review/`
-for Codex):
+Run from repository root:
 
 ```bash
-uv run <skill-dir>/scripts/aws_health_review.py
+uv run skills/aws-health-review/scripts/aws_health_review.py
 ```
 
 Optional flags:

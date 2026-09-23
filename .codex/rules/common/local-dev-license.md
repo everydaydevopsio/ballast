@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/local-dev/license" version="5.20.0" checksum="b8081a1a9ec795532d7d23e169cc0c3d49946ec2eb1e3f663f78f08089846400" -->
+<!-- ballast:rule id="typescript/local-dev/license" version="5.21.0" checksum="b8081a1a9ec795532d7d23e169cc0c3d49946ec2eb1e3f663f78f08089846400" -->
 # Local Development: License Setup
 
 Ensure proper license configuration (LICENSE file, package.json, README reference). Default: MIT. Overridable in AGENTS.md or CLAUDE.md.

@@ -11,7 +11,7 @@ description: >
   and Python with language-specific tools plus cross-language Semgrep rulesets.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.20.0. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.21.0. Do not edit this section. -->
 
 # OWASP Security Scan Skill
 

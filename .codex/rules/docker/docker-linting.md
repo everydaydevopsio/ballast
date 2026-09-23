@@ -1,4 +1,4 @@
-<!-- ballast:rule id="docker/linting" version="5.20.0" checksum="e3fd62b318c6d4af0547ff24e27aeb6f5f954588646ee7a756dde097098e5db7" -->
+<!-- ballast:rule id="docker/linting" version="5.21.0" checksum="e3fd62b318c6d4af0547ff24e27aeb6f5f954588646ee7a756dde097098e5db7" -->
 # Docker Linting Rules
 
 ## Responsibilities

@@ -31,6 +31,26 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.21.0] - 2026-09-23
+
+### Highlights
+
+- **Claude skills now install as directories**, enabling them to register as slash commands. The new layout is supported by both the Go and Python backends.
+
+### Fixes
+
+- Made migration to the Claude skill directory layout safe to rerun, with improved handling of directories at the legacy path in the wrapper and Python backend.
+- Improved skill-resource reconciliation and detection of missing generated resources. Migration errors are now surfaced rather than silently ignored.
+- Corrected AWS skill script paths.
+- Addressed silent staleness issues involving pinned backends, skill patching, and the Homebrew token.
+
+### Changes
+
+- Added tests covering skill-resource reconciliation.
+- Clarified the manifest contract in `ARCHITECTURE.md` and documented multi-backend and `PATH` pitfalls.
+
+**Full changelog:** [v5.20.0...v5.21.0](../../compare/v5.20.0...v5.21.0)
+
 ## [5.20.0] - 2026-09-22
 
 ### Highlights
