@@ -19,10 +19,13 @@ The bundled script runs read-only checks against AWS and writes a Markdown repor
 
 ## Command
 
-Run from repository root:
+`scripts/aws_weekly_security_review.py` ships inside this skill's own directory. Run it from the
+repository root, resolving `<skill-dir>` against the directory this SKILL.md is in
+(`.claude/skills/aws-weekly-security-review/` for Claude Code, `.codex/skills/aws-weekly-security-review/`
+for Codex):
 
 ```bash
-uv run skills/aws-weekly-security-review/scripts/aws_weekly_security_review.py
+uv run <skill-dir>/scripts/aws_weekly_security_review.py
 ```
 
 Optional flags:

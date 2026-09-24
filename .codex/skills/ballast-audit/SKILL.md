@@ -1,77 +1,206 @@
 ---
 name: ballast-audit
-description: audit AI rule and skill files for context density, duplication, and bloat
+description: audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
 ---
 
 <!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.21.0. Do not edit this section. -->
 
 # Ballast Audit Skill
 
-This skill performs a "Context Hygiene" audit of the repository's AI rule files (`.codex/rules/`, `.gemini/rules/`, etc.). It identifies redundant, oversized, or low-density rules that degrade AI performance by consuming excessive context tokens.
+Audit what Ballast has actually installed into this repository against two questions:
+
+1. **Is it current?** Does the checked-in output match what the installed Ballast version generates?
+2. **Is it needed?** Does every emitted rule and skill correspond to something this repository really does?
+
+Rules load on every turn, so an out-of-date or irrelevant rule is a permanent tax on every session in every target. Skills load on demand, but their names and descriptions sit in the generated manifest (`CLAUDE.md`, `AGENTS.md`) each session and invite misfires.
+
+Run all five checks below, then produce the report in **Reporting**. Do not stop at the first finding; check 1 hides check 2's evidence and vice versa.
 
 ---
 
-## Capabilities
-
-- **Find Duplicates**: Detect identical rule files across different language/target directories.
-- **Calculate BAS**: Apply the Ballast Audit Score to evaluate rule efficiency.
-- **Identify Bloat**: Flag files over 5KB for trimming, and escalate files over 10KB to skill-or-split candidates.
-- **Recommend Merges**: Suggest consolidation for fragmented rules.
-
----
-
-## Scoring Logic (BAS)
-
-Evaluate every rule file against these four criteria:
-
-1.  **Density (40%)**: (Project-Specific Lines / Total Lines).
-2.  **Risk (30%)**: High (Security, CI, Build), Med (Linting, Tests), Low (Badges, Docs).
-3.  **Uniqueness (20%)**: 0% if a byte-for-byte duplicate exists; 100% if unique.
-4.  **Actionability (10%)**: Percentage of lines starting with imperatives (Use, Run, Don't, Ensure).
-
----
-
-## Audit Procedures
-
-### 1. Check for Redundancy (The "Duplication Tax")
-
-Run this to find identical files that should be symlinked or merged:
+## 0. Establish the baseline
 
 ```bash
-find .codex/rules .gemini/rules -type f -exec md5sum {} + | sort | uniq -w32 -d
+ballast --version
+cat .rulesrc.json
 ```
 
-**Action**: If duplicates exist across `common/` and `<lang>/`, remove the language-specific copy and reference the common one.
+Record `targets`, `agents`, `skills`, `languages`, `paths`, `taskSystem`, `deploymentModel`, and `publishingProfiles`. Everything below is measured against this config. If `.rulesrc.json` is absent the repository is not Ballast-managed — stop and say so.
 
-### 2. Check for "AI Bloat" (The "Size Tax")
-
-Identify files that are too large to be persistent rules:
+Then compare the wrapper version against the project's pinned backend:
 
 ```bash
-find .codex/rules .gemini/rules -name "*.md" -size +5k
-find .codex/rules .gemini/rules -name "*.md" -size +10k
+ballast --version
+ballast doctor | sed -n 's/^- \(ballast-[a-z]*\): \([^ ]*\).*/\1 \2/p'
 ```
 
-**Action**:
-- **Files > 10KB**: Convert to a **Skill** (loaded on-demand) rather than a **Rule** (loaded every turn).
-- **Files > 5KB**: Audit for "Generic Tooling" sections (e.g., "How to install Node.js") and delete them.
+**If the backend is older than the wrapper, every remediation in this report must be `ballast upgrade`, not `ballast install --refresh-config`.** The wrapper forwards to the pinned backend in `.ballast/`, so a refresh run against an outdated one reports installing everything, writes the old backend's content, and leaves `ballastVersion` behind — a silent no-op that looks like success. `ballast upgrade` syncs the backend first. Recommending the refresh command in this situation is the most common way an audit produces advice that does nothing.
 
-### 3. Calculate Signal-to-Noise Ratio
-
-For a specific file, check how many lines are actually project-specific:
+Measure the current always-on cost per target:
 
 ```bash
-# Count lines mentioning specific repo paths or custom scripts vs total lines
-FILE="path/to/rule.md"
-SPECIFIC=$(grep -cE "(\./|src/|packages/|ballast)" "$FILE")
-TOTAL=$(wc -l < "$FILE" | awk '{print $1}')
-echo "Density: $(( (SPECIFIC * 100) / TOTAL ))%"
+for t in claude codex cursor gemini opencode; do
+  [ -d ".$t/rules" ] || continue
+  printf '%s: %s bytes of rules\n' "$t" "$(cat .$t/rules/*.md 2>/dev/null | wc -c | tr -d ' ')"
+done
+wc -c CLAUDE.md AGENTS.md 2>/dev/null
+```
+
+Rules plus the target's manifest are the always-on total. Divide bytes by 4 for a rough token estimate.
+
+---
+
+## 1. Ownership census (run the backend doctor, not the wrapper)
+
+Ballast marks every file it generates with an HTML comment on line 1:
+
+```
+<!-- ballast:rule id="typescript/cicd" version="5.19.1" checksum="0d00ce..." -->
+```
+
+Files **without** that marker are `unowned`: Ballast will not refresh them and will not prune them. They predate the ownership marker and are frozen in place until deleted by hand. This is the single highest-value check in this skill.
+
+The wrapper `ballast doctor` does not print rule-file status. The language backend does. Get its path from the wrapper, then run it directly:
+
+```bash
+ballast doctor | sed -n 's/^- \(ballast-[a-z]*\): .*(\(.*\))$/\2/p'
+```
+
+Run each path returned with `doctor`, and bucket the results:
+
+```bash
+<backend-path> doctor 2>&1 | grep -E '^- \.[a-z]+/rules' | sed 's/.*\[\([a-z]*\).*/\1/' | sort | uniq -c
+<backend-path> doctor 2>&1 | grep -E '\[(unowned|stale|drifted)'
+```
+
+Interpret the states:
+
+- `ok` — owned, still in the active config set, and the body matches canonical.
+- `drifted` — the body differs from canonical, usually a hand edit. Either the edit belongs upstream in `agents/`, or it should be reverted; a drifted rule silently diverges from every other repo. `ballast install --refresh-config` restores it.
+- `stale` — owned, but its rule id is **no longer in the active set** for the current config, so it should be deleted, not refreshed: `ballast doctor --fix`. This does not mean "generated by an older version".
+- `unowned` — **unfixable by any refresh**. Report the file list and byte total explicitly.
+
+**The `version=` in the ownership marker is not a state and not a finding.** A rule whose body has not changed keeps the stamp of the version that first wrote it, by design — `ok` is computed after stripping the marker, so an older stamp on an `ok` file means the content is current. Do not report old stamps as staleness, and do not recommend a refresh to "fix" them; a refresh that finds no content change will leave them exactly as they are. Only a stamp *newer* than the installed Ballast is a real signal, and it means a hand-edited or foreign artifact.
+
+The backend doctor also flags rules over 5120 bytes. Carry those into check 4.
+
+---
+
+## 2. Baseline diff against a clean install
+
+This is the only check that catches unowned drift, and it is mechanical. Clean-install this repository's own config into a scratch copy and diff.
+
+```bash
+TMP=$(mktemp -d)
+rsync -a --exclude node_modules --exclude .git --exclude .ballast \
+  --exclude '.claude' --exclude '.codex' --exclude '.cursor' \
+  --exclude '.gemini' --exclude '.opencode' \
+  --exclude CLAUDE.md --exclude AGENTS.md \
+  ./ "$TMP/baseline/"
+cd "$TMP/baseline" && git init -q . && ballast install --refresh-config --yes
+```
+
+The scratch copy keeps `.rulesrc.json`, so the install reproduces exactly what this repository asks for, with nothing pre-existing to skip. Then, from the repository root, for each target:
+
+```bash
+diff -rq "$TMP/baseline/.codex/rules" .codex/rules
+diff -rq "$TMP/baseline/.claude/rules" .claude/rules
+```
+
+Read the output as three distinct findings:
+
+- **`Only in <repo>`** — an orphan. The installed Ballast version no longer emits this rule at all. Pure dead weight, loaded every turn.
+- **`Only in <baseline>`** — a missing rule. The config asks for coverage the repository does not have.
+- **`Files ... differ`** — stale or drifted content. Compare sizes; an oversized local copy is almost always an old generation.
+
+Report the delta in bytes: `baseline total` versus `repo total`. A repo materially larger than its own baseline is carrying dead context.
+
+**A refresh does not necessarily fix this.** Verify rather than assume: `ballast install --refresh-config` skips files that already exist ("Skipped (already present)"), and `--refresh-config --patch` can report installing every agent while leaving unowned files byte-for-byte unchanged. When the diff is non-empty and the files are unowned, the remediation is to delete the directory and reinstall:
+
+```bash
+rm -rf .codex/rules && ballast install --refresh-config --yes
+```
+
+Re-run check 1 afterwards and confirm the unowned count is zero.
+
+---
+
+## 3. Fit check: does the repository actually do this?
+
+For each emitted rule and skill, look for evidence in the repository. Absence of evidence is the finding.
+
+| Emitted | Evidence that justifies it | If absent |
+| --- | --- | --- |
+| `publishing-cli` | `bin` in `package.json`, `[project.scripts]`, `.goreleaser.yaml` | Drop from `publishingProfiles` |
+| `publishing-libraries` | Public package with `publishConfig`/`files`, or a consumed module tag | Drop from `publishingProfiles` |
+| `publishing-sdks` | A generated or hand-written client SDK published for consumers | Drop from `publishingProfiles` |
+| `publishing-apps` | A deployable app or service; check `deploymentModel` | Drop from `publishingProfiles` |
+| `publishing*` (all) | Any registry publish step in `.github/workflows/` | Drop the `publishing` agent entirely |
+| `spec-kit` | `.specify/` directory | Drop the `spec-kit` agent |
+| `observability` | Deployed runtime with metrics/tracing to instrument | Drop the `observability` agent |
+| `docker-*` rules, `docker-registry-publish` | `Dockerfile`, `docker-compose*.yaml` | Drop the skill and the `docker` language |
+| `aws-*-review` skills | AWS config, IaC, or deploy credentials in the repo | Drop the skills |
+| `speckit-*` skills | `.specify/` directory | Drop the skills |
+| `logging` (`<lang>-logging`) | A logging library in the dependency manifest, or a long-running process that emits logs | Drop the `logging` agent |
+| `testing` (`<lang>-testing`) | A test runner in the dependency manifest or a test directory | Drop the `testing` agent |
+| `linting` (`<lang>-linting`) | A lint or format config for that language | Drop the `linting` agent |
+| language rules (`<lang>-*`) | A `paths` entry for that language with real source | Remove with `--remove-language` |
+
+Language agents need the same evidence test as common ones. A repository can be squarely TypeScript and still have no use for `typescript-logging`, which configures Pino, Fluentd, and browser log forwarding — a GitHub Action or a build-only package has no runtime to log from.
+
+Two checks that need the config rather than the tree:
+
+- **`publishingProfiles` unset** emits every publishing variant except `apt` and `brew`. A repository that ships one artifact type is carrying four rules to get one. Setting the field explicitly is usually the largest single byte win after check 2. An **empty array is treated as unset** and still emits all of them, so never recommend `"publishingProfiles": []` to suppress publishing rules — list the profiles that apply, or drop the `publishing` agent entirely.
+- **`deploymentModel: none`** suppresses the `web` and `api` variants but not `publishing-apps`. Verify `publishing-apps` against the repository directly rather than trusting the deployment model to have excluded it.
+
+Report each mismatch with the rule's byte cost so the saving is quantified.
+
+Before recommending that an agent be dropped, grep the rules that would survive for the guidance it carries. Some agents hold an invariant that is also stated elsewhere, and some hold the only copy. Say which it is: "dropping `publishing` loses the bump-and-tag detail but `core` already carries the release invariant" is an actionable recommendation; "drop `publishing`" alone asks the reader to take the risk blind. An emitted rule that is the sole source of a constraint the repository genuinely relies on is not irrelevant, whatever the evidence table says.
+
+Where a fit question turns on config behavior rather than repository contents, test it in the scratch copy from check 2 rather than the real repository — edit its `.rulesrc.json`, reinstall there, and read the result.
+
+---
+
+## 4. Density and bloat
+
+Within what survives checks 1–3, flag low-value content:
+
+- **Over 5120 bytes** — the backend doctor already lists these. Procedural or reference-heavy material belongs in a skill (on demand), not a rule (every turn).
+- **Placeholder rules** — a rule whose body is scope description with no actionable instruction is pure cost. Grep for the marker sentence, then open each hit to confirm; the bare word "placeholder" also appears in legitimate guidance:
+  ```bash
+  grep -rln 'will be expanded in a future release' .claude/rules .codex/rules 2>/dev/null
+  ```
+- **Cross-target duplication** — the same rule body emitted into several targets is expected and correct; each target loads only its own. Do not report it as duplication. Report duplication only *within* one target's rules directory. Group by hash with `awk`; `uniq -w` and `md5sum` are GNU-only and are absent on macOS:
+  ```bash
+  find .codex/rules -name '*.md' -exec shasum {} + |
+    awk '{ seen[$1] = seen[$1] " " $2 }
+         END { for (h in seen) if (split(seen[h], parts, " ") > 1) print seen[h] }'
+  ```
+- **Target parity** — targets built from the same config should emit the same rule set. A set that differs between two targets means one of them was not regenerated:
+  ```bash
+  diff <(ls .claude/rules | sed 's/\.md$//') <(ls .codex/rules | sed 's/\.md$//')
+  ```
+
+---
+
+## 5. Manifest and index cost
+
+`CLAUDE.md` and `AGENTS.md` carry the generated rule index and the full skill list with descriptions, in every session. Confirm each listed file exists — an index entry pointing at a deleted rule costs tokens and produces a failed read when an agent follows it.
+
+```bash
+grep -oE '`\.[a-z]+/rules/[^`]+`' CLAUDE.md AGENTS.md | sed 's/.*`\(.*\)`/\1/' | sort -u |
+  while read -r f; do [ -f "$f" ] || echo "indexed but missing: $f"; done
 ```
 
 ---
 
-## Recommendations for Optimization
+## Reporting
 
-1.  **Kill the Duplicates**: Move all shared logic to `.codex/rules/common` (or `.gemini/rules/common`) and ensure the installer doesn't create duplicate content in language subdirectories.
-2.  **Rule-to-Skill Promotion**: Any rule file with a large "Example Script" or "Reference Implementation" block should be moved to a `.skill` file.
-3.  **Inheritance over Copying**: Use a "Base Rule" for languages and only provide "Delta Rules" for specific overrides.
+Produce one report with:
+
+1. **Always-on cost per target** — current bytes and approximate tokens, and the same figures after the recommended changes.
+2. **Findings, most expensive first.** Each names files, byte cost, and which check produced it. Distinguish sharply between *stale* (a refresh fixes it), *unowned* (only deletion and reinstall fixes it), and *irrelevant* (a config change fixes it).
+3. **Remediation commands**, in dependency order: reinstall first (check 2), then narrow the config (check 3), then trim what remains (check 4). Give the exact invocation — the narrowed `--skill` list, or the exact `.rulesrc.json` edit — not a description of one, and use `ballast upgrade` wherever check 0 found the backend behind the wrapper. Skip any step its check did not justify: when the ownership census is clean and the baseline diff is empty, say so and go straight to the config, rather than prescribing a reinstall that has nothing to do.
+4. **Verification** — re-run check 1 and check 2 and report the unowned count and baseline delta afterwards.
+
+Do not edit generated rule or skill files directly to fix a finding. Ballast-managed output is regenerated from `agents/` and `skills/` in the Ballast repository; a hand edit becomes `drifted` on the next audit and is lost on the next refresh. Fix the config, reinstall, or raise the change upstream.

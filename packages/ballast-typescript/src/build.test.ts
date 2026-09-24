@@ -787,6 +787,27 @@ describe('build', () => {
       expect(content).toContain('# OWASP Security Scan Skill');
     });
 
+    test('ballast audit skill distinguishes an old version stamp from staleness', () => {
+      // Two real audits of the same repo disagreed here: one reported 20
+      // "stale" files purely because their marker said an older version, and
+      // prescribed a refresh that would have done nothing.
+      const content = buildSkillMarkdown('ballast-audit');
+      expect(content).toContain('not a state and not a finding');
+      expect(content).toContain('no longer in the active set');
+      expect(content).toContain('ballast doctor --fix');
+    });
+
+    test('ballast audit skill prescribes upgrade when the backend is behind', () => {
+      // A refresh run against an outdated pinned backend is a silent no-op, so
+      // the audit must not recommend it in that situation.
+      const content = buildSkillMarkdown('ballast-audit');
+      expect(content).toContain('ballast --version');
+      expect(content).toContain(
+        '`ballast upgrade`, not `ballast install --refresh-config`'
+      );
+      expect(content).toContain('publishingProfiles": []');
+    });
+
     test('ballast audit skill documents unowned files and the size threshold', () => {
       const content = buildSkillMarkdown('ballast-audit');
       expect(content).toContain('ballast:rule');

@@ -1529,7 +1529,7 @@ func TestBuildCursorSkillFormatIncludesBallastAuditFrontmatter(t *testing.T) {
 	if !strings.Contains(content, "alwaysApply: false") {
 		t.Fatalf("expected alwaysApply false frontmatter: %s", content)
 	}
-	if !strings.Contains(content, "description: \"audit AI rule and skill files for context density, duplication, and bloat\"") {
+	if !strings.Contains(content, "description: \"audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository\"") {
 		t.Fatalf("expected ballast-audit description in frontmatter: %s", content)
 	}
 	if !strings.Contains(content, "# Ballast Audit Skill") {
