@@ -302,6 +302,12 @@ jobs:
           - name: git-hooks-mode-policy-e2e
             script: ./scripts/e2e-git-hooks-mode-policy.sh
             needs_typescript: true
+          - name: tools-rendered-in-rules-e2e
+            script: ./scripts/e2e-tools-rendered-in-rules.sh
+          - name: go-first-run-required-options-e2e
+            script: ./scripts/e2e-go-first-run-required-options.sh
+          - name: support-file-default-patch-e2e
+            script: ./scripts/e2e-support-file-default-patch.sh
 
     steps:
       - name: Checkout ballast repo
