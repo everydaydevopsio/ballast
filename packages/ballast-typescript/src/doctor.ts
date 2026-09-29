@@ -50,7 +50,8 @@ export interface DoctorReport {
   recommendations: string[];
 }
 
-export type RuleFileState = 'ok' | 'drifted' | 'stale' | 'unowned';
+export type RuleFileState =
+  'ok' | 'drifted' | 'stale' | 'unowned' | 'unconfigured-target';
 
 export interface RuleFileStatus {
   path: string;
@@ -332,6 +333,11 @@ export function buildDoctorReport(
         `Remove stale managed rule file ${ruleFile.path}: ballast doctor --fix`
       );
     }
+    if (ruleFile.status === 'unconfigured-target') {
+      recommendations.push(
+        `Rule file ${ruleFile.path} belongs to target "${ruleFile.target}", which is not in the config: ballast install --remove-target ${ruleFile.target} --yes && ballast install --refresh-config`
+      );
+    }
     if ((ruleFile.sizeBytes ?? 0) > MAX_RULE_BYTES) {
       recommendations.push(
         `Rule file ${ruleFile.path} is ${ruleFile.sizeBytes} bytes (> ${MAX_RULE_BYTES}); trim it or move procedural content to a skill`
@@ -524,6 +530,7 @@ export function collectRuleFileStatuses(
   config: RuleConfig
 ): RuleFileStatus[] {
   const active = configuredRuleKeys(config);
+  const configuredTargets = new Set<Target>(config.targets);
   const statuses: RuleFileStatus[] = [];
   for (const [target, dirs] of Object.entries(TARGET_RULE_DIRS) as Array<
     [Target, string[]]
@@ -544,6 +551,21 @@ export function collectRuleFileStatuses(
           continue;
         }
         const key = `${target}:${marker.ruleId}`;
+        if (!configuredTargets.has(target)) {
+          // The whole target left the config, so every rule under it looks
+          // stale. Deleting them here would strip the rules while leaving the
+          // target's manifest indexing all of them -- the state that left
+          // castoff with a CLAUDE.md promising 23 rules and none on disk.
+          // Removing a target is install's job; it rewrites the manifest too.
+          statuses.push({
+            path: filePath,
+            target,
+            ruleId: marker.ruleId,
+            status: 'unconfigured-target',
+            sizeBytes: Buffer.byteLength(content, 'utf8')
+          });
+          continue;
+        }
         if (!active.has(key)) {
           statuses.push({
             path: filePath,
@@ -640,6 +662,8 @@ function formatRuleStatus(status: RuleFileState): string {
       return 'STALE - run ballast doctor --fix to remove';
     case 'unowned':
       return 'unowned - not managed by Ballast, skipped';
+    case 'unconfigured-target':
+      return 'UNCONFIGURED TARGET - not removed; run ballast install --remove-target then --refresh-config';
     default:
       return status;
   }
