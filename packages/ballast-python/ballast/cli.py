@@ -105,7 +105,10 @@ def cli_version() -> str:
 @dataclass
 class InstallResult:
     installed: list[str] = field(default_factory=list)
-    installed_rules: list[tuple[str, str]] = field(default_factory=list)
+    # (agent, suffix, path). The path is recorded at write time rather than
+    # recomputed for reporting, so the log cannot name a destination the run
+    # did not write.
+    installed_rules: list[tuple[str, str, Path]] = field(default_factory=list)
     installed_skills: list[str] = field(default_factory=list)
     installed_support_files: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
@@ -2773,7 +2776,7 @@ def install(
                     else content
                 )
                 dst.write_text(next_content, encoding="utf-8")
-                result.installed_rules.append((agent, suffix))
+                result.installed_rules.append((agent, suffix, dst))
                 agent_installed = True
                 agent_processed = True
             if agent_processed:
@@ -2983,9 +2986,15 @@ def print_install_result(
 
     if result.installed_rules:
         print(f"Installed for {target}: {', '.join(result.installed)}")
-        for agent, suffix in result.installed_rules:
-            basename = rule_basename(agent, language, suffix)
-            print(f"  {basename} -> {destination(root, target, basename)}")
+        for agent, suffix, path in result.installed_rules:
+            # Language backends run in sequence and prune rules they do not own,
+            # so a later pass can remove what an earlier one wrote. Report the
+            # file only if it survived the run: a line naming a path that is not
+            # there reads exactly like the destructive case where the files were
+            # wrongly deleted.
+            if not path.exists():
+                continue
+            print(f"  {rule_basename(agent, language, suffix)} -> {path}")
     if result.installed_skills:
         print(f"Installed skills for {target}: {', '.join(result.installed_skills)}")
         for skill in result.installed_skills:

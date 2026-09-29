@@ -25,7 +25,7 @@ EOF
 
 cat > "${PROJECT}/.rulesrc.json" <<'EOF'
 {
-  "targets": ["claude", "codex"],
+  "targets": ["claude", "codex", "cursor", "opencode"],
   "agents": ["testing"],
   "skills": [],
   "languages": ["python"],
@@ -41,12 +41,35 @@ EOF
 
 (
   cd "${PROJECT}"
-  ballast-go install --language python --target claude --target codex --agent testing --yes >/dev/null
+  ballast-go install --language python --target claude --target codex \
+    --target cursor --target opencode --agent testing --yes >/dev/null
 )
 
+# Targets that ship a manifest carry the policy there, once, and deliberately
+# keep it out of every rule file. See test_manifest_targets_omit_tools_policy_in_rules
+# and test_manifests_include_tools_policy_once in the Python backend.
 for rule in \
   "${PROJECT}/.codex/rules/python-testing.md" \
   "${PROJECT}/.claude/rules/python-testing.md"
+do
+  assert_file_exists "${rule}"
+  assert_not_contains "Repository Tool Policy" "${rule}"
+done
+
+for manifest in \
+  "${PROJECT}/AGENTS.md" \
+  "${PROJECT}/CLAUDE.md"
+do
+  assert_file_exists "${manifest}"
+  assert_contains "### Repository Tool Policy" "${manifest}"
+  assert_contains "python=uv,pyenv" "${manifest}"
+  assert_contains 'uv run <command>' "${manifest}"
+done
+
+# Targets with no manifest keep the policy inline in each rule instead.
+for rule in \
+  "${PROJECT}/.cursor/rules/python-testing.mdc" \
+  "${PROJECT}/.opencode/python-testing.md"
 do
   assert_file_exists "${rule}"
   assert_contains "## Repository Tool Policy" "${rule}"

@@ -35,6 +35,8 @@ EOF
 # these; the upgrade must migrate it away rather than try to repair it.
 printf 'not-a-zip-archive' > "${PROJECT}/.claude/skills/owasp-security-scan.skill"
 
+git_init_clean_fixture "${PROJECT}"
+
 (
   cd "${PROJECT}"
   ballast --language go upgrade --patch >/dev/null

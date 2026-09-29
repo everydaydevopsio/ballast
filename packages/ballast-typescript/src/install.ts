@@ -316,8 +316,13 @@ export interface InstallOptions {
 
 export interface InstallResult {
   installed: string[];
-  /** Per-rule: which (agent, ruleSuffix) files were written (ruleSuffix '' = main) */
-  installedRules: Array<{ agentId: string; ruleSuffix: string }>;
+  /**
+   * Per-rule: which (agent, ruleSuffix) files were written (ruleSuffix '' = main),
+   * and the path each was actually written to. The path is recorded at write time
+   * rather than recomputed for reporting, so the log cannot name a destination the
+   * run did not write.
+   */
+  installedRules: Array<{ agentId: string; ruleSuffix: string; file: string }>;
   installedSkills: string[];
   installedSupportFiles: string[];
   skipped: string[];
@@ -495,7 +500,11 @@ export function install(options: InstallOptions): InstallResult {
   } = options;
   const effectiveAgents = withImplicitAgents(agents);
   const installed: string[] = [];
-  const installedRules: Array<{ agentId: string; ruleSuffix: string }> = [];
+  const installedRules: Array<{
+    agentId: string;
+    ruleSuffix: string;
+    file: string;
+  }> = [];
   const installedSkills: string[] = [];
   const installedSupportFiles: string[] = [];
   const skipped: string[] = [];
@@ -662,7 +671,7 @@ export function install(options: InstallOptions): InstallResult {
             ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
             : content;
         fs.writeFileSync(file, nextContent, 'utf8');
-        installedRules.push({ agentId, ruleSuffix: ruleSuffix || '' });
+        installedRules.push({ agentId, ruleSuffix: ruleSuffix || '', file });
         agentInstalled = true;
         agentProcessed = true;
       }
@@ -871,6 +880,30 @@ export function install(options: InstallOptions): InstallResult {
     declinedSupportFiles,
     errors
   };
+}
+
+/**
+ * Lines describing the rule files an install wrote, for the command output.
+ *
+ * Language backends run in sequence and prune rules they do not own, so a later
+ * pass can remove what an earlier one wrote. Entries whose file did not survive
+ * the run are dropped: a line naming a path that is not there reads exactly like
+ * the destructive case where the files were wrongly deleted, which is what made
+ * that class of bug hard to spot.
+ */
+export function reportInstalledRules(
+  installedRules: ReadonlyArray<{
+    agentId: string;
+    ruleSuffix: string;
+    file: string;
+  }>
+): string[] {
+  return installedRules
+    .filter(({ file }) => fs.existsSync(file))
+    .map(({ agentId, ruleSuffix, file }) => {
+      const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      return `  ${label} -> ${file}`;
+    });
 }
 
 export interface RunInstallOptions {
@@ -1106,16 +1139,8 @@ export async function runInstall(
 
     if (result.installedRules.length > 0) {
       console.log(`Installed for ${target}: ${result.installed.join(', ')}`);
-      result.installedRules.forEach(({ agentId, ruleSuffix }) => {
-        const { file } = getDestination(
-          agentId,
-          target,
-          projectRoot,
-          ruleSuffix || undefined,
-          language
-        );
-        const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
-        console.log(`  ${label} -> ${file}`);
+      reportInstalledRules(result.installedRules).forEach((line) => {
+        console.log(line);
       });
     }
     if (result.installedSkills.length > 0) {

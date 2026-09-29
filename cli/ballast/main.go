@@ -1039,6 +1039,99 @@ func runUpdate(args []string) int {
 	return 0
 }
 
+// ballastManagedGitPaths lists the repository-relative paths an upgrade may
+// rewrite: each configured target's directory, its manifest, and .rulesrc.json.
+// Scoped deliberately -- unrelated uncommitted work must not block an upgrade.
+func ballastManagedGitPaths(root string, config *monorepoConfig) []string {
+	seen := map[string]bool{}
+	var paths []string
+	add := func(abs string) {
+		rel, err := filepath.Rel(root, abs)
+		if err != nil || rel == "" || strings.HasPrefix(rel, "..") {
+			return
+		}
+		if _, statErr := os.Stat(abs); statErr != nil {
+			return
+		}
+		if seen[rel] {
+			return
+		}
+		seen[rel] = true
+		paths = append(paths, rel)
+	}
+	add(filepath.Join(root, ".rulesrc.json"))
+	if config != nil {
+		for _, target := range config.Targets {
+			add(targetRootDir(root, target))
+			add(supportFilePath(root, target))
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+// pendingBallastChanges returns `git status --porcelain` lines for the given
+// paths. A non-nil error means git could not answer, which includes the project
+// not being a git repository at all.
+func pendingBallastChanges(root string, paths []string) ([]string, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	args := append([]string{"-C", root, "status", "--porcelain", "--"}, paths...)
+	out, err := exec.Command("git", args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("git status failed: %s", strings.TrimSpace(string(out)))
+	}
+	var changes []string
+	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
+		if strings.TrimSpace(line) != "" {
+			changes = append(changes, line)
+		}
+	}
+	return changes, nil
+}
+
+// verifyUpgradePreconditions refuses to start an upgrade that could not be
+// undone. An upgrade applies target by target and aborts on the first backend
+// error, so a failed run can leave targets on different content versions. From
+// a clean tree that is recoverable with `git checkout`; from a dirty one, or
+// with no git at all, it is not. --force accepts that risk.
+func verifyUpgradePreconditions(root string, config *monorepoConfig, force bool) error {
+	if force {
+		return nil
+	}
+	if !insideGitRepository(root) {
+		return fmt.Errorf(
+			"upgrade needs a git repository so a partial upgrade can be undone with git checkout.\n"+
+				"%s is not tracked by git.\n"+
+				"Initialise one, or re-run with --force to upgrade anyway.", root)
+	}
+	changes, err := pendingBallastChanges(root, ballastManagedGitPaths(root, config))
+	if err != nil {
+		return fmt.Errorf("%v\nRe-run with --force to upgrade anyway.", err)
+	}
+	if len(changes) == 0 {
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("upgrade needs a clean starting point for Ballast-managed files.\n")
+	b.WriteString("An upgrade that fails part-way leaves targets on different content versions;\n")
+	b.WriteString("from a clean tree that is recoverable with git checkout, but these changes\n")
+	b.WriteString("would be lost:\n")
+	for _, change := range changes {
+		b.WriteString("  " + change + "\n")
+	}
+	b.WriteString("Commit or stash them, or re-run with --force to upgrade anyway.")
+	return errors.New(b.String())
+}
+
+// insideGitRepository reports whether root is tracked by git, including when the
+// repository root is an ancestor of root.
+func insideGitRepository(root string) bool {
+	out, err := exec.Command("git", "-C", root, "rev-parse", "--is-inside-work-tree").Output()
+	return err == nil && strings.TrimSpace(string(out)) == "true"
+}
+
 func runUpgrade(selectedLanguage language, args []string) int {
 	patch, force, err := parseUpgradeOptions(args)
 	if err != nil {
@@ -1054,6 +1147,11 @@ func runUpgrade(selectedLanguage language, args []string) int {
 	}
 	if config == nil {
 		fmt.Println("upgrade requires an existing .rulesrc.json; run ballast install first")
+		return 1
+	}
+
+	if err := verifyUpgradePreconditions(root, config, force); err != nil {
+		fmt.Println(err)
 		return 1
 	}
 

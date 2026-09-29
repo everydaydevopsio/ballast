@@ -169,6 +169,15 @@ ballast upgrade --patch   # merge updates while retaining local edits
 ballast upgrade --force   # reset managed content to the canonical version
 ```
 
+`ballast upgrade` requires a recoverable starting point. It refuses to run when any
+Ballast-managed file has pending changes, and when the project is not a git repository
+at all. An upgrade applies target by target and stops on the first backend error, so a
+failed run can leave targets on different content versions; from a clean tree that is
+undone with `git checkout`, and `ballast doctor` reports the skew. Only the paths an
+upgrade can rewrite are checked — each configured target's directory, its manifest, and
+`.rulesrc.json` — so unrelated uncommitted work never blocks an upgrade. Pass `--force`
+to upgrade anyway.
+
 Support files such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` use marked, Ballast-managed sections. Ballast updates those sections without replacing unrelated project guidance. In non-interactive mode, it will not silently overwrite a customized support file.
 
 Useful maintenance commands:

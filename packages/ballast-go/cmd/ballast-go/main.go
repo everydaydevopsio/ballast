@@ -1,9 +1,7 @@
 package main
 
 import (
-	"archive/zip"
 	"bufio"
-	"bytes"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
@@ -170,6 +168,9 @@ type installedRule struct {
 	agentID    string
 	ruleSuffix string
 	target     string
+	// file is the path actually written, recorded here rather than recomputed
+	// for reporting, so the log cannot name a destination the run did not write.
+	file string
 }
 
 type agentError struct {
@@ -397,13 +398,16 @@ func runInstall(args []string) int {
 	if len(result.installedRules) > 0 {
 		fmt.Printf("Installed for %s: %s\n", strings.Join(resolved.Targets, ", "), strings.Join(result.installed, ", "))
 		for _, rule := range result.installedRules {
-			base := ruleBaseName(rule.agentID, lang, rule.ruleSuffix)
-			_, file, err := destination(root, rule.target, base)
-			if err != nil {
-				fmt.Println(err)
-				return 1
+			// Language backends run in sequence and prune rules they do not own,
+			// so a later pass can remove what an earlier one wrote. Report the
+			// file only if it survived the run: a line naming a path that is not
+			// there reads exactly like the destructive case where the files were
+			// wrongly deleted.
+			if _, err := os.Stat(rule.file); err != nil {
+				continue
 			}
-			fmt.Printf("  %s -> %s\n", base, file)
+			base := ruleBaseName(rule.agentID, lang, rule.ruleSuffix)
+			fmt.Printf("  %s -> %s\n", base, rule.file)
 		}
 	}
 	if len(result.installedSkills) > 0 {
@@ -1054,7 +1058,7 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
 				}
-				result.installedRules = append(result.installedRules, installedRule{target: target, agentID: agentID, ruleSuffix: suffix})
+				result.installedRules = append(result.installedRules, installedRule{target: target, agentID: agentID, ruleSuffix: suffix, file: file})
 				agentInstalled = true
 				agentProcessed = true
 			}
@@ -1738,80 +1742,6 @@ func copyCodexSkillResourceDir(sourceDir, destinationDir string) error {
 // buildClaudeSkill packages a skill as a claude.ai Agent Skills zip bundle.
 // This is not what Claude Code installs -- it discovers directories, see
 // skillDestination -- and is kept for publishing bundles to claude.ai.
-func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte, error) {
-	content := ""
-	if len(skillContent) > 0 {
-		content = skillContent[0]
-	} else {
-		var err error
-		content, err = readSkillContent(skillID, language)
-		if err != nil {
-			return nil, err
-		}
-	}
-	var buffer bytes.Buffer
-	archive := zip.NewWriter(&buffer)
-	writer, err := archive.Create("SKILL.md")
-	if err != nil {
-		return nil, err
-	}
-	if _, err := writer.Write([]byte(content)); err != nil {
-		return nil, err
-	}
-	referencesDir := path.Join(skillDir(skillID, language), "references")
-	if existsSkillFile(referencesDir) {
-		if overrideRoot := repoRootOverride(); overrideRoot != "" {
-			rootDir := filepath.Join(overrideRoot, filepath.FromSlash(referencesDir))
-			err = filepath.WalkDir(rootDir, func(file string, d os.DirEntry, walkErr error) error {
-				if walkErr != nil || d.IsDir() {
-					return walkErr
-				}
-				relative, relErr := filepath.Rel(rootDir, file)
-				if relErr != nil {
-					return relErr
-				}
-				entry, createErr := archive.Create(path.Join("references", filepath.ToSlash(relative)))
-				if createErr != nil {
-					return createErr
-				}
-				data, readErr := os.ReadFile(file)
-				if readErr != nil {
-					return readErr
-				}
-				_, writeErr := entry.Write(data)
-				return writeErr
-			})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			referenceEntries, readErr := fs.ReadDir(embeddedSkillsFS, referencesDir)
-			if readErr == nil {
-				for _, entry := range referenceEntries {
-					if entry.IsDir() {
-						continue
-					}
-					data, fileErr := readSkillFile(path.Join(referencesDir, entry.Name()))
-					if fileErr != nil {
-						return nil, fileErr
-					}
-					writer, createErr := archive.Create(path.Join("references", entry.Name()))
-					if createErr != nil {
-						return nil, createErr
-					}
-					if _, fileErr := writer.Write(data); fileErr != nil {
-						return nil, fileErr
-					}
-				}
-			}
-		}
-	}
-	if err := archive.Close(); err != nil {
-		return nil, err
-	}
-	return buffer.Bytes(), nil
-}
-
 func normalizeLineEndings(content string) string {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	return strings.ReplaceAll(content, "\r", "\n")

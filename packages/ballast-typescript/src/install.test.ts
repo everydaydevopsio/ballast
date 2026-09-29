@@ -3,9 +3,13 @@ import path from 'path';
 import os from 'os';
 import readline from 'readline';
 import zlib from 'zlib';
-import { install, resolveTargetAndAgents, runInstall } from './install';
 import {
-  buildClaudeSkill,
+  install,
+  reportInstalledRules,
+  resolveTargetAndAgents,
+  runInstall
+} from './install';
+import {
   buildCodexAgentsMd,
   buildCursorSkillFormat,
   getClaudeMdPath,
@@ -52,6 +56,54 @@ describe('install', () => {
       value: isTTY,
       configurable: true
     });
+  }
+
+  // Legacy `.skill` bundles shipped in two shapes, and the migration path has
+  // to read both: STORE (what Ballast's own writer produced) and DEFLATE with a
+  // data descriptor (what claude.ai produced). Ballast no longer writes either,
+  // so these builders live here rather than in the shipped API.
+  function buildStoredSkillArchive(skillMd: string): Buffer {
+    const crc32 = (buffer: Buffer): number => {
+      let crc = 0xffffffff;
+      for (const byte of buffer) {
+        crc ^= byte;
+        for (let index = 0; index < 8; index += 1) {
+          const mask = -(crc & 1);
+          crc = (crc >>> 1) ^ (0xedb88320 & mask);
+        }
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    };
+
+    const name = Buffer.from('SKILL.md', 'utf8');
+    const data = Buffer.from(skillMd, 'utf8');
+    const checksum = crc32(data);
+
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(name.length, 28);
+
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(1, 8);
+    end.writeUInt16LE(1, 10);
+    end.writeUInt32LE(central.length + name.length, 12);
+    end.writeUInt32LE(local.length + name.length + data.length, 16);
+
+    return Buffer.concat([local, name, data, central, name, end]);
   }
 
   function buildClaudeSkillWithDataDescriptor(skillMd: string): Buffer {
@@ -785,7 +837,7 @@ Content upstream deleted that must not survive a patch.
       fs.mkdirSync(path.dirname(legacyArchive), { recursive: true });
       fs.writeFileSync(
         legacyArchive,
-        buildClaudeSkill('owasp-security-scan', '# stale bundle\n')
+        buildStoredSkillArchive('# stale bundle\n')
       );
 
       const result = install({
@@ -851,7 +903,7 @@ Content upstream deleted that must not survive a patch.
       );
       fs.writeFileSync(
         legacyArchive,
-        buildClaudeSkill('owasp-security-scan', '# stale bundle\n')
+        buildStoredSkillArchive('# stale bundle\n')
       );
 
       install({
@@ -1652,10 +1704,61 @@ Keep my custom responsibilities.
       expect(
         fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'cicd.mdc'))
       ).toBe(true);
-      expect(result.installedRules).toContainEqual({
-        agentId: 'docs',
-        ruleSuffix: ''
+      expect(result.installedRules).toContainEqual(
+        expect.objectContaining({ agentId: 'docs', ruleSuffix: '' })
+      );
+    });
+
+    test('reportInstalledRules omits entries whose file did not survive', () => {
+      // #357: a later language pass can prune what an earlier one wrote. A line
+      // naming a path that is not on disk is indistinguishable from the
+      // destructive case where rules were wrongly deleted, so it is dropped.
+      const written = path.join(tmpDir, 'written.md');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      fs.writeFileSync(written, 'x', 'utf8');
+      const pruned = path.join(tmpDir, 'pruned.md');
+
+      const lines = reportInstalledRules([
+        { agentId: 'docs', ruleSuffix: '', file: written },
+        { agentId: 'git-hooks', ruleSuffix: '', file: pruned }
+      ]);
+
+      expect(lines).toEqual([`  docs -> ${written}`]);
+    });
+
+    test('reportInstalledRules labels suffixed rules', () => {
+      const file = path.join(tmpDir, 'publishing-cli.md');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      fs.writeFileSync(file, 'x', 'utf8');
+
+      expect(
+        reportInstalledRules([
+          { agentId: 'publishing', ruleSuffix: 'cli', file }
+        ])
+      ).toEqual([`  publishing-cli -> ${file}`]);
+    });
+
+    test('every rule path install reports was actually written', () => {
+      // #357: the reporter recomputed each destination from (agentId, ruleSuffix)
+      // instead of recording what was written, so it could name files that were
+      // never created -- indistinguishable from the destructive case where the
+      // files were wrongly deleted. The path is recorded at write time now.
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: ['linting', 'testing', 'git-hooks'],
+        language: 'typescript',
+        force: false,
+        saveConfig: false
       });
+
+      expect(result.installedRules.length).toBeGreaterThan(0);
+
+      const missing = result.installedRules
+        .map(({ file }) => file)
+        .filter((file) => !fs.existsSync(file));
+
+      expect(missing).toEqual([]);
     });
 
     test('installs docs rule', () => {
@@ -1668,10 +1771,7 @@ Keep my custom responsibilities.
       });
       expect(result.installed).toEqual(['docs']);
       expect(result.installedRules).toEqual([
-        {
-          agentId: 'docs',
-          ruleSuffix: ''
-        }
+        expect.objectContaining({ agentId: 'docs', ruleSuffix: '' })
       ]);
       const docsFile = path.join(tmpDir, '.cursor', 'rules', 'docs.mdc');
       expect(fs.existsSync(docsFile)).toBe(true);
@@ -1830,9 +1930,12 @@ Keep my custom responsibilities.
       expect(result.installedRules).toHaveLength(3);
       expect(result.installedRules).toEqual(
         expect.arrayContaining([
-          { agentId: 'publishing', ruleSuffix: '' },
-          { agentId: 'publishing', ruleSuffix: 'apps' },
-          { agentId: 'publishing', ruleSuffix: 'cli' }
+          expect.objectContaining({ agentId: 'publishing', ruleSuffix: '' }),
+          expect.objectContaining({
+            agentId: 'publishing',
+            ruleSuffix: 'apps'
+          }),
+          expect.objectContaining({ agentId: 'publishing', ruleSuffix: 'cli' })
         ])
       );
       expect(
@@ -2574,7 +2677,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
 
       expect(result.errors).toEqual([]);
       expect(result.installedRules).toEqual([
-        { agentId: 'core', ruleSuffix: '' }
+        expect.objectContaining({ agentId: 'core', ruleSuffix: '' })
       ]);
       const corePath = path.join(tmpDir, '.claude', 'rules', 'core.md');
       expect(fs.existsSync(corePath)).toBe(true);

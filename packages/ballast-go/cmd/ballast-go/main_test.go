@@ -1,7 +1,6 @@
 package main
 
 import (
-	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -1534,36 +1533,6 @@ func TestBuildCursorSkillFormatIncludesBallastAuditFrontmatter(t *testing.T) {
 	}
 	if !strings.Contains(content, "# Ballast Audit Skill") {
 		t.Fatalf("expected ballast-audit body: %s", content)
-	}
-}
-
-func TestBuildClaudeSkillIncludesSkillAndReferences(t *testing.T) {
-	content, err := buildClaudeSkill("owasp-security-scan", "go")
-	if err != nil {
-		t.Fatalf("buildClaudeSkill: %v", err)
-	}
-
-	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
-	if err != nil {
-		t.Fatalf("open skill archive: %v", err)
-	}
-
-	entries := map[string]bool{}
-	for _, file := range reader.File {
-		entries[file.Name] = true
-	}
-
-	expected := []string{
-		"SKILL.md",
-		"references/owasp-mapping.md",
-		"references/remediation-guide.md",
-		"references/ci-workflow.md",
-		"references/tool-config.md",
-	}
-	for _, name := range expected {
-		if !entries[name] {
-			t.Fatalf("expected archive entry %q, got %+v", name, entries)
-		}
 	}
 }
 

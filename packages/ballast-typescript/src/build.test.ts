@@ -12,7 +12,6 @@ import {
   buildOpenCodeFormat,
   buildCodexFormat,
   buildContent,
-  buildClaudeSkill,
   buildSkillDirectoryMarkdown,
   buildCursorSkillFormat,
   buildSkillMarkdown,
@@ -841,15 +840,6 @@ describe('build', () => {
       expect(content).toContain('5120');
       expect(content).toContain('--refresh-config');
       expect(content).not.toContain('name: ballast-audit');
-    });
-
-    test('builds claude skill zip with references', () => {
-      const archive = buildClaudeSkill('owasp-security-scan');
-      expect(archive.subarray(0, 4).toString('hex')).toBe('504b0304');
-      expect(archive.includes(Buffer.from('SKILL.md'))).toBe(true);
-      expect(archive.includes(Buffer.from('references/owasp-mapping.md'))).toBe(
-        true
-      );
     });
 
     test('gets skill description and destination', () => {
