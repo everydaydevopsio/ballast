@@ -1,6 +1,6 @@
 # Plan: Spec Kit Development Process
 
-**Status:** In progress (Phases 2 and 4 complete; Phase 1 blocked on the placement question)
+**Status:** Complete — all five phases landed; ready to graduate to an ADR
 **Branch:** docs/spec-kit-development-process
 **Created:** 2026-08-29
 **Related ADRs:** _(none yet)_
@@ -227,11 +227,11 @@ A change is complete only when:
 
 Per-agent and per-skill guides (`docs/agents/spec-kit.md`, `docs/skills/speckit-*.md`, `docs/skills/github-pr-copilot-cycle.md`) already exist from the Spec Kit merge, so the remaining work is the connective tissue between them, not new per-artifact docs.
 
-- [ ] Phase 1: Resolve the placement question, then write the end-to-end process doc that sequences the existing guides.
+- [x] Phase 1: Placement resolved as option (a) — a new `docs/development-process.md`. The per-agent and per-skill guides already existed, so what was missing was the connective tissue between them; burying that inside one agent's guide would make it hard to find. Written and indexed in `docs/README.md`.
 - [x] Phase 2 (#340): Created `docs/code_review.md` rather than repointing. The reference is written into `AGENTS.md` by an external Codex reviewer installer (an orphaned `END CODEX REVIEWER INSTALLER` marker sits below it), so providing the target is durable where editing the pointer would be overwritten. Indexed in `docs/README.md`.
-- [ ] Phase 3: Add cross-links from the existing Spec Kit guides to task, plan lifecycle, testing, docs, and PR review guidance.
+- [x] Phase 3: Added a one-line pointer to the top of nine guides — `spec-kit`, the three `speckit-*` skills, `github-pr-copilot-cycle`, `tasks`, `plan-lifecycle`, `testing` and `docs` — each naming the step it belongs to, so the sequence is discoverable from any entry point.
 - [x] Phase 4: Added `packages/ballast-typescript/src/docs-links.test.ts`. Checks that every relative markdown link resolves, and that every `docs/*.md` path named in backticks exists. Verified it reproduces #340 by deleting the doc. `plans/` is excluded from the second check, since a plan naming a file it intends to create describes intent, not current state.
-- [ ] Phase 5: Run focused validation and update this plan with evidence.
+- [x] Phase 5: Validated. 385/385 TypeScript tests, eslint and prettier clean; `docs-links.test.ts` confirms every link in the new doc and the nine cross-links resolve. Claims spot-checked against the repository: `.specify/` is genuinely absent and #303 is genuinely open, as the doc states.
 
 ## Verification
 
@@ -257,12 +257,27 @@ Future implementation should verify:
 | Keep process guidance only in agent rules         | Rules guide agents, but users need GitHub-readable docs that explain the workflow without inspecting generated `.codex/` or `.claude/` files. |
 | Skip `tasks/todo.md` when Spec Kit has `tasks.md` | Spec Kit tasks describe implementation work; `tasks/todo.md` records branch evidence, rollback notes, and final triage.                       |
 
+## Resolved Questions
+
+All four answered; the phases above carry the decisions.
+
+- **Placement — option (a)**, a new `docs/development-process.md`. The per-guide docs
+  already existed; the gap was the sequence between them, which does not belong inside any
+  one agent's guide.
+- **`docs/code_review.md` — created**, not repointed. The reference is written into
+  `AGENTS.md` by an external Codex reviewer installer, so supplying the target is durable
+  where editing the pointer would be overwritten. Closed #340, which was the same question
+  asked in a second place.
+- **`speckit-taskstoissues` — optional handoff**, not part of the default path. It earns
+  its place only when generated tasks need to be visible to people off the branch;
+  otherwise it duplicates what `tasks.md` already tracks.
+- **ADR graduation — only when the plan lifecycle rule already triggers.** Not every Spec
+  Kit feature makes an architectural decision, and requiring an ADR per feature would
+  produce records that no one consults.
+
 ## Open Questions
 
-- Should the final process live in a new `docs/development-process.md`, under `docs/agents/spec-kit.md`, or both?
-- Should `docs/code_review.md` be created as a standalone review policy, or should `AGENTS.md` point to an existing review document?
-- Should `speckit-taskstoissues` be part of the default process, or only an optional handoff for larger features?
-- Should ADR graduation be required for all Spec Kit plans or only when the Ballast plan lifecycle rule is triggered?
+- None outstanding.
 
 ## Change Log
 
@@ -271,3 +286,4 @@ Future implementation should verify:
 | 2026-08-29 | Plan created with Spec Kit process model and target `.rulesrc.json` configuration.                                                                                                                        |
 | 2026-09-16 | Merged main; corrected Files Affected (Spec Kit agent/skill docs already exist) and rescoped phases to the remaining connective work; confirmed the `.rulesrc.json` example still matches the repository. |
 | 2026-09-29 | Phases 2 and 4 landed. Phase 1 still needs the placement question answered. |
+| 2026-09-29 | Phases 1, 3 and 5 landed; all four open questions resolved. Plan complete. |

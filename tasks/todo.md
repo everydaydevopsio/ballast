@@ -51,16 +51,17 @@ A stale plan is worse than no plan — it is read as current intent.
       via #339/#342/#325, leaving only #128 and #94, which are tracked as issues. The
       Phase 2 and Phase 3 design notes, and the unanswered parity open question, were
       posted to #128 and #94 before deletion so nothing was lost.
-- [ ] **`plans/plan-spec-kit-development-process.md` — kept and in progress.** Phases 2
-      and 4 are done; Phase 1 is blocked on its placement question (does the end-to-end
-      process doc live at `docs/development-process.md`, under `docs/agents/spec-kit.md`,
-      or both?). Phases 3 and 5 follow Phase 1.
+- [x] **`plans/plan-spec-kit-development-process.md` — complete.** All five phases landed
+      and all four open questions are resolved. `docs/development-process.md` is the
+      sequence; nine guides cross-link into it. Ready to graduate to an ADR.
 - [x] **#340 answered and closed.** The spec-kit plan's open question and #340 were the
       same question. Resolved by creating `docs/code_review.md` rather than repointing
       `AGENTS.md`: that line is written by an external Codex reviewer installer, so
       supplying the target is durable where editing the pointer is not.
-- [ ] Promote whichever of these outlive this branch into GitHub issues and record the links
-      here, per the task-system rule. `tasks/todo.md` is not durable tracking.
+- [x] **Nothing outlived the branch.** All three plans are resolved — two retired with
+      their substance moved to the issues that own it (#128, #94), one completed — so no
+      promotion was needed. #340 was closed rather than promoted. The one genuinely new
+      item found along the way, #376, was filed when it was found.
 
 ## Test Strategy
 
@@ -71,5 +72,5 @@ Documentation-only; no test changes expected. Verification is by inspection:
 
 ## Outcome
 
-- Result: _pending_
-- Evidence links/commands: _pending_
+- Result: all three plans resolved — `issue-priority-plan.md` retired to ADR-003, `plan-setup-toolchain.md` retired to #128/#94, `plan-spec-kit-development-process.md` completed across five phases.
+- Evidence: PRs #379 (retirements, ADR-003), #380 (#340 + docs-link check), and this branch (process doc + cross-links). 385/385 TypeScript tests, eslint and prettier clean, `docs-links.test.ts` green.

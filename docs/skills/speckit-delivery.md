@@ -1,5 +1,7 @@
 # Spec Kit Delivery
 
+> Step 3 of the [development process](../development-process.md).
+
 Use `speckit-delivery` after a Spec Kit baseline exists to coordinate a bounded product change.
 
 ## Install

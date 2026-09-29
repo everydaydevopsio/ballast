@@ -1,5 +1,7 @@
 # Plan Lifecycle Agent
 
+> Step 5 of the [development process](../development-process.md).
+
 The **plan-lifecycle** agent defines when agents should create implementation plans and how completed plans graduate into ADRs.
 
 ## What It Sets Up

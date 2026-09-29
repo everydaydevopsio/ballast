@@ -1,5 +1,7 @@
 # Testing Agent
 
+> Step 6 of the [development process](../development-process.md) — tests start from the Spec Kit acceptance criteria.
+
 The **testing** agent sets up and maintains test workflows for TypeScript, Python, Go, Ansible, Terraform, Dart, and Docker projects with sensible defaults and CI integration.
 
 ## What It Sets Up by Language
