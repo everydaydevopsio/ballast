@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { buildContent } from './build';
+import { install } from './install';
 import {
   buildDoctorReport,
   collectRuleFileStatuses,
@@ -572,6 +573,49 @@ describe('rule file status collection', () => {
         })
       ])
     );
+  });
+
+  test('doctor fix never leaves a manifest indexing a rule it deleted', () => {
+    // Regression: in a consuming repository, `doctor --fix` pruned every
+    // .claude rule it judged stale but left CLAUDE.md indexing all of them.
+    // Agent sessions then read a manifest promising rules that did not exist
+    // and loaded none. Pruning is allowed; a manifest pointing at the pruned
+    // file is not. See the castoff repository, commits d40387f and 27f3888.
+    const previousCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      fs.writeFileSync(path.join(tmpDir, 'package.json'), '{}\n', 'utf8');
+      for (const target of ['claude', 'codex'] as const) {
+        install({
+          projectRoot: tmpDir,
+          target,
+          agents: ['linting', 'docs'],
+          language: 'typescript',
+          saveConfig: true
+        });
+      }
+
+      runDoctor({ fix: true });
+
+      const manifests = ['CLAUDE.md', 'AGENTS.md']
+        .map((name) => path.join(tmpDir, name))
+        .filter((file) => fs.existsSync(file));
+      expect(manifests.length).toBeGreaterThan(0);
+
+      const dangling: string[] = [];
+      for (const manifest of manifests) {
+        const body = fs.readFileSync(manifest, 'utf8');
+        for (const match of body.matchAll(/`(\.[a-z]+\/rules\/[^`]+\.md)`/g)) {
+          if (!fs.existsSync(path.join(tmpDir, match[1]))) {
+            dangling.push(`${path.basename(manifest)} -> ${match[1]}`);
+          }
+        }
+      }
+
+      expect(dangling).toEqual([]);
+    } finally {
+      process.chdir(previousCwd);
+    }
   });
 
   test('doctor fix does not delete stale managed rules without a loaded config', () => {
