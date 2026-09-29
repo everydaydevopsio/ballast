@@ -824,9 +824,14 @@ class PatchInstallTests(unittest.TestCase):
                 config["publishingProfiles"], ["apps", "libraries", "sdks", "cli"]
             )
 
+    # tempfile hands back an unresolved path, and on macOS /tmp is a symlink to
+    # /private/tmp. resolve_project_root resolves, so the fixture must too or
+    # every assertion below compares /tmp/... against /private/tmp/... and fails
+    # on macOS while passing on Linux CI. The Go wrapper tests resolve for the
+    # same reason.
     def test_resolve_project_root_supports_ansible_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             (root / "ansible.cfg").write_text("[defaults]\n", encoding="utf-8")
             self.make_git_boundary(root)
             nested = root / "roles" / "novnc"
@@ -838,7 +843,7 @@ class PatchInstallTests(unittest.TestCase):
 
     def test_resolve_project_root_supports_ansible_requirements_yaml(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             (root / "requirements.yaml").write_text("---\n", encoding="utf-8")
             self.make_git_boundary(root)
             nested = root / "roles" / "novnc"
@@ -850,7 +855,7 @@ class PatchInstallTests(unittest.TestCase):
 
     def test_resolve_project_root_supports_terraform_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             (root / ".terraform-version").write_text("1.8.5\n", encoding="utf-8")
             (root / "versions.tf").write_text("terraform {}\n", encoding="utf-8")
             self.make_git_boundary(root)
@@ -863,7 +868,7 @@ class PatchInstallTests(unittest.TestCase):
 
     def test_resolve_project_root_supports_docker_markers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             (root / "Dockerfile.prod").write_text("FROM alpine\n", encoding="utf-8")
             self.make_git_boundary(root)
             nested = root / "docker" / "scripts"
@@ -875,7 +880,7 @@ class PatchInstallTests(unittest.TestCase):
 
     def test_resolve_project_root_ignores_docker_marker_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             (root / "Dockerfile.prod").mkdir()
             nested = root / "docker" / "scripts"
             nested.mkdir(parents=True)
@@ -888,7 +893,7 @@ class PatchInstallTests(unittest.TestCase):
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             (root / ".rulesrc.json").write_text("{}", encoding="utf-8")
             child = root / "new-product"
             child.mkdir()
@@ -899,7 +904,7 @@ class PatchInstallTests(unittest.TestCase):
 
     def test_resolve_project_root_does_not_cross_git_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             # parent has a project marker
             (root / "playbook.yml").write_text("---\n", encoding="utf-8")
             child = root / "child-project"
@@ -913,7 +918,7 @@ class PatchInstallTests(unittest.TestCase):
 
     def test_resolve_project_root_returns_child_repo_root_for_nested_cwd(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             (root / "playbook.yml").write_text("---\n", encoding="utf-8")
             child = root / "child-project"
             nested = child / "subdir"
