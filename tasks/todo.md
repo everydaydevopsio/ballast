@@ -35,22 +35,22 @@ A stale plan is worse than no plan — it is read as current intent.
 
 - Risk: retiring a plan discards design thinking that is not recorded anywhere else.
   Mitigate by moving the reasoning to the governing issue or an ADR before deleting.
-- Tradeoff: updating all three costs more than deleting them, but `issue-priority-plan.md`
-  is the only forward-looking index of what Ballast does next.
+- Tradeoff (resolved): `issue-priority-plan.md` was the only forward-looking index of what
+  Ballast does next, which argued for keeping it. Retired anyway — every entry in its
+  priority table is a GitHub issue, so the index duplicated tracking rather than adding to
+  it, and a second place to record priority is a second place to go stale.
 
 ## Execution Checklist
 
-- [ ] **`plans/issue-priority-plan.md` — re-prioritise or retire.** Its priorities 1–4
-      (#286–#297) are all complete, so the numbering now points at finished work; only
-      priority 5 (#128, #94) and 6 (#153, #149, #147) remain open. Decide whether it stays
-      the rolling index of what comes next or is retired in favour of GitHub milestones. If
-      it stays, renumber against what is actually outstanding.
-- [ ] **`plans/plan-setup-toolchain.md` — status is wrong.** It is marked `Draft`, but its
-      Go 1.26 toolchain phase has already shipped (#339, #342, #325 all closed). Mark that
-      phase done, confirm #128 (package-manager detection, Node LTS alignment) and #94
-      (local tool prerequisite checks) are the only remaining work, and answer its open
-      question: do the TypeScript and Python backends gain doctor tool checks for parity, or
-      is the wrapper the single front door? The plan's own default is wrapper-only.
+- [x] **`plans/issue-priority-plan.md` — retired.** Its completed context-hygiene
+      workstream (#286–#297) was recorded nowhere durable, so it graduated to
+      [ADR-003](../adr/003-budget-the-always-on-rule-payload.md) rather than being deleted
+      outright. Its forward priority table added nothing over the GitHub issues it listed
+      (#128, #94, #153, #149, #147), all of which remain open and tracked.
+- [x] **`plans/plan-setup-toolchain.md` — retired.** Phase 1 (Go 1.26) had already shipped
+      via #339/#342/#325, leaving only #128 and #94, which are tracked as issues. The
+      Phase 2 and Phase 3 design notes, and the unanswered parity open question, were
+      posted to #128 and #94 before deletion so nothing was lost.
 - [ ] **`plans/plan-spec-kit-development-process.md` — decide whether to pursue.** Proposed
       2026-08-29, a month old with no work started and four open questions unresolved.
       Related issue #303 is still open. Either commit to it and answer the questions, or
