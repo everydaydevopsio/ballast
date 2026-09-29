@@ -3,7 +3,12 @@ import path from 'path';
 import os from 'os';
 import readline from 'readline';
 import zlib from 'zlib';
-import { install, resolveTargetAndAgents, runInstall } from './install';
+import {
+  install,
+  reportInstalledRules,
+  resolveTargetAndAgents,
+  runInstall
+} from './install';
 import {
   buildCodexAgentsMd,
   buildCursorSkillFormat,
@@ -1702,6 +1707,35 @@ Keep my custom responsibilities.
       expect(result.installedRules).toContainEqual(
         expect.objectContaining({ agentId: 'docs', ruleSuffix: '' })
       );
+    });
+
+    test('reportInstalledRules omits entries whose file did not survive', () => {
+      // #357: a later language pass can prune what an earlier one wrote. A line
+      // naming a path that is not on disk is indistinguishable from the
+      // destructive case where rules were wrongly deleted, so it is dropped.
+      const written = path.join(tmpDir, 'written.md');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      fs.writeFileSync(written, 'x', 'utf8');
+      const pruned = path.join(tmpDir, 'pruned.md');
+
+      const lines = reportInstalledRules([
+        { agentId: 'docs', ruleSuffix: '', file: written },
+        { agentId: 'git-hooks', ruleSuffix: '', file: pruned }
+      ]);
+
+      expect(lines).toEqual([`  docs -> ${written}`]);
+    });
+
+    test('reportInstalledRules labels suffixed rules', () => {
+      const file = path.join(tmpDir, 'publishing-cli.md');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      fs.writeFileSync(file, 'x', 'utf8');
+
+      expect(
+        reportInstalledRules([
+          { agentId: 'publishing', ruleSuffix: 'cli', file }
+        ])
+      ).toEqual([`  publishing-cli -> ${file}`]);
     });
 
     test('every rule path install reports was actually written', () => {

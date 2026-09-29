@@ -882,6 +882,30 @@ export function install(options: InstallOptions): InstallResult {
   };
 }
 
+/**
+ * Lines describing the rule files an install wrote, for the command output.
+ *
+ * Language backends run in sequence and prune rules they do not own, so a later
+ * pass can remove what an earlier one wrote. Entries whose file did not survive
+ * the run are dropped: a line naming a path that is not there reads exactly like
+ * the destructive case where the files were wrongly deleted, which is what made
+ * that class of bug hard to spot.
+ */
+export function reportInstalledRules(
+  installedRules: ReadonlyArray<{
+    agentId: string;
+    ruleSuffix: string;
+    file: string;
+  }>
+): string[] {
+  return installedRules
+    .filter(({ file }) => fs.existsSync(file))
+    .map(({ agentId, ruleSuffix, file }) => {
+      const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
+      return `  ${label} -> ${file}`;
+    });
+}
+
 export interface RunInstallOptions {
   projectRoot?: string;
   target?: string;
@@ -1115,18 +1139,8 @@ export async function runInstall(
 
     if (result.installedRules.length > 0) {
       console.log(`Installed for ${target}: ${result.installed.join(', ')}`);
-      result.installedRules.forEach(({ agentId, ruleSuffix, file }) => {
-        // Language backends run in sequence and prune rules they do not own, so
-        // a later pass can remove what an earlier one wrote. Report the file
-        // only if it survived to the end of the run: a line naming a path that
-        // is not there reads exactly like the destructive case where the files
-        // were wrongly deleted, which is what made that class of bug hard to
-        // spot in the first place.
-        if (!fs.existsSync(file)) {
-          return;
-        }
-        const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
-        console.log(`  ${label} -> ${file}`);
+      reportInstalledRules(result.installedRules).forEach((line) => {
+        console.log(line);
       });
     }
     if (result.installedSkills.length > 0) {
