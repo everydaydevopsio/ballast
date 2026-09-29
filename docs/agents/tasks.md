@@ -1,5 +1,7 @@
 # Tasks Agent
 
+> Step 4 of the [development process](../development-process.md). `tasks/todo.md` is branch-local; durable work belongs in the configured task system.
+
 The **tasks** agent keeps branch-local work tracking and durable task-system handoff consistent.
 
 ## What It Sets Up

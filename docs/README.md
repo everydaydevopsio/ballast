@@ -92,6 +92,13 @@ See [installation.md](installation.md) for package-specific commands, skill inst
 - go install/go run (`ballast-go`)
 - installed skills under target-specific skill locations such as `.claude/skills/` and `.opencode/skills/`
 
+## Development Process
+
+See [development-process.md](development-process.md) for how Spec Kit and Ballast's rules
+fit together end to end: which artifact owns which kind of truth, the eight-step sequence
+from product intent to merged code, the completion gates, and which steps to skip for
+smaller changes.
+
 ## Code Review
 
 See [code_review.md](code_review.md) for the review policy this repository follows: what

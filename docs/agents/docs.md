@@ -1,5 +1,7 @@
 # Documentation Agent
 
+> Step 7 of the [development process](../development-process.md).
+
 The **docs** agent keeps repository documentation aligned with the shipped application, CLI, configuration, and operating model.
 
 ## What It Sets Up

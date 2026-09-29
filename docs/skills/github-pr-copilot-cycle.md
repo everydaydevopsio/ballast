@@ -1,5 +1,7 @@
 # GitHub PR Copilot Cycle
 
+> Step 8 of the [development process](../development-process.md). Review standards live in [code_review.md](../code_review.md).
+
 Use `github-pr-copilot-cycle` to run a pull request feedback loop with GitHub Copilot review.
 
 ## Install

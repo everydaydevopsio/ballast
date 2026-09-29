@@ -1,5 +1,7 @@
 # Spec Kit Reverse Engineer
 
+> Step 2 of the [development process](../development-process.md), for products that exist before their specs do.
+
 Use `speckit-reverse-engineer` to create a GitHub Spec Kit baseline for an existing application before normal forward development begins.
 
 ## Install

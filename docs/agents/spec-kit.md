@@ -1,5 +1,7 @@
 # Spec Kit Agent
 
+> Part of the [development process](../development-process.md) — Spec Kit owns product intent and the feature lifecycle; that doc sequences it with the task, plan, testing, docs, and review rules.
+
 The **spec-kit** agent adds common GitHub Spec Kit guidance for repositories that use `.specify/` and `specs/`.
 
 ## What It Sets Up

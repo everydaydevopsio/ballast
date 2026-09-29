@@ -1,5 +1,7 @@
 # Spec Kit Bootstrap
 
+> Step 1 of the [development process](../development-process.md).
+
 Use `speckit-bootstrap` when adopting or repairing GitHub Spec Kit in a repository.
 
 ## Install
