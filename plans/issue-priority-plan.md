@@ -31,6 +31,7 @@ Implement the context-hygiene phases in order (#286/#287/#288 first), then retur
 - **Final payload**: 133.3 KB baseline → **71.2 KB (−47%)** per target, all emitted rules ≤ 5 KB with valid checksums, enforced by the CI gate (rule ≤ 5 KB, target total ≤ 80 KB, `ruleBudget` override) and doctor recommendations. `ruleProfile: minimal` compiles a ~1.8 KB core rule for small-context agents.
 - Deferred follow-ups: rule-to-skill conversion for a `standard` profile tier (noted on #295); dynamic Cursor globs from `.rulesrc.json` `paths` (noted in ARCHITECTURE.md); strict byte-for-byte artifact enforcement (#10) is now unblocked since checksum drift is cleared.
 - **Next workstream**: setup/toolchain reliability (#128 + #94), per the priority table below.
+- **Interposed and complete (2026-09-29)**: the 2026-09-21 reliability cluster (#356, #357, #358, #359, #360, #361, #363) closed via PRs #371, #372, #374, #375 and graduated to [ADR-002](../adr/002-trust-ballasts-own-feedback-channels.md). It took priority because #361 had disabled every commit-time hook, including secret scanning, which gated all other work. Follow-up: #376 (doctor cannot tell current content from stale-but-self-consistent content).
 
 Goal: reduce the always-loaded rule payload from ~33k tokens to ~10k (standard) or ~1–2k (minimal profile) per session with zero loss of actual policy, and prevent regression.
 
