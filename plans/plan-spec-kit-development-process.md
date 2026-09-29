@@ -1,6 +1,6 @@
 # Plan: Spec Kit Development Process
 
-**Status:** Proposed
+**Status:** In progress (Phases 2 and 4 complete; Phase 1 blocked on the placement question)
 **Branch:** docs/spec-kit-development-process
 **Created:** 2026-08-29
 **Related ADRs:** _(none yet)_
@@ -93,7 +93,7 @@ This example was verified against the repository's `.rulesrc.json` on 2026-09-16
 - `docs/agents/spec-kit.md` - exists; add cross-links from the agent guide into this process.
 - `docs/skills/speckit-bootstrap.md`, `docs/skills/speckit-reverse-engineer.md`, `docs/skills/speckit-delivery.md` - exist; each covers its own procedure, so this process should link them rather than restate them.
 - `docs/skills/github-pr-copilot-cycle.md` - exists; link it as the PR closure gate.
-- `docs/code_review.md` - **missing but referenced** by `AGENTS.md` ("Follow `docs/code_review.md` for code reviews"). Either create it or fix the reference before treating it as a process gate.
+- `docs/code_review.md` - **created** (#340). `AGENTS.md` now points at a real review policy, so it can be treated as a process gate.
 
 ## Process Model
 
@@ -228,9 +228,9 @@ A change is complete only when:
 Per-agent and per-skill guides (`docs/agents/spec-kit.md`, `docs/skills/speckit-*.md`, `docs/skills/github-pr-copilot-cycle.md`) already exist from the Spec Kit merge, so the remaining work is the connective tissue between them, not new per-artifact docs.
 
 - [ ] Phase 1: Resolve the placement question, then write the end-to-end process doc that sequences the existing guides.
-- [ ] Phase 2 (#340): Fix the broken `docs/code_review.md` reference in `AGENTS.md` (create the doc or repoint the reference).
+- [x] Phase 2 (#340): Created `docs/code_review.md` rather than repointing. The reference is written into `AGENTS.md` by an external Codex reviewer installer (an orphaned `END CODEX REVIEWER INSTALLER` marker sits below it), so providing the target is durable where editing the pointer would be overwritten. Indexed in `docs/README.md`.
 - [ ] Phase 3: Add cross-links from the existing Spec Kit guides to task, plan lifecycle, testing, docs, and PR review guidance.
-- [ ] Phase 4: Add a docs-link check that prevents advertised-process drift (would have caught the `docs/code_review.md` break).
+- [x] Phase 4: Added `packages/ballast-typescript/src/docs-links.test.ts`. Checks that every relative markdown link resolves, and that every `docs/*.md` path named in backticks exists. Verified it reproduces #340 by deleting the doc. `plans/` is excluded from the second check, since a plan naming a file it intends to create describes intent, not current state.
 - [ ] Phase 5: Run focused validation and update this plan with evidence.
 
 ## Verification
@@ -270,3 +270,4 @@ Future implementation should verify:
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-08-29 | Plan created with Spec Kit process model and target `.rulesrc.json` configuration.                                                                                                                        |
 | 2026-09-16 | Merged main; corrected Files Affected (Spec Kit agent/skill docs already exist) and rescoped phases to the remaining connective work; confirmed the `.rulesrc.json` example still matches the repository. |
+| 2026-09-29 | Phases 2 and 4 landed. Phase 1 still needs the placement question answered. |

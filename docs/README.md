@@ -92,6 +92,12 @@ See [installation.md](installation.md) for package-specific commands, skill inst
 - go install/go run (`ballast-go`)
 - installed skills under target-specific skill locations such as `.claude/skills/` and `.opencode/skills/`
 
+## Code Review
+
+See [code_review.md](code_review.md) for the review policy this repository follows: what
+reviews look for, the severity scale and when each level blocks a merge, the gates a change
+must pass before review is requested, and how agent-assisted review fits in.
+
 ## Publishing
 
 See [publish.md](publish.md) for npmjs, Python GitHub release assets, and Go release publishing setup.
