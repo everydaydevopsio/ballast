@@ -9,7 +9,7 @@ describe('generated rule context hygiene', () => {
     expect(content).toContain('docker-compose.local.yaml');
     expect(content).toContain('Makefile');
     expect(content).toContain('make up-local');
-    expect(content).toContain('docs/agents/local-dev.md');
+    expect(content).not.toMatch(/`docs\/agents\/[\w-]+\.md`/);
   });
 
   test('typescript logging rule stays under the persistent-context budget', () => {

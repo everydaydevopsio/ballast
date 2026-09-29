@@ -1,4 +1,4 @@
-Use this rule to set direction; the full playbook and examples live in `docs/agents/local-dev.md`.
+Use this rule to set direction; keep project-specific detail in the repository's own README and runbooks.
 
 ## Goals
 
