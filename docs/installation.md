@@ -318,3 +318,27 @@ Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVers
 | Codex    | `.codex/rules/`  | `.codex/skills/`    | agents use `<agent>.md` or `<language>-<agent>.md`; skills use `<skill>/SKILL.md` |
 
 Codex installs root `AGENTS.md` when missing (or always with `--force`), records installed skills there, and scaffolds a `Repository Facts` section for durable repo metadata that agents should consult before re-deriving stable facts from the checkout. Gemini installs a thin `GEMINI.md` that imports `AGENTS.md` for shared guidance.
+
+## Upgrading
+
+`ballast upgrade` needs a recoverable starting point, because it applies target by
+target and stops on the first backend error — a failed run can otherwise leave targets
+on different content versions with nothing saying so.
+
+It refuses to start when:
+
+- any Ballast-managed file has pending changes in the working tree, or
+- the project is not a git repository, since there is then no way to undo a partial run.
+
+Only the paths an upgrade can rewrite are checked — each configured target's directory,
+its manifest, and `.rulesrc.json` — so unrelated uncommitted work never blocks an
+upgrade.
+
+```bash
+git status --short          # commit or stash Ballast-managed changes first
+ballast upgrade
+ballast upgrade --force     # upgrade anyway, accepting the risk
+```
+
+After an interrupted upgrade, restore the previous state with `git checkout` and run
+`ballast doctor` to confirm every target is back on the same content version.
