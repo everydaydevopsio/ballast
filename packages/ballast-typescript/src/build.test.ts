@@ -33,6 +33,28 @@ import {
 } from './build';
 import { COMMON_SKILL_IDS } from './agents';
 
+const REPO_ROOT = path.resolve(__dirname, '../../..');
+
+/** Every rule body under agents/, across common and language directories. */
+function listRuleContentFiles(): string[] {
+  const root = path.join(REPO_ROOT, 'agents');
+  const found: string[] = [];
+
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (/^content(-[\w-]+)?\.md$/.test(entry.name)) {
+        found.push(full);
+      }
+    }
+  };
+
+  walk(root);
+  return found;
+}
+
 describe('build', () => {
   describe('managed rule marker', () => {
     test('buildContent writes a machine-readable rule marker', () => {
@@ -373,13 +395,17 @@ describe('build', () => {
       expect(content).toContain('**Decision Request**');
     });
 
-    test('tasks rule does not depend on a docs file consumers never receive', () => {
-      // Install writes rules and support files, never docs/. A rule that tells
-      // an agent to copy a template verbatim must therefore carry that template
-      // itself; pointing at docs/agents/*.md leaves consuming repositories with
-      // an instruction to read a file that does not exist there.
-      const content = getContent('tasks', 'todo');
-      expect(content).not.toMatch(/`docs\/agents\/[\w-]+\.md`/);
+    test('no rule depends on a docs file consumers never receive', () => {
+      // Install writes rules, skills and support files, never docs/. A rule
+      // that points at docs/agents/*.md leaves every consuming repository with
+      // an instruction to read a file that does not exist there. #362 guarded
+      // only the tasks rule; the pointer that shipped was in local-dev, so the
+      // guard walks every rule source instead of naming one.
+      const offenders = listRuleContentFiles().filter((file) =>
+        /`docs\/agents\/[\w-]+\.md`/.test(fs.readFileSync(file, 'utf8'))
+      );
+
+      expect(offenders).toEqual([]);
     });
 
     test('returns plan-lifecycle content', () => {
