@@ -11,6 +11,7 @@ takes its place.
 | [001](001-scope-generated-rules-to-repository-shape.md) | Accepted | Generated state must be internally consistent, and rule scope follows the repository's shape rather than a fixed default. |
 | [002](002-trust-ballasts-own-feedback-channels.md)      | Accepted | Ballast's own reports must match what is on disk: record rather than recompute, never index a pruned file, refuse rather than half-apply, and run every check. |
 | [003](003-budget-the-always-on-rule-payload.md)          | Accepted | Always-on rule context is a budgeted resource with a CI-enforced ceiling; procedural and reference material belongs in on-demand skills. |
+| [004](004-one-artifact-owns-each-kind-of-truth.md)       | Accepted | Each artifact owns exactly one kind of truth, and `docs/development-process.md` sequences Spec Kit with Ballast's task, plan, testing, docs and review rules. |
 
 ## Conventions
 

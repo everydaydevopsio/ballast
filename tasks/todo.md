@@ -51,9 +51,10 @@ A stale plan is worse than no plan — it is read as current intent.
       via #339/#342/#325, leaving only #128 and #94, which are tracked as issues. The
       Phase 2 and Phase 3 design notes, and the unanswered parity open question, were
       posted to #128 and #94 before deletion so nothing was lost.
-- [x] **`plans/plan-spec-kit-development-process.md` — complete.** All five phases landed
-      and all four open questions are resolved. `docs/development-process.md` is the
-      sequence; nine guides cross-link into it. Ready to graduate to an ADR.
+- [x] **`plans/plan-spec-kit-development-process.md` — complete and graduated.** All five
+      phases landed and all four open questions resolved. `docs/development-process.md` is
+      the sequence; nine guides cross-link into it. Graduated to
+      [ADR-004](../adr/004-one-artifact-owns-each-kind-of-truth.md); `plans/` is now empty.
 - [x] **#340 answered and closed.** The spec-kit plan's open question and #340 were the
       same question. Resolved by creating `docs/code_review.md` rather than repointing
       `AGENTS.md`: that line is written by an external Codex reviewer installer, so
