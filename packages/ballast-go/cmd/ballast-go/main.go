@@ -168,6 +168,9 @@ type installedRule struct {
 	agentID    string
 	ruleSuffix string
 	target     string
+	// file is the path actually written, recorded here rather than recomputed
+	// for reporting, so the log cannot name a destination the run did not write.
+	file string
 }
 
 type agentError struct {
@@ -395,13 +398,16 @@ func runInstall(args []string) int {
 	if len(result.installedRules) > 0 {
 		fmt.Printf("Installed for %s: %s\n", strings.Join(resolved.Targets, ", "), strings.Join(result.installed, ", "))
 		for _, rule := range result.installedRules {
-			base := ruleBaseName(rule.agentID, lang, rule.ruleSuffix)
-			_, file, err := destination(root, rule.target, base)
-			if err != nil {
-				fmt.Println(err)
-				return 1
+			// Language backends run in sequence and prune rules they do not own,
+			// so a later pass can remove what an earlier one wrote. Report the
+			// file only if it survived the run: a line naming a path that is not
+			// there reads exactly like the destructive case where the files were
+			// wrongly deleted.
+			if _, err := os.Stat(rule.file); err != nil {
+				continue
 			}
-			fmt.Printf("  %s -> %s\n", base, file)
+			base := ruleBaseName(rule.agentID, lang, rule.ruleSuffix)
+			fmt.Printf("  %s -> %s\n", base, rule.file)
 		}
 	}
 	if len(result.installedSkills) > 0 {
@@ -1052,7 +1058,7 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
 				}
-				result.installedRules = append(result.installedRules, installedRule{target: target, agentID: agentID, ruleSuffix: suffix})
+				result.installedRules = append(result.installedRules, installedRule{target: target, agentID: agentID, ruleSuffix: suffix, file: file})
 				agentInstalled = true
 				agentProcessed = true
 			}

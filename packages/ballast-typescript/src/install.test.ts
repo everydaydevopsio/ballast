@@ -1699,10 +1699,32 @@ Keep my custom responsibilities.
       expect(
         fs.existsSync(path.join(tmpDir, '.cursor', 'rules', 'cicd.mdc'))
       ).toBe(true);
-      expect(result.installedRules).toContainEqual({
-        agentId: 'docs',
-        ruleSuffix: ''
+      expect(result.installedRules).toContainEqual(
+        expect.objectContaining({ agentId: 'docs', ruleSuffix: '' })
+      );
+    });
+
+    test('every rule path install reports was actually written', () => {
+      // #357: the reporter recomputed each destination from (agentId, ruleSuffix)
+      // instead of recording what was written, so it could name files that were
+      // never created -- indistinguishable from the destructive case where the
+      // files were wrongly deleted. The path is recorded at write time now.
+      const result = install({
+        projectRoot: tmpDir,
+        target: 'claude',
+        agents: ['linting', 'testing', 'git-hooks'],
+        language: 'typescript',
+        force: false,
+        saveConfig: false
       });
+
+      expect(result.installedRules.length).toBeGreaterThan(0);
+
+      const missing = result.installedRules
+        .map(({ file }) => file)
+        .filter((file) => !fs.existsSync(file));
+
+      expect(missing).toEqual([]);
     });
 
     test('installs docs rule', () => {
@@ -1715,10 +1737,7 @@ Keep my custom responsibilities.
       });
       expect(result.installed).toEqual(['docs']);
       expect(result.installedRules).toEqual([
-        {
-          agentId: 'docs',
-          ruleSuffix: ''
-        }
+        expect.objectContaining({ agentId: 'docs', ruleSuffix: '' })
       ]);
       const docsFile = path.join(tmpDir, '.cursor', 'rules', 'docs.mdc');
       expect(fs.existsSync(docsFile)).toBe(true);
@@ -1877,9 +1896,12 @@ Keep my custom responsibilities.
       expect(result.installedRules).toHaveLength(3);
       expect(result.installedRules).toEqual(
         expect.arrayContaining([
-          { agentId: 'publishing', ruleSuffix: '' },
-          { agentId: 'publishing', ruleSuffix: 'apps' },
-          { agentId: 'publishing', ruleSuffix: 'cli' }
+          expect.objectContaining({ agentId: 'publishing', ruleSuffix: '' }),
+          expect.objectContaining({
+            agentId: 'publishing',
+            ruleSuffix: 'apps'
+          }),
+          expect.objectContaining({ agentId: 'publishing', ruleSuffix: 'cli' })
         ])
       );
       expect(
@@ -2621,7 +2643,7 @@ Read and follow these rule files in \`.codex/rules/\` when they apply:
 
       expect(result.errors).toEqual([]);
       expect(result.installedRules).toEqual([
-        { agentId: 'core', ruleSuffix: '' }
+        expect.objectContaining({ agentId: 'core', ruleSuffix: '' })
       ]);
       const corePath = path.join(tmpDir, '.claude', 'rules', 'core.md');
       expect(fs.existsSync(corePath)).toBe(true);

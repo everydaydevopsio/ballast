@@ -316,8 +316,13 @@ export interface InstallOptions {
 
 export interface InstallResult {
   installed: string[];
-  /** Per-rule: which (agent, ruleSuffix) files were written (ruleSuffix '' = main) */
-  installedRules: Array<{ agentId: string; ruleSuffix: string }>;
+  /**
+   * Per-rule: which (agent, ruleSuffix) files were written (ruleSuffix '' = main),
+   * and the path each was actually written to. The path is recorded at write time
+   * rather than recomputed for reporting, so the log cannot name a destination the
+   * run did not write.
+   */
+  installedRules: Array<{ agentId: string; ruleSuffix: string; file: string }>;
   installedSkills: string[];
   installedSupportFiles: string[];
   skipped: string[];
@@ -495,7 +500,11 @@ export function install(options: InstallOptions): InstallResult {
   } = options;
   const effectiveAgents = withImplicitAgents(agents);
   const installed: string[] = [];
-  const installedRules: Array<{ agentId: string; ruleSuffix: string }> = [];
+  const installedRules: Array<{
+    agentId: string;
+    ruleSuffix: string;
+    file: string;
+  }> = [];
   const installedSkills: string[] = [];
   const installedSupportFiles: string[] = [];
   const skipped: string[] = [];
@@ -662,7 +671,7 @@ export function install(options: InstallOptions): InstallResult {
             ? patchRuleContent(fs.readFileSync(file, 'utf8'), content, target)
             : content;
         fs.writeFileSync(file, nextContent, 'utf8');
-        installedRules.push({ agentId, ruleSuffix: ruleSuffix || '' });
+        installedRules.push({ agentId, ruleSuffix: ruleSuffix || '', file });
         agentInstalled = true;
         agentProcessed = true;
       }
@@ -1106,14 +1115,16 @@ export async function runInstall(
 
     if (result.installedRules.length > 0) {
       console.log(`Installed for ${target}: ${result.installed.join(', ')}`);
-      result.installedRules.forEach(({ agentId, ruleSuffix }) => {
-        const { file } = getDestination(
-          agentId,
-          target,
-          projectRoot,
-          ruleSuffix || undefined,
-          language
-        );
+      result.installedRules.forEach(({ agentId, ruleSuffix, file }) => {
+        // Language backends run in sequence and prune rules they do not own, so
+        // a later pass can remove what an earlier one wrote. Report the file
+        // only if it survived to the end of the run: a line naming a path that
+        // is not there reads exactly like the destructive case where the files
+        // were wrongly deleted, which is what made that class of bug hard to
+        // spot in the first place.
+        if (!fs.existsSync(file)) {
+          return;
+        }
         const label = ruleSuffix ? `${agentId}-${ruleSuffix}` : agentId;
         console.log(`  ${label} -> ${file}`);
       });
