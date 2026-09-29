@@ -67,10 +67,11 @@ least evidenced.
 ### Phase 1 — Unblock the commit path (#361)
 
 - [ ] Reproduce: touch any `.ts` file and commit without `--no-verify`; confirm `ENOENT`
-- [ ] Decide between the two fixes: restore a root `tsconfig.json`, or move the
-      `lint-staged` typecheck entry into `packages/ballast-typescript/package.json`
-      where `tsc-files` resolves. Prefer the latter — it matches the monorepo layout
-      rather than re-adding a root artifact that `b502343` deliberately removed
+- [ ] **Decided:** relocate the `lint-staged` typecheck entry into
+      `packages/ballast-typescript/package.json`, where `tsc-files` resolves. Do not
+      restore a root `tsconfig.json` — `b502343` removed it deliberately when splitting
+      to the monorepo layout, and re-adding it walks that back
+- [ ] Confirm `tsc-files` resolves the package-level `tsconfig.json` from that location
 - [ ] Confirm `gitleaks` and lint hooks actually run again after the fix
 - [ ] Add a check that fails if the hook cannot spawn its own tools, so a broken hook
       is loud instead of a habit of `--no-verify`
@@ -85,25 +86,41 @@ least evidenced.
 
 ### Phase 3 — Restore the unwatched signals
 
-- [ ] #360: answer the issue's open question first — is the tool policy meant to render
-      into per-language rule files, or only into the manifest? The manifest carries a
-      `### Repository Tool Policy` section today, which suggests the script is stale,
-      but confirm against the renderer before editing the assertion
+- [ ] #360: **Decided:** confirm against the renderer before touching anything. Read the
+      tool-policy rendering path and establish whether per-language rule files are still
+      meant to carry the section. The manifest carries `### Repository Tool Policy`
+      today, which points at the script being stale — but that is the assumption to
+      test, not the conclusion. Fix whichever side the renderer says is wrong
 - [ ] Wire `e2e-tools-rendered-in-rules.sh`, `e2e-go-first-run-required-options.sh` and
       `e2e-support-file-default-patch.sh` into CI. These three are the only e2e scripts
       no workflow runs, which is exactly why #360 rotted undetected
 - [ ] #357: make the install log reflect post-prune reality — either report after the
       final language pass, or omit files a later pass removes
 
-### Phase 4 — Atomicity (#356)
+### Phase 4 — Make an interrupted upgrade recoverable (#356)
 
-- [ ] Reproduce the skew by forcing a backend error mid-run
-- [ ] Print an explicit per-target synced/not-synced summary on failure (the minimum fix)
-- [ ] Evaluate full rollback vs. summary-only; rollback may not be worth the complexity
-      if the summary plus `doctor` makes the skew visible and recoverable
+**Decided:** do not build rollback machinery. Make the failure recoverable with git
+instead, by requiring a clean starting point.
+
+- [ ] Add a precondition to `ballast upgrade`: refuse to run when any Ballast-managed
+      file has pending changes in the working tree. A half-applied upgrade from a clean
+      tree is then fully recoverable with `git checkout` / `git restore`
+- [ ] Refuse to run when the project is not a git repository at all, for the same
+      reason — without git there is no recovery path
+- [ ] Add `--force` to override both refusals, for users who accept the risk
+- [ ] Scope the check to Ballast-managed paths, not the whole tree: unrelated
+      uncommitted work must not block an upgrade
+- [ ] Reproduce the skew by forcing a backend error mid-run, and confirm
+      `git checkout -- <ballast paths>` restores the pre-upgrade state exactly
+- [ ] Let `doctor` surface the resulting skew rather than the upgrade trying to repair
+      it; confirm doctor reports targets left on different content versions
 - [ ] Add stale-backend-build detection to `doctor`: compare a locally built backend's
       compiled output against its source. This was the actual trigger in the issue's
       repro and would have surfaced the cause immediately
+
+Rejected: full rollback across four backends. It is a large amount of machinery to
+replicate what git already does, and it would have to be correct in exactly the
+situation where the tool is already failing.
 
 ## Verification
 
@@ -112,7 +129,9 @@ least evidenced.
 - #358: `buildClaudeSkill` gone; full suite green; issue closed as obsolete
 - #360: all 18 `scripts/e2e-*.sh` pass on a clean checkout and all 18 run in CI
 - #357: install log lines match `find` output afterward, on a multi-language repo
-- #356: an interrupted upgrade names which targets synced; `doctor` flags a stale backend
+- #356: `upgrade` refuses to start on a dirty Ballast-managed tree and on a non-git
+  project, `--force` overrides both, an interrupted run is fully restored by
+  `git checkout`, and `doctor` flags both the skew and a stale backend build
 
 ## Alternatives Rejected
 
@@ -124,17 +143,26 @@ least evidenced.
   in one PR is unreviewable, and #361 needs to land before the others are even
   committed safely.
 
+## Resolved Questions
+
+All three were answered on 2026-09-29; the phases above carry the decisions.
+
+- **#361 — relocate the `lint-staged` entry**, rather than restoring a root
+  `tsconfig.json`. Keeps the monorepo split that `b502343` established.
+- **#360 — confirm against the renderer** before editing either side. The manifest
+  evidence points at the script being stale, but that is the hypothesis to test.
+- **#356 — guard the precondition instead of building rollback.** `ballast upgrade`
+  refuses to run when Ballast-managed files have pending changes, or when the project
+  is not under git; `--force` overrides both. Recovery is then `git checkout`, and
+  `doctor` surfaces any skew.
+
 ## Open Questions
 
-- #360: is per-language tool-policy rendering intended, or did it deliberately move to
-  the manifest? Determines whether the script or the renderer is wrong.
-- #356: is full rollback warranted, or is an explicit summary plus `doctor` detection
-  enough? Rollback across four backends may cost more than the skew it prevents.
-- #361: restore a root `tsconfig.json`, or relocate the `lint-staged` entry? The latter
-  respects the monorepo split; confirm `tsc-files` can resolve a package-level config.
+- None outstanding.
 
 ## Change Log
 
 | Date | Change |
 | --- | --- |
 | 2026-09-28 | Created. Current state verified against the working tree, not taken from the issue text. |
+| 2026-09-29 | All three open questions answered. #356 reframed from rollback to a clean-tree precondition with `--force`. |
