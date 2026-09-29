@@ -37,6 +37,13 @@ cat > "${PROJECT}/.codex/rules/owasp-security-scan.md" <<'EOF'
 stale skill content
 EOF
 
+# `ballast upgrade` requires a clean git tree for Ballast-managed files so a
+# partial upgrade can be undone with `git checkout`.
+git -C "${PROJECT}" init -q
+git -C "${PROJECT}" add -A
+git -C "${PROJECT}" -c user.email=smoke@example.com -c user.name=smoke \
+  commit -q --allow-empty -m "fixture"
+
 (
   cd "${PROJECT}"
   ballast --language go upgrade

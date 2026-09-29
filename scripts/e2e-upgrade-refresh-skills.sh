@@ -41,6 +41,8 @@ cat > "${PROJECT}/.codex/rules/go-linting.md" <<'EOF'
 existing linting rule
 EOF
 
+git_init_clean_fixture "${PROJECT}"
+
 (
   cd "${PROJECT}"
   ballast --language go upgrade >/dev/null

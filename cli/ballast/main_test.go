@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -1263,6 +1264,7 @@ func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T)
   "paths":{"typescript":["."]}
 }`)
 
+	gitInitForUpgrade(t, root)
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"upgrade"})
 		if exitCode != 0 {
@@ -1322,6 +1324,7 @@ func TestRunUpgradePatchForwardsPatchToRefreshInstall(t *testing.T) {
   "paths":{"typescript":["."]}
 }`)
 
+	gitInitForUpgrade(t, root)
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"upgrade", "--patch"})
 		if exitCode != 0 {
@@ -1380,6 +1383,7 @@ func TestRunUpgradeUsesLocalSourcesInsideSourceCheckout(t *testing.T) {
   "paths":{"go":["."]}
 }`)
 
+	gitInitForUpgrade(t, projectRoot)
 	withWorkingDir(t, projectRoot, func() {
 		exitCode := run([]string{"--language", "go", "upgrade"})
 		if exitCode != 0 {
@@ -1576,6 +1580,7 @@ func TestRunUpgradeRefreshesSelectedBackendOnceOutsideSourceCheckout(t *testing.
   }
 }`)
 
+	gitInitForUpgrade(t, root)
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"--language", "go", "upgrade"})
 		if exitCode != 0 {
@@ -1915,6 +1920,7 @@ func TestRunUpgradeDoesNotRunBrew(t *testing.T) {
   "paths":{"typescript":["."]}
 }`)
 
+	gitInitForUpgrade(t, root)
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"upgrade"})
 		if exitCode != 0 {
@@ -6255,6 +6261,85 @@ func TestContainsBallastManagedMarkerRequiresLiteralRuleMarkerPrefix(t *testing.
 
 // resolvedTempDir wraps t.TempDir and resolves symlinks so that path
 // comparisons work on macOS where /tmp is a symlink to /private/tmp.
+func TestVerifyUpgradePreconditionsRefusesOutsideGit(t *testing.T) {
+	root := resolvedTempDir(t)
+	config := &monorepoConfig{Targets: []string{"claude"}}
+
+	err := verifyUpgradePreconditions(root, config, false)
+	if err == nil {
+		t.Fatal("expected a refusal outside a git repository")
+	}
+	if !strings.Contains(err.Error(), "needs a git repository") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVerifyUpgradePreconditionsRefusesDirtyManagedFiles(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), "{}\n")
+	gitInitForUpgrade(t, root)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), "{\"targets\":[]}\n")
+
+	err := verifyUpgradePreconditions(root, &monorepoConfig{Targets: []string{"claude"}}, false)
+	if err == nil {
+		t.Fatal("expected a refusal for a dirty Ballast-managed file")
+	}
+	if !strings.Contains(err.Error(), "needs a clean starting point") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(err.Error(), ".rulesrc.json") {
+		t.Fatalf("expected the offending path in the message: %v", err)
+	}
+}
+
+func TestVerifyUpgradePreconditionsForceOverridesBothRefusals(t *testing.T) {
+	root := resolvedTempDir(t)
+	config := &monorepoConfig{Targets: []string{"claude"}}
+
+	// Not a git repository at all.
+	if err := verifyUpgradePreconditions(root, config, true); err != nil {
+		t.Fatalf("force should override the git requirement: %v", err)
+	}
+
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), "{}\n")
+	gitInitForUpgrade(t, root)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), "{\"targets\":[]}\n")
+
+	if err := verifyUpgradePreconditions(root, config, true); err != nil {
+		t.Fatalf("force should override the clean-tree requirement: %v", err)
+	}
+}
+
+func TestVerifyUpgradePreconditionsIgnoresUnrelatedChanges(t *testing.T) {
+	// Scope matters: unrelated uncommitted work must not block an upgrade.
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), "{}\n")
+	gitInitForUpgrade(t, root)
+	mustWriteFile(t, filepath.Join(root, "src", "app.ts"), "export const x = 1;\n")
+
+	if err := verifyUpgradePreconditions(root, &monorepoConfig{Targets: []string{"claude"}}, false); err != nil {
+		t.Fatalf("unrelated changes must not block an upgrade: %v", err)
+	}
+}
+
+// gitInitForUpgrade makes dir a git repository with a clean tree. runUpgrade
+// refuses to start outside git, or with pending changes to Ballast-managed
+// files, so that a partial upgrade is always recoverable with git checkout.
+func gitInitForUpgrade(t *testing.T, dir string) {
+	t.Helper()
+	for _, args := range [][]string{
+		{"init"},
+		{"add", "-A"},
+		{"-c", "user.email=test@example.com", "-c", "user.name=test", "commit",
+			"--allow-empty", "-q", "-m", "fixture"},
+	} {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+}
+
 func resolvedTempDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

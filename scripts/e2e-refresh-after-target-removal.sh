@@ -28,10 +28,17 @@ EOF
 
 materialize_saved_install "${PROJECT}"
 
+git_init_clean_fixture "${PROJECT}"
+
 (
   cd "${PROJECT}"
   ballast install --remove-target codex --yes >/dev/null
   ballast install --refresh-config >/dev/null
+  # Removing a target rewrites Ballast-managed files, and upgrade refuses to
+  # start on a dirty tree so a partial run stays recoverable. Commit first, as
+  # a user would, rather than reaching for --force.
+  git add -A
+  git -c user.email=e2e@example.com -c user.name=e2e commit -q -m "remove codex target"
   ballast --language go upgrade >/dev/null
 )
 

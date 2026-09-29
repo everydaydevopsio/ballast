@@ -159,3 +159,14 @@ assert_doctor_not_contains() {
     fail "expected '${needle}' to be absent from doctor output"
   fi
 }
+
+# `ballast upgrade` refuses to start outside git, or with pending changes to
+# Ballast-managed files, so a partial upgrade is always recoverable with
+# `git checkout`. Fixtures that run an upgrade must therefore be clean repos.
+git_init_clean_fixture() {
+  local project="$1"
+  git -C "${project}" init -q
+  git -C "${project}" add -A
+  git -C "${project}" -c user.email=e2e@example.com -c user.name=e2e \
+    commit -q --allow-empty -m "fixture"
+}
