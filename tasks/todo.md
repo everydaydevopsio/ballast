@@ -51,13 +51,14 @@ A stale plan is worse than no plan — it is read as current intent.
       via #339/#342/#325, leaving only #128 and #94, which are tracked as issues. The
       Phase 2 and Phase 3 design notes, and the unanswered parity open question, were
       posted to #128 and #94 before deletion so nothing was lost.
-- [ ] **`plans/plan-spec-kit-development-process.md` — decide whether to pursue.** Proposed
-      2026-08-29, a month old with no work started and four open questions unresolved.
-      Related issue #303 is still open. Either commit to it and answer the questions, or
-      retire it and record why on #303.
-- [ ] Note while triaging: that plan's open question *"should `docs/code_review.md` be
-      created, or should `AGENTS.md` point to an existing review document?"* is live issue
-      **#340**, filed separately on 2026-09-17. Answer it once, in one place.
+- [ ] **`plans/plan-spec-kit-development-process.md` — kept and in progress.** Phases 2
+      and 4 are done; Phase 1 is blocked on its placement question (does the end-to-end
+      process doc live at `docs/development-process.md`, under `docs/agents/spec-kit.md`,
+      or both?). Phases 3 and 5 follow Phase 1.
+- [x] **#340 answered and closed.** The spec-kit plan's open question and #340 were the
+      same question. Resolved by creating `docs/code_review.md` rather than repointing
+      `AGENTS.md`: that line is written by an external Codex reviewer installer, so
+      supplying the target is durable where editing the pointer is not.
 - [ ] Promote whichever of these outlive this branch into GitHub issues and record the links
       here, per the task-system rule. `tasks/todo.md` is not durable tracking.
 
