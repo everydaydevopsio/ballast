@@ -5,7 +5,6 @@ import readline from 'readline';
 import zlib from 'zlib';
 import { install, resolveTargetAndAgents, runInstall } from './install';
 import {
-  buildClaudeSkill,
   buildCodexAgentsMd,
   buildCursorSkillFormat,
   getClaudeMdPath,
@@ -52,6 +51,54 @@ describe('install', () => {
       value: isTTY,
       configurable: true
     });
+  }
+
+  // Legacy `.skill` bundles shipped in two shapes, and the migration path has
+  // to read both: STORE (what Ballast's own writer produced) and DEFLATE with a
+  // data descriptor (what claude.ai produced). Ballast no longer writes either,
+  // so these builders live here rather than in the shipped API.
+  function buildStoredSkillArchive(skillMd: string): Buffer {
+    const crc32 = (buffer: Buffer): number => {
+      let crc = 0xffffffff;
+      for (const byte of buffer) {
+        crc ^= byte;
+        for (let index = 0; index < 8; index += 1) {
+          const mask = -(crc & 1);
+          crc = (crc >>> 1) ^ (0xedb88320 & mask);
+        }
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    };
+
+    const name = Buffer.from('SKILL.md', 'utf8');
+    const data = Buffer.from(skillMd, 'utf8');
+    const checksum = crc32(data);
+
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(name.length, 28);
+
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt16LE(1, 8);
+    end.writeUInt16LE(1, 10);
+    end.writeUInt32LE(central.length + name.length, 12);
+    end.writeUInt32LE(local.length + name.length + data.length, 16);
+
+    return Buffer.concat([local, name, data, central, name, end]);
   }
 
   function buildClaudeSkillWithDataDescriptor(skillMd: string): Buffer {
@@ -785,7 +832,7 @@ Content upstream deleted that must not survive a patch.
       fs.mkdirSync(path.dirname(legacyArchive), { recursive: true });
       fs.writeFileSync(
         legacyArchive,
-        buildClaudeSkill('owasp-security-scan', '# stale bundle\n')
+        buildStoredSkillArchive('# stale bundle\n')
       );
 
       const result = install({
@@ -851,7 +898,7 @@ Content upstream deleted that must not survive a patch.
       );
       fs.writeFileSync(
         legacyArchive,
-        buildClaudeSkill('owasp-security-scan', '# stale bundle\n')
+        buildStoredSkillArchive('# stale bundle\n')
       );
 
       install({

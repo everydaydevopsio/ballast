@@ -1,9 +1,7 @@
 package main
 
 import (
-	"archive/zip"
 	"bufio"
-	"bytes"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
@@ -1738,80 +1736,6 @@ func copyCodexSkillResourceDir(sourceDir, destinationDir string) error {
 // buildClaudeSkill packages a skill as a claude.ai Agent Skills zip bundle.
 // This is not what Claude Code installs -- it discovers directories, see
 // skillDestination -- and is kept for publishing bundles to claude.ai.
-func buildClaudeSkill(skillID, language string, skillContent ...string) ([]byte, error) {
-	content := ""
-	if len(skillContent) > 0 {
-		content = skillContent[0]
-	} else {
-		var err error
-		content, err = readSkillContent(skillID, language)
-		if err != nil {
-			return nil, err
-		}
-	}
-	var buffer bytes.Buffer
-	archive := zip.NewWriter(&buffer)
-	writer, err := archive.Create("SKILL.md")
-	if err != nil {
-		return nil, err
-	}
-	if _, err := writer.Write([]byte(content)); err != nil {
-		return nil, err
-	}
-	referencesDir := path.Join(skillDir(skillID, language), "references")
-	if existsSkillFile(referencesDir) {
-		if overrideRoot := repoRootOverride(); overrideRoot != "" {
-			rootDir := filepath.Join(overrideRoot, filepath.FromSlash(referencesDir))
-			err = filepath.WalkDir(rootDir, func(file string, d os.DirEntry, walkErr error) error {
-				if walkErr != nil || d.IsDir() {
-					return walkErr
-				}
-				relative, relErr := filepath.Rel(rootDir, file)
-				if relErr != nil {
-					return relErr
-				}
-				entry, createErr := archive.Create(path.Join("references", filepath.ToSlash(relative)))
-				if createErr != nil {
-					return createErr
-				}
-				data, readErr := os.ReadFile(file)
-				if readErr != nil {
-					return readErr
-				}
-				_, writeErr := entry.Write(data)
-				return writeErr
-			})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			referenceEntries, readErr := fs.ReadDir(embeddedSkillsFS, referencesDir)
-			if readErr == nil {
-				for _, entry := range referenceEntries {
-					if entry.IsDir() {
-						continue
-					}
-					data, fileErr := readSkillFile(path.Join(referencesDir, entry.Name()))
-					if fileErr != nil {
-						return nil, fileErr
-					}
-					writer, createErr := archive.Create(path.Join("references", entry.Name()))
-					if createErr != nil {
-						return nil, createErr
-					}
-					if _, fileErr := writer.Write(data); fileErr != nil {
-						return nil, fileErr
-					}
-				}
-			}
-		}
-	}
-	if err := archive.Close(); err != nil {
-		return nil, err
-	}
-	return buffer.Bytes(), nil
-}
-
 func normalizeLineEndings(content string) string {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	return strings.ReplaceAll(content, "\r", "\n")
