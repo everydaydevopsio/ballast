@@ -106,8 +106,10 @@ expect_exit "Rejected submission with a non-zero notarytool exit fails" 1 \
   run_hook STUB_STATUS=Rejected STUB_SUBMIT_EXIT=1
 
 # Missing credentials must abort rather than silently skip notarization.
+# `env -u` so an issuer id exported in the caller's shell cannot leak in and
+# send this case down the normal notarization path instead.
 expect_exit "Missing APPLE_API_KEY_ISSUER_ID fails" 1 \
-  env PATH="${WORKDIR}/bin:${PATH}" HOME="${WORKDIR}/home" \
+  env -u APPLE_API_KEY_ISSUER_ID PATH="${WORKDIR}/bin:${PATH}" HOME="${WORKDIR}/home" \
   APPLE_SIGNING_IDENTITY="Developer ID Application: Smoke Test" \
   APPLE_API_KEY_ID="TESTKEY" \
   bash "${HOOK}" darwin "${WORKDIR}/ballast"
