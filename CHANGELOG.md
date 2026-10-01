@@ -31,6 +31,30 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.21.1] - 2026-10-01
+
+### Highlights
+
+- Improved reliability of rule handling: `doctor --fix` no longer removes rules for an unconfigured target, and shipped rules no longer reference documentation unavailable to consumers.
+- Restored pre-commit’s ownership of Git hooks.
+- Completed the September 21 reliability work and consolidated development-process guidance into architecture decision records.
+
+### Fixes
+
+- **Rule handling and distribution:** Preserved rules for unconfigured targets during `doctor --fix` and removed a pointer to documentation not included in the distributed package. (#372, #371)
+- **Git hooks:** Returned hook management to pre-commit. (#374)
+- **Audit guidance:** Corrected `ballast-audit` state definitions and remediation commands. (#367)
+- **Review policy:** Added the review policy already referenced by `AGENTS.md`. (#380)
+- **Reliability:** Closed out the September 21 reliability cluster covering #356, #357, #358, and #360. (#375)
+
+### Changes
+
+- **Development guidance:** Clarified how Spec Kit fits alongside existing Ballast rules and promoted its development-process plan to ADR-004. (#381, #382)
+- **Documentation lifecycle:** Recorded the reliability work in ADR-002, retired two stale plans with one promoted to ADR-003, and documented triage of the remaining plans. (#373, #377, #378, #379)
+- **Development dependencies:** Updated Prettier, upgraded `ts-jest` from 29.4.12 to 29.4.14, and refreshed four ESLint-related dependencies. (#369, #370, #368)
+
+**Full changelog:** [v5.21.0…v5.21.1](../../compare/v5.21.0...v5.21.1)
+
 ## [5.21.0] - 2026-09-23
 
 ### Highlights
