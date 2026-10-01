@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing" version="5.21.2" checksum="aec70ee6384a0ca93b2b47247024169d0b145d62e7433697132de81b2cb39d60" -->
+<!-- ballast:rule id="typescript/publishing" version="5.21.2" checksum="674aa495013ae71cb2c28fda66eebf2c91b9f2ed17a7d019f5a3d89aab7647b2" -->
 # Publishing Rules
 
 Shared release pattern for every publishing variant in this repository. The `publishing-<variant>` rules add artifact-specific requirements on top of this pattern.
@@ -20,6 +20,24 @@ Version and tag rules:
 - The published artifact version must equal the tag version without the `v` prefix.
 - Create the tag first, then publish from that tag; publishing steps must be idempotent or fail safely on duplicate versions.
 - Changelog or release notes must exist for the version, and build and tests must pass before publish.
+
+## Recovering A Release That Failed After The Tag
+
+`bump_and_tag` is the point of no return: everything after it publishes outward. Classify the failure before retrying.
+
+| Failure | Example | Recovery |
+| --- | --- | --- |
+| Before any outward write | signing or notarization gated ahead of upload | Re-run the failed job. |
+| After a partial outward write | assets uploaded or an index updated, then a step failed | Roll forward with a new patch release. |
+| After a complete write | registry rejects a duplicate version | Nothing to do. |
+
+The middle case is the trap: re-running a job that already published fails on its own artifacts — GitHub rejects duplicate asset names with `422 already_exists`, and indexes already advertise checksums for what is being replaced. Default to rolling forward; a burned version number is cheaper than a mutated one. Deleting artifacts to retry the same version leaves the release missing assets while indexes still point at them; reserve it for a version consumers cannot move off.
+
+Prevent it instead:
+
+- Order every verification that can fail — signing, notarization, attestation, scanning — ahead of the first upload, so a failure aborts the release instead of publishing partial artifacts.
+- Let a re-run overwrite its own artifacts where supported (GoReleaser: `release.mode: replace`).
+- Workflows read config from the checked-out tag, so neither fix helps an already-tagged version.
 
 ## Registry Publishing
 

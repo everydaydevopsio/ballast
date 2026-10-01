@@ -4,6 +4,9 @@ project_name: ballast
 
 release:
   name_template: "ballast v{{ .Version }}"
+  # Allow a re-run to overwrite its own assets instead of failing the
+  # whole release with 422 already_exists on every upload.
+  mode: replace
 
 builds:
   - id: ballast
@@ -26,9 +29,11 @@ builds:
         goarch: arm64
     hooks:
       post:
-        - cmd: sh -c 'if [ "{{ .Os }}" = "darwin" ]; then codesign --sign "{{ .Env.APPLE_SIGNING_IDENTITY }}" --options runtime --timestamp "{{ .Path }}"; fi'
+        - cmd: ./scripts/sign-and-notarize-darwin.sh "{{ .Os }}" "{{ .Path }}"
           env:
             - APPLE_SIGNING_IDENTITY={{ .Env.APPLE_SIGNING_IDENTITY }}
+            - APPLE_API_KEY_ID={{ .Env.APPLE_API_KEY_ID }}
+            - APPLE_API_KEY_ISSUER_ID={{ .Env.APPLE_API_KEY_ISSUER_ID }}
 
 archives:
   - id: ballast
