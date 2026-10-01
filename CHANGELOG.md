@@ -31,6 +31,30 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.21.2] - 2026-10-01
+
+Updates since **v5.21.0**, focused on reliability, rule integrity, and development workflow cleanup.
+
+### Highlights
+
+- Made `doctor --fix` safer by preserving rules for targets that have not been configured.
+- Restored pre-commit’s ownership of Git hooks.
+- Completed the September 21 reliability work covering #356, #357, #358, and #360. (#375)
+
+### Fixes
+
+- Removed a shipped rule reference to documentation that consumers do not receive. (#371)
+- Added the review policy that `AGENTS.md` already referenced. (#380)
+- Corrected `ballast-audit` state definitions and remediation commands. (#367)
+- Prevented `doctor --fix` from stripping rules for an unconfigured target. (#372)
+- Resolved Git hook ownership conflicts so pre-commit can manage hooks again. (#374)
+
+### Changes
+
+- Clarified how Spec Kit fits into the existing Ballast rules and documented its development process in **ADR-004**. (#381, #382)
+- Consolidated completed plans into architecture decision records, including **ADR-002** and **ADR-003**, retired stale plans, and tracked triage of the remaining plan files. (#373, #377–#379)
+- Updated development tooling: Prettier, four packages in the ESLint dependency group, and `ts-jest` from **29.4.12** to **29.4.14**. (#368–#370)
+
 ## [5.21.1] - 2026-10-01
 
 ### Highlights
