@@ -1,4 +1,4 @@
-<!-- ballast:rule id="typescript/publishing/libraries" version="5.21.2" checksum="95f4bec59a20df0d0fec66ebfb5ab3a618ffeb151dc0b3e8621381ac3e0d9be2" -->
+<!-- ballast:rule id="typescript/publishing/libraries" version="5.21.3" checksum="95f4bec59a20df0d0fec66ebfb5ab3a618ffeb151dc0b3e8621381ac3e0d9be2" -->
 # Publishing Libraries Agent
 
 ## Goals

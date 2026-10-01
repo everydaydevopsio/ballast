@@ -31,6 +31,19 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.21.3] - 2026-10-01
+
+### Highlights
+macOS builds are now notarized before any release artifacts are uploaded.
+
+### Fixes
+- Corrected the release workflow ordering to ensure macOS notarization completes before uploads begin. (#384)
+
+### Changes
+- Updated release sequencing only; no application behavior changes are included in this release.
+
+**Full changelog:** [v5.21.2...v5.21.3](../../compare/v5.21.2...v5.21.3)
+
 ## [5.21.2] - 2026-10-01
 
 Updates since **v5.21.0**, focused on reliability, rule integrity, and development workflow cleanup.
