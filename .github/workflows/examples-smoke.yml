@@ -413,3 +413,17 @@ jobs:
 
       - name: Run e2e script
         run: SKIP_BUILD=1 "${{ matrix.script }}" "$GITHUB_WORKSPACE"
+
+  # Runs on macOS because the hook under test uses codesign, ditto, and plutil.
+  # Apple tooling is stubbed on PATH, so no signing identity, credentials, or
+  # network access are required.
+  sign-notarize-hook-smoke:
+    name: sign-notarize-hook-smoke
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v7
+
+      - name: Run sign-and-notarize hook smoke test
+        run: ./scripts/smoke-sign-notarize-hook.sh
