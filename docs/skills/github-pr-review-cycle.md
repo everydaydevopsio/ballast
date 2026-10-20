@@ -71,6 +71,13 @@ allow about 35 minutes. It has three terminal outcomes rather than two: a publis
 at capacity, or the App is not installed). A failure comment is infrastructure failure and must
 never be scored as review feedback.
 
+Bosun publishes on two surfaces, so the skill polls both: findings arrive as a pull-request
+review with inline comments, while a review with nothing anchorable to the diff — and every
+failure — arrives as a conversation comment. Polling only one surface makes a settled review
+look like a timeout. Whether a review covers the current head is decided by the commit it
+names (`commit_id` on a review object, the metadata line under the heading on a comment),
+never by its timestamp.
+
 Two Bosun constraints are worth knowing before wiring this into automation: the triggering
 comment's author must be `OWNER`, `MEMBER`, or `COLLABORATOR`, and comments from bots are
 ignored so Bosun cannot trigger itself. A local `gh` session qualifies; a GitHub Actions

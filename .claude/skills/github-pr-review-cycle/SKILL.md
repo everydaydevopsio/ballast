@@ -254,10 +254,18 @@ Two constraints on the trigger, both enforced by Bosun's webhook:
 - The comment author must be `OWNER`, `MEMBER`, or `COLLABORATOR` on the repository.
 - Comments whose sender is a bot are ignored, so Bosun cannot trigger itself. A local `gh` session qualifies; a GitHub Actions `GITHUB_TOKEN` does not and will be silently dropped.
 
-**Settle.** Bosun publishes as the App's bot account, so poll issue comments rather than reviews:
+**Settle.** Bosun publishes as the App's bot account, on **two** surfaces. Findings arrive as
+a pull-request review with inline comments; a review with nothing anchorable to the diff, and
+every failure, arrive as a conversation comment. Poll both — polling only one is how a
+settled review looks like a timeout:
 
 ```bash
 OWNER_REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+
+gh api "repos/$OWNER_REPO/pulls/$PR_NUMBER/reviews" --paginate \
+  --jq '[.[] | select(.body | startswith("## Bosun code review"))]
+        | .[-3:] | .[] | {id, url: .html_url, login: .user.login, submitted_at, commit_id, body}'
+
 gh api "repos/$OWNER_REPO/issues/$PR_NUMBER/comments" --paginate \
   --jq '[.[] | select(.body | startswith("## Bosun code review"))]
         | .[-3:] | .[] | {id, url: .html_url, login: .user.login, created_at, body}'
@@ -269,12 +277,18 @@ bot-filtered tail. And return the whole `body`, not its first line — the first
 the `## Bosun code review` heading, and the commit stamp you need sits on the metadata line
 below it.
 
-A settled review is a comment whose body starts with `## Bosun code review` and whose
-stamped commit is `$HEAD_OID`. Bosun records the reviewed ref and commit in a metadata line
-directly under that heading; **that commit, not the timestamp, decides whether the review
-covers the current head.** A Bosun job started by your push can finish before `gh pr checks`
+A settled review is output headed `## Bosun code review` whose reviewed commit is
+`$HEAD_OID`. **That commit, not the timestamp, decides whether the review covers the current
+head.** Read it from `commit_id` on a review object, which Bosun sets to the commit it read;
+on a conversation comment, read it from the metadata line directly under the heading, which
+both surfaces carry. A Bosun job started by your push can finish before `gh pr checks`
 returns, so a review for the right commit may legitimately predate `$REQUESTED_AT`. Fall
-back to `created_at > $REQUESTED_AT` only for output that carries no commit stamp.
+back to `submitted_at` / `created_at > $REQUESTED_AT` only for output that carries no commit
+stamp at all.
+
+Older Bosun deployments publish every review as a conversation comment and stamp no commit.
+Both shapes are handled below, so a version check is not needed — but on an unstamped review
+the timestamp is all you have, and two pushes in quick succession are genuinely ambiguous.
 
 Timeout must be far longer than Copilot's. A Bosun review runs to `BOSUN_REVIEW_TIMEOUT_SECONDS`, 1800 seconds by default, plus queue time. Poll at 60s, then 120s repeating, and allow about 35 minutes.
 
@@ -282,13 +296,15 @@ Bosun has three terminal outcomes, not two:
 
 | Outcome | Signal | Action |
 | --- | --- | --- |
-| Review published | `## Bosun code review` | Score the findings |
-| Review failed | `## Bosun code review failed` | Infrastructure failure, not findings. Do not score it. Report the quoted reason and stop the cycle |
-| No review arrived | timeout with neither comment | Bosun may have rejected the webhook at capacity, or is not installed on this repository. Report the PR as blocked and say the delivery may need redelivering |
+| Review published | a review **or** a comment headed `## Bosun code review` | Score the findings |
+| Review failed | a comment headed `## Bosun code review failed` | Infrastructure failure, not findings. Do not score it. Report the quoted reason and stop the cycle |
+| No review arrived | timeout with neither, on either surface | Bosun may have rejected the webhook at capacity, or is not installed on this repository. Report the PR as blocked and say the delivery may need redelivering |
 
 Never score a failure comment as if it were review feedback.
 
-**Read findings.** Where Bosun publishes a pull-request review with inline comments, read it exactly as the Copilot section describes — the thread query, replies, and `resolveReviewThread` all apply unchanged, with the author login being the App's bot (`<app-slug>[bot]`, for example `bosun-reviewer[bot]`).
+**Read findings.** The normal case is a pull-request review with inline comments: read it exactly as the Copilot section describes — the thread query, replies, and `resolveReviewThread` all apply unchanged, with the author login being the App's bot (`<app-slug>[bot]`, for example `bosun-reviewer[bot]`). Each inline comment opens with its severity, `**high** — <title>`, so the rubric below applies per thread.
+
+A review body can also carry findings that are not threads, under `### Findings outside the diff` or `### Findings` — the first when a finding names a file the PR does not touch, the second when GitHub rejected the inline positions and Bosun republished everything in the body. Score those from the body and record them in the audit comment described below; there is nothing to resolve.
 
 Where Bosun publishes a single conversation comment instead, there are no threads to resolve. Read the comment body, which lists findings in severity order with file and line. Map severity to the scoring rubric:
 
