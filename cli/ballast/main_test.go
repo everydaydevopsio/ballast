@@ -7032,3 +7032,61 @@ func TestParseCodeReviewerFlag(t *testing.T) {
 		})
 	}
 }
+
+func TestStripMonorepoFlagsRemovesCodeReviewerInBothForms(t *testing.T) {
+	// The wrapper re-adds a single resolved --code-reviewer, so both spellings
+	// must be stripped first or the backend receives it twice.
+	got := stripMonorepoFlags([]string{
+		"install", "--target", "codex",
+		"--code-reviewer", "bosun",
+		"--code-reviewer=none",
+		"--skill", "github-pr-review-cycle",
+	})
+	for _, arg := range got {
+		if strings.Contains(arg, "code-reviewer") || arg == "bosun" || arg == "none" {
+			t.Fatalf("--code-reviewer survived stripping: %v", got)
+		}
+	}
+	if !slices.Contains(got, "--skill") || !slices.Contains(got, "github-pr-review-cycle") {
+		t.Fatalf("stripping removed unrelated flags: %v", got)
+	}
+}
+
+func TestConfigValueExposesCodeReviewer(t *testing.T) {
+	if got := configValue(&monorepoConfig{CodeReviewer: "skill:house-style"}, "codeReviewer"); got != "skill:house-style" {
+		t.Fatalf("got %q", got)
+	}
+	if got := configValue(&monorepoConfig{}, "codeReviewer"); got != "" {
+		t.Fatalf("an unset reviewer should be empty, got %q", got)
+	}
+}
+
+func TestReadCodeReviewer(t *testing.T) {
+	cases := []struct {
+		name, body, want string
+	}{
+		{name: "valid", body: `{"codeReviewer":"bosun"}`, want: "bosun"},
+		{name: "skill reference", body: `{"codeReviewer":"Skill:House-Style"}`, want: "skill:house-style"},
+		{name: "absent", body: `{"targets":["codex"]}`, want: ""},
+		// An unusable or wrong-typed value must read as unset rather than being
+		// passed through to a backend that would reject it.
+		{name: "invalid value", body: `{"codeReviewer":"gemini"}`, want: ""},
+		{name: "wrong type", body: `{"codeReviewer":false}`, want: ""},
+		{name: "malformed json", body: `{`, want: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, ".rulesrc.json"), []byte(tc.body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if got := readCodeReviewer(dir); got != tc.want {
+				t.Fatalf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+	// A missing file is not an error, just an unset reviewer.
+	if got := readCodeReviewer(t.TempDir()); got != "" {
+		t.Fatalf("missing config should yield an empty reviewer, got %q", got)
+	}
+}
