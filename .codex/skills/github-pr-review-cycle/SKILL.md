@@ -26,12 +26,27 @@ Before anything else, decide which reviewer this run uses. Precedence:
 2. The `codeReviewer` key in `.rulesrc.json` at the repository root.
 3. `copilot`, the default.
 
-```bash
-REVIEWER=$(python3 -c 'import json,sys;print(json.load(open(".rulesrc.json")).get("codeReviewer","copilot"))' 2>/dev/null || echo copilot)
-echo "reviewer: $REVIEWER"
-```
+Read `.rulesrc.json` yourself rather than shelling out to a parser. Resolution has three
+distinct outcomes, and **only one of them defaults**:
 
-Valid values are `copilot`, `bosun`, `none`, and `skill:<skill-name>`.
+| Situation | Resolution |
+| --- | --- |
+| No `.rulesrc.json`, or the file has no `codeReviewer` key | `copilot` |
+| `codeReviewer` is present and valid | that value |
+| The file exists but cannot be read or parsed, or `codeReviewer` holds an unrecognized value | **stop and report — do not default** |
+
+That third row is the one that matters. Defaulting on a read failure turns "this repository
+must not use Copilot" into a Copilot review request, which is the exact outcome the setting
+exists to prevent. A repository that cannot be read is not a repository that chose Copilot.
+Say what failed and ask, rather than guessing.
+
+For the same reason, do not pipe the lookup through `2>/dev/null || echo copilot`, and do not
+make the resolution depend on a tool that may be absent — a missing `python3` or `jq` is a
+read failure, not a vote for Copilot.
+
+Valid values are `copilot`, `bosun`, `none`, and `skill:<skill-name>` where `<skill-name>` is
+lowercase alphanumeric with hyphens. Anything else is invalid: stop, name the value you found,
+and ask.
 
 If `codeReviewer` is `none`, do not run a review cycle. Say that automated review is disabled for this repository, finish any PR work that was asked for, and stop.
 
@@ -244,8 +259,15 @@ Two constraints on the trigger, both enforced by Bosun's webhook:
 ```bash
 OWNER_REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 gh api "repos/$OWNER_REPO/issues/$PR_NUMBER/comments" --paginate \
-  --jq '[.[] | select(.user.type == "Bot")] | .[-3:] | .[] | {login: .user.login, created_at, head: (.body | split("\n")[0])}'
+  --jq '[.[] | select(.body | startswith("## Bosun code review"))]
+        | .[-3:] | .[] | {id, url: .html_url, login: .user.login, created_at, body}'
 ```
+
+Filter for Bosun **before** taking the last few, not after: a busy PR can carry enough
+unrelated bot comments (Dependabot, coverage, CI bots) to push the review out of a
+bot-filtered tail. And return the whole `body`, not its first line — the first line is only
+the `## Bosun code review` heading, and the commit stamp you need sits on the metadata line
+below it.
 
 A settled review is a comment whose body starts with `## Bosun code review` and whose
 stamped commit is `$HEAD_OID`. Bosun records the reviewed ref and commit in a metadata line
