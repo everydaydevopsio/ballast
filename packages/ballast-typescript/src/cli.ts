@@ -138,6 +138,17 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       i += 2;
       continue;
     }
+    // The wrapper accepts `--code-reviewer=value` and forwards single-language
+    // installs verbatim, so without this the equals form reaches this parser
+    // unrecognized and the explicit choice is replaced by the default.
+    if (arg.startsWith('--code-reviewer=')) {
+      options.codeReviewer = arg
+        .slice('--code-reviewer='.length)
+        .trim()
+        .toLowerCase();
+      i += 1;
+      continue;
+    }
     if (arg === '--repository-facts-file') {
       const value = readFlagValue(args, i, arg);
       options.repositoryFactsFile = value.trim();

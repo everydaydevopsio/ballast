@@ -156,6 +156,21 @@ describe('parseArgs', () => {
     });
   });
 
+  test('parses the equals form of --code-reviewer', () => {
+    const parsed = parseArgs([
+      'node',
+      'ballast-typescript',
+      'install',
+      '--target',
+      'codex',
+      '--skill',
+      'github-pr-review-cycle',
+      '--code-reviewer=none',
+      '--yes'
+    ]);
+    expect(parsed).toMatchObject({ codeReviewer: 'none' });
+  });
+
   test('parses a skill: reference as the code reviewer', () => {
     const parsed = parseArgs([
       'node',

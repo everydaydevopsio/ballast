@@ -66,6 +66,12 @@
   and implementation notes.
 
 ## Follow-ups
+- Promoted: [everydaydevopsio/ballast#401](https://github.com/everydaydevopsio/ballast/issues/401)
+  — a wrong-typed scalar in `.rulesrc.json` discards the whole config in Go, affecting
+  `taskSystem`, `deploymentModel`, `ruleProfile`, and `ballastVersion` as well as
+  `codeReviewer`. Pre-existing pattern, surfaced by review of this branch; fixing one field
+  in isolation would leave the rest fragile. Also carries the TypeScript equals-form gap for
+  the other flags.
 - Promoted: [everydaydevopsio/bosun#53](https://github.com/everydaydevopsio/bosun/issues/53)
   — publish findings as a real pull-request review with inline comments. Until that lands,
   `codeReviewer: bosun` uses the conversation-comment path, which the skill already handles.
