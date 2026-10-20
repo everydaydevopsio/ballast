@@ -16,6 +16,17 @@ export const DEPLOYMENT_MODELS = [
   'hosted'
 ] as const;
 export const DEFAULT_DEPLOYMENT_MODEL = 'none' as const;
+/**
+ * Built-in code review agents the PR review cycle knows how to drive. A
+ * repository may also name a skill of its own with the `skill:` prefix, which
+ * is why this list is not the whole of the valid value space -- see
+ * `normalizeCodeReviewer`.
+ */
+export const CODE_REVIEWERS = ['copilot', 'bosun', 'none'] as const;
+export const DEFAULT_CODE_REVIEWER = 'copilot' as const;
+/** Prefix marking a user-defined reviewer implemented as a skill. */
+export const CUSTOM_CODE_REVIEWER_PREFIX = 'skill:';
+const CUSTOM_CODE_REVIEWER_PATTERN = /^skill:[a-z0-9][a-z0-9-]*$/;
 export const PUBLISHING_PROFILES = [
   'cli',
   'apps',
@@ -39,6 +50,8 @@ export const DEFAULT_LANGUAGE_TOOLS: Record<string, string[]> = {
 export type Target = (typeof TARGETS)[number];
 export type TaskSystem = (typeof TASK_SYSTEMS)[number];
 export type DeploymentModel = (typeof DEPLOYMENT_MODELS)[number];
+export type BuiltInCodeReviewer = (typeof CODE_REVIEWERS)[number];
+export type CodeReviewer = BuiltInCodeReviewer | `skill:${string}`;
 export type PublishingProfile = (typeof PUBLISHING_PROFILES)[number];
 
 /** Reference-only variants that are emitted only when explicitly configured. */
@@ -70,6 +83,7 @@ export interface RulesConfig {
   discovery?: DiscoveryConfig;
   taskSystem?: TaskSystem;
   deploymentModel?: DeploymentModel;
+  codeReviewer?: CodeReviewer;
   publishingProfiles?: PublishingProfile[];
   ruleProfile?: RuleProfile;
 }
@@ -270,6 +284,11 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     nextConfig = { ...nextConfig, deploymentModel };
   }
 
+  const codeReviewer = config.codeReviewer ?? existing?.codeReviewer;
+  if (codeReviewer) {
+    nextConfig = { ...nextConfig, codeReviewer };
+  }
+
   const publishingProfiles =
     config.publishingProfiles ?? existing?.publishingProfiles;
   if (publishingProfiles !== undefined) {
@@ -282,6 +301,31 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
   }
 
   fs.writeFileSync(filePath, JSON.stringify(nextConfig, null, 2), 'utf8');
+}
+
+/**
+ * Accept a built-in reviewer name or a `skill:<skill-name>` reference, and
+ * reject anything else. Returning null rather than throwing matches the rest of
+ * normalization: an unreadable value is dropped so the caller falls back to the
+ * default instead of failing the whole config load.
+ */
+export function normalizeCodeReviewer(value: unknown): CodeReviewer | null {
+  if (typeof value !== 'string') return null;
+  const reviewer = value.trim().toLowerCase();
+  if ((CODE_REVIEWERS as readonly string[]).includes(reviewer)) {
+    return reviewer as BuiltInCodeReviewer;
+  }
+  if (CUSTOM_CODE_REVIEWER_PATTERN.test(reviewer)) {
+    return reviewer as CodeReviewer;
+  }
+  return null;
+}
+
+/** The skill name behind a `skill:<name>` reviewer, or null for built-ins. */
+export function getCustomReviewerSkill(reviewer: CodeReviewer): string | null {
+  return reviewer.startsWith(CUSTOM_CODE_REVIEWER_PREFIX)
+    ? reviewer.slice(CUSTOM_CODE_REVIEWER_PREFIX.length)
+    : null;
 }
 
 function loadRawConfig(filePath: string): RulesConfig | null {
@@ -309,6 +353,7 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     discovery?: unknown;
     taskSystem?: unknown;
     deploymentModel?: unknown;
+    codeReviewer?: unknown;
     publishingProfiles?: unknown;
     ruleProfile?: unknown;
   };
@@ -365,6 +410,10 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     if ((DEPLOYMENT_MODELS as readonly string[]).includes(deploymentModel)) {
       config.deploymentModel = deploymentModel as DeploymentModel;
     }
+  }
+  const codeReviewer = normalizeCodeReviewer(record.codeReviewer);
+  if (codeReviewer) {
+    config.codeReviewer = codeReviewer;
   }
   if (Array.isArray(record.publishingProfiles)) {
     config.publishingProfiles = normalizePublishingProfiles(

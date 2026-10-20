@@ -31,6 +31,7 @@ import {
   isValidAgent,
   isValidSkill,
   DEFAULT_SKILL_IDS,
+  PR_REVIEW_CYCLE_SKILL_ID,
   type Language
 } from './agents';
 import {
@@ -40,6 +41,10 @@ import {
   isCiMode,
   parseTargets,
   TASK_SYSTEMS,
+  CODE_REVIEWERS,
+  DEFAULT_CODE_REVIEWER,
+  normalizeCodeReviewer,
+  type CodeReviewer,
   DEFAULT_TASK_SYSTEM,
   DEPLOYMENT_MODELS,
   DEFAULT_DEPLOYMENT_MODEL,
@@ -202,6 +207,19 @@ async function promptDeploymentModel(): Promise<DeploymentModel> {
   return promptDeploymentModel();
 }
 
+async function promptCodeReviewer(): Promise<CodeReviewer> {
+  const line = await prompt(
+    `Code review agent for the PR review cycle (${CODE_REVIEWERS.join(', ')}, or skill:<skill-name>) [${DEFAULT_CODE_REVIEWER}]: `
+  );
+  if (!line) return DEFAULT_CODE_REVIEWER;
+  const reviewer = normalizeCodeReviewer(line);
+  if (reviewer) return reviewer;
+  console.error(
+    `Invalid code reviewer. Choose one of: ${CODE_REVIEWERS.join(', ')}, or skill:<skill-name>`
+  );
+  return promptCodeReviewer();
+}
+
 export interface ResolveTargetAndAgentsOptions {
   projectRoot?: string;
   target?: string;
@@ -311,6 +329,7 @@ export interface InstallOptions {
   saveConfig?: boolean;
   taskSystem?: TaskSystem;
   deploymentModel?: DeploymentModel;
+  codeReviewer?: CodeReviewer;
   publishingProfiles?: PublishingProfile[];
 }
 
@@ -496,6 +515,7 @@ export function install(options: InstallOptions): InstallResult {
     saveConfig: persist,
     taskSystem,
     deploymentModel,
+    codeReviewer,
     publishingProfiles
   } = options;
   const effectiveAgents = withImplicitAgents(agents);
@@ -556,6 +576,7 @@ export function install(options: InstallOptions): InstallResult {
         deploymentModel: effectiveAgents.includes('publishing')
           ? resolvedDeploymentModel
           : (deploymentModel ?? existingConfig?.deploymentModel),
+        codeReviewer: codeReviewer ?? existingConfig?.codeReviewer,
         publishingProfiles: effectiveAgents.includes('publishing')
           ? resolvedPublishingProfiles
           : (publishingProfiles ?? existingConfig?.publishingProfiles)
@@ -920,6 +941,7 @@ export interface RunInstallOptions {
   yes?: boolean;
   taskSystem?: string;
   deploymentModel?: string;
+  codeReviewer?: string;
   publishingProfiles?: PublishingProfile[];
   repositoryFactsFile?: string;
 }
@@ -1063,6 +1085,31 @@ export async function runInstall(
       resolvedDeploymentModel = await promptDeploymentModel();
     }
   }
+  // A bare `skill:` reference cannot be validated against the registry: it
+  // names a skill the user owns, which Ballast does not ship or track.
+  const normalizedCodeReviewer = options.codeReviewer?.trim().toLowerCase();
+  if (
+    normalizedCodeReviewer &&
+    !normalizeCodeReviewer(normalizedCodeReviewer)
+  ) {
+    console.error(
+      `Invalid --code-reviewer value: "${normalizedCodeReviewer}". Valid values: ${CODE_REVIEWERS.join(', ')}, or skill:<skill-name>`
+    );
+    return 1;
+  }
+  const codeReviewerFromFlag = normalizedCodeReviewer
+    ? (normalizeCodeReviewer(normalizedCodeReviewer) ?? undefined)
+    : undefined;
+  let resolvedCodeReviewer: CodeReviewer | undefined =
+    codeReviewerFromFlag ?? priorConfig?.codeReviewer ?? undefined;
+  if (skills.includes(PR_REVIEW_CYCLE_SKILL_ID)) {
+    if (isCiMode() || options.yes || codeReviewerFromFlag) {
+      resolvedCodeReviewer = resolvedCodeReviewer ?? DEFAULT_CODE_REVIEWER;
+    } else if (resolvedCodeReviewer === undefined) {
+      resolvedCodeReviewer = await promptCodeReviewer();
+    }
+  }
+
   const resolvedPublishingProfiles =
     options.publishingProfiles ?? priorConfig?.publishingProfiles;
 
@@ -1098,6 +1145,7 @@ export async function runInstall(
       tools: priorConfig?.tools,
       taskSystem: resolvedTaskSystem,
       deploymentModel: resolvedDeploymentModel,
+      codeReviewer: resolvedCodeReviewer,
       publishingProfiles: resolvedPublishingProfiles
     },
     projectRoot
@@ -1127,6 +1175,7 @@ export async function runInstall(
       saveConfig: false,
       taskSystem: resolvedTaskSystem,
       deploymentModel: resolvedDeploymentModel,
+      codeReviewer: resolvedCodeReviewer,
       publishingProfiles: resolvedPublishingProfiles
     });
 

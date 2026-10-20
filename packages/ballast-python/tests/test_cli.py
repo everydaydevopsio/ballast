@@ -1511,6 +1511,7 @@ class PatchInstallTests(unittest.TestCase):
                 "aws-weekly-security-review",
                 "github-health-check",
                 "github-pr-copilot-cycle",
+                "github-pr-review-cycle",
                 "ballast-audit",
                 "agent-performance-audit",
                 "ballast-project-maintenance",
@@ -2697,3 +2698,161 @@ class PublishingProfilePersistenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CodeReviewerTests(unittest.TestCase):
+    def test_normalizes_built_ins_and_skill_references(self) -> None:
+        self.assertEqual(cli.normalize_code_reviewer("copilot"), "copilot")
+        self.assertEqual(cli.normalize_code_reviewer("  BOSUN "), "bosun")
+        self.assertEqual(cli.normalize_code_reviewer("none"), "none")
+        self.assertEqual(
+            cli.normalize_code_reviewer("Skill:My-Reviewer"), "skill:my-reviewer"
+        )
+
+    def test_rejects_unusable_values(self) -> None:
+        for value in ("gemini", "skill:", "skill:-bad", "skill:Has Space", None, 42):
+            self.assertEqual(cli.normalize_code_reviewer(value), "")
+
+    def test_run_install_writes_code_reviewer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            old_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--skill",
+                        "github-pr-review-cycle",
+                        "--code-reviewer",
+                        "bosun",
+                        "--yes",
+                    ]
+                )
+                self.assertEqual(cli.run_install(args), 0)
+            finally:
+                os.chdir(old_cwd)
+            config = json.loads((root / ".rulesrc.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["codeReviewer"], "bosun")
+
+    def test_run_install_rejects_an_invalid_code_reviewer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            old_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--agent",
+                        "docs",
+                        "--code-reviewer",
+                        "gemini",
+                        "--yes",
+                    ]
+                )
+                self.assertEqual(cli.run_install(args), 1)
+            finally:
+                os.chdir(old_cwd)
+            self.assertFalse((root / ".rulesrc.json").exists())
+
+    def test_save_config_preserves_an_existing_reviewer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cli.save_config(
+                root, "python", "codex", ["docs"], [], code_reviewer="skill:house"
+            )
+            cli.save_config(root, "python", "codex", ["docs", "cicd"], [])
+            config = json.loads((root / ".rulesrc.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["codeReviewer"], "skill:house")
+
+    def test_resolve_code_reviewer_precedence(self) -> None:
+        # Flag or saved value wins without prompting.
+        self.assertEqual(cli.resolve_code_reviewer_for_skill("bosun", True), "bosun")
+        self.assertEqual(
+            cli.resolve_code_reviewer_for_skill("skill:house", True), "skill:house"
+        )
+        # Non-interactive with nothing saved takes the default rather than
+        # leaving the key unset, matching the other backends.
+        self.assertEqual(
+            cli.resolve_code_reviewer_for_skill(None, True), cli.DEFAULT_CODE_REVIEWER
+        )
+        # An unusable saved value is discarded, not propagated.
+        self.assertEqual(
+            cli.resolve_code_reviewer_for_skill("gemini", True),
+            cli.DEFAULT_CODE_REVIEWER,
+        )
+
+    def test_run_install_persists_default_reviewer_for_the_review_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            old_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--skill",
+                        "github-pr-review-cycle",
+                        "--yes",
+                    ]
+                )
+                self.assertEqual(cli.run_install(args), 0)
+            finally:
+                os.chdir(old_cwd)
+            config = json.loads((root / ".rulesrc.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["codeReviewer"], cli.DEFAULT_CODE_REVIEWER)
+
+    def test_prompt_code_reviewer_accepts_retries_and_defaults(self) -> None:
+        # Empty input takes the default.
+        with mock.patch.object(cli, "prompt", return_value=""):
+            self.assertEqual(cli.prompt_code_reviewer(), cli.DEFAULT_CODE_REVIEWER)
+        # A skill reference is normalized.
+        with mock.patch.object(cli, "prompt", return_value="Skill:House-Style"):
+            self.assertEqual(cli.prompt_code_reviewer(), "skill:house-style")
+        # An invalid answer re-prompts rather than silently defaulting.
+        with mock.patch.object(cli, "prompt", side_effect=["gemini", "bosun"]):
+            self.assertEqual(cli.prompt_code_reviewer(), "bosun")
+
+    def test_resolve_code_reviewer_prompts_when_interactive(self) -> None:
+        with mock.patch.object(cli, "prompt", return_value="bosun"):
+            self.assertEqual(cli.resolve_code_reviewer_for_skill(None, False), "bosun")
+
+    def test_save_config_rejects_an_invalid_code_reviewer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError) as ctx:
+                cli.save_config(
+                    Path(tmp),
+                    "python",
+                    "codex",
+                    ["docs"],
+                    [],
+                    code_reviewer="gemini",
+                )
+            self.assertIn("invalid codeReviewer", str(ctx.exception))
+
+    def test_doctor_reports_the_configured_code_reviewer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            cli.save_config(
+                root, "python", "codex", ["docs"], [], code_reviewer="bosun"
+            )
+            buf = io.StringIO()
+            old_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with redirect_stdout(buf):
+                    cli.run_doctor()
+            finally:
+                os.chdir(old_cwd)
+            self.assertIn("- codeReviewer: bosun", buf.getvalue())

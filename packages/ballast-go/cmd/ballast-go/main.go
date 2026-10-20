@@ -41,6 +41,7 @@ var (
 		"aws-weekly-security-review",
 		"github-health-check",
 		"github-pr-copilot-cycle",
+		"github-pr-review-cycle",
 		"ballast-audit",
 		"agent-performance-audit",
 		"ballast-project-maintenance",
@@ -63,8 +64,14 @@ var (
 	taskSystemToken              = "{{taskSystem}}"
 	taskSystems                  = []string{"github", "jira", "linear", "none"}
 	deploymentModels             = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
-	publishingProfiles           = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
-	publishingProfileAliases     = map[string]string{
+	// Built-in code review agents; a repository may also name its own reviewer
+	// skill as "skill:<skill-name>", so this list is not the whole valid space.
+	codeReviewers             = []string{"copilot", "bosun", "none"}
+	defaultCodeReviewer       = "copilot"
+	prReviewCycleSkillID      = "github-pr-review-cycle"
+	customCodeReviewerPattern = regexp.MustCompile(`^skill:[a-z0-9][a-z0-9-]*$`)
+	publishingProfiles        = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
+	publishingProfileAliases  = map[string]string{
 		"app":     "apps",
 		"library": "libraries",
 		"sdk":     "sdks",
@@ -129,6 +136,7 @@ type rulesConfig struct {
 	Discovery          *discoveryConfig    `json:"discovery,omitempty"`
 	TaskSystem         string              `json:"taskSystem,omitempty"`
 	DeploymentModel    string              `json:"deploymentModel,omitempty"`
+	CodeReviewer       string              `json:"codeReviewer,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 	RuleProfile        string              `json:"ruleProfile,omitempty"`
 }
@@ -149,6 +157,7 @@ type rawRulesConfig struct {
 	Discovery          json.RawMessage     `json:"discovery,omitempty"`
 	TaskSystem         string              `json:"taskSystem,omitempty"`
 	DeploymentModel    string              `json:"deploymentModel,omitempty"`
+	CodeReviewer       string              `json:"codeReviewer,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 	RuleProfile        string              `json:"ruleProfile,omitempty"`
 }
@@ -189,6 +198,7 @@ type resolveOptions struct {
 	language        string
 	taskSystem      string
 	deploymentModel string
+	codeReviewer    string
 }
 
 type installOptions struct {
@@ -205,6 +215,7 @@ type installOptions struct {
 	saveConfig      bool
 	taskSystem      string
 	deploymentModel string
+	codeReviewer    string
 }
 
 type buildOptions struct {
@@ -281,6 +292,7 @@ func runInstall(args []string) int {
 	fs.BoolVar(patch, "p", false, "merge upstream rule and skill updates into existing files")
 	taskSystemFlag := fs.String("task-system", "", "task system for tasks: github|jira|linear|none")
 	deploymentModelFlag := fs.String("deployment-model", "", "app/service deployment model for publishing; use none for CLI/library/SDK-only projects: none|kubernetes|serverless|server|docker|hosted")
+	codeReviewerFlag := fs.String("code-reviewer", "", "code review agent for the PR review cycle: copilot|bosun|none|skill:<skill-name>")
 	yes := fs.Bool("yes", false, "non-interactive mode")
 	fs.BoolVar(yes, "y", false, "non-interactive mode")
 	repositoryFactsFile := fs.String("repository-facts-file", "", "optional path to wrapper-generated repository facts JSON")
@@ -309,6 +321,11 @@ func runInstall(args []string) int {
 		fmt.Printf("Invalid --task-system. Use: %s\n", strings.Join(taskSystems, ", "))
 		return 1
 	}
+	codeReviewer := strings.ToLower(strings.TrimSpace(*codeReviewerFlag))
+	if codeReviewer != "" && !validCodeReviewer(codeReviewer) {
+		fmt.Printf("Invalid --code-reviewer. Use: %s, or skill:<skill-name>\n", strings.Join(codeReviewers, ", "))
+		return 1
+	}
 	deploymentModel := normalizeDeploymentModel(*deploymentModelFlag)
 	if deploymentModel != "" && !contains(deploymentModels, deploymentModel) {
 		fmt.Printf("Invalid --deployment-model. Use: %s\n", strings.Join(deploymentModels, ", "))
@@ -332,6 +349,7 @@ func runInstall(args []string) int {
 		language:        lang,
 		taskSystem:      taskSystem,
 		deploymentModel: deploymentModel,
+		codeReviewer:    codeReviewer,
 	})
 	if err != nil {
 		fmt.Println(err)
@@ -386,6 +404,7 @@ func runInstall(args []string) int {
 		saveConfig:      true,
 		taskSystem:      resolved.TaskSystem,
 		deploymentModel: resolved.DeploymentModel,
+		codeReviewer:    resolved.CodeReviewer,
 	})
 
 	if len(result.errors) > 0 {
@@ -467,11 +486,12 @@ Options:
   --target, -t <platform>   AI platforms: %s (comma-separated or repeatable)
   --language, -l <lang>     Language profile: %s (default: go)
   --agent, -a <agents>      Agent(s): linting, local-dev, docs, cicd, observability, publishing, git-hooks, tasks, logging, testing (comma-separated)
-  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, github-pr-copilot-cycle, ballast-audit, ballast-project-maintenance (comma-separated)
+  --skill, -s <skills>      Skill(s): owasp-security-scan, aws-health-review, aws-live-health-review, aws-weekly-security-review, github-health-check, github-pr-review-cycle, ballast-audit, ballast-project-maintenance (comma-separated)
   --all                     Install all agents
   --all-skills              Install all skills
   --task-system <system>    Task system for tasks: %s
   --deployment-model <mode> App/service deployment model for publishing; use none for CLI/library/SDK-only projects: %s
+  --code-reviewer <agent>   Code review agent for the PR review cycle: copilot, bosun, none, or skill:<skill-name>
   --force                   Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -689,6 +709,9 @@ func buildDoctorReport(currentCLI, currentVersion string, configPath string, con
 		if strings.TrimSpace(config.TaskSystem) != "" {
 			lines = append(lines, fmt.Sprintf("- taskSystem: %s", config.TaskSystem))
 		}
+		if strings.TrimSpace(config.CodeReviewer) != "" {
+			lines = append(lines, fmt.Sprintf("- codeReviewer: %s", config.CodeReviewer))
+		}
 		if strings.TrimSpace(config.DeploymentModel) != "" {
 			lines = append(lines, fmt.Sprintf("- deploymentModel: %s", config.DeploymentModel))
 		}
@@ -797,6 +820,15 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 			}
 			next.TaskSystem = taskSystem
 		}
+		if contains(next.Skills, prReviewCycleSkillID) {
+			reviewer, err := resolveCodeReviewer(opts.codeReviewer, next.CodeReviewer, ci, promptReader)
+			if err != nil {
+				return nil, err
+			}
+			next.CodeReviewer = reviewer
+		} else if opts.codeReviewer != "" {
+			next.CodeReviewer = opts.codeReviewer
+		}
 		if contains(next.Agents, "publishing") {
 			deploymentModel, err := resolveRequiredInstallOption(requiredInstallOptionResolution{
 				Option:         deploymentModelRequiredOption(),
@@ -866,7 +898,20 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 				return nil, err
 			}
 		}
-		return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, TaskSystem: taskSystem, DeploymentModel: deploymentModel}, nil
+		// Fall back to the saved value so a reinstall that omits the flag
+		// does not silently erase the repository's configured reviewer.
+		codeReviewer := opts.codeReviewer
+		if codeReviewer == "" {
+			codeReviewer = configValue(config, "codeReviewer")
+		}
+		if contains(resolvedSkills, prReviewCycleSkillID) {
+			resolved, err := resolveCodeReviewer(opts.codeReviewer, configValue(config, "codeReviewer"), ci, promptReader)
+			if err != nil {
+				return nil, err
+			}
+			codeReviewer = resolved
+		}
+		return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, TaskSystem: taskSystem, DeploymentModel: deploymentModel, CodeReviewer: codeReviewer}, nil
 	}
 
 	if ci {
@@ -923,7 +968,19 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 		}
 	}
 
-	return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, TaskSystem: taskSystem, DeploymentModel: deploymentModel}, nil
+	resolvedCodeReviewer := opts.codeReviewer
+	if resolvedCodeReviewer == "" {
+		resolvedCodeReviewer = configValue(config, "codeReviewer")
+	}
+	if contains(resolvedSkills, prReviewCycleSkillID) {
+		reviewer, err := resolveCodeReviewer(opts.codeReviewer, configValue(config, "codeReviewer"), ci, promptReader)
+		if err != nil {
+			return nil, err
+		}
+		resolvedCodeReviewer = reviewer
+	}
+
+	return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, TaskSystem: taskSystem, DeploymentModel: deploymentModel, CodeReviewer: resolvedCodeReviewer}, nil
 }
 
 func install(opts installOptions) installResult {
@@ -950,6 +1007,7 @@ func install(opts installOptions) installResult {
 			Languages:       []string{opts.language},
 			TaskSystem:      opts.taskSystem,
 			DeploymentModel: opts.deploymentModel,
+			CodeReviewer:    opts.codeReviewer,
 		}); err != nil {
 			result.errors = append(result.errors, agentError{agent: "config", err: err.Error()})
 			return result
@@ -2369,6 +2427,73 @@ func renderGitHooksPreCommitGlob(agentID, language, hookMode string) string {
 	return "  - '.pre-commit-config.yaml'"
 }
 
+// resolveCodeReviewer applies the same precedence as the other backends: an
+// explicit flag, then the saved value, then an interactive prompt, then the
+// default. Called only when the PR review-cycle skill is selected.
+func resolveCodeReviewer(requested, saved string, nonInteractive bool, reader *bufio.Reader) (string, error) {
+	if value := normalizeCodeReviewer(requested); value != "" {
+		return value, nil
+	}
+	if value := normalizeCodeReviewer(saved); value != "" {
+		return value, nil
+	}
+	if nonInteractive {
+		return defaultCodeReviewer, nil
+	}
+	return promptCodeReviewer(reader)
+}
+
+// promptCodeReviewer cannot reuse promptRequiredInstallOption: that helper
+// validates against a closed Allowed list, and "skill:<skill-name>" is open.
+func promptCodeReviewer(reader *bufio.Reader) (string, error) {
+	if reader == nil {
+		reader = bufio.NewReader(os.Stdin)
+	}
+	allowed := strings.Join(codeReviewers, ", ")
+	for {
+		fmt.Printf("Code review agent for the PR review cycle [%s, or skill:<skill-name>] (default: %s): ", allowed, defaultCodeReviewer)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+				if value := normalizeCodeReviewer(response); value != "" {
+					return value, nil
+				}
+				if strings.TrimSpace(response) == "" {
+					return defaultCodeReviewer, nil
+				}
+				fmt.Printf("Invalid code reviewer. Choose one of: %s, or skill:<skill-name>\n", allowed)
+				return defaultCodeReviewer, nil
+			}
+			return "", err
+		}
+		if strings.TrimSpace(response) == "" {
+			return defaultCodeReviewer, nil
+		}
+		if value := normalizeCodeReviewer(response); value != "" {
+			return value, nil
+		}
+		fmt.Printf("Invalid code reviewer. Choose one of: %s, or skill:<skill-name>\n", allowed)
+	}
+}
+
+// normalizeCodeReviewer lowercases a reviewer value and drops it when it is
+// not usable, so a hand-edited config cannot fail the whole load.
+func normalizeCodeReviewer(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if !validCodeReviewer(normalized) {
+		return ""
+	}
+	return normalized
+}
+
+// validCodeReviewer accepts a built-in reviewer or a "skill:<name>" reference.
+// A skill reference names something the user owns, so it is validated by shape
+// rather than against the registry.
+func validCodeReviewer(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	return contains(codeReviewers, normalized) || customCodeReviewerPattern.MatchString(normalized)
+}
+
 func normalizeDeploymentModel(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
@@ -3024,6 +3149,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		Discovery:          normalizeDiscovery(raw.Discovery),
 		TaskSystem:         normalizeRequiredInstallOptionValue(raw.TaskSystem),
 		DeploymentModel:    normalizeDeploymentModel(raw.DeploymentModel),
+		CodeReviewer:       normalizeCodeReviewer(raw.CodeReviewer),
 		PublishingProfiles: normalizePublishingProfiles(raw.PublishingProfiles),
 		RuleProfile:        normalizeRuleProfile(raw.RuleProfile),
 	}
@@ -3074,6 +3200,9 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		if strings.TrimSpace(cfg.DeploymentModel) == "" {
 			cfg.DeploymentModel = existing.DeploymentModel
 		}
+		if strings.TrimSpace(cfg.CodeReviewer) == "" {
+			cfg.CodeReviewer = existing.CodeReviewer
+		}
 		if cfg.Discovery == nil {
 			cfg.Discovery = existing.Discovery
 		}
@@ -3101,6 +3230,10 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 	}
 	if cfg.DeploymentModel != "" && !contains(deploymentModels, cfg.DeploymentModel) {
 		return fmt.Errorf("invalid deploymentModel %q; use one of: %s", cfg.DeploymentModel, strings.Join(deploymentModels, ", "))
+	}
+	cfg.CodeReviewer = strings.ToLower(strings.TrimSpace(cfg.CodeReviewer))
+	if cfg.CodeReviewer != "" && !validCodeReviewer(cfg.CodeReviewer) {
+		return fmt.Errorf("invalid codeReviewer %q; use one of: %s, or skill:<skill-name>", cfg.CodeReviewer, strings.Join(codeReviewers, ", "))
 	}
 	bytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -3464,6 +3597,8 @@ func configValue(config *rulesConfig, field string) string {
 		return config.TaskSystem
 	case "deploymentModel":
 		return config.DeploymentModel
+	case "codeReviewer":
+		return config.CodeReviewer
 	default:
 		return ""
 	}

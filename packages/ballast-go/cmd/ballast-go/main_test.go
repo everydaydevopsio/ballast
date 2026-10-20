@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -156,6 +157,7 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"aws-weekly-security-review",
 		"github-health-check",
 		"github-pr-copilot-cycle",
+		"github-pr-review-cycle",
 		"ballast-audit",
 		"agent-performance-audit",
 		"ballast-project-maintenance",
@@ -3397,5 +3399,251 @@ func TestSaveConfigPreservesPublishingProfiles(t *testing.T) {
 	}
 	if saved.DeploymentModel != "none" {
 		t.Fatalf("deploymentModel not preserved: got %q", saved.DeploymentModel)
+	}
+}
+
+func TestValidCodeReviewer(t *testing.T) {
+	valid := []string{"copilot", "bosun", "none", "  BOSUN ", "skill:my-reviewer", "Skill:My-Reviewer"}
+	for _, value := range valid {
+		if !validCodeReviewer(value) {
+			t.Errorf("expected %q to be a valid code reviewer", value)
+		}
+	}
+	invalid := []string{"", "gemini", "skill:", "skill:-bad", "skill:Has Space", "copilot bosun"}
+	for _, value := range invalid {
+		if validCodeReviewer(value) {
+			t.Errorf("expected %q to be rejected", value)
+		}
+	}
+}
+
+func TestResolveCodeReviewer(t *testing.T) {
+	// Flag wins over the saved value.
+	got, err := resolveCodeReviewer("bosun", "copilot", true, nil)
+	if err != nil || got != "bosun" {
+		t.Fatalf("flag should win: got %q err %v", got, err)
+	}
+	// Saved value is used when no flag is given.
+	got, err = resolveCodeReviewer("", "skill:house-style", true, nil)
+	if err != nil || got != "skill:house-style" {
+		t.Fatalf("saved value should be used: got %q err %v", got, err)
+	}
+	// Non-interactive with nothing saved falls back to the default rather than
+	// leaving the key unset, matching the other backends.
+	got, err = resolveCodeReviewer("", "", true, nil)
+	if err != nil || got != defaultCodeReviewer {
+		t.Fatalf("expected %q, got %q err %v", defaultCodeReviewer, got, err)
+	}
+	// An unusable saved value is discarded, not propagated.
+	got, err = resolveCodeReviewer("", "gemini", true, nil)
+	if err != nil || got != defaultCodeReviewer {
+		t.Fatalf("expected %q for an invalid saved value, got %q err %v", defaultCodeReviewer, got, err)
+	}
+}
+
+func TestPromptCodeReviewerAcceptsSkillReferenceAndDefaults(t *testing.T) {
+	got, err := promptCodeReviewer(bufio.NewReader(strings.NewReader("Skill:House-Style\n")))
+	if err != nil || got != "skill:house-style" {
+		t.Fatalf("got %q err %v", got, err)
+	}
+	got, err = promptCodeReviewer(bufio.NewReader(strings.NewReader("\n")))
+	if err != nil || got != defaultCodeReviewer {
+		t.Fatalf("empty input should take the default: got %q err %v", got, err)
+	}
+}
+
+// installInTempRepo runs runInstall in a throwaway Go repository and returns
+// the resulting .rulesrc.json.
+func installInTempRepo(t *testing.T, args ...string) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalWD) })
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := runInstall(args); code != 0 {
+		t.Fatalf("install %v: expected exit 0, got %d", args, code)
+	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatalf("read .rulesrc.json: %v", err)
+	}
+	return string(content)
+}
+
+func TestRunInstallDefaultsCodeReviewerForTheReviewSkill(t *testing.T) {
+	text := installInTempRepo(t, "install", "--target", "codex", "--language", "go",
+		"--skill", "github-pr-review-cycle", "--yes")
+	if !strings.Contains(text, `"codeReviewer": "copilot"`) {
+		t.Fatalf("expected the default reviewer to be persisted: %s", text)
+	}
+}
+
+func TestRunInstallHonoursTheCodeReviewerFlag(t *testing.T) {
+	for _, tc := range []struct{ flag, want string }{
+		{"bosun", `"codeReviewer": "bosun"`},
+		{"none", `"codeReviewer": "none"`},
+		{"skill:house-style", `"codeReviewer": "skill:house-style"`},
+	} {
+		t.Run(tc.flag, func(t *testing.T) {
+			text := installInTempRepo(t, "install", "--target", "codex", "--language", "go",
+				"--skill", "github-pr-review-cycle", "--code-reviewer", tc.flag, "--yes")
+			if !strings.Contains(text, tc.want) {
+				t.Fatalf("expected %s in config: %s", tc.want, text)
+			}
+		})
+	}
+}
+
+func TestRunInstallWithoutTheReviewSkillDoesNotInventAReviewer(t *testing.T) {
+	text := installInTempRepo(t, "install", "--target", "codex", "--language", "go",
+		"--agent", "docs", "--yes")
+	if strings.Contains(text, `"codeReviewer"`) {
+		t.Fatalf("a repository that did not select the review skill should carry no reviewer: %s", text)
+	}
+}
+
+func TestRunInstallRejectsAnInvalidCodeReviewer(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalWD) })
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := runInstall([]string{"install", "--target", "codex", "--language", "go", "--code-reviewer", "gemini", "--yes"}); code == 0 {
+		t.Fatal("expected a non-zero exit for an invalid --code-reviewer")
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, ".rulesrc.json")); err == nil {
+		t.Fatal("a rejected reviewer must not write a config")
+	}
+}
+
+func TestSaveConfigRejectsAnInvalidCodeReviewer(t *testing.T) {
+	err := saveConfig(t.TempDir(), "go", rulesConfig{
+		Targets: []string{"codex"}, Agents: []string{"docs"}, CodeReviewer: "gemini",
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid codeReviewer") {
+		t.Fatalf("expected an invalid codeReviewer error, got %v", err)
+	}
+}
+
+func TestLoadConfigDropsAnInvalidCodeReviewerButKeepsTheRest(t *testing.T) {
+	dir := t.TempDir()
+	body := `{"targets":["codex"],"agents":["docs"],"languages":["go"],"codeReviewer":"gemini"}`
+	if err := os.WriteFile(filepath.Join(dir, ".rulesrc.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	config := loadConfig(dir, "go")
+	if config == nil {
+		t.Fatal("an unusable reviewer must not discard the whole config")
+	}
+	if config.CodeReviewer != "" {
+		t.Fatalf("expected the invalid reviewer to be dropped, got %q", config.CodeReviewer)
+	}
+	if len(config.Agents) != 1 || config.Agents[0] != "docs" {
+		t.Fatalf("expected the rest of the config to survive: %+v", config)
+	}
+}
+
+func TestConfigValueExposesCodeReviewer(t *testing.T) {
+	if got := configValue(&rulesConfig{CodeReviewer: "bosun"}, "codeReviewer"); got != "bosun" {
+		t.Fatalf("got %q, want bosun", got)
+	}
+	if got := configValue(nil, "codeReviewer"); got != "" {
+		t.Fatalf("a nil config should yield an empty reviewer, got %q", got)
+	}
+}
+
+func TestPromptCodeReviewerRetriesOnAnInvalidAnswer(t *testing.T) {
+	got, err := promptCodeReviewer(bufio.NewReader(strings.NewReader("gemini\nbosun\n")))
+	if err != nil || got != "bosun" {
+		t.Fatalf("an invalid answer should re-prompt: got %q err %v", got, err)
+	}
+}
+
+func TestResolveCodeReviewerPromptsWhenInteractive(t *testing.T) {
+	got, err := resolveCodeReviewer("", "", false, bufio.NewReader(strings.NewReader("none\n")))
+	if err != nil || got != "none" {
+		t.Fatalf("got %q err %v", got, err)
+	}
+}
+
+func TestBuildDoctorReportShowsTheCodeReviewer(t *testing.T) {
+	report := buildDoctorReport("ballast-go", "5.21.3", ".rulesrc.json", &rulesConfig{
+		Targets: []string{"codex"}, Agents: []string{"docs"},
+		Languages: []string{"go"}, CodeReviewer: "skill:house-style",
+	}, nil)
+	if !strings.Contains(report, "- codeReviewer: skill:house-style") {
+		t.Fatalf("doctor should report the configured reviewer:\n%s", report)
+	}
+	// A repository with no reviewer configured should print no reviewer line at
+	// all, rather than implying a choice it never made.
+	report = buildDoctorReport("ballast-go", "5.21.3", ".rulesrc.json", &rulesConfig{
+		Targets: []string{"codex"}, Agents: []string{"docs"}, Languages: []string{"go"},
+	}, nil)
+	if strings.Contains(report, "codeReviewer") {
+		t.Fatalf("doctor should omit an unset reviewer:\n%s", report)
+	}
+}
+
+func TestRunInstallRefreshPreservesAndResolvesTheCodeReviewer(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalWD) })
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/test\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := runInstall([]string{"install", "--target", "codex", "--language", "go",
+		"--skill", "github-pr-review-cycle", "--code-reviewer", "bosun", "--yes"}); code != 0 {
+		t.Fatalf("initial install failed with %d", code)
+	}
+	// Re-running with no selection flags takes the refresh path, which must not
+	// erase the saved reviewer.
+	if code := runInstall([]string{"install", "--language", "go", "--yes"}); code != 0 {
+		t.Fatalf("refresh install failed with %d", code)
+	}
+	content, err := os.ReadFile(filepath.Join(tmpDir, ".rulesrc.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), `"codeReviewer": "bosun"`) {
+		t.Fatalf("refresh must preserve the saved reviewer: %s", content)
+	}
+}
+
+func TestPromptCodeReviewerHandlesEOF(t *testing.T) {
+	// EOF with a usable value still answers.
+	got, err := promptCodeReviewer(bufio.NewReader(strings.NewReader("bosun")))
+	if err != nil || got != "bosun" {
+		t.Fatalf("EOF with a value: got %q err %v", got, err)
+	}
+	// EOF with nothing typed takes the default rather than looping forever.
+	got, err = promptCodeReviewer(bufio.NewReader(strings.NewReader("")))
+	if err != nil || got != defaultCodeReviewer {
+		t.Fatalf("EOF with no value: got %q err %v", got, err)
+	}
+	// EOF with an unusable value must terminate, not spin.
+	got, err = promptCodeReviewer(bufio.NewReader(strings.NewReader("gemini")))
+	if err != nil || got != defaultCodeReviewer {
+		t.Fatalf("EOF with an invalid value: got %q err %v", got, err)
 	}
 }

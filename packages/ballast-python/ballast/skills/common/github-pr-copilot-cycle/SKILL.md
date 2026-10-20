@@ -11,6 +11,12 @@ description: >
 
 # GitHub PR Copilot Cycle Skill
 
+> **Deprecated.** This skill is superseded by `github-pr-review-cycle`, which runs the
+> same cycle against GitHub Copilot, Bosun, or a reviewer the repository defines itself,
+> selected by the `codeReviewer` key in `.rulesrc.json`. It remains available and
+> unchanged so existing installs keep working. To migrate, install
+> `github-pr-review-cycle` and set `codeReviewer` to `copilot` for identical behavior.
+
 Drive a PR from local branch to a bounded Copilot review loop. Use `gh` for GitHub operations and keep the PR branch as the single source of truth.
 
 ## Preconditions

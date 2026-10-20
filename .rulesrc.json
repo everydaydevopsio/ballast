@@ -25,6 +25,7 @@
     "aws-weekly-security-review",
     "github-health-check",
     "github-pr-copilot-cycle",
+    "github-pr-review-cycle",
     "ballast-audit",
     "agent-performance-audit",
     "ballast-project-maintenance",
@@ -85,5 +86,6 @@
   "publishingProfiles": [
     "cli",
     "libraries"
-  ]
+  ],
+  "codeReviewer": "copilot"
 }

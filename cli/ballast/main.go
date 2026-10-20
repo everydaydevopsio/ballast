@@ -188,8 +188,13 @@ var (
 )
 
 var (
-	supportedTaskSystems        = []string{"github", "jira", "linear"}
-	supportedDeploymentModels   = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
+	supportedTaskSystems      = []string{"github", "jira", "linear"}
+	supportedDeploymentModels = []string{"none", "kubernetes", "serverless", "server", "docker", "hosted"}
+	// Built-in code review agents. A repository may also name its own reviewer
+	// skill as "skill:<skill-name>", which is why this list is not the whole of
+	// the valid value space -- see validCodeReviewer.
+	supportedCodeReviewers      = []string{"copilot", "bosun", "none"}
+	customCodeReviewerPattern   = regexp.MustCompile(`^skill:[a-z0-9][a-z0-9-]*$`)
 	supportedPublishingProfiles = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
 	publishingProfileAliases    = map[string]string{
 		"app":     "apps",
@@ -220,6 +225,7 @@ type monorepoConfig struct {
 	Discovery          *discoveryConfig    `json:"discovery,omitempty"`
 	TaskSystem         string              `json:"taskSystem,omitempty"`
 	DeploymentModel    string              `json:"deploymentModel,omitempty"`
+	CodeReviewer       string              `json:"codeReviewer,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 	RuleProfile        string              `json:"ruleProfile,omitempty"`
 }
@@ -409,6 +415,9 @@ func run(args []string) int {
 			}
 			if plan.Config.DeploymentModel == "" {
 				plan.Config.DeploymentModel = readDeploymentModel(root)
+			}
+			if plan.Config.CodeReviewer == "" {
+				plan.Config.CodeReviewer = readCodeReviewer(root)
 			}
 			if err := saveMonorepoConfig(root, plan.Config); err != nil {
 				fmt.Println(err)
@@ -1341,6 +1350,9 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	if strings.TrimSpace(config.TaskSystem) != "" {
 		fmt.Printf("- taskSystem: %s\n", config.TaskSystem)
+	}
+	if strings.TrimSpace(config.CodeReviewer) != "" {
+		fmt.Printf("- codeReviewer: %s\n", config.CodeReviewer)
 	}
 	if strings.TrimSpace(config.DeploymentModel) != "" {
 		fmt.Printf("- deploymentModel: %s\n", config.DeploymentModel)
@@ -3012,6 +3024,13 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Parsed directly rather than through requiredInstallOption: the value
+	// space is open-ended ("skill:<name>"), so it cannot be prompted from a
+	// fixed allowed list.
+	requestedCodeReviewer, err := parseCodeReviewerFlag(args)
+	if err != nil {
+		return nil, err
+	}
 	promptReader := bufio.NewReader(os.Stdin)
 
 	config, err := loadMonorepoConfig(root)
@@ -3159,6 +3178,14 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	if err != nil {
 		return nil, err
 	}
+	savedCodeReviewer := requestedCodeReviewer
+	if savedCodeReviewer == "" && config != nil {
+		savedCodeReviewer = strings.ToLower(strings.TrimSpace(config.CodeReviewer))
+	}
+	if savedCodeReviewer != "" && !validCodeReviewer(savedCodeReviewer) {
+		savedCodeReviewer = ""
+	}
+
 	configToSave := monorepoConfig{
 		Targets:         savedTargets,
 		Agents:          persistAgents,
@@ -3170,6 +3197,7 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		Discovery:       discoveryConfigFromConfig(config),
 		TaskSystem:      savedTaskSystem,
 		DeploymentModel: savedDeploymentModel,
+		CodeReviewer:    savedCodeReviewer,
 	}
 	if config != nil {
 		configToSave.RuleProfile = normalizeWrapperRuleProfile(config.RuleProfile)
@@ -3236,6 +3264,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 	}
 	if savedDeploymentModel != "" && slices.Contains(configToSave.Agents, "publishing") {
 		commonArgs = append(commonArgs, "--deployment-model", savedDeploymentModel)
+	}
+	if savedCodeReviewer != "" {
+		commonArgs = append(commonArgs, "--code-reviewer", savedCodeReviewer)
 	}
 	if len(commonSelection) > 0 || len(selectedSkills) > 0 {
 		commonLanguage := profiles[0].Language
@@ -3350,6 +3381,64 @@ func readTaskSystem(root string) string {
 		return ""
 	}
 	return raw.TaskSystem
+}
+
+// parseCodeReviewerFlag reads --code-reviewer in both "--flag value" and
+// "--flag=value" forms and rejects an unusable value up front, so the backend
+// is never handed something it will refuse.
+func parseCodeReviewerFlag(args []string) (string, error) {
+	value := ""
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--code-reviewer":
+			if i+1 >= len(args) {
+				return "", errors.New("--code-reviewer requires a value")
+			}
+			value = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--code-reviewer="):
+			value = strings.TrimPrefix(args[i], "--code-reviewer=")
+		default:
+			continue
+		}
+	}
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return "", nil
+	}
+	if !validCodeReviewer(normalized) {
+		return "", fmt.Errorf("invalid --code-reviewer value %q: choose one of %s, or skill:<skill-name>",
+			value, strings.Join(supportedCodeReviewers, ", "))
+	}
+	return normalized, nil
+}
+
+// validCodeReviewer accepts a built-in reviewer or a "skill:<name>" reference.
+// A skill reference names something the user owns, so it is validated by shape
+// rather than against the registry.
+func validCodeReviewer(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	return slices.Contains(supportedCodeReviewers, normalized) ||
+		customCodeReviewerPattern.MatchString(normalized)
+}
+
+// readCodeReviewer reads only the codeReviewer field from .rulesrc.json.
+func readCodeReviewer(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, ".rulesrc.json"))
+	if err != nil {
+		return ""
+	}
+	var raw struct {
+		CodeReviewer string `json:"codeReviewer"`
+	}
+	if json.Unmarshal(data, &raw) != nil {
+		return ""
+	}
+	value := strings.ToLower(strings.TrimSpace(raw.CodeReviewer))
+	if !validCodeReviewer(value) {
+		return ""
+	}
+	return value
 }
 
 // readDeploymentModel reads only the deploymentModel field from .rulesrc.json.
@@ -3727,6 +3816,8 @@ func configValue(config *monorepoConfig, field string) string {
 		return config.TaskSystem
 	case "deploymentModel":
 		return config.DeploymentModel
+	case "codeReviewer":
+		return config.CodeReviewer
 	default:
 		return ""
 	}
@@ -3782,6 +3873,10 @@ func stripMonorepoFlags(args []string) []string {
 			i++
 			continue
 		}
+		if arg == "--code-reviewer" {
+			i++
+			continue
+		}
 		if strings.HasPrefix(arg, "--language=") {
 			continue
 		}
@@ -3795,6 +3890,9 @@ func stripMonorepoFlags(args []string) []string {
 			continue
 		}
 		if strings.HasPrefix(arg, "--deployment-model=") {
+			continue
+		}
+		if strings.HasPrefix(arg, "--code-reviewer=") {
 			continue
 		}
 		filtered = append(filtered, arg)

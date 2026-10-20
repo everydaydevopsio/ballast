@@ -35,12 +35,21 @@ Ballast ships reusable skill guides alongside its agent rules.
 - Installed by: `--skill github-health-check` or `--all-skills`
 - Focus: CI status, pull requests, Dependabot, code coverage, GitHub Code Quality findings, security feature enablement, security advisories, and alert listings
 
-`github-pr-copilot-cycle`
+`github-pr-review-cycle`
+
+- Type: common skill
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
+- Installed by: `--skill github-pr-review-cycle` or `--all-skills`
+- Focus: PR creation/update, review requests to the configured code review agent (Copilot, Bosun, or a repository-defined skill), actionable feedback fixes, CI checks, and repeated review cycles
+- Reviewer selected by `codeReviewer` in `.rulesrc.json`
+
+`github-pr-copilot-cycle` (deprecated)
 
 - Type: common skill
 - Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
 - Installed by: `--skill github-pr-copilot-cycle` or `--all-skills`
 - Focus: PR creation/update, Copilot review requests, actionable feedback fixes, CI checks, and repeated review cycles
+- Superseded by `github-pr-review-cycle` with `codeReviewer: copilot`
 
 `ballast-audit`
 
@@ -103,7 +112,8 @@ Codex also records installed skills in the root `AGENTS.md`. Claude records them
 - [aws-live-health-review.md](aws-live-health-review.md)
 - [aws-weekly-security-review.md](aws-weekly-security-review.md)
 - [github-health-check.md](github-health-check.md)
-- [github-pr-copilot-cycle.md](github-pr-copilot-cycle.md)
+- [github-pr-review-cycle.md](github-pr-review-cycle.md)
+- [github-pr-copilot-cycle.md](github-pr-copilot-cycle.md) (deprecated)
 - [ballast-audit.md](ballast-audit.md)
 - [ballast-project-maintenance.md](ballast-project-maintenance.md)
 - [docker-registry-publish.md](docker-registry-publish.md)

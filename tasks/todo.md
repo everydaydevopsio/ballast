@@ -1,77 +1,80 @@
-# Task: Triage the three remaining plan files
+# Task: Selectable code review agent (Copilot, Bosun, or a user-defined skill)
 
 ## Context
-
-- Owner: Mark C Allen
-- Date: 2026-09-29
-- Mode: Approval-Required (each outcome is a scope decision, not a mechanical edit)
-- Related ADRs: [ADR-002](../adr/002-trust-ballasts-own-feedback-channels.md)
-
-All three surviving files in `plans/` were kept during the ADR-002 graduation because each
-still references open issues. Keeping them was the right call, but none is currently
-accurate: one has had its entire priority table completed out from under it, one has
-silently had its first phase delivered, and one has sat untouched for a month with its
-open questions unanswered.
-
-A stale plan is worse than no plan — it is read as current intent.
+- Owner: mark@maplabs.com
+- Date: 2026-10-19
+- Mode: Approval-Required
+- PRD Section: n/a — tracked by `plans/plan-code-review-agent-selection.md`
+- Requirement IDs: n/a
 
 ## Scope
-
-- In scope: deciding the disposition of each of the three `plans/*.md` files, and bringing
-  each into line with reality (update, graduate, or retire).
-- Out of scope: doing the implementation work those plans describe (#128, #94, #153, #149,
-  #147, #303). Those are tracked as GitHub issues already.
+- In scope: `codeReviewer` config plumbed through all four backends; new
+  `github-pr-review-cycle` skill supporting Copilot, Bosun, and `skill:<name>`;
+  deprecation of `github-pr-copilot-cycle`; docs; regenerated artifacts.
+- Out of scope: the Bosun-side review surface, tracked separately in
+  `everydaydevopsio/bosun` as `plans/pr-review-surface.md`.
 
 ## Acceptance Criteria
+- AC1: A repository can select Copilot, Bosun, `none`, or its own reviewer skill, and the
+  choice survives reinstall. ✅
+- AC2: Default behavior is unchanged for existing repositories (`copilot`). ✅
+- AC3: All four backends agree on validation, persistence, and `doctor` output. ✅
+- AC4: It is possible to never use Copilot as a reviewer. ✅
 
-- AC1: Every file in `plans/` accurately states its status and what remains.
-- AC2: Any plan whose work is complete is graduated to an ADR and removed, per the
-  plan-lifecycle rule.
-- AC3: Any plan that will not be pursued is removed, with its rationale captured on the
-  relevant issue rather than lost.
-- AC4: Each remaining open question has an answer recorded, or a ticket carrying it.
+## Constraints
+- A published skill ID is part of the install contract, so the old ID stays until 6.0.0.
+- Skills are copied verbatim with no variable substitution, so the reviewer must be
+  resolved at run time rather than templated in.
 
 ## Risks and Tradeoffs
-
-- Risk: retiring a plan discards design thinking that is not recorded anywhere else.
-  Mitigate by moving the reasoning to the governing issue or an ADR before deleting.
-- Tradeoff (resolved): `issue-priority-plan.md` was the only forward-looking index of what
-  Ballast does next, which argued for keeping it. Retired anyway — every entry in its
-  priority table is a GitHub issue, so the index duplicated tracking rather than adding to
-  it, and a second place to record priority is a second place to go stale.
+- Risk: four-backend drift. Three real parity bugs were found by end-to-end installs
+  after all unit suites were green.
+- Tradeoff: a flat `codeReviewer` string instead of a nested object. Keeps validation and
+  plumbing simple; revisit if per-reviewer options are needed.
 
 ## Execution Checklist
-
-- [x] **`plans/issue-priority-plan.md` — retired.** Its completed context-hygiene
-      workstream (#286–#297) was recorded nowhere durable, so it graduated to
-      [ADR-003](../adr/003-budget-the-always-on-rule-payload.md) rather than being deleted
-      outright. Its forward priority table added nothing over the GitHub issues it listed
-      (#128, #94, #153, #149, #147), all of which remain open and tracked.
-- [x] **`plans/plan-setup-toolchain.md` — retired.** Phase 1 (Go 1.26) had already shipped
-      via #339/#342/#325, leaving only #128 and #94, which are tracked as issues. The
-      Phase 2 and Phase 3 design notes, and the unanswered parity open question, were
-      posted to #128 and #94 before deletion so nothing was lost.
-- [x] **`plans/plan-spec-kit-development-process.md` — complete and graduated.** All five
-      phases landed and all four open questions resolved. `docs/development-process.md` is
-      the sequence; nine guides cross-link into it. Graduated to
-      [ADR-004](../adr/004-one-artifact-owns-each-kind-of-truth.md); `plans/` is now empty.
-- [x] **#340 answered and closed.** The spec-kit plan's open question and #340 were the
-      same question. Resolved by creating `docs/code_review.md` rather than repointing
-      `AGENTS.md`: that line is written by an external Codex reviewer installer, so
-      supplying the target is durable where editing the pointer is not.
-- [x] **Nothing outlived the branch.** All three plans are resolved — two retired with
-      their substance moved to the issues that own it (#128, #94), one completed — so no
-      promotion was needed. #340 was closed rather than promoted. The one genuinely new
-      item found along the way, #376, was filed when it was found.
+- [x] `codeReviewer` through TS config, CLI flag, doctor, install
+- [x] Same through the Go wrapper, Go backend, and Python backend
+- [x] `github-pr-review-cycle` skill with three dispatch paths
+- [x] Deprecate `github-pr-copilot-cycle` (since 5.22.0, remove in 6.0.0)
+- [x] All four registries updated, parity tests passing
+- [x] `sync:content`; regenerate `.claude/` and `.codex/`; update manifests
+- [x] Docs: new skill page, skills index, installation guide
 
 ## Test Strategy
+- Unit: reviewer normalization and flag parsing in all four backends; config round-trip
+  and preservation; registry parity.
+- Integration: `repo-generated-artifacts` compares checked-in output to freshly generated.
+- E2E: installs into scratch repos per backend, reading back `.rulesrc.json`.
+- Failure paths: invalid reviewer rejected with exit 1; invalid saved value dropped
+  without failing config load; deprecation warning emitted.
+- Requirement-to-test mapping: AC1 → `CodeReviewerTests`, `TestParseCodeReviewerFlag`,
+  `config.test.ts` round-trip; AC3 → per-backend E2E installs.
 
-Documentation-only; no test changes expected. Verification is by inspection:
-
-- Every link in `plans/README.md` resolves, and each row's Status matches its file.
-- No plan references an issue that is closed without saying so.
+## Rollback Strategy
+- Trigger: a repository fails to install or loses its saved reviewer.
+- Rollback steps: revert the branch; `codeReviewer` is additive and ignored by older
+  Ballast versions, so no config migration is needed.
+- Validation after rollback: `ballast install --refresh-config`, confirm `.rulesrc.json`
+  and generated rules are unchanged apart from the dropped key.
 
 ## Outcome
+- Result: Implemented and verified.
+- Evidence: TS 393 passed; Python 136 passed; both Go suites ok; `pnpm lint`, `gofmt`,
+  `go vet` clean; per-backend install smoke tests confirm persistence and `doctor` output.
+- PRD updates: none; see `plans/plan-code-review-agent-selection.md` for the design record
+  and implementation notes.
 
-- Result: all three plans resolved — `issue-priority-plan.md` retired to ADR-003, `plan-setup-toolchain.md` retired to #128/#94, `plan-spec-kit-development-process.md` completed across five phases.
-- Evidence: PRs #379 (retirements, ADR-003), #380 (#340 + docs-link check), and this branch (process doc + cross-links). 385/385 TypeScript tests, eslint and prettier clean, `docs-links.test.ts` green.
+## Follow-ups
+- Promoted: [everydaydevopsio/ballast#401](https://github.com/everydaydevopsio/ballast/issues/401)
+  — a wrong-typed scalar in `.rulesrc.json` discards the whole config in Go, affecting
+  `taskSystem`, `deploymentModel`, `ruleProfile`, and `ballastVersion` as well as
+  `codeReviewer`. Pre-existing pattern, surfaced by review of this branch; fixing one field
+  in isolation would leave the rest fragile. Also carries the TypeScript equals-form gap for
+  the other flags.
+- Promoted: [everydaydevopsio/bosun#53](https://github.com/everydaydevopsio/bosun/issues/53)
+  — publish findings as a real pull-request review with inline comments. Until that lands,
+  `codeReviewer: bosun` uses the conversation-comment path, which the skill already handles.
+  Related bosun issues already tracking adjacent work: #28 (failure visibility), #37
+  (structured results), #42 (cross-pass campaign).
+- Done: graduated to [ADR-005](../adr/005-the-code-review-agent-is-repository-policy.md); `plans/` is empty again.

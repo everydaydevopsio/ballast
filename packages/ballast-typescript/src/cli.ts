@@ -4,7 +4,7 @@ import { runInstall } from './install';
 import { LANGUAGES, Language, AGENT_IDS, SKILL_IDS } from './agents';
 import { runDoctor } from './doctor';
 import { BALLAST_VERSION } from './version';
-import { TASK_SYSTEMS, DEPLOYMENT_MODELS } from './config';
+import { TASK_SYSTEMS, DEPLOYMENT_MODELS, CODE_REVIEWERS } from './config';
 
 export interface CliOptions {
   targets: string[];
@@ -18,6 +18,7 @@ export interface CliOptions {
   yes: boolean;
   taskSystem: string;
   deploymentModel: string;
+  codeReviewer: string;
   repositoryFactsFile?: string;
 }
 
@@ -58,7 +59,8 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     patch: false,
     yes: false,
     taskSystem: '',
-    deploymentModel: ''
+    deploymentModel: '',
+    codeReviewer: ''
   };
   let i = 0;
   while (i < args.length) {
@@ -130,6 +132,23 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       i += 2;
       continue;
     }
+    if (arg === '--code-reviewer') {
+      const value = readFlagValue(args, i, arg);
+      options.codeReviewer = value.trim().toLowerCase();
+      i += 2;
+      continue;
+    }
+    // The wrapper accepts `--code-reviewer=value` and forwards single-language
+    // installs verbatim, so without this the equals form reaches this parser
+    // unrecognized and the explicit choice is replaced by the default.
+    if (arg.startsWith('--code-reviewer=')) {
+      options.codeReviewer = arg
+        .slice('--code-reviewer='.length)
+        .trim()
+        .toLowerCase();
+      i += 1;
+      continue;
+    }
     if (arg === '--repository-facts-file') {
       const value = readFlagValue(args, i, arg);
       options.repositoryFactsFile = value.trim();
@@ -169,6 +188,7 @@ Options:
   --all-skills              Install all skills
   --task-system <system>    Task system for the tasks agent: ${TASK_SYSTEMS.join(', ')} (default: github)
   --deployment-model <model> App/service deployment model for publishing; use none for CLI/library/SDK-only projects: ${DEPLOYMENT_MODELS.join(', ')} (default: none)
+  --code-reviewer <agent>   Code review agent for the PR review cycle: ${CODE_REVIEWERS.join(', ')}, or skill:<skill-name> (default: copilot)
   --force, -f               Overwrite existing rule/skill files; prompts before replacing AGENTS.md, CLAUDE.md, or GEMINI.md
   --patch, -p               Merge upstream rule/skill updates into existing files; ignored when --force is set
   --yes, -y                 Non-interactive; require --target and --agent/--all if no .rulesrc.json
@@ -260,6 +280,7 @@ export async function main(): Promise<void> {
     skills: cliOptions.skills.length > 0 ? cliOptions.skills : undefined,
     taskSystem: cliOptions.taskSystem || undefined,
     deploymentModel: cliOptions.deploymentModel || undefined,
+    codeReviewer: cliOptions.codeReviewer || undefined,
     repositoryFactsFile: cliOptions.repositoryFactsFile
   };
 

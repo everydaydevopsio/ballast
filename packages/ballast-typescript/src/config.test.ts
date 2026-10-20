@@ -13,7 +13,9 @@ import {
   DEFAULT_TASK_SYSTEM,
   DEPLOYMENT_MODELS,
   DEFAULT_DEPLOYMENT_MODEL,
-  PUBLISHING_PROFILES
+  PUBLISHING_PROFILES,
+  normalizeCodeReviewer,
+  getCustomReviewerSkill
 } from './config';
 import { BALLAST_VERSION } from './version';
 
@@ -741,5 +743,71 @@ describe('config', () => {
       delete process.env.TF_BUILD;
       expect(isCiMode()).toBe(false);
     });
+  });
+});
+
+describe('codeReviewer', () => {
+  test('normalizes built-in reviewers and skill references', () => {
+    expect(normalizeCodeReviewer('copilot')).toBe('copilot');
+    expect(normalizeCodeReviewer('  BOSUN ')).toBe('bosun');
+    expect(normalizeCodeReviewer('none')).toBe('none');
+    expect(normalizeCodeReviewer('skill:my-reviewer')).toBe(
+      'skill:my-reviewer'
+    );
+    expect(normalizeCodeReviewer('Skill:My-Reviewer')).toBe(
+      'skill:my-reviewer'
+    );
+  });
+
+  test('rejects unusable values rather than throwing', () => {
+    expect(normalizeCodeReviewer('gemini')).toBeNull();
+    expect(normalizeCodeReviewer('skill:')).toBeNull();
+    expect(normalizeCodeReviewer('skill:-leading-dash')).toBeNull();
+    expect(normalizeCodeReviewer('skill:Has Space')).toBeNull();
+    expect(normalizeCodeReviewer(42)).toBeNull();
+    expect(normalizeCodeReviewer(undefined)).toBeNull();
+  });
+
+  test('getCustomReviewerSkill extracts only skill references', () => {
+    expect(getCustomReviewerSkill('skill:my-reviewer')).toBe('my-reviewer');
+    expect(getCustomReviewerSkill('copilot')).toBeNull();
+  });
+
+  test('round-trips through .rulesrc.json', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-reviewer-'));
+    saveConfig(
+      { targets: ['claude'], agents: ['docs'], codeReviewer: 'bosun' },
+      dir
+    );
+    expect(loadConfig(dir)?.codeReviewer).toBe('bosun');
+  });
+
+  test('drops an invalid saved value instead of failing the whole load', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-reviewer-'));
+    fs.writeFileSync(
+      path.join(dir, '.rulesrc.json'),
+      JSON.stringify({
+        targets: ['claude'],
+        agents: ['docs'],
+        codeReviewer: 'not-a-reviewer'
+      })
+    );
+    const config = loadConfig(dir);
+    expect(config).not.toBeNull();
+    expect(config?.codeReviewer).toBeUndefined();
+  });
+
+  test('preserves a saved reviewer when another key is rewritten', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-reviewer-'));
+    saveConfig(
+      {
+        targets: ['claude'],
+        agents: ['docs'],
+        codeReviewer: 'skill:house-style'
+      },
+      dir
+    );
+    saveConfig({ targets: ['claude'], agents: ['docs', 'cicd'] }, dir);
+    expect(loadConfig(dir)?.codeReviewer).toBe('skill:house-style');
   });
 });

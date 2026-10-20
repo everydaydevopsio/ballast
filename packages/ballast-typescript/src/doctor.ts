@@ -43,6 +43,7 @@ export interface DoctorReport {
   configDiscoveryExcludePaths: string[];
   configTaskSystem: string | null;
   configDeploymentModel: string | null;
+  configCodeReviewer: string | null;
   configPublishingProfiles: string[];
   installed: InstalledCliStatus[];
   detectedAppType: AppType;
@@ -272,7 +273,8 @@ export function buildDoctorReport(
   configPublishingProfiles: string[],
   installed: InstalledCliStatus[],
   detectedAppType: AppType = 'unknown',
-  ruleFiles: RuleFileStatus[] = []
+  ruleFiles: RuleFileStatus[] = [],
+  configCodeReviewer: string | null = null
 ): DoctorReport {
   const targetVersion = latestVersion([
     currentVersion,
@@ -359,6 +361,7 @@ export function buildDoctorReport(
     configDiscoveryExcludePaths,
     configTaskSystem,
     configDeploymentModel,
+    configCodeReviewer,
     configPublishingProfiles,
     installed,
     detectedAppType,
@@ -743,6 +746,9 @@ export function formatDoctorReport(report: DoctorReport): string {
     if (report.configDeploymentModel) {
       lines.push(`- deploymentModel: ${report.configDeploymentModel}`);
     }
+    if (report.configCodeReviewer) {
+      lines.push(`- codeReviewer: ${report.configCodeReviewer}`);
+    }
     if (report.configPublishingProfiles.length > 0) {
       lines.push(
         `- publishingProfiles: ${report.configPublishingProfiles.join(', ')}`
@@ -801,7 +807,8 @@ export function runDoctor(options: { fix?: boolean } = {}): number {
     config?.publishingProfiles ?? [],
     CLI_NAMES.map((name) => detectInstalledCli(name)),
     detectAppType(projectRoot),
-    nextRuleFiles
+    nextRuleFiles,
+    config?.codeReviewer ?? null
   );
   if (removedRuleFiles.length > 0) {
     process.stdout.write('Removed stale managed rule files:\n');
