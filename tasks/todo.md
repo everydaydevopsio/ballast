@@ -66,8 +66,9 @@
   and implementation notes.
 
 ## Follow-ups
-- Promote before merge: Bosun's review surface
-  (`everydaydevopsio/bosun` → `plans/pr-review-surface.md`). Until it publishes a real PR
-  review, `codeReviewer: bosun` uses the conversation-comment path. Needs a tracked issue
-  in GitHub per the task-system rule.
+- Promoted: [everydaydevopsio/bosun#53](https://github.com/everydaydevopsio/bosun/issues/53)
+  — publish findings as a real pull-request review with inline comments. Until that lands,
+  `codeReviewer: bosun` uses the conversation-comment path, which the skill already handles.
+  Related bosun issues already tracking adjacent work: #28 (failure visibility), #37
+  (structured results), #42 (cross-pass campaign).
 - At merge: graduate `plans/plan-code-review-agent-selection.md` to an ADR.
