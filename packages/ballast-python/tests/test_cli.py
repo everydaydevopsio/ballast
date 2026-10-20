@@ -2811,3 +2811,48 @@ class CodeReviewerTests(unittest.TestCase):
                 os.chdir(old_cwd)
             config = json.loads((root / ".rulesrc.json").read_text(encoding="utf-8"))
             self.assertEqual(config["codeReviewer"], cli.DEFAULT_CODE_REVIEWER)
+
+    def test_prompt_code_reviewer_accepts_retries_and_defaults(self) -> None:
+        # Empty input takes the default.
+        with mock.patch.object(cli, "prompt", return_value=""):
+            self.assertEqual(cli.prompt_code_reviewer(), cli.DEFAULT_CODE_REVIEWER)
+        # A skill reference is normalized.
+        with mock.patch.object(cli, "prompt", return_value="Skill:House-Style"):
+            self.assertEqual(cli.prompt_code_reviewer(), "skill:house-style")
+        # An invalid answer re-prompts rather than silently defaulting.
+        with mock.patch.object(cli, "prompt", side_effect=["gemini", "bosun"]):
+            self.assertEqual(cli.prompt_code_reviewer(), "bosun")
+
+    def test_resolve_code_reviewer_prompts_when_interactive(self) -> None:
+        with mock.patch.object(cli, "prompt", return_value="bosun"):
+            self.assertEqual(cli.resolve_code_reviewer_for_skill(None, False), "bosun")
+
+    def test_save_config_rejects_an_invalid_code_reviewer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError) as ctx:
+                cli.save_config(
+                    Path(tmp),
+                    "python",
+                    "codex",
+                    ["docs"],
+                    [],
+                    code_reviewer="gemini",
+                )
+            self.assertIn("invalid codeReviewer", str(ctx.exception))
+
+    def test_doctor_reports_the_configured_code_reviewer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            cli.save_config(
+                root, "python", "codex", ["docs"], [], code_reviewer="bosun"
+            )
+            buf = io.StringIO()
+            old_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with redirect_stdout(buf):
+                    cli.run_doctor()
+            finally:
+                os.chdir(old_cwd)
+            self.assertIn("- codeReviewer: bosun", buf.getvalue())
