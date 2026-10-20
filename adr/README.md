@@ -12,6 +12,7 @@ takes its place.
 | [002](002-trust-ballasts-own-feedback-channels.md)      | Accepted | Ballast's own reports must match what is on disk: record rather than recompute, never index a pruned file, refuse rather than half-apply, and run every check. |
 | [003](003-budget-the-always-on-rule-payload.md)          | Accepted | Always-on rule context is a budgeted resource with a CI-enforced ceiling; procedural and reference material belongs in on-demand skills. |
 | [004](004-one-artifact-owns-each-kind-of-truth.md)       | Accepted | Each artifact owns exactly one kind of truth, and `docs/development-process.md` sequences Spec Kit with Ballast's task, plan, testing, docs and review rules. |
+| [005](005-the-code-review-agent-is-repository-policy.md) | Accepted | The code review agent is a `codeReviewer` key in `.rulesrc.json`, resolved at run time by the review-cycle skill, so a repository can use Copilot, Bosun, or a reviewer it defines itself — or none. |
 
 ## Conventions
 

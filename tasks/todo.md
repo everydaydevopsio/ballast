@@ -77,4 +77,4 @@
   `codeReviewer: bosun` uses the conversation-comment path, which the skill already handles.
   Related bosun issues already tracking adjacent work: #28 (failure visibility), #37
   (structured results), #42 (cross-pass campaign).
-- At merge: graduate `plans/plan-code-review-agent-selection.md` to an ADR.
+- Done: graduated to [ADR-005](../adr/005-the-code-review-agent-is-repository-policy.md); `plans/` is empty again.
