@@ -156,6 +156,7 @@ func TestListSkillsIncludesAllRegistrySkills(t *testing.T) {
 		"aws-weekly-security-review",
 		"github-health-check",
 		"github-pr-copilot-cycle",
+		"github-pr-review-cycle",
 		"ballast-audit",
 		"agent-performance-audit",
 		"ballast-project-maintenance",
@@ -3397,5 +3398,20 @@ func TestSaveConfigPreservesPublishingProfiles(t *testing.T) {
 	}
 	if saved.DeploymentModel != "none" {
 		t.Fatalf("deploymentModel not preserved: got %q", saved.DeploymentModel)
+	}
+}
+
+func TestValidCodeReviewer(t *testing.T) {
+	valid := []string{"copilot", "bosun", "none", "  BOSUN ", "skill:my-reviewer", "Skill:My-Reviewer"}
+	for _, value := range valid {
+		if !validCodeReviewer(value) {
+			t.Errorf("expected %q to be a valid code reviewer", value)
+		}
+	}
+	invalid := []string{"", "gemini", "skill:", "skill:-bad", "skill:Has Space", "copilot bosun"}
+	for _, value := range invalid {
+		if validCodeReviewer(value) {
+			t.Errorf("expected %q to be rejected", value)
+		}
 	}
 }

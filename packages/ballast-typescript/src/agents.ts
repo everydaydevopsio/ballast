@@ -76,6 +76,7 @@ export const COMMON_SKILL_IDS = [
   'aws-weekly-security-review',
   'github-health-check',
   'github-pr-copilot-cycle',
+  'github-pr-review-cycle',
   'ballast-audit',
   'agent-performance-audit',
   'ballast-project-maintenance',
@@ -84,6 +85,12 @@ export const COMMON_SKILL_IDS = [
   'speckit-reverse-engineer',
   'speckit-delivery'
 ] as const;
+
+/**
+ * The reviewer-agnostic PR review cycle. Named here because install resolves
+ * the `codeReviewer` policy only when this skill is selected.
+ */
+export const PR_REVIEW_CYCLE_SKILL_ID = 'github-pr-review-cycle';
 export const SKILL_IDS = [...COMMON_SKILL_IDS] as const;
 export type SkillId = (typeof SKILL_IDS)[number];
 

@@ -47,6 +47,7 @@ describe('parseArgs', () => {
       patch: false,
       yes: false,
       taskSystem: '',
+      codeReviewer: '',
       deploymentModel: ''
     });
   });
@@ -72,6 +73,7 @@ describe('parseArgs', () => {
       patch: false,
       yes: false,
       taskSystem: '',
+      codeReviewer: '',
       deploymentModel: ''
     });
   });
@@ -100,6 +102,7 @@ describe('parseArgs', () => {
       patch: false,
       yes: false,
       taskSystem: '',
+      codeReviewer: '',
       deploymentModel: ''
     });
   });
@@ -129,8 +132,42 @@ describe('parseArgs', () => {
       patch: false,
       yes: true,
       taskSystem: 'jira',
+      codeReviewer: '',
       deploymentModel: ''
     });
+  });
+
+  test('parses --code-reviewer flag', () => {
+    const parsed = parseArgs([
+      'node',
+      'ballast-typescript',
+      'install',
+      '--target',
+      'cursor',
+      '--skill',
+      'github-pr-review-cycle',
+      '--code-reviewer',
+      'bosun',
+      '--yes'
+    ]);
+    expect(parsed).toMatchObject({
+      skills: ['github-pr-review-cycle'],
+      codeReviewer: 'bosun'
+    });
+  });
+
+  test('parses a skill: reference as the code reviewer', () => {
+    const parsed = parseArgs([
+      'node',
+      'ballast-typescript',
+      'install',
+      '--target',
+      'cursor',
+      '--code-reviewer',
+      'Skill:My-Reviewer',
+      '--yes'
+    ]);
+    expect(parsed).toMatchObject({ codeReviewer: 'skill:my-reviewer' });
   });
 
   test('parses --deployment-model flag', () => {
@@ -158,6 +195,7 @@ describe('parseArgs', () => {
       patch: false,
       yes: true,
       taskSystem: '',
+      codeReviewer: '',
       deploymentModel: 'kubernetes'
     });
   });

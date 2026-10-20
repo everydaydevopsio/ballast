@@ -86,6 +86,7 @@ These skills are registered with Claude Code. Invoke one by name (for example `/
 - `/aws-weekly-security-review` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `/github-health-check` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 - `/github-pr-copilot-cycle` — create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles
+- `/github-pr-review-cycle` — create or update a GitHub PR, run the configured code review agent (Copilot, Bosun, or a repository-defined skill), triage and fix findings, push fixes, check CI, and repeat up to three cycles
 - `/ballast-audit` — audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
 - `/agent-performance-audit` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
 - `/ballast-project-maintenance` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools

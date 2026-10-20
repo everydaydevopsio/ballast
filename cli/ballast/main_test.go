@@ -6998,3 +6998,37 @@ func TestConfiguredRuleSuffixesHonorDeploymentModel(t *testing.T) {
 		t.Fatalf("explicit profiles should keep web, got %v", got)
 	}
 }
+
+func TestParseCodeReviewerFlag(t *testing.T) {
+	cases := []struct {
+		name    string
+		args    []string
+		want    string
+		wantErr bool
+	}{
+		{name: "absent", args: []string{"install"}, want: ""},
+		{name: "spaced", args: []string{"install", "--code-reviewer", "bosun"}, want: "bosun"},
+		{name: "equals", args: []string{"install", "--code-reviewer=Copilot"}, want: "copilot"},
+		{name: "skill reference", args: []string{"--code-reviewer=Skill:House-Style"}, want: "skill:house-style"},
+		{name: "unknown reviewer", args: []string{"--code-reviewer", "gemini"}, wantErr: true},
+		{name: "malformed skill", args: []string{"--code-reviewer", "skill:"}, wantErr: true},
+		{name: "missing value", args: []string{"install", "--code-reviewer"}, wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseCodeReviewerFlag(tc.args)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected an error for %v", tc.args)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

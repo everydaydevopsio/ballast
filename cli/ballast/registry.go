@@ -107,6 +107,19 @@ var skillRegistry = []skillEntry{
 	{
 		ID:          "github-pr-copilot-cycle",
 		Description: "create or update a GitHub PR, request Copilot review, triage and fix Copilot comments, push fixes, check CI, and repeat up to three cycles",
+		Status:      statusDeprecated,
+		Deprecated: &deprecationNote{
+			Since: "5.22.0",
+			// A published skill ID is part of the install contract: removing it
+			// fails validation for every repository that still lists it, so the
+			// removal waits for the next major.
+			Remove:  "6.0.0",
+			Message: "use github-pr-review-cycle with codeReviewer: copilot for identical behavior",
+		},
+	},
+	{
+		ID:          "github-pr-review-cycle",
+		Description: "create or update a GitHub PR, run the configured code review agent (Copilot, Bosun, or a repository-defined skill), triage and fix findings, push fixes, check CI, and repeat up to three cycles",
 		Status:      statusActive,
 	},
 	{

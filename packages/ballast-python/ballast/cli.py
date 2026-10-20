@@ -47,6 +47,7 @@ COMMON_SKILLS = [
     "aws-weekly-security-review",
     "github-health-check",
     "github-pr-copilot-cycle",
+    "github-pr-review-cycle",
     "ballast-audit",
     "agent-performance-audit",
     "ballast-project-maintenance",
@@ -72,6 +73,10 @@ TASK_SYSTEM_TOKEN = "{{taskSystem}}"
 DEFAULT_TASK_SYSTEM = "github"
 TASK_SYSTEMS = ["github", "jira", "linear", "none"]
 DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "docker", "hosted"]
+# Built-in code review agents. A repository may also name its own reviewer
+# skill as "skill:<skill-name>", so this list is not the whole valid space.
+CODE_REVIEWERS = ["copilot", "bosun", "none"]
+CUSTOM_CODE_REVIEWER_PATTERN = re.compile(r"^skill:[a-z0-9][a-z0-9-]*$")
 PUBLISHING_PROFILE_ALIASES = {
     "app": "apps",
     "library": "libraries",
@@ -392,6 +397,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
         skills = data.get("skills")
         task_system = data.get("taskSystem")
         deployment_model = data.get("deploymentModel")
+        code_reviewer = data.get("codeReviewer")
         publishing_profiles = data.get("publishingProfiles")
         discovery = normalize_discovery(data.get("discovery"))
         return {
@@ -425,6 +431,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
                 if isinstance(deployment_model, str)
                 else None
             ),
+            "codeReviewer": normalize_code_reviewer(code_reviewer) or None,
             "publishingProfiles": normalize_publishing_profiles(publishing_profiles),
             "ruleProfile": (
                 data["ruleProfile"].strip().lower()
@@ -437,6 +444,20 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
         return None
 
 
+def normalize_code_reviewer(value: object) -> str:
+    """Return a valid reviewer, or "" when the value is unusable.
+
+    A "skill:<name>" reference names a skill the user owns, so it is validated
+    by shape rather than against Ballast's registry.
+    """
+    if not isinstance(value, str):
+        return ""
+    reviewer = value.strip().lower()
+    if reviewer in CODE_REVIEWERS or CUSTOM_CODE_REVIEWER_PATTERN.match(reviewer):
+        return reviewer
+    return ""
+
+
 def save_config(
     root: Path,
     language: str,
@@ -445,6 +466,7 @@ def save_config(
     skills: list[str] | None = None,
     deployment_model: str | None = None,
     task_system: str | None = None,
+    code_reviewer: str | None = None,
 ) -> None:
     file_path = root / rulesrc_filename(language)
     languages: list[str] = []
@@ -452,6 +474,7 @@ def save_config(
     existing_discovery: dict[str, list[str]] | None = None
     existing_task_system: str | None = None
     existing_deployment_model: str | None = None
+    existing_code_reviewer: str | None = None
     existing_rule_profile: str | None = None
     existing_publishing_profiles: list[str] = []
     tools: dict[str, list[str]] = {}
@@ -479,6 +502,9 @@ def save_config(
                     existing_task_system = raw["taskSystem"].strip().lower()
                 if isinstance(raw.get("deploymentModel"), str):
                     existing_deployment_model = raw["deploymentModel"].strip().lower()
+                existing_code_reviewer = (
+                    normalize_code_reviewer(raw.get("codeReviewer")) or None
+                )
                 if isinstance(raw.get("ruleProfile"), str):
                     existing_rule_profile = raw["ruleProfile"].strip().lower()
                 existing_publishing_profiles = normalize_publishing_profiles(
@@ -507,6 +533,14 @@ def save_config(
     normalized_task_system = normalize_task_system(
         task_system or existing_task_system or ""
     )
+    requested_code_reviewer = (code_reviewer or existing_code_reviewer or "").strip()
+    normalized_code_reviewer = normalize_code_reviewer(requested_code_reviewer)
+    if requested_code_reviewer and not normalized_code_reviewer:
+        raise ValueError(
+            "invalid codeReviewer "
+            f"{requested_code_reviewer!r}; use one of: {', '.join(CODE_REVIEWERS)}, "
+            "or skill:<skill-name>"
+        )
     if (
         normalized_deployment_model
         and normalized_deployment_model not in DEPLOYMENT_MODELS
@@ -536,6 +570,8 @@ def save_config(
         payload["taskSystem"] = normalized_task_system
     if normalized_deployment_model:
         payload["deploymentModel"] = normalized_deployment_model
+    if normalized_code_reviewer:
+        payload["codeReviewer"] = normalized_code_reviewer
     if existing_rule_profile in ("full", "minimal"):
         payload["ruleProfile"] = existing_rule_profile
     # publishingProfiles scopes which publishing rules load into every session.
@@ -745,6 +781,9 @@ def build_doctor_report(
                 lines.append(f"- discovery.excludePaths: {','.join(exclude_paths)}")
         if isinstance(task_system, str) and task_system.strip():
             lines.append(f"- taskSystem: {task_system}")
+        code_reviewer = config.get("codeReviewer")
+        if isinstance(code_reviewer, str) and code_reviewer.strip():
+            lines.append(f"- codeReviewer: {code_reviewer}")
         if isinstance(deployment_model, str) and deployment_model.strip():
             lines.append(f"- deploymentModel: {deployment_model}")
         if (
@@ -2569,6 +2608,13 @@ def resolve_target_and_agents(
         )
     if task_system_from_flag and task_system_from_flag not in TASK_SYSTEMS:
         raise ValueError(f"Invalid --task-system. Use: {', '.join(TASK_SYSTEMS)}")
+    raw_code_reviewer = (getattr(args, "code_reviewer", "") or "").strip()
+    code_reviewer_from_flag = normalize_code_reviewer(raw_code_reviewer)
+    if raw_code_reviewer and not code_reviewer_from_flag:
+        raise ValueError(
+            f"Invalid --code-reviewer. Use: {', '.join(CODE_REVIEWERS)}, "
+            "or skill:<skill-name>"
+        )
 
     if (
         cfg
@@ -2653,6 +2699,7 @@ def install(
     skip_support_files: set[str] | None = None,
     deployment_model: str | None = None,
     task_system: str | None = None,
+    code_reviewer: str | None = None,
     refresh_task_rules: bool = False,
 ) -> InstallResult:
     result = InstallResult()
@@ -2669,7 +2716,14 @@ def install(
 
     if persist:
         save_config(
-            root, language, target, agents, skills, deployment_model, task_system
+            root,
+            language,
+            target,
+            agents,
+            skills,
+            deployment_model,
+            task_system,
+            code_reviewer,
         )
 
     config_for_support_files = load_config(root, language)
@@ -2943,13 +2997,21 @@ def install_for_targets(
     patch_gemini_md: bool = False,
     deployment_model: str | None = None,
     task_system: str | None = None,
+    code_reviewer: str | None = None,
     refresh_task_rules: bool = False,
 ) -> list[tuple[str, InstallResult]]:
     results: list[tuple[str, InstallResult]] = []
     agents = with_implicit_agents(agents)
     if persist:
         save_config(
-            root, language, targets, agents, skills, deployment_model, task_system
+            root,
+            language,
+            targets,
+            agents,
+            skills,
+            deployment_model,
+            task_system,
+            code_reviewer,
         )
 
     for target in targets:
@@ -2969,6 +3031,7 @@ def install_for_targets(
                     patch_gemini_md,
                     deployment_model=deployment_model,
                     task_system=task_system,
+                    code_reviewer=code_reviewer,
                     refresh_task_rules=refresh_task_rules,
                 ),
             )
@@ -3085,6 +3148,9 @@ def run_install(args: argparse.Namespace) -> int:
         skills,
         deployment_model,
         task_system,
+        # Already validated in resolve_target_and_agents, which raises on a
+        # bad value before this point.
+        normalize_code_reviewer(getattr(args, "code_reviewer", "")) or None,
     )
     for target in targets:
         skipped_support_file = support_decisions.get(target)
@@ -3107,9 +3173,13 @@ def run_install(args: argparse.Namespace) -> int:
                     False,
                     False,
                     {skipped_support_file} if skipped_support_file else None,
-                    deployment_model,
-                    task_system,
-                    refresh_task_rules,
+                    deployment_model=deployment_model,
+                    task_system=task_system,
+                    code_reviewer=normalize_code_reviewer(
+                        getattr(args, "code_reviewer", "")
+                    )
+                    or None,
+                    refresh_task_rules=refresh_task_rules,
                 ),
             )
         )
@@ -3169,6 +3239,13 @@ def parser() -> argparse.ArgumentParser:
         "--deployment-model",
         choices=DEPLOYMENT_MODELS,
         help="App/service deployment model for publishing; use none for CLI/library/SDK-only projects",
+    )
+    install_cmd.add_argument(
+        "--code-reviewer",
+        help=(
+            "Code review agent for the PR review cycle: "
+            f"{', '.join(CODE_REVIEWERS)}, or skill:<skill-name>"
+        ),
     )
     install_cmd.add_argument(
         "--task-system",
