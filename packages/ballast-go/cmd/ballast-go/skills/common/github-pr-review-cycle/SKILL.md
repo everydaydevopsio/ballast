@@ -78,6 +78,15 @@ Run at most three review cycles. A cycle is:
 4. Fix, reply, resolve, test, push.
 5. Check PR CI.
 
+**Record `REQUESTED_AT` before anything that can trigger a review, not after.** With a
+reviewer that starts automatically on push — Bosun does — the push in step 4 *is* the next
+cycle's request. Stamping `REQUESTED_AT` at step 1 of the following cycle, after CI has been
+waited on in step 5, can place the timestamp *after* a review that already finished. That
+review is then discarded as stale, no new one is requested because the push already
+triggered it, and the cycle waits until timeout for a review that has already been
+published. So for auto-triggering reviewers, re-stamp `REQUESTED_AT` and `HEAD_OID`
+immediately before the push, and treat a commit match as authoritative over the timestamp.
+
 Stop before three cycles only when a settled review for the current head produced no unresolved findings, confirmed by a fresh query after that review settled.
 
 Do not treat a single immediate "nothing found" poll as completion. Every reviewer here can accept a request and publish its output later. If a timeout is reached without a settled review, report the PR as blocked or pending rather than complete.
@@ -89,6 +98,10 @@ PR_NUMBER=$(gh pr view --json number --jq .number)
 REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 HEAD_OID=$(gh pr view --json headRefOid --jq .headRefOid)
 ```
+
+A review that identifies the commit it covers is settled evidence for that commit whatever
+its timestamp says. Use `REQUESTED_AT` only to disambiguate reviews that carry no commit,
+never to reject one whose commit matches `$HEAD_OID`.
 
 If `headRefOid` changes while you are waiting, the PR moved. Stop the current wait, record a new `REQUESTED_AT` and `HEAD_OID`, re-request, and restart the wait for that head.
 
@@ -120,7 +133,15 @@ Before pushing:
 ```bash
 git status --short
 git diff --check
+```
+
+Re-stamp the cycle markers immediately before the push, because for an auto-triggering
+reviewer the push is the request:
+
+```bash
+REQUESTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 git push
+HEAD_OID=$(git rev-parse HEAD)
 ```
 
 ## Check CI After Each Push
@@ -224,7 +245,12 @@ gh api "repos/$OWNER_REPO/issues/$PR_NUMBER/comments" --paginate \
   --jq '[.[] | select(.user.type == "Bot")] | .[-3:] | .[] | {login: .user.login, created_at, head: (.body | split("\n")[0])}'
 ```
 
-A settled review is a comment whose body starts with `## Bosun code review`, created after `$REQUESTED_AT`. Bosun stamps the reviewed ref and commit into a metadata line directly under that heading — use it to confirm the review covers `$HEAD_OID` rather than an earlier push.
+A settled review is a comment whose body starts with `## Bosun code review` and whose
+stamped commit is `$HEAD_OID`. Bosun records the reviewed ref and commit in a metadata line
+directly under that heading; **that commit, not the timestamp, decides whether the review
+covers the current head.** A Bosun job started by your push can finish before `gh pr checks`
+returns, so a review for the right commit may legitimately predate `$REQUESTED_AT`. Fall
+back to `created_at > $REQUESTED_AT` only for output that carries no commit stamp.
 
 Timeout must be far longer than Copilot's. A Bosun review runs to `BOSUN_REVIEW_TIMEOUT_SECONDS`, 1800 seconds by default, plus queue time. Poll at 60s, then 120s repeating, and allow about 35 minutes.
 

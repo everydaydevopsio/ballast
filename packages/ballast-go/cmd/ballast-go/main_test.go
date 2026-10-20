@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -3413,5 +3414,40 @@ func TestValidCodeReviewer(t *testing.T) {
 		if validCodeReviewer(value) {
 			t.Errorf("expected %q to be rejected", value)
 		}
+	}
+}
+
+func TestResolveCodeReviewer(t *testing.T) {
+	// Flag wins over the saved value.
+	got, err := resolveCodeReviewer("bosun", "copilot", true, nil)
+	if err != nil || got != "bosun" {
+		t.Fatalf("flag should win: got %q err %v", got, err)
+	}
+	// Saved value is used when no flag is given.
+	got, err = resolveCodeReviewer("", "skill:house-style", true, nil)
+	if err != nil || got != "skill:house-style" {
+		t.Fatalf("saved value should be used: got %q err %v", got, err)
+	}
+	// Non-interactive with nothing saved falls back to the default rather than
+	// leaving the key unset, matching the other backends.
+	got, err = resolveCodeReviewer("", "", true, nil)
+	if err != nil || got != defaultCodeReviewer {
+		t.Fatalf("expected %q, got %q err %v", defaultCodeReviewer, got, err)
+	}
+	// An unusable saved value is discarded, not propagated.
+	got, err = resolveCodeReviewer("", "gemini", true, nil)
+	if err != nil || got != defaultCodeReviewer {
+		t.Fatalf("expected %q for an invalid saved value, got %q err %v", defaultCodeReviewer, got, err)
+	}
+}
+
+func TestPromptCodeReviewerAcceptsSkillReferenceAndDefaults(t *testing.T) {
+	got, err := promptCodeReviewer(bufio.NewReader(strings.NewReader("Skill:House-Style\n")))
+	if err != nil || got != "skill:house-style" {
+		t.Fatalf("got %q err %v", got, err)
+	}
+	got, err = promptCodeReviewer(bufio.NewReader(strings.NewReader("\n")))
+	if err != nil || got != defaultCodeReviewer {
+		t.Fatalf("empty input should take the default: got %q err %v", got, err)
 	}
 }

@@ -67,6 +67,8 @@ var (
 	// Built-in code review agents; a repository may also name its own reviewer
 	// skill as "skill:<skill-name>", so this list is not the whole valid space.
 	codeReviewers             = []string{"copilot", "bosun", "none"}
+	defaultCodeReviewer       = "copilot"
+	prReviewCycleSkillID      = "github-pr-review-cycle"
 	customCodeReviewerPattern = regexp.MustCompile(`^skill:[a-z0-9][a-z0-9-]*$`)
 	publishingProfiles        = []string{"cli", "apps", "web", "api", "libraries", "sdks", "apt", "brew"}
 	publishingProfileAliases  = map[string]string{
@@ -818,7 +820,13 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 			}
 			next.TaskSystem = taskSystem
 		}
-		if opts.codeReviewer != "" {
+		if contains(next.Skills, prReviewCycleSkillID) {
+			reviewer, err := resolveCodeReviewer(opts.codeReviewer, next.CodeReviewer, ci, promptReader)
+			if err != nil {
+				return nil, err
+			}
+			next.CodeReviewer = reviewer
+		} else if opts.codeReviewer != "" {
 			next.CodeReviewer = opts.codeReviewer
 		}
 		if contains(next.Agents, "publishing") {
@@ -896,6 +904,13 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 		if codeReviewer == "" {
 			codeReviewer = configValue(config, "codeReviewer")
 		}
+		if contains(resolvedSkills, prReviewCycleSkillID) {
+			resolved, err := resolveCodeReviewer(opts.codeReviewer, configValue(config, "codeReviewer"), ci, promptReader)
+			if err != nil {
+				return nil, err
+			}
+			codeReviewer = resolved
+		}
 		return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, TaskSystem: taskSystem, DeploymentModel: deploymentModel, CodeReviewer: codeReviewer}, nil
 	}
 
@@ -956,6 +971,13 @@ func resolveTargetAndAgents(opts resolveOptions) (*rulesConfig, error) {
 	resolvedCodeReviewer := opts.codeReviewer
 	if resolvedCodeReviewer == "" {
 		resolvedCodeReviewer = configValue(config, "codeReviewer")
+	}
+	if contains(resolvedSkills, prReviewCycleSkillID) {
+		reviewer, err := resolveCodeReviewer(opts.codeReviewer, configValue(config, "codeReviewer"), ci, promptReader)
+		if err != nil {
+			return nil, err
+		}
+		resolvedCodeReviewer = reviewer
 	}
 
 	return &rulesConfig{Targets: resolvedTargets, Agents: resolvedAgents, Skills: resolvedSkills, TaskSystem: taskSystem, DeploymentModel: deploymentModel, CodeReviewer: resolvedCodeReviewer}, nil
@@ -2403,6 +2425,55 @@ func renderGitHooksPreCommitGlob(agentID, language, hookMode string) string {
 		return ""
 	}
 	return "  - '.pre-commit-config.yaml'"
+}
+
+// resolveCodeReviewer applies the same precedence as the other backends: an
+// explicit flag, then the saved value, then an interactive prompt, then the
+// default. Called only when the PR review-cycle skill is selected.
+func resolveCodeReviewer(requested, saved string, nonInteractive bool, reader *bufio.Reader) (string, error) {
+	if value := normalizeCodeReviewer(requested); value != "" {
+		return value, nil
+	}
+	if value := normalizeCodeReviewer(saved); value != "" {
+		return value, nil
+	}
+	if nonInteractive {
+		return defaultCodeReviewer, nil
+	}
+	return promptCodeReviewer(reader)
+}
+
+// promptCodeReviewer cannot reuse promptRequiredInstallOption: that helper
+// validates against a closed Allowed list, and "skill:<skill-name>" is open.
+func promptCodeReviewer(reader *bufio.Reader) (string, error) {
+	if reader == nil {
+		reader = bufio.NewReader(os.Stdin)
+	}
+	allowed := strings.Join(codeReviewers, ", ")
+	for {
+		fmt.Printf("Code review agent for the PR review cycle [%s, or skill:<skill-name>] (default: %s): ", allowed, defaultCodeReviewer)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) {
+				if value := normalizeCodeReviewer(response); value != "" {
+					return value, nil
+				}
+				if strings.TrimSpace(response) == "" {
+					return defaultCodeReviewer, nil
+				}
+				fmt.Printf("Invalid code reviewer. Choose one of: %s, or skill:<skill-name>\n", allowed)
+				return defaultCodeReviewer, nil
+			}
+			return "", err
+		}
+		if strings.TrimSpace(response) == "" {
+			return defaultCodeReviewer, nil
+		}
+		if value := normalizeCodeReviewer(response); value != "" {
+			return value, nil
+		}
+		fmt.Printf("Invalid code reviewer. Choose one of: %s, or skill:<skill-name>\n", allowed)
+	}
 }
 
 // normalizeCodeReviewer lowercases a reviewer value and drops it when it is

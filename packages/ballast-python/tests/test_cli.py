@@ -2771,3 +2771,43 @@ class CodeReviewerTests(unittest.TestCase):
             cli.save_config(root, "python", "codex", ["docs", "cicd"], [])
             config = json.loads((root / ".rulesrc.json").read_text(encoding="utf-8"))
             self.assertEqual(config["codeReviewer"], "skill:house")
+
+    def test_resolve_code_reviewer_precedence(self) -> None:
+        # Flag or saved value wins without prompting.
+        self.assertEqual(cli.resolve_code_reviewer_for_skill("bosun", True), "bosun")
+        self.assertEqual(
+            cli.resolve_code_reviewer_for_skill("skill:house", True), "skill:house"
+        )
+        # Non-interactive with nothing saved takes the default rather than
+        # leaving the key unset, matching the other backends.
+        self.assertEqual(
+            cli.resolve_code_reviewer_for_skill(None, True), cli.DEFAULT_CODE_REVIEWER
+        )
+        # An unusable saved value is discarded, not propagated.
+        self.assertEqual(
+            cli.resolve_code_reviewer_for_skill("gemini", True),
+            cli.DEFAULT_CODE_REVIEWER,
+        )
+
+    def test_run_install_persists_default_reviewer_for_the_review_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".git").mkdir()
+            old_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                args = cli.parser().parse_args(
+                    [
+                        "install",
+                        "--target",
+                        "codex",
+                        "--skill",
+                        "github-pr-review-cycle",
+                        "--yes",
+                    ]
+                )
+                self.assertEqual(cli.run_install(args), 0)
+            finally:
+                os.chdir(old_cwd)
+            config = json.loads((root / ".rulesrc.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["codeReviewer"], cli.DEFAULT_CODE_REVIEWER)

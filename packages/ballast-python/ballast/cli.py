@@ -76,6 +76,8 @@ DEPLOYMENT_MODELS = ["none", "kubernetes", "serverless", "server", "docker", "ho
 # Built-in code review agents. A repository may also name its own reviewer
 # skill as "skill:<skill-name>", so this list is not the whole valid space.
 CODE_REVIEWERS = ["copilot", "bosun", "none"]
+DEFAULT_CODE_REVIEWER = "copilot"
+PR_REVIEW_CYCLE_SKILL_ID = "github-pr-review-cycle"
 CUSTOM_CODE_REVIEWER_PATTERN = re.compile(r"^skill:[a-z0-9][a-z0-9-]*$")
 PUBLISHING_PROFILE_ALIASES = {
     "app": "apps",
@@ -2568,6 +2570,38 @@ def resolve_deployment_model_for_publishing(
     return prompt_deployment_model()
 
 
+def prompt_code_reviewer() -> str:
+    value = prompt(
+        "Code review agent for the PR review cycle "
+        f"[{', '.join(CODE_REVIEWERS)}, or skill:<skill-name>] "
+        f"(default: {DEFAULT_CODE_REVIEWER}): "
+    )
+    if not value.strip():
+        return DEFAULT_CODE_REVIEWER
+    normalized = normalize_code_reviewer(value)
+    if normalized:
+        return normalized
+    print(
+        "Invalid code reviewer. Choose one of: "
+        f"{', '.join(CODE_REVIEWERS)}, or skill:<skill-name>"
+    )
+    return prompt_code_reviewer()
+
+
+def resolve_code_reviewer_for_skill(current: object, non_interactive: bool) -> str:
+    """Flag or saved value, else prompt, else the default.
+
+    Mirrors the TypeScript and Go backends so the documented interactive flow is
+    the same whichever backend runs.
+    """
+    normalized = normalize_code_reviewer(current)
+    if normalized:
+        return normalized
+    if non_interactive:
+        return DEFAULT_CODE_REVIEWER
+    return prompt_code_reviewer()
+
+
 def resolve_requested_targets(raw: object) -> list[str]:
     if raw is None:
         return []
@@ -3133,6 +3167,20 @@ def run_install(args: argparse.Namespace) -> int:
     prior_task_system = (
         normalize_task_system(prior_config.get("taskSystem")) if prior_config else ""
     )
+    # Already validated in resolve_target_and_agents, which raises on a bad
+    # value before this point.
+    resolved_code_reviewer = (
+        normalize_code_reviewer(getattr(args, "code_reviewer", "")) or None
+    )
+    if PR_REVIEW_CYCLE_SKILL_ID in (skills or []):
+        resolved_code_reviewer = resolve_code_reviewer_for_skill(
+            resolved_code_reviewer
+            or (prior_config.get("codeReviewer") if prior_config else None),
+            is_ci_mode()
+            or bool(getattr(args, "yes", False))
+            or not is_stdin_interactive(),
+        )
+
     refresh_task_rules = (
         "tasks" in with_implicit_agents(agents)
         and task_system is not None
@@ -3148,9 +3196,7 @@ def run_install(args: argparse.Namespace) -> int:
         skills,
         deployment_model,
         task_system,
-        # Already validated in resolve_target_and_agents, which raises on a
-        # bad value before this point.
-        normalize_code_reviewer(getattr(args, "code_reviewer", "")) or None,
+        resolved_code_reviewer,
     )
     for target in targets:
         skipped_support_file = support_decisions.get(target)
@@ -3175,10 +3221,7 @@ def run_install(args: argparse.Namespace) -> int:
                     {skipped_support_file} if skipped_support_file else None,
                     deployment_model=deployment_model,
                     task_system=task_system,
-                    code_reviewer=normalize_code_reviewer(
-                        getattr(args, "code_reviewer", "")
-                    )
-                    or None,
+                    code_reviewer=resolved_code_reviewer,
                     refresh_task_rules=refresh_task_rules,
                 ),
             )
