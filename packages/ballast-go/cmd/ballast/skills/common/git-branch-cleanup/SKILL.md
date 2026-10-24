@@ -65,15 +65,32 @@ if [ -z "$DEFAULT_BRANCH" ] && [ -n "$REMOTE" ]; then
   DEFAULT_BRANCH=${DEFAULT_BRANCH#"${REMOTE}/"}
 fi
 
-# Validate: the branch must be non-empty AND actually resolve.
-if [ -z "$DEFAULT_BRANCH" ] || ! git rev-parse --verify -q "refs/remotes/${REMOTE}/${DEFAULT_BRANCH}" >/dev/null; then
+# With no remote at all, fall back to the local default branch.
+if [ -z "$REMOTE" ] && [ -z "$DEFAULT_BRANCH" ]; then
+  for candidate in main master trunk; do
+    git rev-parse --verify -q "refs/heads/$candidate" >/dev/null && DEFAULT_BRANCH=$candidate && break
+  done
+fi
+
+# BASE_REF is what every later comparison runs against. It is the
+# remote-tracking ref when a remote exists, the local branch otherwise.
+if [ -n "$REMOTE" ]; then
+  BASE_REF="$BASE_REF"
+else
+  BASE_REF="$DEFAULT_BRANCH"
+fi
+
+# Validate: the branch must be non-empty AND BASE_REF must actually resolve.
+if [ -z "$DEFAULT_BRANCH" ] || ! git rev-parse --verify -q "$BASE_REF" >/dev/null; then
   echo "could not determine the default branch — stopping"
   exit 1
 fi
-echo "Remote: $REMOTE   Default branch: $DEFAULT_BRANCH"
+echo "Remote: ${REMOTE:-none}   Default branch: $DEFAULT_BRANCH   Comparing against: $BASE_REF"
 ```
 
-If detection fails, **stop and ask the user** for the default branch. Do not guess `main`, and never continue with an empty value. A wrong or empty default branch turns this skill into a data-loss tool: every classification compares against `${REMOTE}/${DEFAULT_BRANCH}`, and `origin/` resolves to nothing, so "is this branch merged?" has no meaningful answer.
+Use `$BASE_REF` for every comparison from here on, never a hard-coded remote-tracking ref. A repository with no remote is a supported case — the edge cases promise local branch and worktree cleanup there — and hard-coding a remote-tracking ref would make that promise unreachable. In no-remote mode, skip Step 0's fetch, Step 3's PR lookups, and Step 6 entirely, and say so in the report.
+
+If detection fails, **stop and ask the user** for the default branch. Do not guess `main`, and never continue with an empty value. A wrong or empty default branch turns this skill into a data-loss tool: every classification compares against `$BASE_REF`, and `origin/` resolves to nothing, so "is this branch merged?" has no meaningful answer.
 
 Validate the answer the user gives you the same way before using it.
 
@@ -131,10 +148,10 @@ For each local branch `B` other than `$DEFAULT_BRANCH`, gather the five facts be
 LOCAL_TIP=$(git rev-parse "$B")
 
 # 1. Is every commit on B already reachable from the default branch?
-git merge-base --is-ancestor "$B" "${REMOTE}/${DEFAULT_BRANCH}" && echo "ANCESTOR" || echo "NOT_ANCESTOR"
+git merge-base --is-ancestor "$B" "$BASE_REF" && echo "ANCESTOR" || echo "NOT_ANCESTOR"
 
 # 2. How many commits does B carry that the default branch does not?
-git rev-list --count "${REMOTE}/${DEFAULT_BRANCH}..$B"
+git rev-list --count "$BASE_REF..$B"
 
 # 3. The merged PR whose head ref is B, if one exists.
 gh pr list --state merged --head "$B" --limit 1 \
@@ -143,7 +160,7 @@ gh pr list --state merged --head "$B" --limit 1 \
 # 4. Do B's individual patches already exist in the default branch under
 #    different SHAs? Detects rebase and cherry-pick, NOT squash (see below).
 #    Capture output and exit status separately: see the warning below.
-if CHERRY=$(git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" 2>/dev/null); then
+if CHERRY=$(git cherry "$BASE_REF" "$B" 2>/dev/null); then
   UNIQUE_PATCHES=$(printf '%s\n' "$CHERRY" | grep -c '^+')
   CHERRY_OK=yes
 else
@@ -154,7 +171,7 @@ fi
 # 5. Does B carry merge commits the default branch does not?
 #    git cherry compares patch-ids of NON-MERGE commits only, so a merge commit
 #    carrying unique conflict resolutions produces zero `+` lines and looks merged.
-git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B"
+git rev-list --merges --count "$BASE_REF..$B"
 ```
 
 **Categories**, evaluated top to bottom — the first match wins:
@@ -162,9 +179,9 @@ git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B"
 | Category | Test | Action |
 |---|---|---|
 | `MERGED` | Check 1 succeeds | Auto-delete |
-| `SQUASH_MERGED` | Check 3 found a merged PR whose `headRefOid` equals `$LOCAL_TIP`, whose `baseRefName` equals `$DEFAULT_BRANCH`, and whose `mergeCommit` is reachable from `${REMOTE}/${DEFAULT_BRANCH}` | Auto-delete |
+| `SQUASH_MERGED` | Check 3 found a merged PR whose `headRefOid` equals `$LOCAL_TIP`, whose `baseRefName` equals `$DEFAULT_BRANCH`, and whose `mergeCommit` is reachable from `$BASE_REF` | Auto-delete |
 | `UNIQUE_MERGE` | `CHERRY_OK=yes`, check 4 is `0`, but check 5 is greater than `0` | Report, ask — never auto-delete |
-| `REBASE_MERGED` | `CHERRY_OK=yes`, check 4 is `0`, and check 5 is `0` | Auto-delete |
+| `REBASE_MERGED` | `CHERRY_OK=yes`, check 4 is `0`, and check 5 is `0` | Report, ask — patch equivalence is not proof |
 | `UNMERGED` | Anything else, including `CHERRY_OK=no` | Report, ask |
 | `GONE` | `%(upstream:track)` contains `[gone]` | Report, ask — the remote branch was deleted |
 | `NO_UPSTREAM` | No tracking branch configured | Report, ask — work may exist only locally |
@@ -187,7 +204,7 @@ PR_MERGE=$(printf '%s' "$PR" | cut -f3)
   && [ "$PR_HEAD" = "$LOCAL_TIP" ] \
   && [ "$PR_BASE" = "$DEFAULT_BRANCH" ] \
   && [ -n "$PR_MERGE" ] \
-  && git merge-base --is-ancestor "$PR_MERGE" "${REMOTE}/${DEFAULT_BRANCH}" \
+  && git merge-base --is-ancestor "$PR_MERGE" "$BASE_REF" \
   && echo "SQUASH_CONFIRMED" || echo "NOT_CONFIRMED"
 ```
 
@@ -202,7 +219,11 @@ Do not substitute a timestamp comparison for the head-SHA check. "No commits new
 
 ### What `git cherry` is still for
 
-It remains the right test for rebase and cherry-pick, where individual patches are preserved — a branch rebased onto the default branch and landed commit-by-commit has every patch-id present, and no PR may exist at all. That is the `REBASE_MERGED` path.
+It is the right *signal* for rebase and cherry-pick, where individual patches are preserved — a branch rebased onto the default branch and landed commit-by-commit has every patch-id present, and no PR may exist at all. That is the `REBASE_MERGED` label, and it belongs in the report so the user can see the branch is probably finished.
+
+It is not sufficient to delete on. `git cherry` compares patch-ids, and `git patch-id` normalizes whitespace before hashing — including whitespace inside string literals. Two commits from the same parent, one adding `return "a b"` and one adding `return "ab"`, produce **identical** patch-ids, so `git cherry` reports zero unique patches for a branch whose behaviour genuinely differs from the default branch. Verified: both commits hash to the same id and `git cherry` prints `-`.
+
+So `REBASE_MERGED` is reported, never auto-deleted. Automatic deletion requires evidence about a specific commit — ancestry (`MERGED`) or a merged PR whose head SHA equals the local tip (`SQUASH_MERGED`) — not a heuristic about content. Surface `REBASE_MERGED` branches in Step 4 with their patch-equivalence noted, and let the user approve.
 
 But `git cherry` alone is never sufficient evidence. It ignores merge commits entirely, so a branch whose unique content lives in a merge commit's conflict resolution reports zero `+` lines while being the only place that resolution exists. Check 5 catches exactly that: anything other than `0` means `UNIQUE_MERGE`, routed to Step 4 for a decision no matter how clean `git cherry` looks.
 
@@ -212,23 +233,23 @@ Capture the output and test the exit status separately, as in check 4 above. Whe
 
 ### When `gh` is unavailable
 
-`SQUASH_MERGED` cannot be established without the PR, so no branch qualifies. `REBASE_MERGED` still works — it is pure git. Report every other non-ancestor branch for a decision, and state in the report that squash-merge detection was unavailable so the user knows the pass was narrower than usual rather than finding nothing to do.
+`SQUASH_MERGED` cannot be established without the PR, so no branch qualifies and auto-deletion narrows to strict ancestors. `REBASE_MERGED` is still computed and still reported — it is pure git — but it was never an auto-delete category anyway. State in the report that squash-merge detection was unavailable, so the user knows the pass was narrower than usual rather than finding nothing to do.
 
 ---
 
 ## Step 2 — Auto-Delete Merged Local Branches
 
-Only `MERGED`, `SQUASH_MERGED`, and `REBASE_MERGED` are eligible. `UNIQUE_MERGE`, `UNMERGED`, `GONE`, and `NO_UPSTREAM` all go to Step 4.
+Only `MERGED` and `SQUASH_MERGED` are eligible. `REBASE_MERGED`, `UNIQUE_MERGE`, `UNMERGED`, `GONE`, and `NO_UPSTREAM` all go to Step 4.
 
 Skip this step entirely in report mode.
 
 Every category deletes the same way: re-assert the evidence, then delete the exact commit that was verified.
 
-`MERGED` is the simplest, but do not reach for `git branch -d` here. It checks the branch against its configured upstream, or against `HEAD` when no upstream is set — neither of which is necessarily `${REMOTE}/${DEFAULT_BRANCH}`. That makes it wrong in both directions: a branch whose new commits reached its upstream but not the default branch is deleted, and a genuinely merged branch is refused whenever the checked-out `HEAD` is behind. Re-check ancestry against the default branch explicitly:
+`MERGED` is the simplest, but do not reach for `git branch -d` here. It checks the branch against its configured upstream, or against `HEAD` when no upstream is set — neither of which is necessarily `$BASE_REF`. That makes it wrong in both directions: a branch whose new commits reached its upstream but not the default branch is deleted, and a genuinely merged branch is refused whenever the checked-out `HEAD` is behind. Re-check ancestry against the default branch explicitly:
 
 ```bash
 SHA=$(git rev-parse "$B")
-if git merge-base --is-ancestor "$SHA" "${REMOTE}/${DEFAULT_BRANCH}"; then
+if git merge-base --is-ancestor "$SHA" "$BASE_REF"; then
   if git update-ref -d "refs/heads/$B" "$SHA"; then
     echo "deleted $B at $SHA"
     git config --remove-section "branch.$B" 2>/dev/null || true
@@ -238,7 +259,7 @@ else
 fi
 ```
 
-`SQUASH_MERGED` and `REBASE_MERGED` carry no git-visible merge relationship at all, so re-assert their evidence immediately before deleting rather than trusting a classification computed earlier in the run — the repository may have changed, and `gh` may have stopped responding:
+`SQUASH_MERGED` carries no git-visible merge relationship at all, so re-assert its evidence immediately before deleting rather than trusting a classification computed earlier in the run — the repository may have changed, and `gh` may have stopped responding:
 
 ```bash
 SHA=$(git rev-parse "$B")
@@ -253,18 +274,8 @@ case "$CATEGORY" in
     PR_MERGE=$(printf '%s' "$PR" | cut -f3)
     [ -n "$PR_HEAD" ] && [ "$PR_HEAD" = "$SHA" ] && [ "$PR_BASE" = "$DEFAULT_BRANCH" ] \
       && [ -n "$PR_MERGE" ] \
-      && git merge-base --is-ancestor "$PR_MERGE" "${REMOTE}/${DEFAULT_BRANCH}" \
+      && git merge-base --is-ancestor "$PR_MERGE" "$BASE_REF" \
       && OK=yes || OK=no
-    ;;
-  REBASE_MERGED)
-    # Require git cherry to SUCCEED, not merely to print nothing.
-    if CHERRY=$(git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" 2>/dev/null) \
-       && [ "$(printf '%s\n' "$CHERRY" | grep -c '^+')" = "0" ] \
-       && [ "$(git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B")" = "0" ]; then
-      OK=yes
-    else
-      OK=no
-    fi
     ;;
   *) OK=no ;;
 esac
@@ -325,7 +336,8 @@ Build one row per branch:
 - **PR closed without merge** — the branch holds abandoned work; it is a deletion candidate but always ask.
 - **PR merged but branch still has newer commits** — post-merge commits need their own PR.
 - **Branch with `[gone]` upstream** — the remote is gone; usually safe to delete, still ask.
-- **`UNIQUE_MERGE`** — `git cherry` is clean but the branch carries merge commits the default branch does not. Say plainly that the branch may hold conflict resolutions that exist nowhere else, and show `git log --merges --oneline "${REMOTE}/${DEFAULT_BRANCH}..$B"` so the user can judge.
+- **`REBASE_MERGED`** — every patch is already present in the default branch, so the branch is probably finished. Say "probably": patch-ids normalize whitespace, so this is a strong hint rather than proof. Offer it for deletion in Step 4 rather than acting on it.
+- **`UNIQUE_MERGE`** — `git cherry` is clean but the branch carries merge commits the default branch does not. Say plainly that the branch may hold conflict resolutions that exist nowhere else, and show `git log --merges --oneline "$BASE_REF..$B"` so the user can judge.
 - **Stale** — no commits in 90+ days. Call out the age; stale unmerged work is where silent loss happens.
 - **Draft PR open 30+ days** — ask whether it should be closed or finished.
 
@@ -398,7 +410,7 @@ git worktree prune -v
 **Auto-remove without asking:**
 
 - Worktrees whose directory is missing from disk — `git worktree prune` handles these; they are bookkeeping, not work.
-- Worktrees whose branch classified as `MERGED`, or as `SQUASH_MERGED` / `REBASE_MERGED` confirmed by the Step 2 re-verification, **and** that hold nothing but tracked, committed files:
+- Worktrees whose branch classified as `MERGED`, or as `SQUASH_MERGED` confirmed by the Step 2 re-verification, **and** that hold nothing but tracked, committed files:
 
   ```bash
   # --untracked-files=all --ignored is the point: plain --porcelain hides
@@ -442,7 +454,7 @@ Remote deletion is the only outward-facing action in this skill and is irreversi
 
 ```bash
 # Remote branches already merged into the default branch
-git branch -r --merged "${REMOTE}/${DEFAULT_BRANCH}" \
+git branch -r --merged "$BASE_REF" \
   | grep -v -E "HEAD|${DEFAULT_BRANCH}\$" \
   | sed "s|^ *${REMOTE}/||"
 
