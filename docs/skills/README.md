@@ -72,6 +72,13 @@ Ballast ships reusable skill guides alongside its agent rules.
 - Installed by: `--skill docker-registry-publish` or `--all-skills`
 - Focus: GHCR and Docker Hub image publishing, public/private visibility, registry credentials, image tags, and digest handoff
 
+`git-branch-cleanup`
+
+- Type: common skill
+- Supported language profiles: TypeScript, Python, Go, Ansible, Terraform, Dart, Docker
+- Installed by: `--skill git-branch-cleanup` or `--all-skills`
+- Focus: deleting merged local branches, pruning stale worktrees and remote-tracking refs, reporting unmerged branches with pull request status, and flagging branches with no pull request
+
 `speckit-bootstrap`
 
 - Type: common skill
@@ -117,6 +124,7 @@ Codex also records installed skills in the root `AGENTS.md`. Claude records them
 - [ballast-audit.md](ballast-audit.md)
 - [ballast-project-maintenance.md](ballast-project-maintenance.md)
 - [docker-registry-publish.md](docker-registry-publish.md)
+- [git-branch-cleanup.md](git-branch-cleanup.md)
 - [speckit-bootstrap.md](speckit-bootstrap.md)
 - [speckit-reverse-engineer.md](speckit-reverse-engineer.md)
 - [speckit-delivery.md](speckit-delivery.md)

@@ -81,6 +81,7 @@ export const COMMON_SKILL_IDS = [
   'agent-performance-audit',
   'ballast-project-maintenance',
   'docker-registry-publish',
+  'git-branch-cleanup',
   'speckit-bootstrap',
   'speckit-reverse-engineer',
   'speckit-delivery'

@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth*)",
+      "Bash(gh repo view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh api*)",
+      "Bash(git status*)",
+      "Bash(git fetch*)",
+      "Bash(git log*)",
+      "Bash(git rev-list*)",
+      "Bash(git rev-parse*)",
+      "Bash(git merge-base*)",
+      "Bash(git cherry*)",
+      "Bash(git for-each-ref*)",
+      "Bash(git symbolic-ref*)",
+      "Bash(git remote*)",
+      "Bash(git branch*)",
+      "Bash(git worktree list*)",
+      "Bash(git worktree prune*)",
+      "Bash(git count-objects*)"
+    ]
+  }
+}

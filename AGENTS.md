@@ -94,6 +94,7 @@ Read and use these skill files in `.codex/skills/` when they are relevant:
 - `.codex/skills/speckit-reverse-engineer/SKILL.md` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
 - `.codex/skills/speckit-delivery/SKILL.md` — orchestrate GitHub Spec Kit's native skills for a bounded product change
 - `.codex/skills/docker-registry-publish/SKILL.md` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility
+- `.codex/skills/git-branch-cleanup/SKILL.md` — clean up local branches, remote branches, and git worktrees, deleting merged refs and reporting the rest with PR status
 
 ## Codex code review expectations
 

@@ -94,3 +94,4 @@ These skills are registered with Claude Code. Invoke one by name (for example `/
 - `/speckit-reverse-engineer` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
 - `/speckit-delivery` — orchestrate GitHub Spec Kit's native skills for a bounded product change
 - `/docker-registry-publish` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility
+- `/git-branch-cleanup` — clean up local branches, remote branches, and git worktrees, deleting merged refs and reporting the rest with PR status

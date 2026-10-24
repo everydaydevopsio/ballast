@@ -53,6 +53,7 @@ Common skills:
 - `ballast-audit`
 - `ballast-project-maintenance`
 - `docker-registry-publish`
+- `git-branch-cleanup`
 - `speckit-bootstrap`
 - `speckit-reverse-engineer`
 - `speckit-delivery`
@@ -62,6 +63,8 @@ Common skills:
 `ballast-audit` audits a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and reports the narrowest config that still covers the repository. It is installed by default.
 
 `ballast-project-maintenance` covers Ballast-managed repository status, `.ballast/` local tool repair, and config refresh workflows.
+
+`git-branch-cleanup` deletes local branches already merged into the default branch, prunes stale worktrees and remote-tracking refs, and reports every remaining branch with its pull request status, flagging unmerged branches that have no pull request.
 
 The `speckit-*` skills coordinate GitHub Spec Kit adoption and delivery while leaving native Spec Kit workflow details to the generated native `speckit-*` skills.
 
@@ -77,6 +80,7 @@ Guide index:
 - [skills/ballast-audit.md](skills/ballast-audit.md)
 - [skills/ballast-project-maintenance.md](skills/ballast-project-maintenance.md)
 - [skills/docker-registry-publish.md](skills/docker-registry-publish.md)
+- [skills/git-branch-cleanup.md](skills/git-branch-cleanup.md)
 - [skills/speckit-bootstrap.md](skills/speckit-bootstrap.md)
 - [skills/speckit-reverse-engineer.md](skills/speckit-reverse-engineer.md)
 - [skills/speckit-delivery.md](skills/speckit-delivery.md)

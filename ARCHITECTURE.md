@@ -79,7 +79,7 @@ Rule suffixes allow one logical agent to emit multiple installed files. The inst
 
 ### Skills
 
-Ballast ships 13 common skills:
+Ballast ships 14 common skills:
 
 - `agent-performance-audit`
 - `aws-health-review`
@@ -88,6 +88,7 @@ Ballast ships 13 common skills:
 - `ballast-audit`
 - `ballast-project-maintenance`
 - `docker-registry-publish`
+- `git-branch-cleanup`
 - `github-health-check`
 - `github-pr-copilot-cycle`
 - `owasp-security-scan`

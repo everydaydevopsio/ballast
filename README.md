@@ -140,6 +140,7 @@ A **skill** describes a focused task with a clear workflow. Examples include:
 - `github-pr-copilot-cycle`
 - `ballast-audit` (installed by default)
 - `docker-registry-publish`
+- `git-branch-cleanup`
 - `speckit-bootstrap`
 - `speckit-delivery`
 
