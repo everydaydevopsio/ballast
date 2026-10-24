@@ -241,11 +241,22 @@ case "$CATEGORY" in
 esac
 
 if [ "$OK" = "yes" ]; then
-  git branch -D "$B" && echo "deleted $B at $SHA"
+  # Delete the exact commit that was verified. `git branch -D` deletes
+  # whatever $B points to now, which may have moved while the gh request
+  # above was in flight; update-ref fails instead of deleting the new tip.
+  if git update-ref -d "refs/heads/$B" "$SHA"; then
+    echo "deleted $B at $SHA"
+    # update-ref leaves branch.<name>.* behind; git branch -D would not.
+    git config --remove-section "branch.$B" 2>/dev/null || true
+  fi
 else
   echo "skip $B — re-verification failed; reporting instead"
 fi
 ```
+
+Use `git update-ref -d <ref> <expected-sha>` rather than `git branch -D` on both force-delete paths. The verification above establishes a fact about one specific commit, and the branch can advance between that check and the delete — another process, another agent, or a parallel command. `git branch -D` would delete the new tip and then report the old SHA as the recovery point, so the recorded SHA would not restore what was lost. `update-ref` refuses with `cannot lock ref ... is at X but expected Y`, which is the correct outcome: report it and move on.
+
+`git branch -d` needs no such treatment — it independently re-checks merge status and refuses on its own.
 
 Capture the recovery SHA **before** deleting, as above. Reading it afterwards fails, and a deletion with no recorded SHA is the one thing here that is genuinely hard to undo.
 
@@ -308,7 +319,17 @@ These branches are not merged. Delete any?
 Reply with the numbers to delete, "none", or "all".
 ```
 
-Apply the answer with `git branch -D` and report each deleted branch's SHA so it can be restored with `git branch <name> <sha>`.
+Apply the answer the same way Step 2 does — against the SHA shown in the prompt, not against wherever the branch points when the user finally answers:
+
+```bash
+SHA=$(git rev-parse "$B")        # the SHA presented in the list above
+git update-ref -d "refs/heads/$B" "$SHA" && echo "deleted $B at $SHA"
+git config --remove-section "branch.$B" 2>/dev/null || true
+```
+
+Report each deleted branch's SHA so it can be restored with `git branch <name> <sha>`.
+
+`git update-ref` deletes the ref but leaves the branch's `branch.<name>.*` config behind, which `git branch -D` would have cleaned up — hence the `git config --remove-section` line. Run it only after the deletion succeeds, so a refused delete does not strip the upstream of a branch that still exists.
 
 Default to keeping a branch when the answer is ambiguous or absent.
 
@@ -404,11 +425,22 @@ gh api "/repos/{owner}/{repo}/branches?per_page=100" --jq '.[].name'
   gh api -X PATCH "/repos/{owner}/{repo}" -F delete_branch_on_merge=true   # only with user approval
   ```
 
-- Ask once with the full list, then delete the approved set:
+- Record each candidate's remote tip **at the moment you present the list**, and include it in what you show:
 
   ```bash
-  git push "$REMOTE" --delete "$BRANCH"
+  EXPECTED=$(git ls-remote --heads "$REMOTE" "$BRANCH" | cut -f1)
   ```
+
+- Ask once with the full list, then delete the approved set with a lease on that recorded tip:
+
+  ```bash
+  git push --force-with-lease="refs/heads/$BRANCH:$EXPECTED" \
+    "$REMOTE" ":refs/heads/$BRANCH"
+  ```
+
+  A plain `git push --delete` deletes whatever the branch points to now, not what the user approved. Approval is not instant — the user reads the list, thinks, and answers — and a collaborator can push to one of those branches in that window. The lease makes git refuse with `stale info` instead, leaving the branch intact.
+
+  Treat a lease failure as new information, not an error to retry past: re-read the branch, show what arrived, and ask again. Never fall back to `--delete` to force it through.
 
 - If a remote branch was created by someone else, say so (`gh pr list --head "$BRANCH" --json author`) and default to leaving it.
 
