@@ -21,6 +21,24 @@ The governing rule is **evidence before deletion**: a branch is only auto-delete
 
 ---
 
+## Mode — Decide This First
+
+This skill answers two different kinds of request, and only one of them is allowed to delete anything. Decide which before running a single command.
+
+**Report mode** — the user asked a question about branches. Run Steps 0, 1, 3, and the report. Do not delete a branch, remove a worktree, prune, push a deletion, or run maintenance. Classification is read-only and produces the same table; it simply stops before acting on it.
+
+Treat these as report mode: "what branches do I still have open", "which of my branches have no PR", "list unmerged branches", "show me my worktrees", "which branches are stale", and any other phrasing that asks to see state rather than change it.
+
+**Cleanup mode** — the user asked to change something. Run every step.
+
+Treat these as cleanup mode: "clean up my branches", "delete merged branches", "prune branches", "tidy up git", "remove stale branches", "clean up worktrees", and the combined form "delete the merged ones and list what's left".
+
+When the request is ambiguous, run report mode and end by offering cleanup: showing the user what would be deleted costs nothing and is reversible, while deleting in response to a question is neither. A request that only *mentions* deletion as a hypothetical ("do I have branches I could delete?") is a question, not an instruction.
+
+State the chosen mode in the first line of the report so the user can correct it.
+
+---
+
 ## Prerequisites
 
 ```bash
@@ -82,101 +100,134 @@ Classification decides who gets deleted silently and who gets a question. Comput
 git for-each-ref --format='%(refname:short)|%(upstream:short)|%(upstream:track)|%(committerdate:relative)|%(committerdate:unix)|%(authorname)' refs/heads
 ```
 
-For each local branch `B` other than `$DEFAULT_BRANCH`:
+For each local branch `B` other than `$DEFAULT_BRANCH`, gather the five facts below. Classification follows from them in order.
 
 ```bash
+LOCAL_TIP=$(git rev-parse "$B")
+
 # 1. Is every commit on B already reachable from the default branch?
 git merge-base --is-ancestor "$B" "${REMOTE}/${DEFAULT_BRANCH}" && echo "ANCESTOR" || echo "NOT_ANCESTOR"
 
 # 2. How many commits does B carry that the default branch does not?
 git rev-list --count "${REMOTE}/${DEFAULT_BRANCH}..$B"
 
-# 3. Does B's content already exist in the default branch under a different SHA?
-#    Catches squash-merged and rebase-merged branches, which fail the ancestor test.
+# 3. The merged PR whose head ref is B, if one exists.
+gh pr list --state merged --head "$B" --limit 1 \
+  --json number,headRefOid,baseRefName,mergeCommit,mergedAt,title
+
+# 4. Do B's individual patches already exist in the default branch under
+#    different SHAs? Detects rebase and cherry-pick, NOT squash (see below).
 git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" | grep -c '^+' || true
 
-# 4. Does B carry merge commits that the default branch does not?
+# 5. Does B carry merge commits the default branch does not?
 #    git cherry compares patch-ids of NON-MERGE commits only, so a merge commit
 #    carrying unique conflict resolutions produces zero `+` lines and looks merged.
 git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B"
 ```
 
-**Categories:**
+**Categories**, evaluated top to bottom — the first match wins:
 
 | Category | Test | Action |
 |---|---|---|
-| `MERGED` | `git merge-base --is-ancestor` succeeds | Auto-delete |
-| `SQUASH_MERGED` | Not an ancestor, `git cherry` reports 0 `+` lines, **and** check 4 reports 0 unique merge commits | Auto-delete only after the PR head-SHA check below |
-| `UNMERGED` | Carries commits absent from the default branch | Report, ask |
-| `UNIQUE_MERGE` | `git cherry` is clean but check 4 found unique merge commits | Report, ask — never auto-delete |
+| `MERGED` | Check 1 succeeds | Auto-delete |
+| `SQUASH_MERGED` | Check 3 found a merged PR whose `headRefOid` equals `$LOCAL_TIP`, whose `baseRefName` equals `$DEFAULT_BRANCH`, and whose `mergeCommit` is reachable from `${REMOTE}/${DEFAULT_BRANCH}` | Auto-delete |
+| `UNIQUE_MERGE` | Check 4 is `0` but check 5 is greater than `0` | Report, ask — never auto-delete |
+| `REBASE_MERGED` | Check 4 is `0` and check 5 is `0` | Auto-delete |
+| `UNMERGED` | Anything else | Report, ask |
 | `GONE` | `%(upstream:track)` contains `[gone]` | Report, ask — the remote branch was deleted |
 | `NO_UPSTREAM` | No tracking branch configured | Report, ask — work may exist only locally |
 
-The `git cherry` check matters more than the ancestor check in practice: squash merge is the common default on GitHub, and squash-merged branches look unmerged to `git branch --merged`. Treating them as unmerged leaves the branch list permanently cluttered.
+### Why the PR check comes before `git cherry`
 
-But `git cherry` alone is not sufficient evidence to delete. It compares patch-ids of non-merge commits only, so a branch whose unique content lives in a merge commit's conflict resolution reports zero `+` lines while still being the only place that resolution exists. Check 4 exists to catch exactly that: if it returns anything other than `0`, classify the branch `UNIQUE_MERGE` and route it to Step 4 for a decision, no matter how clean `git cherry` looks.
+`git cherry` compares patch-ids of individual commits. A squash merge collapses N commits into one, and the combined patch does not match any individual patch when N is greater than 1. So `git cherry` reports every commit as unmerged for exactly the case this skill exists to handle — the ordinary multi-commit squash-merged branch. Relying on it would classify those branches `UNMERGED` forever and defeat the whole point.
 
-Confirm `SQUASH_MERGED` against the PR's head SHA before auto-deleting:
-
-```bash
-gh pr list --state merged --head "$B" --limit 1 \
-  --json number,mergedAt,mergeCommit,headRefOid,baseRefName,title
-```
-
-Require **all** of the following before the branch is eligible for Step 2:
-
-- A merged PR exists for `$B`.
-- Its `baseRefName` equals `$DEFAULT_BRANCH`. A PR merged into a release branch says nothing about the default branch.
-- Its `headRefOid` equals the local tip, `git rev-parse "$B"`. This is the check that matters: the local branch must be the exact commit that was merged.
+The merged PR is the authority instead. GitHub records which branch head it squashed and where the result landed, which is the fact that actually matters:
 
 ```bash
-LOCAL_TIP=$(git rev-parse "$B")
-PR_HEAD=$(gh pr list --state merged --head "$B" --limit 1 --json headRefOid --jq '.[0].headRefOid // ""')
-[ -n "$PR_HEAD" ] && [ "$LOCAL_TIP" = "$PR_HEAD" ] && echo "TIP_MATCHES" || echo "TIP_DIFFERS"
+PR=$(gh pr list --state merged --head "$B" --limit 1 \
+  --json headRefOid,baseRefName,mergeCommit \
+  --jq '.[0] | [.headRefOid, .baseRefName, (.mergeCommit.oid // "")] | @tsv')
+PR_HEAD=$(printf '%s' "$PR" | cut -f1)
+PR_BASE=$(printf '%s' "$PR" | cut -f2)
+PR_MERGE=$(printf '%s' "$PR" | cut -f3)
+
+[ -n "$PR_HEAD" ] \
+  && [ "$PR_HEAD" = "$LOCAL_TIP" ] \
+  && [ "$PR_BASE" = "$DEFAULT_BRANCH" ] \
+  && [ -n "$PR_MERGE" ] \
+  && git merge-base --is-ancestor "$PR_MERGE" "${REMOTE}/${DEFAULT_BRANCH}" \
+  && echo "SQUASH_CONFIRMED" || echo "NOT_CONFIRMED"
 ```
 
-Do not substitute a timestamp comparison for the head-SHA check. "No commits newer than `mergedAt`" passes for a local commit that was authored *before* the merge and never pushed — the merged PR never contained it, and deleting the branch destroys the only copy. Commit dates also survive rebases and can be backdated outright, so they prove nothing about what was merged.
+All four conditions are required:
 
-If `TIP_DIFFERS`, the local branch holds commits the PR did not. Report it under Step 3 and ask; never auto-delete it.
+- **A merged PR exists** for `$B`.
+- **`headRefOid` equals the local tip.** The local branch must be the exact commit that was merged. Without this, a local commit authored before the merge and never pushed still passes — the merged PR never contained it, and deleting the branch destroys the only copy.
+- **`baseRefName` equals `$DEFAULT_BRANCH`.** A PR merged into a release branch says nothing about the default branch.
+- **`mergeCommit` is reachable from the default branch.** A merged PR whose merge commit was later reverted, force-pushed away, or merged into a branch that never landed is not evidence that the work is in the default branch today.
 
-If `gh` is unavailable, no branch qualifies as `SQUASH_MERGED`. Report every non-ancestor branch for a decision and state in the report that squash-merge detection was unavailable. `git cherry` on its own cannot distinguish "already merged" from "unique merge resolution", so it must not be the sole basis for a force-delete.
+Do not substitute a timestamp comparison for the head-SHA check. "No commits newer than `mergedAt`" passes for a commit authored before the merge, and commit dates survive rebases and can be backdated outright, so they prove nothing about what was merged.
+
+### What `git cherry` is still for
+
+It remains the right test for rebase and cherry-pick, where individual patches are preserved — a branch rebased onto the default branch and landed commit-by-commit has every patch-id present, and no PR may exist at all. That is the `REBASE_MERGED` path.
+
+But `git cherry` alone is never sufficient evidence. It ignores merge commits entirely, so a branch whose unique content lives in a merge commit's conflict resolution reports zero `+` lines while being the only place that resolution exists. Check 5 catches exactly that: anything other than `0` means `UNIQUE_MERGE`, routed to Step 4 for a decision no matter how clean `git cherry` looks.
+
+### When `gh` is unavailable
+
+`SQUASH_MERGED` cannot be established without the PR, so no branch qualifies. `REBASE_MERGED` still works — it is pure git. Report every other non-ancestor branch for a decision, and state in the report that squash-merge detection was unavailable so the user knows the pass was narrower than usual rather than finding nothing to do.
 
 ---
 
 ## Step 2 — Auto-Delete Merged Local Branches
 
-No confirmation needed for `MERGED` and confirmed `SQUASH_MERGED` branches. Nothing else is eligible — `UNIQUE_MERGE`, `UNMERGED`, `GONE`, and `NO_UPSTREAM` all go to Step 4.
+Only `MERGED`, `SQUASH_MERGED`, and `REBASE_MERGED` are eligible. `UNIQUE_MERGE`, `UNMERGED`, `GONE`, and `NO_UPSTREAM` all go to Step 4.
+
+Skip this step entirely in report mode.
+
+`MERGED` is the easy case — git itself is the second opinion:
 
 ```bash
-# Use -d (not -D) for MERGED: git refuses if the branch is not actually merged,
-# so git itself is the second opinion on this category.
-git branch -d "$B"
+# -d (not -D): git refuses if the branch is not actually merged.
+SHA=$(git rev-parse "$B")
+git branch -d "$B" && echo "deleted $B at $SHA"
 ```
 
-`SQUASH_MERGED` is the only category that needs `-D`, because git cannot see patch equivalence. `-D` discards git's own safety check, so re-verify immediately before deleting rather than trusting a classification computed earlier in the run:
+`SQUASH_MERGED` and `REBASE_MERGED` need `-D`, because git cannot see patch equivalence. `-D` discards git's own safety check, so re-assert the evidence immediately before deleting rather than trusting a classification computed earlier in the run — the repository may have changed, and `gh` may have stopped responding:
 
 ```bash
-# Re-assert every condition at deletion time. Any failure means skip and report.
-LOCAL_TIP=$(git rev-parse "$B")
-PR_HEAD=$(gh pr list --state merged --head "$B" --limit 1 --json headRefOid --jq '.[0].headRefOid // ""')
-PR_BASE=$(gh pr list --state merged --head "$B" --limit 1 --json baseRefName --jq '.[0].baseRefName // ""')
-UNIQUE_MERGES=$(git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B")
-UNIQUE_PATCHES=$(git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" | grep -c '^+' || true)
+SHA=$(git rev-parse "$B")
 
-if [ "$LOCAL_TIP" = "$PR_HEAD" ] && [ "$PR_BASE" = "$DEFAULT_BRANCH" ] \
-   && [ "$UNIQUE_MERGES" = "0" ] && [ "$UNIQUE_PATCHES" = "0" ]; then
-  git branch -D "$B"
+case "$CATEGORY" in
+  SQUASH_MERGED)
+    PR=$(gh pr list --state merged --head "$B" --limit 1 \
+      --json headRefOid,baseRefName,mergeCommit \
+      --jq '.[0] | [.headRefOid, .baseRefName, (.mergeCommit.oid // "")] | @tsv')
+    PR_HEAD=$(printf '%s' "$PR" | cut -f1)
+    PR_BASE=$(printf '%s' "$PR" | cut -f2)
+    PR_MERGE=$(printf '%s' "$PR" | cut -f3)
+    [ -n "$PR_HEAD" ] && [ "$PR_HEAD" = "$SHA" ] && [ "$PR_BASE" = "$DEFAULT_BRANCH" ] \
+      && [ -n "$PR_MERGE" ] \
+      && git merge-base --is-ancestor "$PR_MERGE" "${REMOTE}/${DEFAULT_BRANCH}" \
+      && OK=yes || OK=no
+    ;;
+  REBASE_MERGED)
+    [ "$(git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" | grep -c '^+' || true)" = "0" ] \
+      && [ "$(git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B")" = "0" ] \
+      && OK=yes || OK=no
+    ;;
+  *) OK=no ;;
+esac
+
+if [ "$OK" = "yes" ]; then
+  git branch -D "$B" && echo "deleted $B at $SHA"
 else
   echo "skip $B — re-verification failed; reporting instead"
 fi
 ```
 
-Record each deletion with its SHA so it stays recoverable. Capture the SHA **before** deleting, not after:
-
-```bash
-SHA=$(git rev-parse "$B")
-git branch -d "$B" && echo "deleted $B at $SHA"
-```
+Capture the recovery SHA **before** deleting, as above. Reading it afterwards fails, and a deletion with no recorded SHA is the one thing here that is genuinely hard to undo.
 
 **Skip and report instead of deleting when:**
 
@@ -222,6 +273,8 @@ Build one row per branch:
 
 ## Step 4 — Ask About the Rest
 
+Skip this step in report mode — the report already lists these branches, and report mode does not act on them.
+
 Group the branches needing a decision and ask in a single batch, not one prompt per branch:
 
 ```text
@@ -243,6 +296,8 @@ Default to keeping a branch when the answer is ambiguous or absent.
 
 ## Step 5 — Clean Up Worktrees
 
+Skip this step entirely in report mode: list the worktrees in the report and stop.
+
 Worktrees pin branches and block deletion, so handle them after local branches.
 
 ```bash
@@ -257,7 +312,7 @@ git worktree prune -v
 **Auto-remove without asking:**
 
 - Worktrees whose directory is missing from disk — `git worktree prune` handles these; they are bookkeeping, not work.
-- Worktrees whose branch classified as `MERGED`, or as `SQUASH_MERGED` confirmed by the Step 2 re-verification, provided the worktree is clean:
+- Worktrees whose branch classified as `MERGED`, or as `SQUASH_MERGED` / `REBASE_MERGED` confirmed by the Step 2 re-verification, provided the worktree is clean:
 
   ```bash
   git -C "$WORKTREE_PATH" status --porcelain   # must be empty
@@ -279,6 +334,8 @@ git worktree prune -v
 ---
 
 ## Step 6 — Clean Up Remote Branches
+
+Skip this step entirely in report mode.
 
 Remote deletion is the only outward-facing action in this skill and is irreversible for other clones. Treat it as a separate, explicitly-confirmed phase.
 
@@ -324,17 +381,23 @@ gh api "/repos/{owner}/{repo}/branches?per_page=100" --jq '.[].name'
 
 ## Step 7 — Repository Maintenance
 
+Skip this step entirely in report mode.
+
 Deleting refs leaves garbage behind. Finish with the cheap, safe maintenance pass:
 
 ```bash
-# Expire unreachable reflog entries older than the default window and repack
-git gc --prune=now --quiet
+# Repack using git's normal grace period. No --prune=now.
+git gc --quiet
 
 # Report repository size before and after when the repo is large
 git count-objects -vH
 ```
 
-Skip `git gc` when branches were deleted in this run and the user may still want to recover them — reflog expiry is what makes a deletion permanent. Prefer to run it only when the session deleted nothing, or when the user explicitly asks to reclaim space. Say which choice you made.
+Never use `git gc --prune=now` here. "This session deleted nothing" does not make immediate pruning safe: it still destroys unreachable objects left by *earlier* deletions, which are exactly the objects a user recovers from after a mistake last week, and it can race a concurrent git process that has written objects but not yet updated the ref pointing at them. Plain `git gc` keeps the default two-week grace period and reclaims the same space a fortnight later.
+
+Reserve `--prune=now` for maintenance the user explicitly asks for, on a repository with no concurrent writers, and say plainly that it makes earlier deletions unrecoverable.
+
+Skip `git gc` entirely when branches were deleted in this run and the user may still want them back. Say which choice you made.
 
 ---
 
@@ -342,6 +405,7 @@ Skip `git gc` when branches were deleted in this run and the user may still want
 
 ```text
 ## Git Branch & Worktree Cleanup
+**Mode**: report (nothing was changed) | cleanup
 **Repo**: owner/name
 **Default branch**: main
 **Date**: <today>
@@ -350,7 +414,8 @@ Skip `git gc` when branches were deleted in this run and the user may still want
 | Branch | Reason | SHA (for recovery) |
 |---|---|---|
 | feat-x | ancestor of main | a1b2c3d |
-| fix-y  | squash-merged via PR #401, tip matches PR head | e4f5g6h |
+| fix-y  | squash-merged via PR #401 (tip = PR head, merge commit in main) | e4f5g6h |
+| chore-z | rebase-merged, all patches present in main | b7c8d9e |
 
 Recover any of these with: git branch <name> <sha>
 
