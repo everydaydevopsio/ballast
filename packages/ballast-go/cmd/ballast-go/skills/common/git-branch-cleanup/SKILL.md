@@ -75,9 +75,9 @@ fi
 # BASE_REF is what every later comparison runs against. It is the
 # remote-tracking ref when a remote exists, the local branch otherwise.
 if [ -n "$REMOTE" ]; then
-  BASE_REF="$BASE_REF"
+  BASE_REF="refs/remotes/${REMOTE}/${DEFAULT_BRANCH}"
 else
-  BASE_REF="$DEFAULT_BRANCH"
+  BASE_REF="refs/heads/${DEFAULT_BRANCH}"
 fi
 
 # Validate: the branch must be non-empty AND BASE_REF must actually resolve.
@@ -90,7 +90,7 @@ echo "Remote: ${REMOTE:-none}   Default branch: $DEFAULT_BRANCH   Comparing agai
 
 Use `$BASE_REF` for every comparison from here on, never a hard-coded remote-tracking ref. A repository with no remote is a supported case — the edge cases promise local branch and worktree cleanup there — and hard-coding a remote-tracking ref would make that promise unreachable. In no-remote mode, skip Step 0's fetch, Step 3's PR lookups, and Step 6 entirely, and say so in the report.
 
-If detection fails, **stop and ask the user** for the default branch. Do not guess `main`, and never continue with an empty value. A wrong or empty default branch turns this skill into a data-loss tool: every classification compares against `$BASE_REF`, and `origin/` resolves to nothing, so "is this branch merged?" has no meaningful answer.
+If detection fails, **stop and ask the user** for the default branch. Do not guess `main`, and never continue with an empty value. A wrong or empty default branch turns this skill into a data-loss tool: every classification compares against `$BASE_REF`, and an unresolvable `$BASE_REF` makes "is this branch merged?" unanswerable.
 
 Validate the answer the user gives you the same way before using it.
 
@@ -323,7 +323,7 @@ Build one row per branch:
 | Field | Source |
 |---|---|
 | Branch | local ref name |
-| Ahead / Behind | `git rev-list --left-right --count "${REMOTE}/${DEFAULT_BRANCH}...$B"` |
+| Behind / Ahead | `git rev-list --left-right --count "$BASE_REF...$B"` — first number is behind, second is ahead |
 | Last commit | `%(committerdate:relative)` |
 | Upstream | `%(upstream:short)` or `none` |
 | PR | number + state (`OPEN` / `DRAFT` / `CLOSED` / `MERGED`) + URL |
