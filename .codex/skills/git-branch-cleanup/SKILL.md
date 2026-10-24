@@ -427,6 +427,20 @@ Skip this step entirely in report mode: list the worktrees in the report and sto
 
 Worktrees pin branches and block deletion, so handle them after local branches.
 
+**Never remove the worktree you are running in.** This skill can be invoked from a linked worktree, and if that worktree's own branch is merged it becomes a removal candidate like any other. Step 2 already refuses to delete the current branch, but Step 5 would delete the directory the session is executing in, and every command after that fails. Record the running worktree once and exclude it from every removal:
+
+```bash
+# Canonical path of the worktree this session is running in.
+SELF_WORKTREE=$(git rev-parse --show-toplevel)
+SELF_WORKTREE=$(cd "$SELF_WORKTREE" && pwd -P)
+
+is_self_worktree() {
+  [ "$(cd "$1" 2>/dev/null && pwd -P)" = "$SELF_WORKTREE" ]
+}
+```
+
+Canonicalize both sides with `pwd -P`. `git worktree list` prints resolved paths, but a path reached through a symlink — common on macOS, where `/tmp` is a symlink to `/private/tmp` — compares unequal as a plain string and would defeat the check.
+
 ```bash
 # Current worktrees with their branches and state
 git worktree list --porcelain
@@ -444,8 +458,9 @@ git worktree prune -v
   ```bash
   # --untracked-files=all --ignored is the point: plain --porcelain hides
   # ignored files, and removing the worktree deletes them with the directory.
+  is_self_worktree "$WORKTREE_PATH" && echo "skip — this is the running worktree"
   git -C "$WORKTREE_PATH" status --porcelain --untracked-files=all --ignored
-  # must print nothing before the next line runs
+  # must print nothing, and must not be the running worktree, before removing
   git worktree remove "$WORKTREE_PATH"         # never use --force here
   ```
 
@@ -467,6 +482,7 @@ git worktree prune -v
 
   Often it is only `node_modules/` or a build directory and the user will say yes immediately. Sometimes it is the only copy of a working `.env`. Showing the list is what lets them tell the difference, so show it rather than deciding on their behalf.
 - Removing a worktree on an unmerged branch.
+- The running worktree is never removed at all, with or without approval. Report it in the worktree table as `running this cleanup` so the user can remove it themselves from elsewhere.
 - Removing a locked worktree — report the lock reason from `git worktree list --porcelain` and leave it alone unless the user unlocks it:
 
   ```bash
