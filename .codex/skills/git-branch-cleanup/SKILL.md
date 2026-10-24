@@ -332,18 +332,33 @@ git worktree prune -v
 **Auto-remove without asking:**
 
 - Worktrees whose directory is missing from disk — `git worktree prune` handles these; they are bookkeeping, not work.
-- Worktrees whose branch classified as `MERGED`, or as `SQUASH_MERGED` / `REBASE_MERGED` confirmed by the Step 2 re-verification, provided the worktree is clean:
+- Worktrees whose branch classified as `MERGED`, or as `SQUASH_MERGED` / `REBASE_MERGED` confirmed by the Step 2 re-verification, **and** that hold nothing but tracked, committed files:
 
   ```bash
-  git -C "$WORKTREE_PATH" status --porcelain   # must be empty
+  # --untracked-files=all --ignored is the point: plain --porcelain hides
+  # ignored files, and removing the worktree deletes them with the directory.
+  git -C "$WORKTREE_PATH" status --porcelain --untracked-files=all --ignored
+  # must print nothing before the next line runs
   git worktree remove "$WORKTREE_PATH"         # never use --force here
   ```
 
   Removing the worktree frees the branch; delete the branch afterward in Step 2's pass.
 
+  A bare `git status --porcelain` is not a safe gate here. It excludes ignored files, so a worktree holding a `.env`, a local database, generated certificates, or an uncommitted scratch directory reports clean — and `git worktree remove` deletes the directory and everything in it. The branch SHA recorded in Step 2 restores commits; it restores none of that. Ignored files are the one thing in this skill with no recovery path at all.
+
 **Always ask before:**
 
 - Removing a worktree with uncommitted or untracked changes. Show `git -C "$WORKTREE_PATH" status --short` so the user sees what is at risk, and never pass `--force` without an explicit yes.
+- Removing a worktree that holds ignored files, even when the branch is merged and the tracked tree is clean. List what is there so the decision is quick:
+
+  ```bash
+  # Default untracked handling here on purpose: it collapses node_modules/ to
+  # one line instead of listing every file inside it.
+  git -C "$WORKTREE_PATH" status --porcelain --ignored | awk '$1 == "!!" {print $2}'
+  du -sh "$WORKTREE_PATH"
+  ```
+
+  Often it is only `node_modules/` or a build directory and the user will say yes immediately. Sometimes it is the only copy of a working `.env`. Showing the list is what lets them tell the difference, so show it rather than deciding on their behalf.
 - Removing a worktree on an unmerged branch.
 - Removing a locked worktree — report the lock reason from `git worktree list --porcelain` and leave it alone unless the user unlocks it:
 
@@ -482,7 +497,9 @@ auto-deletion covered only strict ancestors of main.
 Include any that apply, with the command to fix them:
 
 - **`delete_branch_on_merge` disabled** — enabling it removes most of this skill's remote work.
-- **No automatic pruning** — `git config --global fetch.prune true` and `git config --global fetch.pruneTags true` keep remote-tracking refs honest on every fetch.
+- **No automatic branch pruning** — `git config --global fetch.prune true` keeps remote-tracking branches honest on every fetch.
+
+  Do not recommend `fetch.pruneTags` alongside it. With both set, every fetch deletes local tags the fetched remote does not have, across every repository the global config covers: local-only release tags, tags that came from a second remote, and tags created before a remote was re-pointed all disappear, and an unannotated tag that is not an ancestor of any branch is gone for good. Tag pruning is a deliberate, repository-specific cleanup, not a hygiene default — if the user wants it, set it per repository with `git config fetch.pruneTags true` after confirming every local tag also exists on that remote.
 - **Branch naming is inconsistent** — if most branches follow a convention (`feat/`, `fix/`, `issue-NNN-`), note the outliers; consistent names make this cleanup and PR traceability easier.
 - **Long-lived branches diverging** — a branch more than 50 commits behind the default branch will be painful to merge. Report the count and recommend rebasing or closing it.
 - **Branches without issue references** — when the repo tracks work in issues, an unmerged branch with no PR and no issue is untracked work.
