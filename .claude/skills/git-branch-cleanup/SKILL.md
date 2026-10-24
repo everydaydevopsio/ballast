@@ -241,6 +241,26 @@ Capture the output and test the exit status separately, as in check 4 above. Whe
 
 ## Step 2 — Auto-Delete Merged Local Branches
 
+### The worktree guard
+
+`git update-ref -d` is the right tool for binding a deletion to a verified SHA, but it gives up one protection `git branch -D` had: it does **not** refuse a branch that is checked out in a worktree. It deletes the ref and leaves that worktree's `HEAD` dangling, so the worktree reports `fatal: ambiguous argument 'HEAD'` and is effectively broken.
+
+Check ownership immediately before every deletion — not at classification time, because a branch can be checked out into a worktree while approval is pending:
+
+```bash
+# Prints the branch each worktree has checked out.
+checked_out_branches() {
+  git worktree list --porcelain | awk '/^branch /{sub("refs/heads/","",$2); print $2}'
+}
+
+is_checked_out() {
+  checked_out_branches | grep -qx "$1"
+}
+```
+
+Guard both Step 2 and Step 4: if `is_checked_out "$B"`, skip the deletion and report that the branch is in use, naming the worktree. Step 5 removes the worktree first when it is safe to do so, which releases the branch for a later pass.
+
+
 Only `MERGED` and `SQUASH_MERGED` are eligible. `REBASE_MERGED`, `UNIQUE_MERGE`, `UNMERGED`, `GONE`, and `NO_UPSTREAM` all go to Step 4.
 
 Skip this step entirely in report mode.
@@ -251,7 +271,9 @@ Every category deletes the same way: re-assert the evidence, then delete the exa
 
 ```bash
 SHA=$(git rev-parse "$B")
-if git merge-base --is-ancestor "$SHA" "$BASE_REF"; then
+if is_checked_out "$B"; then
+  echo "skip $B — checked out in a worktree; handle it in Step 5"
+elif git merge-base --is-ancestor "$SHA" "$BASE_REF"; then
   if git update-ref -d "refs/heads/$B" "$SHA"; then
     echo "deleted $B at $SHA"
     git config --remove-section "branch.$B" 2>/dev/null || true
@@ -282,7 +304,7 @@ case "$CATEGORY" in
   *) OK=no ;;
 esac
 
-if [ "$OK" = "yes" ]; then
+if [ "$OK" = "yes" ] && ! is_checked_out "$B"; then
   # Delete the exact commit that was verified. `git branch -D` deletes
   # whatever $B points to now, which may have moved while the gh request
   # above was in flight; update-ref fails instead of deleting the new tip.
@@ -305,7 +327,7 @@ Capture the recovery SHA **before** deleting, as above. Reading it afterwards fa
 **Skip and report instead of deleting when:**
 
 - The branch is the current branch — note that the user should switch to `$DEFAULT_BRANCH` first.
-- The branch is checked out in another worktree — `git branch -d` fails; handle it in Step 5.
+- The branch is checked out in another worktree — the guard above catches this; `git update-ref -d` would not. Handle it in Step 5.
 - `git branch -d` fails for any other reason — report the error verbatim, do not escalate to `-D`.
 - Re-verification above fails for any reason, including `gh` becoming unavailable mid-run.
 
@@ -374,7 +396,9 @@ done
 # After the answer: delete the commit that was shown, not the current tip.
 for B in "${APPROVED[@]}"; do
   SHA=${APPROVAL_SHA["$B"]}
-  if git update-ref -d "refs/heads/$B" "$SHA"; then
+  if is_checked_out "$B"; then
+    echo "skip $B — checked out in a worktree since you were asked"
+  elif git update-ref -d "refs/heads/$B" "$SHA"; then
     echo "deleted $B at $SHA"
     git config --remove-section "branch.$B" 2>/dev/null || true
   else
