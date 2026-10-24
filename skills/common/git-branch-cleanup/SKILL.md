@@ -252,7 +252,10 @@ checked_out_branches() {
 }
 
 is_checked_out() {
-  checked_out_branches | grep -qx "$1"
+  # -F: branch names are literals, not regexes. A branch may legitimately
+  # contain regex metacharacters, and `grep -qx "feature/cost$"` would not
+  # match that very name — silently unguarding it.
+  checked_out_branches | grep -Fxq -- "$1"
 }
 ```
 
