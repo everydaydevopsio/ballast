@@ -52,13 +52,32 @@ Establish the default branch and remote once; every later step depends on them:
 
 ```bash
 REMOTE=$(git remote | grep -x origin || git remote | head -1)
-DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null \
-  || git symbolic-ref --short "refs/remotes/${REMOTE}/HEAD" 2>/dev/null | sed "s|^${REMOTE}/||" \
-  || echo main)
+[ -n "$REMOTE" ] || { echo "no remote configured"; }
+
+# Try each source separately and check the result. Do NOT chain these with
+# `||` through a pipe: `sed` succeeds on empty input, so a failed
+# symbolic-ref yields an empty DEFAULT_BRANCH and the `|| echo main`
+# fallback never runs.
+DEFAULT_BRANCH=""
+if command -v gh >/dev/null 2>&1; then
+  DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null) || DEFAULT_BRANCH=""
+fi
+if [ -z "$DEFAULT_BRANCH" ] && [ -n "$REMOTE" ]; then
+  DEFAULT_BRANCH=$(git symbolic-ref --short "refs/remotes/${REMOTE}/HEAD" 2>/dev/null) || DEFAULT_BRANCH=""
+  DEFAULT_BRANCH=${DEFAULT_BRANCH#"${REMOTE}/"}
+fi
+
+# Validate: the branch must be non-empty AND actually resolve.
+if [ -z "$DEFAULT_BRANCH" ] || ! git rev-parse --verify -q "refs/remotes/${REMOTE}/${DEFAULT_BRANCH}" >/dev/null; then
+  echo "could not determine the default branch — stopping"
+  exit 1
+fi
 echo "Remote: $REMOTE   Default branch: $DEFAULT_BRANCH"
 ```
 
-If every detection fails, ask the user for the default branch rather than guessing. A wrong default branch turns this skill into a data-loss tool.
+If detection fails, **stop and ask the user** for the default branch. Do not guess `main`, and never continue with an empty value. A wrong or empty default branch turns this skill into a data-loss tool: every classification compares against `${REMOTE}/${DEFAULT_BRANCH}`, and `origin/` resolves to nothing, so "is this branch merged?" has no meaningful answer.
+
+Validate the answer the user gives you the same way before using it.
 
 ---
 
@@ -75,9 +94,11 @@ git branch --show-current
 
 # Refresh remote state. --prune deletes remote-tracking refs, so pruning is a
 # cleanup-mode action only.
-git fetch --all --tags --no-prune --no-prune-tags   # report mode
-git fetch --all --tags --prune                      # cleanup mode
+git fetch --all --tags --no-prune --no-prune-tags    # report mode
+git fetch --all --tags --prune --no-prune-tags       # cleanup mode
 ```
+
+Both modes pass `--no-prune-tags`. Cleanup mode prunes remote-tracking *branches* on purpose, but tag pruning is never part of this skill's job: with `fetch.pruneTags=true` or `remote.<name>.pruneTags` already set, `--prune` would also delete local tags the remote does not have. The recovery inventory in Step 0 records branches only, so a deleted local-only release tag has no recovery path here at all.
 
 In report mode, pass `--no-prune --no-prune-tags` explicitly. Merely omitting `--prune` is not enough: `fetch.prune=true` makes every fetch prune by default — and this skill recommends setting exactly that — so an informational request would silently delete remote-tracking refs. A `remote.<name>.prune` setting does the same per remote. Only the explicit negative flags override them.
 
