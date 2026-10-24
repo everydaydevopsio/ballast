@@ -73,9 +73,13 @@ git status --porcelain
 # Current branch — never delete the branch you are standing on
 git branch --show-current
 
-# Refresh remote state and drop remote-tracking refs for branches deleted upstream
-git fetch --all --prune --tags
+# Refresh remote state. --prune deletes remote-tracking refs, so it is a
+# cleanup-mode action only.
+git fetch --all --tags            # both modes
+git fetch --all --prune --tags    # cleanup mode only
 ```
+
+In report mode, fetch without `--prune`. Pruning deletes remote-tracking refs, which is a state change, and report mode promised not to make any. The cost is that a branch deleted upstream may still show a live-looking upstream; note in the report that remote-tracking refs were not pruned and `[gone]` detection may therefore under-report.
 
 **Rules:**
 
@@ -117,7 +121,14 @@ gh pr list --state merged --head "$B" --limit 1 \
 
 # 4. Do B's individual patches already exist in the default branch under
 #    different SHAs? Detects rebase and cherry-pick, NOT squash (see below).
-git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" | grep -c '^+' || true
+#    Capture output and exit status separately: see the warning below.
+if CHERRY=$(git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" 2>/dev/null); then
+  UNIQUE_PATCHES=$(printf '%s\n' "$CHERRY" | grep -c '^+')
+  CHERRY_OK=yes
+else
+  UNIQUE_PATCHES=unknown
+  CHERRY_OK=no
+fi
 
 # 5. Does B carry merge commits the default branch does not?
 #    git cherry compares patch-ids of NON-MERGE commits only, so a merge commit
@@ -131,9 +142,9 @@ git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B"
 |---|---|---|
 | `MERGED` | Check 1 succeeds | Auto-delete |
 | `SQUASH_MERGED` | Check 3 found a merged PR whose `headRefOid` equals `$LOCAL_TIP`, whose `baseRefName` equals `$DEFAULT_BRANCH`, and whose `mergeCommit` is reachable from `${REMOTE}/${DEFAULT_BRANCH}` | Auto-delete |
-| `UNIQUE_MERGE` | Check 4 is `0` but check 5 is greater than `0` | Report, ask — never auto-delete |
-| `REBASE_MERGED` | Check 4 is `0` and check 5 is `0` | Auto-delete |
-| `UNMERGED` | Anything else | Report, ask |
+| `UNIQUE_MERGE` | `CHERRY_OK=yes`, check 4 is `0`, but check 5 is greater than `0` | Report, ask — never auto-delete |
+| `REBASE_MERGED` | `CHERRY_OK=yes`, check 4 is `0`, and check 5 is `0` | Auto-delete |
+| `UNMERGED` | Anything else, including `CHERRY_OK=no` | Report, ask |
 | `GONE` | `%(upstream:track)` contains `[gone]` | Report, ask — the remote branch was deleted |
 | `NO_UPSTREAM` | No tracking branch configured | Report, ask — work may exist only locally |
 
@@ -174,6 +185,10 @@ It remains the right test for rebase and cherry-pick, where individual patches a
 
 But `git cherry` alone is never sufficient evidence. It ignores merge commits entirely, so a branch whose unique content lives in a merge commit's conflict resolution reports zero `+` lines while being the only place that resolution exists. Check 5 catches exactly that: anything other than `0` means `UNIQUE_MERGE`, routed to Step 4 for a decision no matter how clean `git cherry` looks.
 
+**Never write `git cherry ... | grep -c '^+' || true`.** The `|| true` is tempting because `grep -c` exits non-zero when the count is zero, but it also swallows a failure of `git cherry` itself. If patch generation fails — a partial clone that cannot fetch a required blob, a corrupt object, an interrupted fetch — the pipeline emits `0`, and `0` is the value that authorizes a force-delete. Commit traversal can succeed while patch generation fails, so check 5 will not catch it either: the branch looks perfectly merged and gets deleted.
+
+Capture the output and test the exit status separately, as in check 4 above. When `CHERRY_OK=no`, the comparison produced no answer, which is not the same as "no unique patches" — classify `UNMERGED`, report the failure, and let the user decide. Apply the same discipline in Step 2's re-verification.
+
 ### When `gh` is unavailable
 
 `SQUASH_MERGED` cannot be established without the PR, so no branch qualifies. `REBASE_MERGED` still works — it is pure git. Report every other non-ancestor branch for a decision, and state in the report that squash-merge detection was unavailable so the user knows the pass was narrower than usual rather than finding nothing to do.
@@ -213,9 +228,14 @@ case "$CATEGORY" in
       && OK=yes || OK=no
     ;;
   REBASE_MERGED)
-    [ "$(git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" | grep -c '^+' || true)" = "0" ] \
-      && [ "$(git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B")" = "0" ] \
-      && OK=yes || OK=no
+    # Require git cherry to SUCCEED, not merely to print nothing.
+    if CHERRY=$(git cherry "${REMOTE}/${DEFAULT_BRANCH}" "$B" 2>/dev/null) \
+       && [ "$(printf '%s\n' "$CHERRY" | grep -c '^+')" = "0" ] \
+       && [ "$(git rev-list --merges --count "${REMOTE}/${DEFAULT_BRANCH}..$B")" = "0" ]; then
+      OK=yes
+    else
+      OK=no
+    fi
     ;;
   *) OK=no ;;
 esac
@@ -482,6 +502,7 @@ Include any that apply, with the command to fix them:
 - **`gh` not authenticated** — run every git-only step; report PR columns as unknown and tell the user to run `gh auth login` for the PR view. Auto-deletion is limited to strict ancestors of the default branch; say so in the report rather than silently widening or skipping it.
 - **Fork workflow** — `gh pr list --head` may miss PRs opened from a fork onto upstream. Check with `gh pr list --head "$OWNER:$B"` before declaring a branch PR-less.
 - **Branch names with slashes** — always quote branch variables; `feat/x` is a valid ref and a valid path fragment.
+- **Partial or shallow clone** — patch generation can fail while commit traversal succeeds, so `git cherry` may error out on a branch whose history looks complete. Treat any `git cherry` failure as `UNMERGED` and say so; never let a failed comparison read as a clean one.
 - **Shallow clone** — `git merge-base --is-ancestor` can be wrong. Detect with `git rev-parse --is-shallow-repository`; if true, run `git fetch --unshallow` or skip auto-deletion entirely and report everything for review.
 - **Submodules** — removing a worktree does not clean its submodule checkouts; note any that remain.
 - **Rate limiting** — if `gh` returns 429, report that PR data is incomplete and never let a missing PR lookup justify a deletion.
