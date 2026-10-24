@@ -20,7 +20,18 @@
       "Bash(npm test*)",
       "Bash(pnpm test*)",
       "Bash(uv run*)",
-      "Bash(make test*)"
+      "Bash(make test*)",
+      "Bash(gh repo view*)",
+      "Bash(gh pr list*)",
+      "Bash(git rev-parse*)",
+      "Bash(git merge-base*)",
+      "Bash(git cherry*)",
+      "Bash(git for-each-ref*)",
+      "Bash(git symbolic-ref*)",
+      "Bash(git remote*)",
+      "Bash(git worktree list*)",
+      "Bash(git worktree prune*)",
+      "Bash(git count-objects*)"
     ]
   }
 }

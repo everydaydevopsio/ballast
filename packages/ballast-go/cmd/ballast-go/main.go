@@ -46,6 +46,7 @@ var (
 		"agent-performance-audit",
 		"ballast-project-maintenance",
 		"docker-registry-publish",
+		"git-branch-cleanup",
 		"speckit-bootstrap",
 		"speckit-reverse-engineer",
 		"speckit-delivery",

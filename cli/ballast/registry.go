@@ -160,6 +160,11 @@ var skillRegistry = []skillEntry{
 		Description: "set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility",
 		Status:      statusActive,
 	},
+	{
+		ID:          "git-branch-cleanup",
+		Description: "clean up local branches, remote branches, and git worktrees, deleting merged refs and reporting the rest with PR status",
+		Status:      statusActive,
+	},
 }
 
 // — Agent registry helpers —————————————————————————————————————————————————

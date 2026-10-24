@@ -32,7 +32,8 @@
     "speckit-bootstrap",
     "speckit-reverse-engineer",
     "speckit-delivery",
-    "docker-registry-publish"
+    "docker-registry-publish",
+    "git-branch-cleanup"
   ],
   "ballastVersion": "5.21.3",
   "languages": [
