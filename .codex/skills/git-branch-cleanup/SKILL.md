@@ -73,13 +73,15 @@ git status --porcelain
 # Current branch — never delete the branch you are standing on
 git branch --show-current
 
-# Refresh remote state. --prune deletes remote-tracking refs, so it is a
+# Refresh remote state. --prune deletes remote-tracking refs, so pruning is a
 # cleanup-mode action only.
-git fetch --all --tags            # both modes
-git fetch --all --prune --tags    # cleanup mode only
+git fetch --all --tags --no-prune --no-prune-tags   # report mode
+git fetch --all --tags --prune                      # cleanup mode
 ```
 
-In report mode, fetch without `--prune`. Pruning deletes remote-tracking refs, which is a state change, and report mode promised not to make any. The cost is that a branch deleted upstream may still show a live-looking upstream; note in the report that remote-tracking refs were not pruned and `[gone]` detection may therefore under-report.
+In report mode, pass `--no-prune --no-prune-tags` explicitly. Merely omitting `--prune` is not enough: `fetch.prune=true` makes every fetch prune by default — and this skill recommends setting exactly that — so an informational request would silently delete remote-tracking refs. A `remote.<name>.prune` setting does the same per remote. Only the explicit negative flags override them.
+
+The cost is that a branch deleted upstream may still show a live-looking upstream. Note in the report that remote-tracking refs were not pruned and `[gone]` detection may therefore under-report.
 
 **Rules:**
 
@@ -201,15 +203,23 @@ Only `MERGED`, `SQUASH_MERGED`, and `REBASE_MERGED` are eligible. `UNIQUE_MERGE`
 
 Skip this step entirely in report mode.
 
-`MERGED` is the easy case — git itself is the second opinion:
+Every category deletes the same way: re-assert the evidence, then delete the exact commit that was verified.
+
+`MERGED` is the simplest, but do not reach for `git branch -d` here. It checks the branch against its configured upstream, or against `HEAD` when no upstream is set — neither of which is necessarily `${REMOTE}/${DEFAULT_BRANCH}`. That makes it wrong in both directions: a branch whose new commits reached its upstream but not the default branch is deleted, and a genuinely merged branch is refused whenever the checked-out `HEAD` is behind. Re-check ancestry against the default branch explicitly:
 
 ```bash
-# -d (not -D): git refuses if the branch is not actually merged.
 SHA=$(git rev-parse "$B")
-git branch -d "$B" && echo "deleted $B at $SHA"
+if git merge-base --is-ancestor "$SHA" "${REMOTE}/${DEFAULT_BRANCH}"; then
+  if git update-ref -d "refs/heads/$B" "$SHA"; then
+    echo "deleted $B at $SHA"
+    git config --remove-section "branch.$B" 2>/dev/null || true
+  fi
+else
+  echo "skip $B — no longer an ancestor of ${DEFAULT_BRANCH}; reporting instead"
+fi
 ```
 
-`SQUASH_MERGED` and `REBASE_MERGED` need `-D`, because git cannot see patch equivalence. `-D` discards git's own safety check, so re-assert the evidence immediately before deleting rather than trusting a classification computed earlier in the run — the repository may have changed, and `gh` may have stopped responding:
+`SQUASH_MERGED` and `REBASE_MERGED` carry no git-visible merge relationship at all, so re-assert their evidence immediately before deleting rather than trusting a classification computed earlier in the run — the repository may have changed, and `gh` may have stopped responding:
 
 ```bash
 SHA=$(git rev-parse "$B")
@@ -319,17 +329,33 @@ These branches are not merged. Delete any?
 Reply with the numbers to delete, "none", or "all".
 ```
 
-Apply the answer the same way Step 2 does — against the SHA shown in the prompt, not against wherever the branch points when the user finally answers:
+Capture each candidate's SHA **before** prompting, show it in the list, and keep the mapping. Deleting against a SHA re-read after the answer defeats the point: the user approved a specific commit, and the branch can advance while they are deciding.
 
 ```bash
-SHA=$(git rev-parse "$B")        # the SHA presented in the list above
-git update-ref -d "refs/heads/$B" "$SHA" && echo "deleted $B at $SHA"
-git config --remove-section "branch.$B" 2>/dev/null || true
+# Before prompting: record what is being offered for deletion.
+declare -A APPROVAL_SHA
+for B in "${CANDIDATES[@]}"; do
+  APPROVAL_SHA["$B"]=$(git rev-parse "$B")
+done
+
+# After the answer: delete the commit that was shown, not the current tip.
+for B in "${APPROVED[@]}"; do
+  SHA=${APPROVAL_SHA["$B"]}
+  if git update-ref -d "refs/heads/$B" "$SHA"; then
+    echo "deleted $B at $SHA"
+    git config --remove-section "branch.$B" 2>/dev/null || true
+  else
+    echo "skip $B — moved since you were asked; re-check before deleting"
+  fi
+done
 ```
 
 Report each deleted branch's SHA so it can be restored with `git branch <name> <sha>`.
 
-`git update-ref` deletes the ref but leaves the branch's `branch.<name>.*` config behind, which `git branch -D` would have cleaned up — hence the `git config --remove-section` line. Run it only after the deletion succeeds, so a refused delete does not strip the upstream of a branch that still exists.
+Two details that are easy to get wrong:
+
+- `git config --remove-section` must sit **inside** the success branch. `git update-ref` leaves `branch.<name>.*` behind where `git branch -D` would have cleaned it up, but running the cleanup unconditionally means a stale-SHA rejection leaves the branch alive with its upstream stripped — a branch that still exists but has quietly lost its tracking configuration.
+- A rejected delete is a real answer, not a glitch. The branch moved between the question and the reply; say so and let the user look again.
 
 Default to keeping a branch when the answer is ambiguous or absent.
 
