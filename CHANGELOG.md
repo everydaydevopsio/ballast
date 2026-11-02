@@ -15,6 +15,10 @@ the complete history.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An unrelated pull request can no longer go red because a macOS runner never arrived.** `sign-notarize-hook-smoke` ran on every pull request, and it is the only macOS job outside the release workflows. GitHub cancels a job that waits more than roughly 15 minutes for a hosted macOS runner, and reports that cancellation as a failed check with no steps and no logs — indistinguishable from a real failure at a glance. Observed queue times for this job ranged from 3 seconds to over 15 minutes. It now lives in its own `sign-notarize-smoke.yml`, which pull requests run only when the hook, its smoke test, or a GoReleaser config changes, while pushes to `main` still run it unconditionally so the guard executes continuously on the default branch. The job also fails fast if it ever lands on a non-macOS runner, because the smoke script exits 0 as a skip off Darwin and would otherwise report a pass having validated nothing.
+
 ### Changed
 
 - **Claude skills install as directories, so they are finally invocable.** Claude Code discovers project skills at `.claude/skills/<name>/SKILL.md` and exposes each as `/<name>`. Ballast wrote `.claude/skills/<name>.skill`, a zip in the claude.ai Agent Skills bundle format, which Claude Code never scans — so no Ballast skill was ever registered, and they worked only because the generated `CLAUDE.md` told the model to go read the files. Skills now install in the same directory layout the Codex target already used (which is why `$<name>` worked there), with reference material copied alongside `SKILL.md`. The generated manifest lists invocations (`/<name>`) instead of paths to read.

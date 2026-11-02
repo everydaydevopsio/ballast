@@ -269,6 +269,7 @@ Key workflows include:
 - `lint.yaml`
 - `cross-language-validate.yml`
 - `examples-smoke.yml`
+- `sign-notarize-smoke.yml`
 - `language-packs.yml`
 - `publish.yml`
 
