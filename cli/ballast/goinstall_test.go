@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -132,7 +133,7 @@ func serveReleaseForVersion(t *testing.T, release string) (string, []byte, func(
 // looks for on the platform running the test.
 func currentReleaseAssetNames(t *testing.T, release string) (string, string) {
 	t.Helper()
-	goos, goarch, archiveExt, err := releasedGoArchiveParts(runtime.GOOS, runtime.GOARCH)
+	goos, goarch, archiveExt, err := releasedGoArchiveParts(runtimeGOOS, runtimeGOARCH)
 	if err != nil {
 		t.Skipf("no published ballast-go release for this platform: %v", err)
 	}
@@ -145,10 +146,20 @@ func currentReleaseAssetNames(t *testing.T, release string) (string, string) {
 
 func currentReleaseArchive(t *testing.T, binaryName string, payload []byte) []byte {
 	t.Helper()
-	if runtime.GOOS == "windows" {
+	if runtimeGOOS == "windows" {
 		return zipArchive(t, map[string][]byte{binaryName: payload})
 	}
 	return tarGzArchive(t, map[string][]byte{binaryName: payload})
+}
+
+// usePlatform pins the platform the installer resolves for one test.
+func usePlatform(t *testing.T, goos string, goarch string) {
+	t.Helper()
+	originalGOOS, originalGOARCH := runtimeGOOS, runtimeGOARCH
+	t.Cleanup(func() {
+		runtimeGOOS, runtimeGOARCH = originalGOOS, originalGOARCH
+	})
+	runtimeGOOS, runtimeGOARCH = goos, goarch
 }
 
 // A verified release archive must land in .ballast/bin as an executable, with
@@ -321,11 +332,14 @@ func TestReleasedGoArchivePartsRejectsUnpublishedPlatforms(t *testing.T) {
 }
 
 func TestReleaseChecksumForParsesChecksumFile(t *testing.T) {
+	// The malformed lines come first so the skip branch runs before a match is
+	// found, rather than being short-circuited by an early return.
 	checksums := []byte(strings.Join([]string{
-		"1111111111111111111111111111111111111111111111111111111111111111  ballast-go_5.21.3_linux_amd64.tar.gz",
-		"2222222222222222222222222222222222222222222222222222222222222222 *ballast-go_5.21.3_darwin_arm64.tar.gz",
 		"",
 		"not a checksum line at all",
+		"   ",
+		"1111111111111111111111111111111111111111111111111111111111111111  ballast-go_5.21.3_linux_amd64.tar.gz",
+		"2222222222222222222222222222222222222222222222222222222222222222 *ballast-go_5.21.3_darwin_arm64.tar.gz",
 	}, "\n"))
 
 	for name, expected := range map[string]string{
@@ -434,5 +448,192 @@ func TestWriteExecutableReplacesExistingBinary(t *testing.T) {
 	}
 	if len(entries) != 1 {
 		t.Fatalf("expected no temporary files left behind, got %d entries", len(entries))
+	}
+}
+
+// The Windows release is a zip holding ballast-go.exe, and the installed
+// binary must keep that suffix. Nothing else in the suite reaches this path,
+// because the test host is not Windows.
+func TestInstallReleasedGoBinaryInstallsWindowsRelease(t *testing.T) {
+	usePlatform(t, "windows", "amd64")
+
+	release := "5.21.3"
+	archiveName, binaryName := currentReleaseAssetNames(t, release)
+	if binaryName != "ballast-go.exe" {
+		t.Fatalf("expected the windows binary to keep its .exe suffix, got %q", binaryName)
+	}
+	if !strings.HasSuffix(archiveName, ".zip") {
+		t.Fatalf("expected the windows release to be a zip, got %q", archiveName)
+	}
+
+	payload := []byte("windows binary")
+	archive := zipArchive(t, map[string][]byte{binaryName: payload})
+	serveRelease(t, map[string][]byte{
+		archiveName:                archive,
+		"ballast-go_checksums.txt": []byte(checksumLine(archive, archiveName)),
+	})
+
+	projectRoot := resolvedTempDir(t)
+	if err := installReleasedGoBinary("v"+release, projectRoot); err != nil {
+		t.Fatalf("unexpected install error: %v", err)
+	}
+
+	installed, err := os.ReadFile(filepath.Join(projectRoot, ".ballast", "bin", binaryName))
+	if err != nil {
+		t.Fatalf("read installed binary: %v", err)
+	}
+	if !bytes.Equal(installed, payload) {
+		t.Fatalf("expected the released payload to be installed, got %q", installed)
+	}
+}
+
+// An unsupported platform must fail before any download is attempted.
+func TestInstallReleasedGoBinaryRejectsUnsupportedPlatform(t *testing.T) {
+	usePlatform(t, "freebsd", "amd64")
+	requestedPaths := serveReleaseRecording(t, map[string][]byte{})
+
+	err := installReleasedGoBinary("v5.21.3", resolvedTempDir(t))
+	if err == nil {
+		t.Fatal("expected an unsupported platform to fail the install")
+	}
+	if !strings.Contains(err.Error(), "freebsd/amd64") {
+		t.Fatalf("expected the error to name the platform, got %v", err)
+	}
+	if paths := requestedPaths(); len(paths) != 0 {
+		t.Fatalf("expected no download attempt for an unsupported platform, got %v", paths)
+	}
+}
+
+// The checksum file is a separate asset from the archive; a release missing it
+// must fail rather than install unverified.
+func TestInstallReleasedGoBinaryReportsMissingChecksumAsset(t *testing.T) {
+	release := "5.21.3"
+	archiveName, binaryName := currentReleaseAssetNames(t, release)
+	archive := currentReleaseArchive(t, binaryName, []byte("payload"))
+
+	// Archive present, checksum asset absent.
+	serveRelease(t, map[string][]byte{archiveName: archive})
+
+	err := installReleasedGoBinary("v"+release, resolvedTempDir(t))
+	if err == nil {
+		t.Fatal("expected a missing checksum asset to fail the install")
+	}
+	if !strings.Contains(err.Error(), "ballast-go_checksums.txt") || !strings.Contains(err.Error(), "404") {
+		t.Fatalf("expected an error naming the missing checksum asset, got %v", err)
+	}
+}
+
+// A correctly checksummed archive that does not hold the binary must fail at
+// extraction instead of installing nothing and reporting success.
+func TestInstallReleasedGoBinaryReportsArchiveWithoutBinary(t *testing.T) {
+	release := "5.21.3"
+	archiveName, binaryName := currentReleaseAssetNames(t, release)
+	archive := currentReleaseArchive(t, "UNRELATED.txt", []byte("not the binary"))
+
+	serveRelease(t, map[string][]byte{
+		archiveName:                archive,
+		"ballast-go_checksums.txt": []byte(checksumLine(archive, archiveName)),
+	})
+
+	projectRoot := resolvedTempDir(t)
+	err := installReleasedGoBinary("v"+release, projectRoot)
+	if err == nil {
+		t.Fatal("expected an archive without the binary to fail the install")
+	}
+	if !strings.Contains(err.Error(), "does not contain "+binaryName) {
+		t.Fatalf("expected a missing-entry error, got %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(projectRoot, ".ballast", "bin", binaryName)); !os.IsNotExist(statErr) {
+		t.Fatal("expected no binary to be installed when extraction fails")
+	}
+}
+
+// A refused connection must name the URL rather than surfacing a bare dial error.
+func TestDownloadReleaseAssetReportsUnreachableHost(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve a port: %v", err)
+	}
+	url := "http://" + listener.Addr().String() + "/ballast-go.tar.gz"
+	// Close immediately so the port is reserved but refuses connections.
+	if err := listener.Close(); err != nil {
+		t.Fatalf("close listener: %v", err)
+	}
+
+	if _, err := downloadReleaseAsset(url); err == nil {
+		t.Fatal("expected an unreachable host to fail")
+	} else if !strings.Contains(err.Error(), url) {
+		t.Fatalf("expected the error to name the URL, got %v", err)
+	}
+}
+
+// Directory entries and unrelated files must be skipped rather than returned as
+// the binary.
+func TestExtractZipEntrySkipsDirectoriesAndOtherFiles(t *testing.T) {
+	payload := []byte("binary")
+	var buffer bytes.Buffer
+	zipWriter := zip.NewWriter(&buffer)
+	if _, err := zipWriter.Create("dist/"); err != nil {
+		t.Fatalf("create zip directory entry: %v", err)
+	}
+	for name, content := range map[string][]byte{
+		"README.md":          []byte("docs"),
+		"dist/ballast-go":    payload,
+		"dist/ballast-go.sh": []byte("wrapper script"),
+	} {
+		writer, err := zipWriter.Create(name)
+		if err != nil {
+			t.Fatalf("create zip entry: %v", err)
+		}
+		if _, err := writer.Write(content); err != nil {
+			t.Fatalf("write zip entry: %v", err)
+		}
+	}
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+
+	extracted, err := extractZipEntry(buffer.Bytes(), "ballast-go")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(extracted, payload) {
+		t.Fatalf("expected the binary payload, got %q", extracted)
+	}
+}
+
+func TestExtractZipEntryReportsMissingEntry(t *testing.T) {
+	archive := zipArchive(t, map[string][]byte{"README.md": []byte("docs")})
+
+	if _, err := extractZipEntry(archive, "ballast-go.exe"); err == nil {
+		t.Fatal("expected a missing zip entry to fail")
+	} else if !strings.Contains(err.Error(), "does not contain ballast-go.exe") {
+		t.Fatalf("expected a missing-entry error, got %v", err)
+	}
+}
+
+func TestExtractReleaseBinaryRejectsCorruptZipArchive(t *testing.T) {
+	if _, err := extractReleaseBinary([]byte("not a zip"), "zip", "ballast-go.exe"); err == nil {
+		t.Fatal("expected a corrupt zip to fail")
+	} else if !strings.Contains(err.Error(), "open release archive") {
+		t.Fatalf("expected an archive-open error, got %v", err)
+	}
+}
+
+// The install directory is created on demand, so a non-directory in its place
+// must be reported against the destination rather than panicking later.
+func TestWriteExecutableReportsUncreatableDirectory(t *testing.T) {
+	root := resolvedTempDir(t)
+	blocker := filepath.Join(root, "bin")
+	if err := os.WriteFile(blocker, []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("create blocking file: %v", err)
+	}
+
+	err := writeExecutable(filepath.Join(blocker, "ballast-go"), []byte("payload"))
+	if err == nil {
+		t.Fatal("expected an uncreatable install directory to fail")
+	}
+	if !strings.Contains(err.Error(), blocker) {
+		t.Fatalf("expected the error to name the directory, got %v", err)
 	}
 }

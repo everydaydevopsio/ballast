@@ -31,6 +31,13 @@ const releaseDownloadTimeout = 2 * time.Minute
 // name the wrapper installs into .ballast/bin.
 const goBackendBinaryName = "ballast-go"
 
+// The running platform, indirected so tests can exercise the archive naming
+// and binary suffix of a platform other than the one running the test.
+var (
+	runtimeGOOS   = runtime.GOOS
+	runtimeGOARCH = runtime.GOARCH
+)
+
 // installReleasedGoBinary downloads the published ballast-go archive for the
 // running platform, verifies its SHA-256 against the release checksum file,
 // extracts the binary, and installs it into .ballast/bin.
@@ -47,7 +54,7 @@ func installReleasedGoBinary(version string, projectRoot string) error {
 		return errors.New("ballast-go install requires a release version or a ballast source checkout")
 	}
 
-	goos, goarch, archiveExt, err := releasedGoArchiveParts(runtime.GOOS, runtime.GOARCH)
+	goos, goarch, archiveExt, err := releasedGoArchiveParts(runtimeGOOS, runtimeGOARCH)
 	if err != nil {
 		return err
 	}
