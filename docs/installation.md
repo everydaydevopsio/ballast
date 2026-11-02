@@ -296,6 +296,21 @@ described above.
 
 `.ballast/` is generated repository-local tool state for backend CLIs. It is safe to recreate and should remain ignored by git. `ballast install` does not require `.ballast/` to exist before installing rules or skills. Use `ballast doctor` to inspect `.ballast/`, `.ballast/bin`, and `.ballast/tools`; use `ballast doctor --fix` or `ballast install-cli` to recreate missing or incomplete local tool state.
 
+### Backend Install Requirements
+
+Each backend install needs only the tooling for its own ecosystem:
+
+| Backend | Requires |
+| --- | --- |
+| `ballast-typescript` | `npm` on `PATH` |
+| `ballast-python` | `uv` on `PATH` |
+| `ballast-go` (released) | nothing beyond the `ballast` wrapper and network access to GitHub Releases |
+| `ballast-go` (source checkout) | `go` on `PATH` |
+
+The released `ballast-go` install runs inside the wrapper: it downloads the published archive, verifies its SHA-256 against `ballast-go_checksums.txt`, extracts the binary, and writes it to `.ballast/bin/`. It does not shell out, so it works in minimal containers and restricted CI images that have no `curl`, `tar`, `openssl`, `install`, or PowerShell. A checksum mismatch, a missing checksum entry, or an unreadable archive fails the install without writing a binary.
+
+Released `ballast-go` binaries are published for `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`, and `windows/amd64`. On any other platform the install reports the published set and directs you to build the backend from a Ballast source checkout instead.
+
 If doctor reports a configured TypeScript path as a JavaScript package without `tsconfig.json`, add that file if the package should be managed as TypeScript. If the repository should not use TypeScript rules, run `ballast install --remove-language typescript --yes`. This removes the repository's TypeScript language selection, so retain it when other packages still need TypeScript rules. `doctor --fix` does not create a missing `tsconfig.json`.
 
 ## Config Persistence

@@ -889,6 +889,8 @@ func TestRunDoctorFixInstallsBackendsAndRefreshesConfig(t *testing.T) {
 		return 0, nil
 	}
 
+	binaryName, _, _ := serveReleaseForVersion(t, "5.0.2")
+
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "pyproject.toml"), "[project]\nname='api'\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"target":"claude","agents":["local-dev"]}`)
@@ -900,8 +902,13 @@ func TestRunDoctorFixInstallsBackendsAndRefreshesConfig(t *testing.T) {
 		}
 	})
 
-	if len(commands) != 3 {
-		t.Fatalf("expected install commands for all backends, got %#v", commands)
+	// Only the TypeScript and Python backends spawn a package manager; the Go
+	// backend installs in-process.
+	if len(commands) != 2 {
+		t.Fatalf("expected install commands for the package-manager backends, got %#v", commands)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin", binaryName)); err != nil {
+		t.Fatalf("expected doctor fix to install the go backend: %v", err)
 	}
 	if got := strings.Join(invocation.Args, " "); !strings.Contains(got, "install --yes") {
 		t.Fatalf("expected refresh-config install invocation, got %q", got)
@@ -1161,6 +1168,8 @@ func TestRunDoctorFixUsesConfigVersionForBackendInstallsInsideSourceCheckout(t *
   "paths":{"typescript":["."]}
 }`)
 
+	_, _, requestedPaths := serveReleaseForVersion(t, "5.0.5")
+
 	withWorkingDir(t, root, func() {
 		exitCode := run([]string{"doctor", "--fix"})
 		if exitCode != 0 {
@@ -1168,8 +1177,8 @@ func TestRunDoctorFixUsesConfigVersionForBackendInstallsInsideSourceCheckout(t *
 		}
 	})
 
-	if len(commands) != 3 {
-		t.Fatalf("expected install commands for all backends, got %#v", commands)
+	if len(commands) != 2 {
+		t.Fatalf("expected install commands for the package-manager backends, got %#v", commands)
 	}
 	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(root, ".ballast", "tools", "typescript")+" @everydaydevopsio/ballast@5.0.5" {
 		t.Fatalf("expected doctor fix to pin typescript backend to config version, got %q", got)
@@ -1177,12 +1186,16 @@ func TestRunDoctorFixUsesConfigVersionForBackendInstallsInsideSourceCheckout(t *
 	if got := strings.Join(commands[1], " "); got != "env UV_TOOL_DIR="+filepath.Join(root, ".ballast", "tools", "python")+" UV_TOOL_BIN_DIR="+filepath.Join(root, ".ballast", "bin")+" uv tool install --reinstall --from https://github.com/everydaydevopsio/ballast/releases/download/v5.0.5/ballast_python-5.0.5-py3-none-any.whl ballast-python" {
 		t.Fatalf("expected doctor fix to pin python backend to config version, got %q", got)
 	}
-	got := strings.Join(commands[2], " ")
-	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.5/ballast-go_5.0.5_") {
+	got := strings.Join(requestedPaths(), " ")
+	if !strings.Contains(got, "/v5.0.5/ballast-go_5.0.5_") {
 		t.Fatalf("expected doctor fix to pin go backend to config version, got %q", got)
 	}
-	if strings.Contains(got, filepath.Join(root, "packages", "ballast-go")) {
-		t.Fatalf("expected doctor fix to avoid local source builds when config pins a release, got %q", got)
+	// A pinned release must come from the published archive even inside a
+	// source checkout, never from a local source build.
+	if slices.ContainsFunc(commands, func(command []string) bool {
+		return strings.Contains(strings.Join(command, " "), filepath.Join(root, "packages", "ballast-go"))
+	}) {
+		t.Fatalf("expected doctor fix to avoid local source builds when config pins a release, got %#v", commands)
 	}
 	config, err := loadDoctorConfig(root)
 	if err != nil {
@@ -1480,6 +1493,8 @@ func TestRunDoctorFixForwardsSelectedLanguageToRefreshInstall(t *testing.T) {
 		return 0, nil
 	}
 
+	binaryName, _, _ := serveReleaseForVersion(t, "5.0.5")
+
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/project\n\ngo 1.24\n")
 	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
@@ -1497,8 +1512,11 @@ func TestRunDoctorFixForwardsSelectedLanguageToRefreshInstall(t *testing.T) {
 		}
 	})
 
-	if len(commands) != 1 {
-		t.Fatalf("expected one backend install command for go, got %#v", commands)
+	if len(commands) != 0 {
+		t.Fatalf("expected the go backend install to run no external commands, got %#v", commands)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin", binaryName)); err != nil {
+		t.Fatalf("expected doctor fix to install the go backend: %v", err)
 	}
 	if refreshCount != 1 {
 		t.Fatalf("expected refresh install to run once for the selected language, got %d", refreshCount)
@@ -2478,6 +2496,8 @@ func TestRunInstallCLIGoUsesReleaseArchiveForPinnedVersion(t *testing.T) {
 		return nil
 	}
 
+	binaryName, payload, requestedPaths := serveReleaseForVersion(t, "5.0.2")
+
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/test\n\ngo 1.24\n")
 	withWorkingDir(t, root, func() {
@@ -2487,21 +2507,26 @@ func TestRunInstallCLIGoUsesReleaseArchiveForPinnedVersion(t *testing.T) {
 		}
 	})
 
-	if len(commands) != 1 {
-		t.Fatalf("expected 1 install command, got %#v", commands)
+	// The release install runs in-process. Spawning anything here would
+	// reintroduce the dependency on sh, curl, tar, openssl, or PowerShell.
+	if len(commands) != 0 {
+		t.Fatalf("expected the release install to run no external commands, got %#v", commands)
 	}
-	got := strings.Join(commands[0], " ")
-	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.2/ballast-go_5.0.2_") {
-		t.Fatalf("expected installer to use a release archive, got %q", got)
+
+	requested := strings.Join(requestedPaths(), " ")
+	if !strings.Contains(requested, "/v5.0.2/ballast-go_5.0.2_") {
+		t.Fatalf("expected installer to fetch the pinned release archive, got %q", requested)
 	}
-	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.2/ballast-go_checksums.txt") {
-		t.Fatalf("expected installer to verify the published checksum asset, got %q", got)
+	if !strings.Contains(requested, "/v5.0.2/ballast-go_checksums.txt") {
+		t.Fatalf("expected installer to fetch the published checksum asset, got %q", requested)
 	}
-	if !strings.Contains(got, `destination="$3"`) || !strings.Contains(got, `install -m 0755 "$tmpdir/ballast-go" "$destination"`) {
-		t.Fatalf("expected installer to preserve the destination path while verifying checksums, got %q", got)
+
+	installed, err := os.ReadFile(filepath.Join(root, ".ballast", "bin", binaryName))
+	if err != nil {
+		t.Fatalf("read installed backend: %v", err)
 	}
-	if strings.Contains(got, "go install github.com/everydaydevopsio/ballast/packages/ballast-go/cmd/ballast-go@") {
-		t.Fatalf("expected installer to avoid the invalid module path, got %q", got)
+	if !bytes.Equal(installed, payload) {
+		t.Fatalf("expected the released payload to be installed, got %q", installed)
 	}
 }
 
@@ -2520,6 +2545,8 @@ func TestRunInstallCLICommandInstallsAllLanguagesByDefault(t *testing.T) {
 		return nil
 	}
 
+	binaryName, _, requestedPaths := serveReleaseForVersion(t, "5.0.2")
+
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "package.json"), "{}")
 	withWorkingDir(t, root, func() {
@@ -2529,11 +2556,19 @@ func TestRunInstallCLICommandInstallsAllLanguagesByDefault(t *testing.T) {
 		}
 	})
 
-	if len(commands) != 3 {
-		t.Fatalf("expected 3 install commands, got %#v", commands)
+	// TypeScript and Python install through external package managers; the Go
+	// backend installs in-process, so only two commands are spawned.
+	if len(commands) != 2 {
+		t.Fatalf("expected 2 install commands, got %#v", commands)
 	}
 	if got := strings.Join(commands[1], " "); got != `env UV_TOOL_DIR=`+filepath.Join(root, ".ballast", "tools", "python")+` UV_TOOL_BIN_DIR=`+filepath.Join(root, ".ballast", "bin")+` uv tool install --reinstall --from https://github.com/everydaydevopsio/ballast/releases/download/v5.0.2/ballast_python-5.0.2-py3-none-any.whl ballast-python` {
 		t.Fatalf("unexpected default python install command: %q", got)
+	}
+	if requested := strings.Join(requestedPaths(), " "); !strings.Contains(requested, "/v5.0.2/ballast-go_5.0.2_") {
+		t.Fatalf("expected the default install to fetch the go backend release, got %q", requested)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin", binaryName)); err != nil {
+		t.Fatalf("expected the go backend to be installed: %v", err)
 	}
 }
 
@@ -2708,6 +2743,8 @@ func TestRunInstallCLICommandInstallsGoBackendForAnsibleLanguage(t *testing.T) {
 		return nil
 	}
 
+	binaryName, _, requestedPaths := serveReleaseForVersion(t, "5.0.2")
+
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "ansible.cfg"), "[defaults]\n")
 	withWorkingDir(t, root, func() {
@@ -2717,12 +2754,14 @@ func TestRunInstallCLICommandInstallsGoBackendForAnsibleLanguage(t *testing.T) {
 		}
 	})
 
-	if len(commands) != 1 {
-		t.Fatalf("expected 1 install command, got %#v", commands)
+	if len(commands) != 0 {
+		t.Fatalf("expected the release install to run no external commands, got %#v", commands)
 	}
-	got := strings.Join(commands[0], " ")
-	if !strings.Contains(got, "ballast-go_5.0.2_") {
-		t.Fatalf("expected ansible install-cli to reuse ballast-go backend, got %q", got)
+	if requested := strings.Join(requestedPaths(), " "); !strings.Contains(requested, "ballast-go_5.0.2_") {
+		t.Fatalf("expected ansible install-cli to reuse ballast-go backend, got %q", requested)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin", binaryName)); err != nil {
+		t.Fatalf("expected the go backend to be installed for ansible: %v", err)
 	}
 }
 
@@ -2741,6 +2780,8 @@ func TestRunInstallCLICommandInstallsGoBackendForTerraformLanguage(t *testing.T)
 		return nil
 	}
 
+	binaryName, _, requestedPaths := serveReleaseForVersion(t, "5.0.2")
+
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, ".terraform-version"), "1.8.5\n")
 	withWorkingDir(t, root, func() {
@@ -2750,12 +2791,14 @@ func TestRunInstallCLICommandInstallsGoBackendForTerraformLanguage(t *testing.T)
 		}
 	})
 
-	if len(commands) != 1 {
-		t.Fatalf("expected 1 install command, got %#v", commands)
+	if len(commands) != 0 {
+		t.Fatalf("expected the release install to run no external commands, got %#v", commands)
 	}
-	got := strings.Join(commands[0], " ")
-	if !strings.Contains(got, "ballast-go_5.0.2_") {
-		t.Fatalf("expected terraform install-cli to reuse ballast-go backend, got %q", got)
+	if requested := strings.Join(requestedPaths(), " "); !strings.Contains(requested, "ballast-go_5.0.2_") {
+		t.Fatalf("expected terraform install-cli to reuse ballast-go backend, got %q", requested)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin", binaryName)); err != nil {
+		t.Fatalf("expected the go backend to be installed for terraform: %v", err)
 	}
 }
 
@@ -2774,6 +2817,8 @@ func TestRunInstallCLICommandInstallsGoBackendForDartLanguage(t *testing.T) {
 		return nil
 	}
 
+	binaryName, _, requestedPaths := serveReleaseForVersion(t, "5.0.2")
+
 	root := resolvedTempDir(t)
 	mustWriteFile(t, filepath.Join(root, "pubspec.yaml"), "name: mobile\ndependencies:\n  flutter:\n    sdk: flutter\n")
 	withWorkingDir(t, root, func() {
@@ -2783,12 +2828,14 @@ func TestRunInstallCLICommandInstallsGoBackendForDartLanguage(t *testing.T) {
 		}
 	})
 
-	if len(commands) != 1 {
-		t.Fatalf("expected 1 install command, got %#v", commands)
+	if len(commands) != 0 {
+		t.Fatalf("expected the release install to run no external commands, got %#v", commands)
 	}
-	got := strings.Join(commands[0], " ")
-	if !strings.Contains(got, "ballast-go_5.0.2_") {
-		t.Fatalf("expected dart install-cli to reuse ballast-go backend, got %q", got)
+	if requested := strings.Join(requestedPaths(), " "); !strings.Contains(requested, "ballast-go_5.0.2_") {
+		t.Fatalf("expected dart install-cli to reuse ballast-go backend, got %q", requested)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ballast", "bin", binaryName)); err != nil {
+		t.Fatalf("expected the go backend to be installed for dart: %v", err)
 	}
 }
 
@@ -3002,6 +3049,8 @@ func TestRunInstallCLIUsesPinnedReleaseVersionsInsideSourceCheckout(t *testing.T
 		return nil
 	}
 
+	binaryName, _, requestedPaths := serveReleaseForVersion(t, "5.0.5")
+
 	withWorkingDir(t, sourceRoot, func() {
 		exitCode := run([]string{"install-cli", "--version", "5.0.5"})
 		if exitCode != 0 {
@@ -3009,8 +3058,8 @@ func TestRunInstallCLIUsesPinnedReleaseVersionsInsideSourceCheckout(t *testing.T
 		}
 	})
 
-	if len(commands) != 3 {
-		t.Fatalf("expected 3 install commands, got %#v", commands)
+	if len(commands) != 2 {
+		t.Fatalf("expected 2 install commands, got %#v", commands)
 	}
 	if got := strings.Join(commands[0], " "); got != "npm install --prefix "+filepath.Join(sourceRoot, ".ballast", "tools", "typescript")+" @everydaydevopsio/ballast@5.0.5" {
 		t.Fatalf("expected pinned typescript release install, got %q", got)
@@ -3018,9 +3067,11 @@ func TestRunInstallCLIUsesPinnedReleaseVersionsInsideSourceCheckout(t *testing.T
 	if got := strings.Join(commands[1], " "); got != "env UV_TOOL_DIR="+filepath.Join(sourceRoot, ".ballast", "tools", "python")+" UV_TOOL_BIN_DIR="+filepath.Join(sourceRoot, ".ballast", "bin")+" uv tool install --reinstall --from https://github.com/everydaydevopsio/ballast/releases/download/v5.0.5/ballast_python-5.0.5-py3-none-any.whl ballast-python" {
 		t.Fatalf("expected pinned python release install, got %q", got)
 	}
-	got := strings.Join(commands[2], " ")
-	if !strings.Contains(got, "https://github.com/everydaydevopsio/ballast/releases/download/v5.0.5/ballast-go_5.0.5_") {
-		t.Fatalf("expected pinned go release install, got %q", got)
+	if requested := strings.Join(requestedPaths(), " "); !strings.Contains(requested, "/v5.0.5/ballast-go_5.0.5_") {
+		t.Fatalf("expected pinned go release install, got %q", requested)
+	}
+	if _, err := os.Stat(filepath.Join(sourceRoot, ".ballast", "bin", binaryName)); err != nil {
+		t.Fatalf("expected the pinned go backend to be installed: %v", err)
 	}
 }
 
@@ -6540,7 +6591,7 @@ func TestGoInstallCommandStampsRepositoryVersionForSourceBuilds(t *testing.T) {
 		return filepath.Join(sourceRoot, "cli", "ballast", "ballast"), nil
 	}
 
-	command, err := toolsByLanguage[langGo].installCommand("", projectRoot)
+	command, err := captureGoInstallCommand(t, projectRoot)
 	if err != nil {
 		t.Fatalf("unexpected install error: %v", err)
 	}
@@ -6552,6 +6603,28 @@ func TestGoInstallCommandStampsRepositoryVersionForSourceBuilds(t *testing.T) {
 	if !strings.Contains(joined, "-X main.ballastVersion=5.19.0") {
 		t.Fatalf("expected source build to stamp the repository version, got %#v", command)
 	}
+}
+
+// captureGoInstallCommand runs the Go backend installer with command execution
+// stubbed out and returns the argv it would have run. It exercises the real
+// goTool.install entry point rather than a detached helper, so a regression in
+// the source-build routing shows up here.
+func captureGoInstallCommand(t *testing.T, projectRoot string) ([]string, error) {
+	t.Helper()
+	originalRunCommand := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRunCommand })
+
+	var command []string
+	runCommandFunc = func(name string, args []string) error {
+		command = append([]string{name}, args...)
+		return nil
+	}
+
+	if goTool.install == nil {
+		t.Fatal("expected the Go backend to install through goTool.install")
+	}
+	err := goTool.install("", projectRoot)
+	return command, err
 }
 
 func TestGoInstallCommandOmitsStampWhenRepositoryVersionUnknown(t *testing.T) {
@@ -6572,7 +6645,7 @@ func TestGoInstallCommandOmitsStampWhenRepositoryVersionUnknown(t *testing.T) {
 		return filepath.Join(sourceRoot, "cli", "ballast", "ballast"), nil
 	}
 
-	command, err := toolsByLanguage[langGo].installCommand("", projectRoot)
+	command, err := captureGoInstallCommand(t, projectRoot)
 	if err != nil {
 		t.Fatalf("unexpected install error: %v", err)
 	}
