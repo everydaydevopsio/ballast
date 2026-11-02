@@ -1,0 +1,66 @@
+# Smoke test for scripts/sign-and-notarize-darwin.sh, the GoReleaser post-build
+# hook that signs and notarizes darwin binaries before any artifact is uploaded.
+#
+# This lives apart from examples-smoke.yml because it is the repository's only
+# macOS job outside the release workflows. GitHub cancels a job that waits more
+# than roughly 15 minutes for a hosted macOS runner, and that cancellation is
+# reported as a failed check. Observed queue times on this repository have
+# ranged from 3 seconds to over 15 minutes for the same job, so leaving it on
+# every pull request put an unrelated change one scarce runner away from a red
+# check it could neither cause nor fix.
+#
+# Pull requests therefore run it only when something that can actually break
+# the hook changes. Pushes to main run it unconditionally, so the guard still
+# executes continuously on the default branch, and a release is always cut from
+# a main commit that has passed it.
+name: Sign and Notarize Hook Smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/sign-and-notarize-darwin.sh
+      - scripts/smoke-sign-notarize-hook.sh
+      - cli/ballast/.goreleaser.yaml
+      - packages/ballast-go/.goreleaser.yaml
+      - .github/workflows/sign-notarize-smoke.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Apple tooling is stubbed on PATH, so no signing identity, credentials, or
+  # network access are required. plutil is the real one, which is why this
+  # cannot move to an ubuntu runner: the script exits 0 as a skip off Darwin,
+  # which would turn the guard into a silent no-op.
+  sign-notarize-hook-smoke:
+    name: sign-notarize-hook-smoke
+    runs-on: macos-latest
+    # Bounds execution only; it does not cover the queue wait described above.
+    # The script itself finishes in seconds, so anything near this is a hang.
+    timeout-minutes: 10
+
+    steps:
+      - name: Confirm the runner is macOS
+        run: |
+          # The smoke script exits 0 as a skip on a non-Darwin host. Were this
+          # job ever moved to another runner to dodge the macOS queue, that
+          # skip would report a pass having validated nothing, so fail first
+          # and loudly instead.
+          if [ "$(uname -s)" != "Darwin" ]; then
+            echo "Expected a macOS runner, got $(uname -s); the hook smoke test would validate nothing." >&2
+            exit 1
+          fi
+
+      - name: Checkout ballast repo
+        uses: actions/checkout@v7
+
+      - name: Run sign-and-notarize hook smoke test
+        run: ./scripts/smoke-sign-notarize-hook.sh
