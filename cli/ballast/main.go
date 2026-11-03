@@ -41,8 +41,18 @@ var (
 )
 
 type toolConfig struct {
-	binary         string
+	binary string
+	// installCommand returns the argv used to install the backend by running
+	// an external package manager.
 	installCommand func(version string, projectRoot string) ([]string, error)
+	// install, when set, fully owns installation for this tool and replaces
+	// the installCommand path. Backends that install themselves without
+	// depending on external shell tooling use this instead.
+	install func(version string, projectRoot string) error
+}
+
+func (tool toolConfig) hasInstaller() bool {
+	return tool.install != nil || tool.installCommand != nil
 }
 
 func localSourceRoot() string {
@@ -145,22 +155,32 @@ var pythonTool = toolConfig{
 }
 
 var goTool = toolConfig{
-	binary: "ballast-go",
-	installCommand: func(version string, projectRoot string) ([]string, error) {
-		if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
-			moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
-			command := []string{"go", "build", "-C", moduleRoot}
-			// Stamp the repository version so rules emitted by a source-built
-			// backend match the version the other backends report, instead of
-			// falling back to the "dev" default.
-			if repoVersion := sourceRepositoryVersion(sourceRoot); repoVersion != "" {
-				command = append(command, "-ldflags", "-X main.ballastVersion="+repoVersion)
-			}
-			command = append(command, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go")
-			return command, nil
-		}
-		return releasedGoInstallCommand(version, projectRoot)
-	},
+	binary:  "ballast-go",
+	install: installGoBackend,
+}
+
+// installGoBackend builds ballast-go from a source checkout when one is
+// available and otherwise installs the published release archive. The release
+// path runs in-process instead of shelling out, so it does not require curl,
+// tar, openssl, install, or PowerShell to be present.
+func installGoBackend(version string, projectRoot string) error {
+	if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
+		command := goSourceBuildCommand(sourceRoot, projectRoot)
+		return runCommandFunc(command[0], command[1:])
+	}
+	return installReleasedGoBinary(version, projectRoot)
+}
+
+func goSourceBuildCommand(sourceRoot string, projectRoot string) []string {
+	moduleRoot := filepath.Join(sourceRoot, "packages", "ballast-go")
+	command := []string{"go", "build", "-C", moduleRoot}
+	// Stamp the repository version so rules emitted by a source-built backend
+	// match the version the other backends report, instead of falling back to
+	// the "dev" default.
+	if repoVersion := sourceRepositoryVersion(sourceRoot); repoVersion != "" {
+		command = append(command, "-ldflags", "-X main.ballastVersion="+repoVersion)
+	}
+	return append(command, "-o", filepath.Join(projectRoot, ".ballast", "bin", "ballast-go"), "./cmd/ballast-go")
 }
 
 var toolsByLanguage = map[language]toolConfig{
@@ -645,6 +665,27 @@ func languageNames() []string {
 	return names
 }
 
+// runToolInstall installs one backend. Tools that install themselves in-process
+// take precedence over tools that shell out to an external package manager, so
+// both the install-cli and auto-install paths agree on how a backend arrives.
+func runToolInstall(tool toolConfig, version string, projectRoot string) error {
+	if tool.install != nil {
+		return tool.install(version, projectRoot)
+	}
+	if tool.installCommand == nil {
+		return fmt.Errorf("no installer is configured for %s", tool.binary)
+	}
+
+	command, err := tool.installCommand(version, projectRoot)
+	if err != nil {
+		return fmt.Errorf("prepare install for %s: %w", tool.binary, err)
+	}
+	if len(command) == 0 {
+		return fmt.Errorf("no installer is configured for %s", tool.binary)
+	}
+	return runCommandFunc(command[0], command[1:])
+}
+
 func ensureInstalled(tool toolConfig) error {
 	root := findProjectRoot("")
 	lang, ok := languageForBinary(tool.binary)
@@ -681,22 +722,15 @@ func ensureInstalled(tool toolConfig) error {
 		fmt.Printf("%s not found in %s. Installing...\n", tool.binary, filepath.Join(root, ".ballast"))
 	}
 
-	if tool.installCommand == nil {
+	if !tool.hasInstaller() {
 		return fmt.Errorf("%s is not installed and no installer is configured", tool.binary)
 	}
 
 	if err := ensureLocalToolDirs(root); err != nil {
 		return err
 	}
-	installCommand, err := tool.installCommand(desiredVersion, root)
-	if err != nil {
-		return fmt.Errorf("prepare install for %s: %w", tool.binary, err)
-	}
-	if len(installCommand) == 0 {
-		return fmt.Errorf("%s is not installed and no installer is configured", tool.binary)
-	}
 
-	if err := runCommandFunc(installCommand[0], installCommand[1:]); err != nil {
+	if err := runToolInstall(tool, desiredVersion, root); err != nil {
 		return fmt.Errorf("failed to install %s: %w", tool.binary, err)
 	}
 
@@ -743,16 +777,7 @@ func installCLIs(selectedLanguage language, version string) int {
 			fmt.Printf("Unsupported language: %s\n", lang)
 			return 1
 		}
-		command, err := tool.installCommand(version, root)
-		if err != nil {
-			fmt.Printf("failed to prepare %s install: %v\n", tool.binary, err)
-			return 1
-		}
-		if len(command) == 0 {
-			fmt.Printf("No installer configured for %s\n", lang)
-			return 1
-		}
-		if err := runCommandFunc(command[0], command[1:]); err != nil {
+		if err := runToolInstall(tool, version, root); err != nil {
 			fmt.Printf("failed to install %s: %v\n", tool.binary, err)
 			return 1
 		}
@@ -1969,91 +1994,6 @@ func ensureGitignoreEntry(root string, entry string) error {
 		separator = "\n"
 	}
 	return os.WriteFile(gitignorePath, append(content, []byte(separator+normalized+"\n")...), 0o644)
-}
-
-func releasedGoInstallCommand(version string, projectRoot string) ([]string, error) {
-	release := releaseVersion(version)
-	if release == "" {
-		release = releaseVersion(resolveVersion())
-	}
-	if release == "" {
-		return nil, errors.New("ballast-go install requires a release version or a ballast source checkout")
-	}
-
-	url, err := releasedGoArchiveURL(release)
-	if err != nil {
-		return nil, err
-	}
-	checksumURL := releasedGoChecksumURL(release)
-	destination := filepath.Join(projectRoot, ".ballast", "bin", "ballast-go")
-
-	if runtime.GOOS == "windows" {
-		script := `$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString()); ` +
-			`New-Item -ItemType Directory -Path $tmp | Out-Null; ` +
-			`try { ` +
-			`$archive = Join-Path $tmp 'ballast-go.zip'; ` +
-			`$checksums = Join-Path $tmp 'ballast-go_checksums.txt'; ` +
-			`Invoke-WebRequest -Uri $args[0] -OutFile $archive; ` +
-			`Invoke-WebRequest -Uri $args[1] -OutFile $checksums; ` +
-			`$archiveName = [System.IO.Path]::GetFileName($args[0]); ` +
-			`$expected = Select-String -Path $checksums -Pattern ("  " + [regex]::Escape($archiveName) + "$") | ForEach-Object { ($_ -split '\s+')[0] } | Select-Object -First 1; ` +
-			`if (-not $expected) { throw "missing checksum for $archiveName" }; ` +
-			`$actual = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLowerInvariant(); ` +
-			`if ($actual -ne $expected.ToLowerInvariant()) { throw "checksum mismatch for $archiveName" }; ` +
-			`Expand-Archive -Path $archive -DestinationPath $tmp -Force; ` +
-			`Copy-Item (Join-Path $tmp 'ballast-go.exe') $args[2] -Force ` +
-			`} finally { ` +
-			`Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue ` +
-			`}`
-		return []string{"powershell", "-NoProfile", "-Command", script, url, checksumURL, destination + ".exe"}, nil
-	}
-
-	script := `set -e
-tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
-archive="$tmpdir/ballast-go.tar.gz"
-checksums="$tmpdir/ballast-go_checksums.txt"
-destination="$3"
-curl -fsSL "$1" -o "$archive"
-curl -fsSL "$2" -o "$checksums"
-archive_name="$(basename "$1")"
-set -- $(grep "  $archive_name$" "$checksums")
-[ "${1:-}" != "" ]
-expected_checksum="$1"
-set -- $(openssl dgst -sha256 -r "$archive")
-[ "${1:-}" = "$expected_checksum" ]
-tar -xzf "$archive" -C "$tmpdir"
-install -m 0755 "$tmpdir/ballast-go" "$destination"`
-	return []string{"sh", "-c", script, "sh", url, checksumURL, destination}, nil
-}
-
-func releasedGoArchiveURL(release string) (string, error) {
-	goos, goarch, archiveExt, err := releasedGoArchiveParts(runtime.GOOS, runtime.GOARCH)
-	if err != nil {
-		return "", err
-	}
-	filename := fmt.Sprintf("ballast-go_%s_%s_%s.%s", release, goos, goarch, archiveExt)
-	return fmt.Sprintf("https://github.com/everydaydevopsio/ballast/releases/download/v%s/%s", release, filename), nil
-}
-
-func releasedGoChecksumURL(release string) string {
-	return fmt.Sprintf("https://github.com/everydaydevopsio/ballast/releases/download/v%s/ballast-go_checksums.txt", release)
-}
-
-func releasedGoArchiveParts(goos string, goarch string) (string, string, string, error) {
-	switch goos {
-	case "linux", "darwin":
-		switch goarch {
-		case "amd64", "arm64":
-			return goos, goarch, "tar.gz", nil
-		}
-	case "windows":
-		switch goarch {
-		case "amd64":
-			return goos, goarch, "zip", nil
-		}
-	}
-	return "", "", "", fmt.Errorf("unsupported ballast-go release platform: %s/%s", goos, goarch)
 }
 
 func hasFlag(args []string, longFlag string, shortFlag string) bool {
