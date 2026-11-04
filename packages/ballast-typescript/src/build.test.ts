@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { normalizeHookRunner } from './config';
 import {
   getContent,
   resolveContentIncludes,
@@ -1582,5 +1583,85 @@ alwaysApply: false
         'gemini'
       ]);
     });
+  });
+});
+
+describe('hook runner selection', () => {
+  const LANGUAGES = [
+    'typescript',
+    'python',
+    'go',
+    'ansible',
+    'terraform',
+    'dart',
+    'docker'
+  ] as const;
+
+  // prek is a drop-in alternative to pre-commit: same config file, same
+  // policy, different commands. Selecting it must not leave pre-commit's
+  // commands behind.
+  test.each(LANGUAGES)('%s prek guidance uses prek commands', (language) => {
+    const guidance = buildContent('git-hooks', 'codex', undefined, language, {
+      hookRunner: 'prek'
+    });
+
+    for (const required of [
+      '`prek install`',
+      // prek only installs the pre-commit shim by default, so the pre-push
+      // shim must be installed explicitly or push-time tests never run.
+      'prek install --hook-type pre-push',
+      'default_install_hook_types',
+      // prek prefers prek.toml, so guidance must not tell a TOML repository
+      // to create YAML beside it.
+      'prek.toml` when both are present',
+      '`prek run --all-files`',
+      '`prek update`',
+      '`prek validate-config`'
+    ]) {
+      expect(guidance).toContain(required);
+    }
+    for (const forbidden of [
+      'pre-commit install',
+      'pre-commit autoupdate',
+      'pre-commit run --all-files'
+    ]) {
+      expect(guidance).not.toContain(forbidden);
+    }
+    // Policy survives the runner change.
+    expect(guidance).toContain('gitleaks');
+    expect(guidance).toContain('prek.toml');
+    expect(guidance).toContain('pre-push');
+  });
+
+  // The default path must be byte-stable so no existing install drifts.
+  test.each(LANGUAGES)('%s defaults to pre-commit commands', (language) => {
+    const defaulted = buildContent('git-hooks', 'codex', undefined, language);
+    const explicit = buildContent('git-hooks', 'codex', undefined, language, {
+      hookRunner: 'pre-commit'
+    });
+    expect(defaulted).toBe(explicit);
+    expect(defaulted).toContain('`pre-commit install`');
+    expect(defaulted).not.toContain('prek');
+  });
+
+  test('normalizeHookRunner accepts only known runners', () => {
+    expect(normalizeHookRunner('prek')).toBe('prek');
+    expect(normalizeHookRunner('  PREK  ')).toBe('prek');
+    expect(normalizeHookRunner('pre-commit')).toBe('pre-commit');
+    expect(normalizeHookRunner('lefthook')).toBeNull();
+    expect(normalizeHookRunner('husky')).toBeNull();
+    expect(normalizeHookRunner(123)).toBeNull();
+    expect(normalizeHookRunner(undefined)).toBeNull();
+  });
+
+  // TypeScript-only repositories use Husky, which is a different tool
+  // entirely, so the runner choice does not apply there.
+  test('husky mode is unaffected by the hook runner', () => {
+    const husky = buildContent('git-hooks', 'codex', undefined, 'typescript', {
+      hookMode: 'husky',
+      hookRunner: 'prek'
+    });
+    expect(husky).toContain('Use Husky');
+    expect(husky).not.toContain('prek');
   });
 });

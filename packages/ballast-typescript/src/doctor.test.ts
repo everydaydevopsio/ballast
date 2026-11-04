@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { resolveHookRunner } from './config';
 import {
   buildContent,
   calculateRuleChecksum,
@@ -833,5 +834,88 @@ describe('detectAppType', () => {
     fs.writeFileSync(path.join(tmpDir, '.goreleaser.yaml'), 'version: 2\n');
     fs.writeFileSync(path.join(tmpDir, 'Dockerfile'), 'FROM golang\n');
     expect(detectAppType(tmpDir)).toBe('cli');
+  });
+});
+
+describe('hook runner drift', () => {
+  // Install resolves the hook runner, so doctor must resolve it the same way.
+  // Comparing a prek repository's rule against pre-commit guidance reports a
+  // correctly generated file as drifted immediately after installation.
+  test('a freshly generated prek rule is not reported as drifted', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-prek-'));
+    try {
+      fs.writeFileSync(path.join(tmpDir, 'prek.toml'), '[hooks]\n', 'utf8');
+      const codexRules = path.join(tmpDir, '.codex', 'rules');
+      fs.mkdirSync(codexRules, { recursive: true });
+      fs.writeFileSync(
+        path.join(codexRules, 'python-git-hooks.md'),
+        buildContent('git-hooks', 'codex', undefined, 'python', {
+          hookRunner: 'prek'
+        }),
+        'utf8'
+      );
+
+      const statuses = collectRuleFileStatuses(tmpDir, {
+        targets: ['codex'],
+        agents: ['git-hooks'],
+        languages: ['python'],
+        paths: {},
+        hookRunner: 'prek'
+      });
+
+      const status = statuses.find(
+        (entry) => path.basename(entry.path) === 'python-git-hooks.md'
+      );
+      expect(status?.status).toBe('ok');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  // The converse: a pre-commit rule in a prek repository really is stale.
+  test('a pre-commit rule in a prek repository is reported as drifted', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-prek-'));
+    try {
+      const codexRules = path.join(tmpDir, '.codex', 'rules');
+      fs.mkdirSync(codexRules, { recursive: true });
+      fs.writeFileSync(
+        path.join(codexRules, 'python-git-hooks.md'),
+        buildContent('git-hooks', 'codex', undefined, 'python'),
+        'utf8'
+      );
+
+      const statuses = collectRuleFileStatuses(tmpDir, {
+        targets: ['codex'],
+        agents: ['git-hooks'],
+        languages: ['python'],
+        paths: {},
+        hookRunner: 'prek'
+      });
+
+      const status = statuses.find(
+        (entry) => path.basename(entry.path) === 'python-git-hooks.md'
+      );
+      expect(status?.status).toBe('drifted');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test('resolveHookRunner prefers an explicit choice over detection', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ballast-prek-'));
+    try {
+      expect(resolveHookRunner(tmpDir, null)).toBe('pre-commit');
+      fs.writeFileSync(path.join(tmpDir, 'prek.toml'), '[hooks]\n', 'utf8');
+      expect(resolveHookRunner(tmpDir, null)).toBe('prek');
+      expect(
+        resolveHookRunner(tmpDir, {
+          targets: ['codex'],
+          agents: ['git-hooks'],
+          hookRunner: 'pre-commit'
+        })
+      ).toBe('pre-commit');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

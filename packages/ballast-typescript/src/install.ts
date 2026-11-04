@@ -48,6 +48,7 @@ import {
   DEFAULT_TASK_SYSTEM,
   DEPLOYMENT_MODELS,
   DEFAULT_DEPLOYMENT_MODEL,
+  resolveHookRunner,
   type Target,
   type TaskSystem,
   type DeploymentModel,
@@ -597,6 +598,7 @@ export function install(options: InstallOptions): InstallResult {
       ? configForInstall.languages
       : [language];
   const hookMode = resolveTsHookMode(projectRoot, language);
+  const hookRunner = resolveHookRunner(projectRoot, configForInstall);
   const baseSupportSelections = resolveSupportFileSelections(
     projectRoot,
     language,
@@ -669,6 +671,7 @@ export function install(options: InstallOptions): InstallResult {
           language,
           {
             hookMode,
+            hookRunner,
             tools: effectiveTools,
             languages: configuredLanguages,
             variables:

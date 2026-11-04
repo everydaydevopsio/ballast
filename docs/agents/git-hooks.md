@@ -5,10 +5,10 @@ The **git-hooks** agent owns local Git hook orchestration for Ballast-managed re
 ## What It Sets Up
 
 - Husky with `lint-staged` or the repo formatter/linter for TypeScript-only repos
-- `pre-commit` for multi-language repos and non-TypeScript language profiles
+- `pre-commit` (or `prek`) for multi-language repos and non-TypeScript language profiles
 - secret detection declared as a `pre-commit` hook, using Gitleaks by default
 - `pre-push` hooks that run unit tests
-- maintenance guidance such as `pre-commit autoupdate` and executable hook scripts only when a hook backend requires scripts
+- maintenance guidance such as `pre-commit autoupdate` (or `prek update`) and executable hook scripts only when a hook backend requires scripts
 
 ## Ownership Model
 
@@ -25,9 +25,50 @@ Ballast auto-installs `git-hooks` whenever `linting` is selected so existing ins
 - TypeScript-only `.husky/pre-push` hooks run the detected or canonical package-manager test command, with build or typecheck first when the repo convention requires it
 - Multi-language repos use `pre-commit` at the repo root
 - Python, Go, Ansible, and Terraform use `pre-commit`
+- Any of those may use `prek` instead; see **Hook Runners** below
 - `pre-commit` repos should declare Gitleaks in `.pre-commit-config.yaml` for secret detection and should not generate a repo-local no-secrets shell script
 - `pre-push` runs the repo's unit test command
 - CI and security-review workflows own heavier language-aware checks such as `govulncheck`, fuzzing, `go test -race`, Bandit, `pip-audit`, package-manager audits, `ansible-lint --profile=safety`, deeper IaC static analysis, and cloud/runtime posture scans unless a repo explicitly opts into running them from hooks
+
+## Hook Runners
+
+The hook *policy* is the same whichever runner you use: fast checks at commit time, unit tests on pre-push, and Gitleaks for secret detection. Only the commands differ.
+
+| | `pre-commit` (default) | `prek` |
+| --- | --- | --- |
+| Install hooks | `pre-commit install` and `pre-commit install --hook-type pre-push` | `prek install` and `prek install --hook-type pre-push` |
+| Update pinned hooks | `pre-commit autoupdate` | `prek update` |
+| Run everything | `pre-commit run --all-files` | `prek run --all-files` |
+| Validate the config | — | `prek validate-config` |
+| Config file | `.pre-commit-config.yaml` | `prek.toml` or `.pre-commit-config.yaml` |
+| Nested configs | `sub-pre-commit` hooks | discovered automatically |
+
+[prek](https://prek.j178.dev/) reads the same `.pre-commit-config.yaml`, so switching runners does not mean rewriting hook definitions. With either runner the **root** config is what installs the Git hooks, even when nested workspace configs exist.
+
+Two prek behaviours the generated guidance accounts for:
+
+- **`prek install` installs only the `pre-commit` shim.** Its `default_install_hook_types` defaults to `[pre-commit]`, and declaring `stages: [pre-push]` on a hook does *not* install that shim. Install it explicitly with `prek install --hook-type pre-push`, or set `default_install_hook_types: [pre-commit, pre-push]` in the config. Without this, push-time tests never run.
+- **`prek.toml` wins over `.pre-commit-config.yaml`.** When both exist in the same directory prek uses the TOML file, so adding YAML beside an existing TOML config produces a file whose hooks are silently ignored. Edit whichever config already exists, and create `.pre-commit-config.yaml` only when neither does.
+
+### Choosing a runner
+
+Ballast picks the runner in this order:
+
+1. **An explicit choice** in `.rulesrc.json`:
+
+   ```json
+   {
+     "hookRunner": "prek"
+   }
+   ```
+
+2. **An existing prek setup**, detected from a `prek.toml` at the repository root. A repository already standardized on prek is not told to migrate.
+
+3. **`pre-commit`**, the default.
+
+The saved choice survives reinstalls and refreshes, and every backend preserves it, so a later install cannot silently migrate a prek repository back to pre-commit.
+
+TypeScript-only repositories use Husky instead, which is a different tool rather than a `.pre-commit-config.yaml` runner, so `hookRunner` does not apply there.
 
 ## Prompts to Improve Your App
 

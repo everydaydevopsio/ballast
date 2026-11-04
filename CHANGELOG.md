@@ -15,6 +15,14 @@ the complete history.
 
 ## [Unreleased]
 
+### Added
+
+- **`prek` is now a supported alternative to `pre-commit` for Git hooks.** The generated `git-hooks` rule mandated `pre-commit` and its commands, so a repository using [prek](https://prek.j178.dev/) was told it was noncompliant even with identical commit and push checks. prek reads the same `.pre-commit-config.yaml`, so the hook policy is unchanged — fast checks at commit time, unit tests on pre-push, and the official Gitleaks hook — and only the commands differ: `prek install` plus `prek install --hook-type pre-push`, with `prek update`, `prek run --all-files`, and `prek validate-config` replacing their pre-commit equivalents. The prek path never tells you to run `pre-commit install` or `pre-commit autoupdate`. Guidance accounts for two prek behaviours that are easy to get wrong: `prek install` installs only the `pre-commit` shim unless `--hook-type pre-push` or `default_install_hook_types` says otherwise, and `prek.toml` takes precedence over `.pre-commit-config.yaml` when both exist, so the guidance edits whichever config is already present rather than adding YAML beside a TOML file. Select it with `"hookRunner": "prek"` in `.rulesrc.json`, or let Ballast detect an existing `prek.toml`; all four backends preserve the choice, so a later install cannot silently migrate a prek repository back. `pre-commit` remains the default and its generated output is unchanged for TypeScript, Python, Go, and Ansible. TypeScript-only repositories continue to use Husky, which the runner choice does not affect.
+
+### Changed
+
+- **Terraform, Dart, and Docker hook guidance now says how to verify the configuration.** Those three were the only languages whose `git-hooks` rule omitted a `run --all-files` step, so they told you to keep hooks current without telling you how to check them.
+
 ### Fixed
 
 - **`doctor`'s canonical rule comparison is now protected by tests.** `doctor` already compares each managed rule against the content the installed version would generate, not only against the checksum in the file's own marker, so a rule that is internally consistent but no longer canonical correctly reports `drifted`. Nothing covered that: the existing drift test edits a body without re-stamping its checksum, so deleting the canonical comparison entirely left all 25 doctor tests green. Added cases for a self-consistent but non-canonical rule, for an interrupted upgrade that leaves two targets on different content, and for an older `version=` stamp on canonical content staying `ok` — the stamp alone is not a finding, matching the `ballast-audit` skill.

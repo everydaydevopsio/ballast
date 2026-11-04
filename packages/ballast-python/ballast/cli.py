@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import metadata
@@ -408,6 +409,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
         task_system = data.get("taskSystem")
         deployment_model = data.get("deploymentModel")
         code_reviewer = data.get("codeReviewer")
+        hook_runner = data.get("hookRunner")
         publishing_profiles = data.get("publishingProfiles")
         discovery = normalize_discovery(data.get("discovery"))
         return {
@@ -442,6 +444,7 @@ def load_config(root: Path, language: str) -> dict[str, object] | None:
                 else None
             ),
             "codeReviewer": normalize_code_reviewer(code_reviewer) or None,
+            "hookRunner": normalize_hook_runner(hook_runner),
             "publishingProfiles": normalize_publishing_profiles(publishing_profiles),
             "ruleProfile": (
                 data["ruleProfile"].strip().lower()
@@ -485,6 +488,7 @@ def save_config(
     existing_task_system: str | None = None
     existing_deployment_model: str | None = None
     existing_code_reviewer: str | None = None
+    existing_hook_runner: str | None = None
     existing_rule_profile: str | None = None
     existing_publishing_profiles: list[str] = []
     tools: dict[str, list[str]] = {}
@@ -515,6 +519,7 @@ def save_config(
                 existing_code_reviewer = (
                     normalize_code_reviewer(raw.get("codeReviewer")) or None
                 )
+                existing_hook_runner = normalize_hook_runner(raw.get("hookRunner"))
                 if isinstance(raw.get("ruleProfile"), str):
                     existing_rule_profile = raw["ruleProfile"].strip().lower()
                 existing_publishing_profiles = normalize_publishing_profiles(
@@ -582,6 +587,10 @@ def save_config(
         payload["deploymentModel"] = normalized_deployment_model
     if normalized_code_reviewer:
         payload["codeReviewer"] = normalized_code_reviewer
+    # The hook runner is a deliberate choice; rebuilding the config without it
+    # would silently migrate a prek repository back to pre-commit guidance.
+    if existing_hook_runner:
+        payload["hookRunner"] = existing_hook_runner
     if existing_rule_profile in ("full", "minimal"):
         payload["ruleProfile"] = existing_rule_profile
     # publishingProfiles scopes which publishing rules load into every session.
@@ -1024,11 +1033,113 @@ def read_content(agent: str, language: str, suffix: str = "") -> str:
     )
 
 
-def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
-    gitleaks_hook_guidance = (
-        "- Add the official `gitleaks` pre-commit hook in `.pre-commit-config.yaml` "
-        "for secret detection; do not generate or call a repo-local no-secrets shell script."
-    )
+# Hook runner vocabulary. prek reads the same .pre-commit-config.yaml as
+# pre-commit, so the hook policy is identical and only the commands differ; a
+# repository already standardized on prek should not be told it is
+# noncompliant. The pre-commit entries reproduce the previously hard-coded
+# lines exactly, so that path emits no new bytes.
+HOOK_RUNNERS = ("pre-commit", "prek")
+DEFAULT_HOOK_RUNNER = "pre-commit"
+
+
+@dataclass(frozen=True)
+class HookRunnerVocabulary:
+    name: str
+    install: list[str]
+    config_line: Callable[[str, str], str]
+    gitleaks: str
+    update: str
+    verify: str
+    verify_after_changes: str
+    extra: list[str]
+    nested_configs: str
+    nested_config_line: str
+
+
+_HOOK_RUNNER_VOCABULARY: dict[str, HookRunnerVocabulary] = {
+    "pre-commit": HookRunnerVocabulary(
+        name="`pre-commit`",
+        install=[
+            "- Install hooks with `pre-commit install`.",
+            "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+        ],
+        config_line=lambda verb, location: (
+            f"- {verb} `.pre-commit-config.yaml` at {location}."
+        ),
+        gitleaks=(
+            "- Add the official `gitleaks` pre-commit hook in "
+            "`.pre-commit-config.yaml` for secret detection; do not generate or "
+            "call a repo-local no-secrets shell script."
+        ),
+        update="- Keep the configuration current with `pre-commit autoupdate`.",
+        verify="- Verify the hook configuration with `pre-commit run --all-files`.",
+        verify_after_changes="- Re-run `pre-commit run --all-files` after hook changes.",
+        extra=[],
+        nested_configs="with `sub-pre-commit`",
+        nested_config_line=(
+            "- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` "
+            "files in Go subprojects."
+        ),
+    ),
+    "prek": HookRunnerVocabulary(
+        name="`prek`",
+        # prek installs only the pre-commit shim by default:
+        # default_install_hook_types defaults to [pre-commit], and a hook's own
+        # `stages: [pre-push]` does not install that shim.
+        install=[
+            "- Install hooks with `prek install`.",
+            "- Install the pre-push hook with `prek install --hook-type pre-push`, "
+            "or set `default_install_hook_types: [pre-commit, pre-push]` in the "
+            "config so `prek install` covers both.",
+        ],
+        # prek reads prek.toml in preference to .pre-commit-config.yaml when both
+        # exist, so adding YAML beside an existing TOML config produces a file
+        # whose hooks never run.
+        config_line=lambda verb, location: (
+            f"- {verb} the project config at {location}: edit the existing "
+            "`prek.toml` or `.pre-commit-config.yaml`, and create "
+            "`.pre-commit-config.yaml` only when neither exists. prek uses "
+            "`prek.toml` when both are present, so do not add YAML beside it."
+        ),
+        gitleaks=(
+            "- Add the official `gitleaks` hook to that config for secret "
+            "detection; do not generate or call a repo-local no-secrets shell "
+            "script."
+        ),
+        update="- Keep pinned hook versions current with `prek update`.",
+        verify="- Verify the hook configuration with `prek run --all-files`.",
+        verify_after_changes="- Re-run `prek run --all-files` after hook changes.",
+        extra=[
+            "- prek discovers nested workspace configs, but the root config is "
+            "what installs the Git hooks.",
+            "- Check the configuration itself with `prek validate-config`.",
+        ],
+        nested_configs="through its own workspace discovery",
+        nested_config_line=(
+            "- Let prek discover nested `.pre-commit-config.yaml` files in Go "
+            "subprojects; no fan-out helper hook is required."
+        ),
+    ),
+}
+
+
+def normalize_hook_runner(value: object) -> str | None:
+    """Read a saved hook runner, ignoring an unusable value."""
+    if not isinstance(value, str):
+        return None
+    runner = value.strip().lower()
+    return runner if runner in HOOK_RUNNERS else None
+
+
+def hook_runner_vocabulary(runner: str | None) -> HookRunnerVocabulary:
+    return _HOOK_RUNNER_VOCABULARY[runner or DEFAULT_HOOK_RUNNER]
+
+
+def render_git_hooks_guidance(
+    language: str, hook_mode: str, hook_runner: str | None = None
+) -> str:
+    runner = hook_runner_vocabulary(hook_runner)
+    gitleaks_hook_guidance = runner.gitleaks
     if language == "typescript":
         if hook_mode == "husky":
             return "\n".join(
@@ -1044,103 +1155,129 @@ def render_git_hooks_guidance(language: str, hook_mode: str) -> str:
             )
         return "\n".join(
             [
-                "- Use `pre-commit` for this repository layout.",
-                "- Create `.pre-commit-config.yaml` at the repo root.",
-                "- Install hooks with `pre-commit install`.",
-                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                f"- Use {runner.name} for this repository layout.",
+                runner.config_line("Create", "the repo root"),
+                *runner.install,
                 "- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.",
                 gitleaks_hook_guidance,
-                "- Keep the configuration current with `pre-commit autoupdate`.",
-                "- Verify the hook configuration with `pre-commit run --all-files`.",
+                *runner.extra,
+                runner.update,
+                runner.verify,
             ]
         )
     if language == "python":
         return "\n".join(
             [
-                "- Use `pre-commit` for Python projects.",
-                "- Create `.pre-commit-config.yaml` at the repo root.",
-                "- Install hooks with `pre-commit install`.",
-                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                f"- Use {runner.name} for Python projects.",
+                runner.config_line("Create", "the repo root"),
+                *runner.install,
                 "- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.",
                 gitleaks_hook_guidance,
                 "- Keep Bandit and `pip-audit` in CI or explicit security-review workflows unless this repository opts into running them from hooks.",
-                "- Keep the configuration current with `pre-commit autoupdate`.",
-                "- Re-run `pre-commit run --all-files` after hook changes.",
+                *runner.extra,
+                runner.update,
+                runner.verify_after_changes,
             ]
         )
     if language == "go":
         return "\n".join(
             [
-                "- Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.",
-                "- Create or update `.pre-commit-config.yaml` at the repo root.",
-                "- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.",
-                "- Install hooks with `pre-commit install` and `pre-commit install --hook-type pre-push`.",
+                f"- Use {runner.name} for Go projects, and fan out to language-local configs {runner.nested_configs} when needed.",
+                runner.config_line("Create or update", "the repo root"),
+                runner.nested_config_line,
+                *runner.install,
                 "- Configure the pre-push stage to run Go unit tests for each module.",
                 gitleaks_hook_guidance,
                 "- Keep `govulncheck`, fuzzing, and `go test -race` in CI, pre-push, or explicit security-review workflows unless this repository opts into running them at commit time.",
-                "- Keep the configuration current with `pre-commit autoupdate`.",
-                "- Verify the hook configuration with `pre-commit run --all-files`.",
+                *runner.extra,
+                runner.update,
+                runner.verify,
             ]
         )
     if language == "ansible":
         return "\n".join(
             [
-                "- Use `pre-commit` for Ansible repositories.",
-                "- Create or update `.pre-commit-config.yaml` at the repo root.",
-                "- Install hooks with `pre-commit install`.",
-                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                f"- Use {runner.name} for Ansible repositories.",
+                runner.config_line("Create or update", "the repo root"),
+                *runner.install,
                 "- Run `ansible-lint` and `yamllint` from the pre-commit stage.",
                 "- Run `ansible-playbook --syntax-check` for representative top-level playbooks from the pre-push stage.",
                 gitleaks_hook_guidance,
                 "- Prefer `ansible-lint --profile=safety` in CI or explicit security-review workflows when the repository is ready for safety-oriented rules.",
                 "- Keep secrets out of logs and commits; prefer Ansible Vault or external secret stores.",
-                "- Keep the configuration current with `pre-commit autoupdate`; rerun `pre-commit run --all-files` after hook changes.",
+                *runner.extra,
+                runner.update,
+                runner.verify_after_changes,
             ]
         )
     if language == "terraform":
         return "\n".join(
             [
-                "- Use `pre-commit` for Terraform repositories.",
-                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                f"- Use {runner.name} for Terraform repositories.",
+                runner.config_line("Create or update", "the repo root"),
                 "- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.",
-                "- Install hooks with `pre-commit install`.",
-                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                *runner.install,
                 "- Run `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .` from the hook configuration; keep `tfsec` only for legacy-compatible pipelines.",
                 "- Keep `.terraform/`, state files, and plan files out of Git.",
                 gitleaks_hook_guidance,
                 "- Keep deeper IaC static analysis, policy checks, and cloud/runtime posture scanning in CI or operational review workflows.",
-                "- Keep the configuration current with `pre-commit autoupdate`.",
+                *runner.extra,
+                runner.update,
+                runner.verify,
             ]
         )
     if language == "dart":
         return "\n".join(
             [
-                "- Use `pre-commit` for Dart and Flutter repositories.",
-                "- Create or update `.pre-commit-config.yaml` at the Flutter app root or monorepo root.",
-                "- Install hooks with `pre-commit install`.",
-                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                f"- Use {runner.name} for Dart and Flutter repositories.",
+                runner.config_line(
+                    "Create or update", "the Flutter app root or monorepo root"
+                ),
+                *runner.install,
                 "- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.",
                 "- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.",
                 "- Keep `.dart_tool/`, `build/`, and platform build output out of Git.",
                 gitleaks_hook_guidance,
-                "- Keep the configuration current with `pre-commit autoupdate`.",
+                *runner.extra,
+                runner.update,
+                runner.verify,
             ]
         )
     if language == "docker":
         return "\n".join(
             [
-                "- Use `pre-commit` for Dockerfile and container configuration repositories.",
-                "- Create or update `.pre-commit-config.yaml` at the repo root.",
-                "- Install hooks with `pre-commit install`.",
-                "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+                f"- Use {runner.name} for Dockerfile and container configuration repositories.",
+                runner.config_line("Create or update", "the repo root"),
+                *runner.install,
                 "- Run `hadolint` for Dockerfiles and `docker compose config` for Compose files from the pre-commit stage.",
                 "- Run image build and smoke checks from the pre-push stage only when they are deterministic and do not require registry credentials.",
                 gitleaks_hook_guidance,
                 "- Keep image vulnerability scans in CI or pre-push when local Docker availability is reliable.",
-                "- Keep the configuration current with `pre-commit autoupdate`.",
+                *runner.extra,
+                runner.update,
+                runner.verify,
             ]
         )
     return ""
+
+
+def resolve_hook_runner(root: Path | None, language: str) -> str:
+    """Pick the hook runner.
+
+    An explicit saved choice wins; otherwise a repository already standardized
+    on prek is detected from prek.toml, so Ballast does not tell it to migrate
+    to pre-commit.
+    """
+    if root is None:
+        return DEFAULT_HOOK_RUNNER
+    config = load_config(root, language)
+    if config is not None:
+        saved = normalize_hook_runner(config.get("hookRunner"))
+        if saved:
+            return saved
+    if (root / "prek.toml").exists():
+        return "prek"
+    return DEFAULT_HOOK_RUNNER
 
 
 def resolve_ts_hook_mode(root: Path, language: str) -> str:
@@ -1174,8 +1311,10 @@ def apply_hook_guidance(
     hook_mode = (
         resolve_ts_hook_mode(root, language) if root is not None else "pre-commit"
     )
+    hook_runner = resolve_hook_runner(root, language)
     return content.replace(
-        GIT_HOOKS_GUIDANCE_TOKEN, render_git_hooks_guidance(language, hook_mode)
+        GIT_HOOKS_GUIDANCE_TOKEN,
+        render_git_hooks_guidance(language, hook_mode, hook_runner),
     )
 
 

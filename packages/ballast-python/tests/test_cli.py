@@ -713,6 +713,81 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(config["discovery"], {"excludePaths": ["examples", "tmp"]})
 
+    # prek is a drop-in alternative to pre-commit: same config file, same
+    # policy, different commands. Selecting it must not leave pre-commit's
+    # commands behind.
+    def test_prek_guidance_uses_prek_commands(self) -> None:
+        for language in (
+            "typescript",
+            "python",
+            "go",
+            "ansible",
+            "terraform",
+            "dart",
+            "docker",
+        ):
+            guidance = cli.render_git_hooks_guidance(language, "pre-commit", "prek")
+            for required in (
+                "`prek install`",
+                # prek only installs the pre-commit shim by default, so the
+                # pre-push shim must be installed explicitly.
+                "prek install --hook-type pre-push",
+                "default_install_hook_types",
+                # prek prefers prek.toml over YAML when both exist.
+                "prek.toml` when both are present",
+                "`prek run --all-files`",
+                "`prek update`",
+                "`prek validate-config`",
+            ):
+                self.assertIn(required, guidance, f"{language} missing {required}")
+            for forbidden in (
+                "pre-commit install",
+                "pre-commit autoupdate",
+                "pre-commit run --all-files",
+            ):
+                self.assertNotIn(
+                    forbidden, guidance, f"{language} still has {forbidden}"
+                )
+            # Policy survives the runner change.
+            self.assertIn("gitleaks", guidance)
+            self.assertIn("prek.toml", guidance)
+            self.assertIn("pre-push", guidance)
+
+    def test_default_hook_runner_keeps_pre_commit_commands(self) -> None:
+        for runner in (None, "pre-commit"):
+            guidance = cli.render_git_hooks_guidance("python", "pre-commit", runner)
+            self.assertIn("`pre-commit install`", guidance)
+            self.assertNotIn("prek", guidance)
+
+    def test_normalize_hook_runner_accepts_only_known_runners(self) -> None:
+        self.assertEqual(cli.normalize_hook_runner("prek"), "prek")
+        self.assertEqual(cli.normalize_hook_runner("  PREK  "), "prek")
+        self.assertEqual(cli.normalize_hook_runner("pre-commit"), "pre-commit")
+        self.assertIsNone(cli.normalize_hook_runner("lefthook"))
+        self.assertIsNone(cli.normalize_hook_runner("husky"))
+        self.assertIsNone(cli.normalize_hook_runner(123))
+        self.assertIsNone(cli.normalize_hook_runner(None))
+
+    # A repository already standardized on prek must not be told to migrate.
+    def test_resolve_hook_runner_detects_an_existing_prek_setup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.assertEqual(cli.resolve_hook_runner(root, "python"), "pre-commit")
+            (root / "prek.toml").write_text("[hooks]\n", encoding="utf-8")
+            self.assertEqual(cli.resolve_hook_runner(root, "python"), "prek")
+            # An explicit saved choice outranks detection.
+            (root / ".rulesrc.json").write_text(
+                json.dumps(
+                    {
+                        "targets": ["codex"],
+                        "agents": ["git-hooks"],
+                        "hookRunner": "pre-commit",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(cli.resolve_hook_runner(root, "python"), "pre-commit")
+
     def test_normalize_discovery_preserves_include_submodules(self) -> None:
         # The wrapper owns language detection and its discovery.includeSubmodules
         # opt-in, but every backend rewrites .rulesrc.json. Dropping the flag

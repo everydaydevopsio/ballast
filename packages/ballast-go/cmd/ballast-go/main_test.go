@@ -252,7 +252,7 @@ func TestBuildDoctorReportRecommendsUpgrades(t *testing.T) {
 }
 
 func TestBuildContentWritesRuleMarkerAndDetectsDrift(t *testing.T) {
-	content, err := buildContent("linting", "codex", "go", "", "pre-commit", "", "")
+	content, err := buildContent("linting", "codex", "go", "", "pre-commit", "", "", "")
 	if err != nil {
 		t.Fatalf("build content: %v", err)
 	}
@@ -787,7 +787,7 @@ func TestInstallSupportsDartFlutterLanguageProfile(t *testing.T) {
 }
 
 func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
-	got, err := readContent("git-hooks", "terraform", "", "standalone", "github", "none")
+	got, err := readContent("git-hooks", "terraform", "", "standalone", "", "github", "none")
 	if err != nil {
 		t.Fatalf("read terraform git-hooks content: %v", err)
 	}
@@ -812,7 +812,7 @@ func TestRenderGitHooksContentSupportsTerraform(t *testing.T) {
 }
 
 func TestRenderGitHooksContentSupportsDartFlutter(t *testing.T) {
-	got, err := readContent("git-hooks", "dart", "", "standalone", "github", "none")
+	got, err := readContent("git-hooks", "dart", "", "standalone", "", "github", "none")
 	if err != nil {
 		t.Fatalf("read dart git-hooks content: %v", err)
 	}
@@ -833,7 +833,7 @@ func TestRenderGitHooksContentSupportsDartFlutter(t *testing.T) {
 }
 
 func TestRenderGitHooksContentSupportsDocker(t *testing.T) {
-	got, err := readContent("git-hooks", "docker", "", "standalone", "github", "none")
+	got, err := readContent("git-hooks", "docker", "", "standalone", "", "github", "none")
 	if err != nil {
 		t.Fatalf("read docker git-hooks content: %v", err)
 	}
@@ -854,7 +854,7 @@ func TestRenderGitHooksContentSupportsDocker(t *testing.T) {
 }
 
 func TestRenderGitHooksContentSupportsGoGitleaksGuidance(t *testing.T) {
-	got, err := readContent("git-hooks", "go", "", "standalone", "github", "none")
+	got, err := readContent("git-hooks", "go", "", "standalone", "", "github", "none")
 	if err != nil {
 		t.Fatalf("read go git-hooks content: %v", err)
 	}
@@ -876,7 +876,7 @@ func TestRenderGitHooksContentSupportsGoGitleaksGuidance(t *testing.T) {
 }
 
 func TestRenderGitHooksContentSupportsAnsibleGitleaksGuidance(t *testing.T) {
-	got, err := readContent("git-hooks", "ansible", "", "standalone", "github", "none")
+	got, err := readContent("git-hooks", "ansible", "", "standalone", "", "github", "none")
 	if err != nil {
 		t.Fatalf("read ansible git-hooks content: %v", err)
 	}
@@ -1163,7 +1163,7 @@ func TestInstallRendersDefaultToolsWhenSavingConfig(t *testing.T) {
 }
 
 func TestResolvesContentFragmentIncludes(t *testing.T) {
-	content, err := readContent("testing-process", "go", "", "pre-commit", "github", "none")
+	content, err := readContent("testing-process", "go", "", "pre-commit", "", "github", "none")
 	if err != nil {
 		t.Fatalf("readContent(testing-process): %v", err)
 	}
@@ -1177,7 +1177,7 @@ func TestResolvesContentFragmentIncludes(t *testing.T) {
 
 func TestLanguageTestingRulesPointAtTestingProcess(t *testing.T) {
 	for _, language := range []string{"go", "python", "typescript"} {
-		content, err := readContent("testing", language, "", "pre-commit", "github", "none")
+		content, err := readContent("testing", language, "", "pre-commit", "", "github", "none")
 		if err != nil {
 			t.Fatalf("readContent(%s): %v", language, err)
 		}
@@ -1294,7 +1294,7 @@ func TestMinimalRuleProfileEmitsOnlyCoreRule(t *testing.T) {
 }
 
 func TestTaskSystemRuleRendersOnlyConfiguredSystemAndTarget(t *testing.T) {
-	claude, err := buildContent("tasks", "claude", "go", "task-system", "pre-commit", "github", "none")
+	claude, err := buildContent("tasks", "claude", "go", "task-system", "pre-commit", "", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent: %v", err)
 	}
@@ -1311,7 +1311,7 @@ func TestTaskSystemRuleRendersOnlyConfiguredSystemAndTarget(t *testing.T) {
 		t.Fatalf("expected conditional markers stripped, got %q", claude)
 	}
 
-	codex, err := buildContent("tasks", "codex", "go", "task-system", "pre-commit", "jira", "none")
+	codex, err := buildContent("tasks", "codex", "go", "task-system", "pre-commit", "", "jira", "none")
 	if err != nil {
 		t.Fatalf("buildContent: %v", err)
 	}
@@ -1351,7 +1351,7 @@ func TestPublishingSuffixesHonorExplicitProfiles(t *testing.T) {
 }
 
 func TestPublishingAPIOmitsKubernetesSectionsForNone(t *testing.T) {
-	content, err := buildContent("publishing", "codex", "go", "api", "pre-commit", "github", "none")
+	content, err := buildContent("publishing", "codex", "go", "api", "pre-commit", "", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent: %v", err)
 	}
@@ -1367,7 +1367,7 @@ func TestPublishingAPIOmitsKubernetesSectionsForNone(t *testing.T) {
 }
 
 func TestPublishingAPIKeepsKubernetesSectionsForKubernetes(t *testing.T) {
-	content, err := buildContent("publishing", "codex", "go", "api", "pre-commit", "github", "kubernetes")
+	content, err := buildContent("publishing", "codex", "go", "api", "pre-commit", "", "github", "kubernetes")
 	if err != nil {
 		t.Fatalf("buildContent: %v", err)
 	}
@@ -1436,7 +1436,7 @@ func TestPatchFillsPlaceholderRepositoryFacts(t *testing.T) {
 }
 
 func TestPatchReplacesPristineRulesWholesale(t *testing.T) {
-	canonicalOld, err := buildContent("testing", "claude", "go", "", "pre-commit", "github", "none")
+	canonicalOld, err := buildContent("testing", "claude", "go", "", "pre-commit", "", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent: %v", err)
 	}
@@ -1450,7 +1450,7 @@ func TestPatchReplacesPristineRulesWholesale(t *testing.T) {
 }
 
 func TestPatchMergesWhenRuleWasUserEdited(t *testing.T) {
-	canonical, err := buildContent("testing", "claude", "go", "", "pre-commit", "github", "none")
+	canonical, err := buildContent("testing", "claude", "go", "", "pre-commit", "", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent: %v", err)
 	}
@@ -1608,7 +1608,7 @@ func TestBuildGeminiMDIncludesRepositoryFactsAndSkills(t *testing.T) {
 }
 
 func TestBuildContentGeminiIncludesMandates(t *testing.T) {
-	content, err := buildContent("linting", "gemini", "go", "", "standalone", "github", "none")
+	content, err := buildContent("linting", "gemini", "go", "", "standalone", "", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent(gemini): %v", err)
 	}
@@ -1625,7 +1625,7 @@ func TestBuildContentGeminiIncludesMandates(t *testing.T) {
 }
 
 func TestBuildContentRendersPublishingDeploymentModelToken(t *testing.T) {
-	content, err := buildContent("publishing", "codex", "go", "apps", "standalone", "github", "kubernetes")
+	content, err := buildContent("publishing", "codex", "go", "apps", "standalone", "", "github", "kubernetes")
 	if err != nil {
 		t.Fatalf("buildContent(publishing): %v", err)
 	}
@@ -1645,7 +1645,7 @@ func TestBuildContentRendersPublishingDeploymentModelToken(t *testing.T) {
 }
 
 func TestBuildContentRendersInactiveDeploymentModel(t *testing.T) {
-	content, err := buildContent("publishing", "codex", "go", "web", "standalone", "github", "none")
+	content, err := buildContent("publishing", "codex", "go", "web", "standalone", "", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent(publishing): %v", err)
 	}
@@ -1665,7 +1665,7 @@ func TestBuildContentRendersInactiveDeploymentModel(t *testing.T) {
 }
 
 func TestBuildContentRendersDockerDeploymentModel(t *testing.T) {
-	content, err := buildContent("publishing", "codex", "go", "web", "standalone", "github", "docker")
+	content, err := buildContent("publishing", "codex", "go", "web", "standalone", "", "github", "docker")
 	if err != nil {
 		t.Fatalf("buildContent(publishing): %v", err)
 	}
@@ -1683,7 +1683,7 @@ func TestBuildContentRendersDockerDeploymentModel(t *testing.T) {
 
 func TestBuildContentMarksOptionalPublishingVariants(t *testing.T) {
 	for _, suffix := range []string{"apt", "brew"} {
-		content, err := buildContent("publishing", "codex", "go", suffix, "standalone", "github", "none")
+		content, err := buildContent("publishing", "codex", "go", suffix, "standalone", "", "github", "none")
 		if err != nil {
 			t.Fatalf("buildContent(publishing %s): %v", suffix, err)
 		}
@@ -1697,7 +1697,7 @@ func TestBuildContentMarksOptionalPublishingVariants(t *testing.T) {
 }
 
 func TestBuildContentRendersActiveTaskSystem(t *testing.T) {
-	content, err := buildContent("tasks", "codex", "go", "task-system", "standalone", "github", "none")
+	content, err := buildContent("tasks", "codex", "go", "task-system", "standalone", "", "github", "none")
 	if err != nil {
 		t.Fatalf("buildContent(tasks): %v", err)
 	}
@@ -1714,7 +1714,7 @@ func TestBuildContentRendersActiveTaskSystem(t *testing.T) {
 }
 
 func TestBuildContentRendersNoneTaskSystem(t *testing.T) {
-	content, err := buildContent("tasks", "codex", "go", "task-system", "standalone", "none", "none")
+	content, err := buildContent("tasks", "codex", "go", "task-system", "standalone", "", "none", "none")
 	if err != nil {
 		t.Fatalf("buildContent(tasks): %v", err)
 	}
@@ -3758,5 +3758,136 @@ func TestNormalizeDiscoveryPreservesIncludeSubmodules(t *testing.T) {
 
 	if off := normalizeDiscovery(json.RawMessage(`{"includeSubmodules":false}`)); off != nil {
 		t.Fatalf("an all-default discovery block stays nil, got %+v", off)
+	}
+}
+
+// prek is a drop-in alternative to pre-commit: same config file, same policy,
+// different commands. Selecting it must not reintroduce pre-commit's commands.
+func TestGitHooksGuidanceUsesPrekCommandsWhenSelected(t *testing.T) {
+	for _, language := range []string{"typescript", "python", "go", "ansible", "terraform", "dart", "docker"} {
+		guidance := renderGitHooksGuidance(language, "pre-commit", "prek")
+
+		for _, required := range []string{
+			"`prek install`",
+			// prek only installs the pre-commit shim by default, so the
+			// pre-push shim must be installed explicitly or push-time tests
+			// silently never run.
+			"prek install --hook-type pre-push",
+			"default_install_hook_types",
+			// prek prefers prek.toml, so guidance must not tell a TOML
+			// repository to create YAML beside it.
+			"prek.toml` when both are present",
+			"`prek run --all-files`",
+			"`prek update`",
+			"`prek validate-config`",
+		} {
+			if !strings.Contains(guidance, required) {
+				t.Fatalf("%s prek guidance is missing %s:\n%s", language, required, guidance)
+			}
+		}
+		for _, forbidden := range []string{"pre-commit install", "pre-commit autoupdate", "pre-commit run --all-files"} {
+			if strings.Contains(guidance, forbidden) {
+				t.Fatalf("%s prek guidance still tells the user to run %q:\n%s", language, forbidden, guidance)
+			}
+		}
+		// The policy itself is unchanged, so these must survive either runner.
+		if !strings.Contains(guidance, "gitleaks") {
+			t.Fatalf("%s prek guidance dropped the gitleaks hook", language)
+		}
+		if !strings.Contains(guidance, "prek.toml") {
+			t.Fatalf("%s prek guidance should name prek.toml as a config option", language)
+		}
+		// Whatever stage policy the pre-commit path states, the prek path must
+		// state too. Only the commands may differ between runners.
+		preCommit := renderGitHooksGuidance(language, "pre-commit", "pre-commit")
+		if strings.Contains(preCommit, "pre-push") && !strings.Contains(guidance, "pre-push") {
+			t.Fatalf("%s prek guidance dropped the pre-push stage", language)
+		}
+	}
+}
+
+// The default path must be untouched, so no existing install drifts.
+func TestGitHooksGuidanceKeepsPreCommitCommandsByDefault(t *testing.T) {
+	for _, runner := range []string{"", "pre-commit"} {
+		guidance := renderGitHooksGuidance("python", "pre-commit", runner)
+		if !strings.Contains(guidance, "`pre-commit install`") {
+			t.Fatalf("runner %q should keep pre-commit commands:\n%s", runner, guidance)
+		}
+		if strings.Contains(guidance, "prek") {
+			t.Fatalf("runner %q must not mention prek:\n%s", runner, guidance)
+		}
+	}
+}
+
+func TestNormalizeHookRunnerAcceptsOnlyKnownRunners(t *testing.T) {
+	cases := map[string]string{
+		"prek": "prek", "PREK": "prek", "  prek  ": "prek",
+		"pre-commit": "pre-commit", "husky": "", "": "", "lefthook": "",
+	}
+	for input, want := range cases {
+		if got := normalizeHookRunner(input); got != want {
+			t.Fatalf("normalizeHookRunner(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+// A repository already standardized on prek must not be told to migrate.
+func TestResolveHookRunnerDetectsAnExistingPrekSetup(t *testing.T) {
+	root := t.TempDir()
+	if got := resolveHookRunner(root, nil); got != "pre-commit" {
+		t.Fatalf("expected the default without prek.toml, got %q", got)
+	}
+	if err := os.WriteFile(filepath.Join(root, "prek.toml"), []byte("[hooks]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolveHookRunner(root, nil); got != "prek" {
+		t.Fatalf("expected prek.toml to select prek, got %q", got)
+	}
+	// An explicit saved choice outranks detection.
+	config := &rulesConfig{HookRunner: "pre-commit"}
+	if got := resolveHookRunner(root, config); got != "pre-commit" {
+		t.Fatalf("an explicit choice must win over detection, got %q", got)
+	}
+}
+
+// The hook runner is a deliberate choice. saveConfig dropping it let the next
+// regeneration silently migrate a prek repository back to pre-commit.
+func TestSaveConfigPreservesHookRunner(t *testing.T) {
+	root := t.TempDir()
+	body := `{"targets":["codex"],"agents":["git-hooks"],"languages":["go"],"paths":{"go":["."]},"hookRunner":"prek"}`
+	if err := os.WriteFile(filepath.Join(root, ".rulesrc.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A save that does not mention the runner must not erase it.
+	if err := saveConfig(root, "go", rulesConfig{
+		Targets:   []string{"codex"},
+		Agents:    []string{"git-hooks"},
+		Languages: []string{"go"},
+		Paths:     map[string][]string{"go": {"."}},
+	}); err != nil {
+		t.Fatalf("saveConfig failed: %v", err)
+	}
+
+	reloaded := loadConfig(root, "go")
+	if reloaded == nil {
+		t.Fatal("expected the saved config to reload")
+	}
+	if reloaded.HookRunner != "prek" {
+		t.Fatalf("hookRunner was lost on save: %q", reloaded.HookRunner)
+	}
+
+	// An explicit new value still wins.
+	if err := saveConfig(root, "go", rulesConfig{
+		Targets:    []string{"codex"},
+		Agents:     []string{"git-hooks"},
+		Languages:  []string{"go"},
+		Paths:      map[string][]string{"go": {"."}},
+		HookRunner: "pre-commit",
+	}); err != nil {
+		t.Fatalf("saveConfig failed: %v", err)
+	}
+	if got := loadConfig(root, "go").HookRunner; got != "pre-commit" {
+		t.Fatalf("an explicit runner should win, got %q", got)
 	}
 }
