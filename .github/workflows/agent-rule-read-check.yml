@@ -118,8 +118,11 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           set -uo pipefail
-          bash scripts/agent-rule-read-check.sh "${{ matrix.agent }}"
-          status=$?
+          # Actions runs this step under errexit, which set -uo does not clear.
+          # Without "|| status=$?" the step would die on exit 1 or 2 before the
+          # case block below, so environmental skips would surface as failures.
+          status=0
+          bash scripts/agent-rule-read-check.sh "${{ matrix.agent }}" || status=$?
           echo "status=$status" >> "$GITHUB_OUTPUT"
           case "$status" in
             0)

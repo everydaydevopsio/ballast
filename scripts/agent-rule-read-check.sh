@@ -104,7 +104,8 @@ fi
 [ -f "$RULE_FILE" ] || skip "expected rule file not installed under $RULE_DIR"
 
 # A random token, so a previous run's value can never produce a false pass.
-SENTINEL="BALLAST-RULE-READ-$(LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom | head -c 16)"
+# BALLAST_RULE_READ_SENTINEL pins it for tests that need a deterministic value.
+SENTINEL="${BALLAST_RULE_READ_SENTINEL:-BALLAST-RULE-READ-$(LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom | head -c 16)}"
 
 cat >>"$RULE_FILE" <<SENTINEL_BLOCK
 
@@ -142,10 +143,22 @@ set -e
 
 AGENT_STDERR="$(cat "$WORK_DIR/.agent.err" 2>/dev/null || true)"
 
-# Environmental failures must not read as Ballast regressions. Classify them
-# from the combined output before judging the assertion.
-COMBINED="$(printf '%s\n%s' "$AGENT_OUTPUT" "$AGENT_STDERR")"
-if printf '%s' "$COMBINED" | grep -qiE 'unauthorized|authentication|not logged in|invalid api key|401|403|429|rate limit|quota|credit balance|insufficient|overloaded|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network error|timed out'; then
+# Judge success before anything else. The sentinel is random, so it can contain
+# a digit run like 401; classifying errors first would turn a correct answer
+# into a spurious skip roughly once every thousand runs.
+if [ "$AGENT_STATUS" -eq 0 ] && printf '%s' "$AGENT_OUTPUT" | grep -qF "$SENTINEL"; then
+  echo "PASS: $AGENT read the installed rule and returned the sentinel"
+  exit "$EXIT_PASS"
+fi
+
+# Environmental failures must not read as Ballast regressions. Status codes are
+# matched on word boundaries so they cannot hit a sentinel substring, and stdout
+# is only searched when the agent actually failed -- a successful answer is
+# never a diagnostic.
+ENVIRONMENTAL_PATTERN='unauthorized|authentication|not logged in|invalid api key|\b(401|403|429)\b|rate limit|quota|credit balance|insufficient|overloaded|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network error|timed out'
+
+if printf '%s' "$AGENT_STDERR" | grep -qiE "$ENVIRONMENTAL_PATTERN" ||
+  { [ "$AGENT_STATUS" -ne 0 ] && printf '%s' "$AGENT_OUTPUT" | grep -qiE "$ENVIRONMENTAL_PATTERN"; }; then
   echo "--- agent stderr ---" >&2
   printf '%s\n' "$AGENT_STDERR" >&2
   skip "agent could not complete for environmental reasons (auth, quota, or network)"
@@ -159,11 +172,6 @@ fi
 
 if [ -z "${AGENT_OUTPUT//[[:space:]]/}" ]; then
   skip "agent produced no output"
-fi
-
-if printf '%s' "$AGENT_OUTPUT" | grep -qF "$SENTINEL"; then
-  echo "PASS: $AGENT read the installed rule and returned the sentinel"
-  exit "$EXIT_PASS"
 fi
 
 echo "--- agent output ---" >&2

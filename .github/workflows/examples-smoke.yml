@@ -109,6 +109,34 @@ jobs:
       - name: Run skills smoke test
         run: ./scripts/smoke-skills.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/.ci/ballast-examples"
 
+  agent-rule-read-selftest:
+    name: agent-rule-read-selftest
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ballast repo
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: packages/ballast-go/go.mod
+
+      - name: Build ballast-go CLI
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
+          BALLAST_VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
+          go build -C packages/ballast-go -ldflags "-X main.ballastVersion=${BALLAST_VERSION}" -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+
+      # The rule read check itself needs provider credentials and runs only on
+      # dispatch. Its pass/fail/skip classification needs no keys, so it is
+      # covered here on every PR.
+      - name: Run agent rule read check self-test
+        env:
+          BALLAST_BIN: ${{ github.workspace }}/.ci/bin/ballast-go
+        run: ./scripts/smoke/agent-rule-read-check-selftest.sh
+
   tasks-smoke:
     name: tasks-smoke
     runs-on: ubuntu-latest

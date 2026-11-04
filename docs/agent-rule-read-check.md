@@ -93,6 +93,29 @@ secrets. Because the trigger is `workflow_dispatch` only, those secrets are
 unreachable from pull requests, including from forks. Do not add a `push`,
 `pull_request`, or `pull_request_target` trigger.
 
+## How the classification logic is tested
+
+The check itself needs provider credentials, so CI cannot run it. The part worth
+protecting is the pass/fail/skip classification, and that needs no keys:
+
+```bash
+scripts/smoke/agent-rule-read-check-selftest.sh
+```
+
+It drives the real script with stub CLIs through every outcome — rule read,
+answer without reading, auth failure, rate limit, network failure, empty answer,
+missing CLI, and the `codex exec` invocation — and asserts the exit code for
+each. Two cases guard specific regressions:
+
+- A sentinel that happens to contain `401` or `429` must still PASS. Classifying
+  errors before success once turned roughly one run in a thousand into a
+  spurious skip.
+- The Actions step must capture exit `1` and `2` rather than dying on them.
+  Actions runs steps under errexit, which `set -uo pipefail` does not clear, so
+  without `|| status=$?` every environmental skip would surface as a failure.
+
+`examples-smoke.yml` runs this self-test on every pull request.
+
 ## Scope
 
 Only `claude` and `codex` are supported, because only they ship a headless CLI
