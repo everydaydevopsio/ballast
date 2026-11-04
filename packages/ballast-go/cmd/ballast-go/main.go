@@ -3304,6 +3304,11 @@ func saveConfig(projectRoot, language string, cfg rulesConfig) error {
 		if strings.TrimSpace(cfg.DeploymentModel) == "" {
 			cfg.DeploymentModel = existing.DeploymentModel
 		}
+		// The hook runner is a deliberate choice; dropping it here would let the
+		// next regeneration silently migrate a prek repository back.
+		if strings.TrimSpace(cfg.HookRunner) == "" {
+			cfg.HookRunner = existing.HookRunner
+		}
 		if strings.TrimSpace(cfg.CodeReviewer) == "" {
 			cfg.CodeReviewer = existing.CodeReviewer
 		}

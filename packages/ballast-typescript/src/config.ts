@@ -327,6 +327,28 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
  * default instead of failing the whole config load.
  */
 /**
+ * Picks the hook runner for a repository. An explicit saved choice wins;
+ * otherwise a repository already standardized on prek is detected from
+ * `prek.toml`, so Ballast does not tell it to migrate. Everything else keeps
+ * the default.
+ *
+ * Install and doctor must agree on this, or doctor reports correctly generated
+ * prek rules as drifted.
+ */
+export function resolveHookRunner(
+  projectRoot: string,
+  config?: RulesConfig | null
+): HookRunnerName {
+  if (config?.hookRunner) {
+    return config.hookRunner;
+  }
+  if (fs.existsSync(path.join(projectRoot, 'prek.toml'))) {
+    return 'prek';
+  }
+  return DEFAULT_HOOK_RUNNER;
+}
+
+/**
  * Reads a saved hook runner. An unusable value drops to undefined so the
  * default applies, rather than discarding the rest of the configuration.
  */

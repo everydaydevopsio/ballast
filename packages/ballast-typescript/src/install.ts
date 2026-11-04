@@ -48,9 +48,7 @@ import {
   DEFAULT_TASK_SYSTEM,
   DEPLOYMENT_MODELS,
   DEFAULT_DEPLOYMENT_MODEL,
-  DEFAULT_HOOK_RUNNER,
-  type HookRunnerName,
-  type RulesConfig,
+  resolveHookRunner,
   type Target,
   type TaskSystem,
   type DeploymentModel,
@@ -80,24 +78,6 @@ function prompt(question: string): Promise<string> {
       resolve((answer || '').trim());
     });
   });
-}
-
-/**
- * Picks the hook runner. An explicit saved choice wins; otherwise a repository
- * already standardized on prek is detected from `prek.toml` so Ballast does not
- * tell it to migrate to pre-commit. Everything else keeps the default.
- */
-function resolveHookRunner(
-  projectRoot: string,
-  config?: RulesConfig | null
-): HookRunnerName {
-  if (config?.hookRunner) {
-    return config.hookRunner;
-  }
-  if (fs.existsSync(path.join(projectRoot, 'prek.toml'))) {
-    return 'prek';
-  }
-  return DEFAULT_HOOK_RUNNER;
 }
 
 function resolveTsHookMode(

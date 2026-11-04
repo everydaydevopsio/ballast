@@ -6,9 +6,15 @@ import {
   DEPLOYMENT_MODELS,
   findProjectRoot,
   getRulesrcFilename,
-  loadConfig
+  loadConfig,
+  resolveHookRunner
 } from './config';
-import type { DeploymentModel, PublishingProfile, Target } from './config';
+import type {
+  DeploymentModel,
+  HookRunnerName,
+  PublishingProfile,
+  Target
+} from './config';
 import { LANGUAGES } from './agents';
 import type { Language } from './agents';
 import {
@@ -379,6 +385,7 @@ interface RuleConfig {
   deploymentModel?: string | null;
   publishingProfiles?: PublishingProfile[];
   ruleProfile?: string;
+  hookRunner?: HookRunnerName;
 }
 
 const TARGET_RULE_DIRS: Record<Target, string[]> = {
@@ -489,8 +496,13 @@ function canonicalRuleContent(
     parsed.agentId === 'git-hooks'
       ? ruleHookMode(parsed.language, config)
       : undefined;
+  // Without the runner, a prek repository's correctly generated git-hooks rule
+  // is compared against pre-commit guidance and reported as drifted.
+  const hookRunner =
+    parsed.agentId === 'git-hooks' ? config.hookRunner : undefined;
   const options = {
     ...(hookMode ? { hookMode } : {}),
+    ...(hookRunner ? { hookRunner } : {}),
     ...(Object.keys(variables).length > 0 ? { variables } : {}),
     // The core rule renders per-language command sections from the configured
     // languages; without them the canonical comparison would flag core.md
@@ -780,7 +792,8 @@ export function runDoctor(options: { fix?: boolean } = {}): number {
     taskSystem: config?.taskSystem ?? null,
     deploymentModel: config?.deploymentModel ?? null,
     publishingProfiles: config?.publishingProfiles ?? [],
-    ruleProfile: config?.ruleProfile
+    ruleProfile: config?.ruleProfile,
+    hookRunner: resolveHookRunner(projectRoot, config)
   });
   const removedRuleFiles =
     options.fix && config ? removeStaleRuleFiles(ruleFiles) : [];

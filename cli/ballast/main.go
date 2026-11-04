@@ -3338,6 +3338,9 @@ func resolveMonorepoPlan(root string, args []string) (*monorepoPlan, error) {
 		CodeReviewer:    savedCodeReviewer,
 	}
 	if config != nil {
+		// The hook runner is a deliberate choice; rebuilding the config without
+		// it would silently migrate a prek repository back to pre-commit.
+		configToSave.HookRunner = normalizeHookRunner(config.HookRunner)
 		configToSave.RuleProfile = normalizeWrapperRuleProfile(config.RuleProfile)
 		// publishingProfiles scopes which publishing rules reach the
 		// always-loaded rule set. Rebuilding the config without it silently
@@ -4967,6 +4970,14 @@ func allRuleSuffixesForAgent(agent string) []string {
 // configuredRuleSuffixesForAgent returns the rule suffixes selected by the
 // repository configuration: explicit publishing profiles when set, otherwise
 // the default active suffixes.
+func normalizeHookRunner(value string) string {
+	runner := strings.ToLower(strings.TrimSpace(value))
+	if runner == "pre-commit" || runner == "prek" {
+		return runner
+	}
+	return ""
+}
+
 func normalizeWrapperRuleProfile(value string) string {
 	profile := strings.ToLower(strings.TrimSpace(value))
 	if profile == "full" || profile == "minimal" {

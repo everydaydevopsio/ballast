@@ -3836,3 +3836,45 @@ func TestResolveHookRunnerDetectsAnExistingPrekSetup(t *testing.T) {
 		t.Fatalf("an explicit choice must win over detection, got %q", got)
 	}
 }
+
+// The hook runner is a deliberate choice. saveConfig dropping it let the next
+// regeneration silently migrate a prek repository back to pre-commit.
+func TestSaveConfigPreservesHookRunner(t *testing.T) {
+	root := t.TempDir()
+	body := `{"targets":["codex"],"agents":["git-hooks"],"languages":["go"],"paths":{"go":["."]},"hookRunner":"prek"}`
+	if err := os.WriteFile(filepath.Join(root, ".rulesrc.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A save that does not mention the runner must not erase it.
+	if err := saveConfig(root, "go", rulesConfig{
+		Targets:   []string{"codex"},
+		Agents:    []string{"git-hooks"},
+		Languages: []string{"go"},
+		Paths:     map[string][]string{"go": {"."}},
+	}); err != nil {
+		t.Fatalf("saveConfig failed: %v", err)
+	}
+
+	reloaded := loadConfig(root, "go")
+	if reloaded == nil {
+		t.Fatal("expected the saved config to reload")
+	}
+	if reloaded.HookRunner != "prek" {
+		t.Fatalf("hookRunner was lost on save: %q", reloaded.HookRunner)
+	}
+
+	// An explicit new value still wins.
+	if err := saveConfig(root, "go", rulesConfig{
+		Targets:    []string{"codex"},
+		Agents:     []string{"git-hooks"},
+		Languages:  []string{"go"},
+		Paths:      map[string][]string{"go": {"."}},
+		HookRunner: "pre-commit",
+	}); err != nil {
+		t.Fatalf("saveConfig failed: %v", err)
+	}
+	if got := loadConfig(root, "go").HookRunner; got != "pre-commit" {
+		t.Fatalf("an explicit runner should win, got %q", got)
+	}
+}

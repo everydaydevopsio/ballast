@@ -7654,3 +7654,40 @@ func TestDoctorPrintsNoDetectionSectionWithoutSubmodules(t *testing.T) {
 		t.Fatalf("expected no detection section, got %q", output)
 	}
 }
+
+// The wrapper rebuilds .rulesrc.json from detected profiles on every install.
+// Omitting the hook runner there erased a deliberate choice, so the next
+// regeneration silently migrated a prek repository back to pre-commit.
+func TestWrapperNormalizeHookRunnerAcceptsOnlyKnownRunners(t *testing.T) {
+	cases := map[string]string{
+		"prek": "prek", "PREK": "prek", "  prek  ": "prek",
+		"pre-commit": "pre-commit", "husky": "", "": "", "lefthook": "",
+	}
+	for input, want := range cases {
+		if got := normalizeHookRunner(input); got != want {
+			t.Fatalf("normalizeHookRunner(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+// A mistyped runner must drop only itself, as every scalar here must.
+func TestLoadDoctorConfigToleratesAWrongTypedHookRunner(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets":["claude"],
+  "agents":["git-hooks"],
+  "languages":["go"],
+  "paths":{"go":["."]},
+  "hookRunner":false
+}`)
+	config, err := loadDoctorConfig(root)
+	if err != nil {
+		t.Fatalf("a wrong-typed hookRunner must not make the config unreadable: %v", err)
+	}
+	if config == nil || len(config.Targets) != 1 {
+		t.Fatalf("the rest of the config must survive: %+v", config)
+	}
+	if config.HookRunner != "" {
+		t.Fatalf("expected the mistyped runner to be dropped, got %q", config.HookRunner)
+	}
+}
