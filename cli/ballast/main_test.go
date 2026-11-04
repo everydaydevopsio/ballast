@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -7161,5 +7162,174 @@ func TestReadCodeReviewer(t *testing.T) {
 	// A missing file is not an error, just an unset reviewer.
 	if got := readCodeReviewer(t.TempDir()); got != "" {
 		t.Fatalf("missing config should yield an empty reviewer, got %q", got)
+	}
+}
+
+// The wrapper aborted on a wrong-typed scalar, reporting the config as
+// unreadable, because every scalar decoded into a string and one bad value
+// failed json.Unmarshal for the whole document. Only that field should drop.
+func TestLoadDoctorConfigKeepsEveryOtherFieldWhenAScalarIsWrongTyped(t *testing.T) {
+	cases := []struct {
+		name  string
+		field string
+		value string
+	}{
+		{"codeReviewer as bool", "codeReviewer", "false"},
+		{"taskSystem as bool", "taskSystem", "false"},
+		{"deploymentModel as number", "deploymentModel", "123"},
+		{"ruleProfile as object", "ruleProfile", `{"nested":true}`},
+		{"ballastVersion as number", "ballastVersion", "5"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			root := resolvedTempDir(t)
+			body := fmt.Sprintf(`{
+  "targets":["claude"],
+  "agents":["docs"],
+  "languages":["go"],
+  "paths":{"go":["."]},
+  "tools":{"go":["go","gofumpt"]},
+  "publishingProfiles":["cli"],
+  "ruleProfile":"minimal",
+  %q:%s
+}`, testCase.field, testCase.value)
+			mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), body)
+
+			config, err := loadDoctorConfig(root)
+			if err != nil {
+				t.Fatalf("a wrong-typed %s must not make the config unreadable: %v", testCase.field, err)
+			}
+			if config == nil {
+				t.Fatalf("expected a config for a wrong-typed %s", testCase.field)
+			}
+			if len(config.Targets) != 1 || config.Targets[0] != "claude" {
+				t.Fatalf("targets did not survive: %+v", config.Targets)
+			}
+			if len(config.Agents) != 1 || config.Agents[0] != "docs" {
+				t.Fatalf("agents did not survive: %+v", config.Agents)
+			}
+			if len(config.Paths["go"]) != 1 {
+				t.Fatalf("paths did not survive: %+v", config.Paths)
+			}
+			if len(config.Tools["go"]) != 2 {
+				t.Fatalf("tools did not survive: %+v", config.Tools)
+			}
+			if len(config.PublishingProfiles) != 1 || config.PublishingProfiles[0] != "cli" {
+				t.Fatalf("publishingProfiles did not survive: %+v", config.PublishingProfiles)
+			}
+			if testCase.field != "ruleProfile" && config.RuleProfile != "minimal" {
+				t.Fatalf("ruleProfile did not survive: %q", config.RuleProfile)
+			}
+		})
+	}
+}
+
+// A malformed scalar must not survive a load/save round trip as a corrupt
+// value, and must not take the rest of the file with it.
+func TestSaveAfterLoadPreservesEveryFieldAroundAWrongTypedScalar(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets":["claude"],
+  "agents":["docs"],
+  "languages":["go"],
+  "paths":{"go":["."]},
+  "tools":{"go":["go","gofumpt"]},
+  "publishingProfiles":["cli"],
+  "ruleProfile":"minimal",
+  "codeReviewer":false
+}`)
+
+	config, err := loadDoctorConfig(root)
+	if err != nil || config == nil {
+		t.Fatalf("expected a readable config: %v", err)
+	}
+	if err := saveMonorepoConfig(root, *config); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	reloaded, err := loadDoctorConfig(root)
+	if err != nil || reloaded == nil {
+		t.Fatalf("expected the saved config to reload: %v", err)
+	}
+	if reloaded.RuleProfile != "minimal" {
+		t.Fatalf("ruleProfile was lost on save: %q", reloaded.RuleProfile)
+	}
+	if len(reloaded.PublishingProfiles) != 1 || reloaded.PublishingProfiles[0] != "cli" {
+		t.Fatalf("publishingProfiles were lost on save: %+v", reloaded.PublishingProfiles)
+	}
+	if len(reloaded.Tools["go"]) != 2 {
+		t.Fatalf("tools were lost on save: %+v", reloaded.Tools)
+	}
+	// The unusable value is dropped rather than written back out.
+	if reloaded.CodeReviewer != "" {
+		t.Fatalf("expected the mistyped reviewer to be dropped, got %q", reloaded.CodeReviewer)
+	}
+}
+
+// A structurally broken document is still an error: that is a real parse
+// failure, not one field the loader can route around.
+func TestLoadDoctorConfigStillFailsOnMalformedJSON(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{"targets":["claude",}`)
+	if _, err := loadDoctorConfig(root); err == nil {
+		t.Fatal("expected malformed JSON to remain an error")
+	}
+}
+
+func TestTolerantStringReadsOnlyJSONStrings(t *testing.T) {
+	cases := map[string]string{
+		`"jira"`:     "jira",
+		`""`:         "",
+		`false`:      "",
+		`123`:        "",
+		`null`:       "",
+		`["claude"]`: "",
+		`{"a":"b"}`:  "",
+	}
+	for raw, want := range cases {
+		if got := tolerantString(json.RawMessage(raw)); got != want {
+			t.Fatalf("tolerantString(%s) = %q, want %q", raw, got, want)
+		}
+	}
+	if got := tolerantString(nil); got != "" {
+		t.Fatalf("a missing field should yield an empty string, got %q", got)
+	}
+}
+
+// The single-field readers decode their own anonymous structs, so each needs
+// the same tolerance independently.
+func TestScalarReadersTolerateAWrongTypedValue(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets":["claude"],
+  "taskSystem":false,
+  "deploymentModel":123,
+  "codeReviewer":["bosun"]
+}`)
+	if got := readTaskSystem(root); got != "" {
+		t.Fatalf("expected a wrong-typed taskSystem to read as empty, got %q", got)
+	}
+	if got := readDeploymentModel(root); got != "" {
+		t.Fatalf("expected a wrong-typed deploymentModel to read as empty, got %q", got)
+	}
+	if got := readCodeReviewer(root); got != "" {
+		t.Fatalf("expected a wrong-typed codeReviewer to read as empty, got %q", got)
+	}
+
+	mustWriteFile(t, filepath.Join(root, ".rulesrc.json"), `{
+  "targets":["claude"],
+  "taskSystem":"jira",
+  "deploymentModel":"kubernetes",
+  "codeReviewer":"bosun"
+}`)
+	if got := readTaskSystem(root); got != "jira" {
+		t.Fatalf("taskSystem = %q, want jira", got)
+	}
+	if got := readDeploymentModel(root); got != "kubernetes" {
+		t.Fatalf("deploymentModel = %q, want kubernetes", got)
+	}
+	if got := readCodeReviewer(root); got != "bosun" {
+		t.Fatalf("codeReviewer = %q, want bosun", got)
 	}
 }

@@ -37,8 +37,42 @@ function readFlagValue(args: string[], index: number, flag: string): string {
   return value;
 }
 
+// Flags that take a value. Go's `flag` package and Python's `argparse` both
+// accept `--flag=value` natively, so this backend was the only one that dropped
+// the equals form -- silently, saving a default instead of the explicit choice.
+const VALUE_FLAGS = new Set([
+  '--target',
+  '-t',
+  '--agent',
+  '-a',
+  '--language',
+  '-l',
+  '--skill',
+  '-s',
+  '--task-system',
+  '--deployment-model',
+  '--code-reviewer',
+  '--repository-facts-file'
+]);
+
+// Rewrites `--flag=value` into `--flag value` so the parser below only has to
+// understand one form. Splitting on the first `=` keeps values that contain one,
+// such as a path or a `skill:` reviewer.
+function expandEqualsFlags(args: string[]): string[] {
+  const expanded: string[] = [];
+  for (const arg of args) {
+    const equals = arg.indexOf('=');
+    if (equals > 0 && VALUE_FLAGS.has(arg.slice(0, equals))) {
+      expanded.push(arg.slice(0, equals), arg.slice(equals + 1));
+      continue;
+    }
+    expanded.push(arg);
+  }
+  return expanded;
+}
+
 export function parseArgs(argv: string[]): ParseArgsResult {
-  const args = argv.slice(2);
+  const args = expandEqualsFlags(argv.slice(2));
   const command = args[0];
   if (command === 'doctor') {
     return args.includes('--fix')
@@ -136,17 +170,6 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       const value = readFlagValue(args, i, arg);
       options.codeReviewer = value.trim().toLowerCase();
       i += 2;
-      continue;
-    }
-    // The wrapper accepts `--code-reviewer=value` and forwards single-language
-    // installs verbatim, so without this the equals form reaches this parser
-    // unrecognized and the explicit choice is replaced by the default.
-    if (arg.startsWith('--code-reviewer=')) {
-      options.codeReviewer = arg
-        .slice('--code-reviewer='.length)
-        .trim()
-        .toLowerCase();
-      i += 1;
       continue;
     }
     if (arg === '--repository-facts-file') {
