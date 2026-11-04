@@ -35,7 +35,7 @@
     "docker-registry-publish",
     "git-branch-cleanup"
   ],
-  "ballastVersion": "5.21.3",
+  "ballastVersion": "5.22.0",
   "languages": [
     "typescript",
     "python",
@@ -84,9 +84,9 @@
   },
   "taskSystem": "github",
   "deploymentModel": "none",
+  "codeReviewer": "copilot",
   "publishingProfiles": [
     "cli",
     "libraries"
-  ],
-  "codeReviewer": "copilot"
+  ]
 }

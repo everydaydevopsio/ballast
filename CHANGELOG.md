@@ -36,6 +36,27 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.22.0] - 2026-11-04
+
+### Highlights
+
+- **New `git-branch-cleanup` skill** for cleaning up Git branches. (#404)
+- **Repository-specific code review agents:** choose which agent handles code reviews for each repository. (#402)
+
+### Fixes
+
+- Fixed installation of released `ballast-go` versions without relying on shell tooling. (#410)
+- Updated Bosun review settling to check both review publication surfaces. (#403)
+- Made release builds fail when Apple rejects notarization, preventing rejected builds from being treated as successful. (#385)
+
+### Changes
+
+- Removed the requirement for every pull request to pass through a scarce macOS runner. (#411)
+- Updated development tooling, including ESLint, Prettier, `ts-jest`, Ruff, `@types/node`, and `globals`. (#405, #400, #399, #398, #397, #388, #387)
+- Updated `golang.org/x/term` for `ballast-go`. (#396)
+
+**Full changelog:** [v5.21.3...v5.22.0](../../compare/v5.21.3...v5.22.0)
+
 ## [5.21.3] - 2026-10-01
 
 ### Highlights
