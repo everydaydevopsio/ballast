@@ -50,6 +50,24 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.22.1] - 2026-11-04
+
+### Highlights
+
+- Added support for **prek** as an alternative runner for Git hooks. (#416)
+
+### Fixes
+
+- Language profile detection now excludes Git submodules, preventing their contents from influencing the detected profile. (#414)
+- A scalar value with an incorrect type no longer causes the entire `.rulesrc.json` configuration to be discarded. (#413)
+
+### Changes
+
+- Added tests for the doctor's canonical rule comparison. (#415)
+- Added an advisory CI check to verify that Claude and Codex read agent rules. (#412)
+
+**Full changelog:** [v5.22.0...v5.22.1](../../compare/v5.22.0...v5.22.1)
+
 ## [5.22.0] - 2026-11-04
 
 ### Highlights
