@@ -1,0 +1,145 @@
+# Advisory check: do rules Ballast installs actually reach the agent?
+#
+# This workflow is dispatch-only and never gates a merge. It invokes real agent
+# CLIs, so it costs provider quota and depends on provider availability -- both
+# bad properties for a required check. The structural guarantees (rules are
+# generated, installed, and correctly formatted) are covered by CI, Examples
+# Smoke Tests, and Generated Agent Artifacts; this fills the one gap those
+# cannot: whether an agent actually loads what Ballast wrote.
+name: Agent Rule Read Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      agents:
+        description: 'Comma-separated agents to check (claude, codex)'
+        type: string
+        default: 'claude,codex'
+        required: false
+      ref:
+        description: 'Ref to check out (defaults to the dispatch ref)'
+        type: string
+        required: false
+
+# Dispatch-only by design. Adding push, pull_request, or pull_request_target
+# would expose the provider secrets below to untrusted code.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  select:
+    name: Select agents
+    runs-on: ubuntu-latest
+    outputs:
+      agents: ${{ steps.parse.outputs.agents }}
+    steps:
+      - name: Parse requested agents
+        id: parse
+        env:
+          REQUESTED: ${{ inputs.agents }}
+        run: |
+          set -euo pipefail
+          requested="${REQUESTED:-claude,codex}"
+          selected=''
+          IFS=',' read -ra entries <<< "$requested"
+          for entry in "${entries[@]}"; do
+            agent="$(echo "$entry" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+            case "$agent" in
+              claude|codex)
+                selected="${selected:+$selected,}\"$agent\""
+                ;;
+              '')
+                ;;
+              *)
+                echo "::error::Unsupported agent '$agent'. Only claude and codex have a headless CLI this check can drive." >&2
+                exit 1
+                ;;
+            esac
+          done
+          if [ -z "$selected" ]; then
+            echo "::error::No supported agents selected." >&2
+            exit 1
+          fi
+          echo "agents=[$selected]" >> "$GITHUB_OUTPUT"
+
+  rule-read:
+    name: ${{ matrix.agent }}
+    needs: select
+    runs-on: ubuntu-latest
+    # A provider outage, an expired key, or an exhausted quota must never read
+    # as a Ballast regression.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: ${{ fromJSON(needs.select.outputs.agents) }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: packages/ballast-go/go.mod
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+
+      - name: Build ballast-go backend
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.ci/bin"
+          BALLAST_VERSION="$(node -p "require('./packages/ballast-typescript/package.json').version")"
+          go build -C packages/ballast-go -ldflags "-X main.ballastVersion=${BALLAST_VERSION}" -o "$GITHUB_WORKSPACE/.ci/bin/ballast-go" ./cmd/ballast-go
+
+      - name: Install Claude Code CLI
+        if: matrix.agent == 'claude'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Install Codex CLI
+        if: matrix.agent == 'codex'
+        run: npm install -g @openai/codex
+
+      - name: Run rule read check
+        id: check
+        env:
+          BALLAST_BIN: ${{ github.workspace }}/.ci/bin/ballast-go
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # codex exec authenticates from CODEX_API_KEY; fall back to the
+          # conventional OPENAI_API_KEY secret name when that is what is set.
+          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}
+        run: |
+          set -uo pipefail
+          # Actions runs this step under errexit, which set -uo does not clear.
+          # Without "|| status=$?" the step would die on exit 1 or 2 before the
+          # case block below, so environmental skips would surface as failures.
+          status=0
+          bash scripts/agent-rule-read-check.sh "${{ matrix.agent }}" || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          case "$status" in
+            0)
+              echo "### ${{ matrix.agent }}: rules reached the agent" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            2)
+              # Reported distinctly from an assertion failure, and not fatal.
+              echo "### ${{ matrix.agent }}: skipped (environment)" >> "$GITHUB_STEP_SUMMARY"
+              echo "The check could not run -- missing CLI, auth, quota, or network. This is not a Ballast finding." >> "$GITHUB_STEP_SUMMARY"
+              echo "::notice title=${{ matrix.agent }} skipped::Environmental failure, not a rule regression."
+              exit 0
+              ;;
+            *)
+              echo "### ${{ matrix.agent }}: NO evidence the rules were read" >> "$GITHUB_STEP_SUMMARY"
+              echo "::warning title=${{ matrix.agent }} rule read failed::The agent answered without reading the installed rule."
+              ;;
+          esac
+          exit "$status"
