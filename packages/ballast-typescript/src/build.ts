@@ -55,6 +55,10 @@ interface HookRunnerVocabulary {
   verifyAfterChanges: string;
   /** Extra lines appended where the runner needs them, such as config discovery. */
   extra: string[];
+  /** Names the config file to edit, for a language's verb and location. */
+  configLine: (verb: string, location: string) => string;
+  /** Where the Gitleaks hook is declared, phrased for this runner. */
+  gitleaks: string;
   /** How this runner reaches nested configs in a multi-module repository. */
   nestedConfigs: string;
   /** The instruction for invoking those nested configs. */
@@ -74,28 +78,42 @@ const HOOK_RUNNERS: Record<HookRunner, HookRunnerVocabulary> = {
     verifyAfterChanges:
       '- Re-run `pre-commit run --all-files` after hook changes.',
     extra: [],
+    configLine: (verb, location) =>
+      `- ${verb} \`.pre-commit-config.yaml\` at ${location}.`,
+    gitleaks:
+      '- Add the official `gitleaks` pre-commit hook in `.pre-commit-config.yaml` for secret detection; do not generate or call a repo-local no-secrets shell script.',
     nestedConfigs: 'with `sub-pre-commit`',
     nestedConfigLine:
       '- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.'
   },
   prek: {
     name: '`prek`',
-    // prek installs every configured stage in one command, so there is no
-    // separate pre-push invocation.
+    // prek installs only the pre-commit shim by default:
+    // default_install_hook_types defaults to [pre-commit], and a hook's own
+    // `stages: [pre-push]` does not install that shim. Without the second
+    // line, push-time tests never run.
     install: [
-      '- Install hooks for every configured stage, including `pre-push`, with `prek install`.'
+      '- Install hooks with `prek install`.',
+      '- Install the pre-push hook with `prek install --hook-type pre-push`, or set `default_install_hook_types: [pre-commit, pre-push]` in the config so `prek install` covers both.'
     ],
     update: '- Keep pinned hook versions current with `prek update`.',
     verify: '- Verify the hook configuration with `prek run --all-files`.',
     verifyAfterChanges: '- Re-run `prek run --all-files` after hook changes.',
     extra: [
-      '- prek reads the root `.pre-commit-config.yaml` or `prek.toml`, and discovers nested workspace configs; the root config is what installs the Git hooks.',
+      '- prek discovers nested workspace configs, but the root config is what installs the Git hooks.',
       '- Check the configuration itself with `prek validate-config`.'
     ],
+    // prek reads prek.toml in preference to .pre-commit-config.yaml when both
+    // are present, so adding YAML beside an existing TOML config produces a
+    // file whose hooks never run.
+    configLine: (verb, location) =>
+      `- ${verb} the project config at ${location}: edit the existing \`prek.toml\` or \`.pre-commit-config.yaml\`, and create \`.pre-commit-config.yaml\` only when neither exists. prek uses \`prek.toml\` when both are present, so do not add YAML beside it.`,
+    gitleaks:
+      '- Add the official `gitleaks` hook to that config for secret detection; do not generate or call a repo-local no-secrets shell script.',
     // prek walks workspace configs natively, so no fan-out helper is needed.
     nestedConfigs: 'through its own workspace discovery',
     nestedConfigLine:
-      '- Let prek discover nested `.pre-commit-config.yaml` files in Go subprojects; no fan-out helper hook is required.'
+      '- Let prek discover nested project configs in Go subprojects; no fan-out helper hook is required.'
   }
 };
 
@@ -348,8 +366,7 @@ function renderGitHooksGuidance(
 ): string {
   const hookMode = getHookMode('git-hooks', language, options);
   const runner = hookRunnerVocabulary(options?.hookRunner);
-  const gitleaksHookGuidance =
-    '- Add the official `gitleaks` pre-commit hook in `.pre-commit-config.yaml` for secret detection; do not generate or call a repo-local no-secrets shell script.';
+  const gitleaksHookGuidance = runner.gitleaks;
   if (language === 'typescript') {
     if (hookMode === 'husky') {
       return [
@@ -368,7 +385,7 @@ function renderGitHooksGuidance(
     return [
       `Use ${runner.name} for this repository layout.`,
       '',
-      '- Create `.pre-commit-config.yaml` at the repo root.',
+      runner.configLine('Create', 'the repo root'),
       ...runner.install,
       '- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.',
       gitleaksHookGuidance,
@@ -382,7 +399,7 @@ function renderGitHooksGuidance(
     return [
       `Use ${runner.name} for Python projects.`,
       '',
-      '- Create `.pre-commit-config.yaml` at the repo root.',
+      runner.configLine('Create', 'the repo root'),
       ...runner.install,
       '- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.',
       gitleaksHookGuidance,
@@ -397,7 +414,7 @@ function renderGitHooksGuidance(
     return [
       `Use ${runner.name} for Go projects, and fan out to language-local configs ${runner.nestedConfigs} when needed.`,
       '',
-      '- Create or update `.pre-commit-config.yaml` at the repo root.',
+      runner.configLine('Create or update', 'the repo root'),
       runner.nestedConfigLine,
       ...runner.install,
       '- Configure the pre-push stage to run Go unit tests for each module.',
@@ -413,7 +430,7 @@ function renderGitHooksGuidance(
     return [
       `Use ${runner.name} for Ansible repositories.`,
       '',
-      '- Create or update `.pre-commit-config.yaml` at the repo root.',
+      runner.configLine('Create or update', 'the repo root'),
       ...runner.install,
       '- Run `ansible-lint` and `yamllint` from the pre-commit stage.',
       '- Run `ansible-playbook --syntax-check` for representative top-level playbooks from the pre-push stage.',
@@ -430,7 +447,7 @@ function renderGitHooksGuidance(
     return [
       `Use ${runner.name} for Terraform repositories.`,
       '',
-      '- Create or update `.pre-commit-config.yaml` at the repo root.',
+      runner.configLine('Create or update', 'the repo root'),
       '- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.',
       ...runner.install,
       '- Run `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .` from the hook configuration; keep `tfsec` only for legacy-compatible pipelines.',
@@ -447,7 +464,10 @@ function renderGitHooksGuidance(
     return [
       `Use ${runner.name} for Dart and Flutter repositories.`,
       '',
-      '- Create or update `.pre-commit-config.yaml` at the Flutter app root or monorepo root.',
+      runner.configLine(
+        'Create or update',
+        'the Flutter app root or monorepo root'
+      ),
       ...runner.install,
       '- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.',
       '- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.',
@@ -463,7 +483,7 @@ function renderGitHooksGuidance(
     return [
       `Use ${runner.name} for Dockerfile and container configuration repositories.`,
       '',
-      '- Create or update `.pre-commit-config.yaml` at the repo root.',
+      runner.configLine('Create or update', 'the repo root'),
       ...runner.install,
       '- Run `hadolint` for Dockerfiles and `docker compose config` for Compose files from the pre-commit stage.',
       '- Run image build and smoke checks from the pre-push stage only when they are deterministic and do not require registry credentials.',

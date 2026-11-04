@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import metadata
@@ -1045,6 +1046,8 @@ DEFAULT_HOOK_RUNNER = "pre-commit"
 class HookRunnerVocabulary:
     name: str
     install: list[str]
+    config_line: Callable[[str, str], str]
+    gitleaks: str
     update: str
     verify: str
     verify_after_changes: str
@@ -1060,6 +1063,14 @@ _HOOK_RUNNER_VOCABULARY: dict[str, HookRunnerVocabulary] = {
             "- Install hooks with `pre-commit install`.",
             "- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
         ],
+        config_line=lambda verb, location: (
+            f"- {verb} `.pre-commit-config.yaml` at {location}."
+        ),
+        gitleaks=(
+            "- Add the official `gitleaks` pre-commit hook in "
+            "`.pre-commit-config.yaml` for secret detection; do not generate or "
+            "call a repo-local no-secrets shell script."
+        ),
         update="- Keep the configuration current with `pre-commit autoupdate`.",
         verify="- Verify the hook configuration with `pre-commit run --all-files`.",
         verify_after_changes="- Re-run `pre-commit run --all-files` after hook changes.",
@@ -1072,17 +1083,35 @@ _HOOK_RUNNER_VOCABULARY: dict[str, HookRunnerVocabulary] = {
     ),
     "prek": HookRunnerVocabulary(
         name="`prek`",
-        # prek installs every configured stage in one command.
+        # prek installs only the pre-commit shim by default:
+        # default_install_hook_types defaults to [pre-commit], and a hook's own
+        # `stages: [pre-push]` does not install that shim.
         install=[
-            "- Install hooks for every configured stage, including `pre-push`, with `prek install`."
+            "- Install hooks with `prek install`.",
+            "- Install the pre-push hook with `prek install --hook-type pre-push`, "
+            "or set `default_install_hook_types: [pre-commit, pre-push]` in the "
+            "config so `prek install` covers both.",
         ],
+        # prek reads prek.toml in preference to .pre-commit-config.yaml when both
+        # exist, so adding YAML beside an existing TOML config produces a file
+        # whose hooks never run.
+        config_line=lambda verb, location: (
+            f"- {verb} the project config at {location}: edit the existing "
+            "`prek.toml` or `.pre-commit-config.yaml`, and create "
+            "`.pre-commit-config.yaml` only when neither exists. prek uses "
+            "`prek.toml` when both are present, so do not add YAML beside it."
+        ),
+        gitleaks=(
+            "- Add the official `gitleaks` hook to that config for secret "
+            "detection; do not generate or call a repo-local no-secrets shell "
+            "script."
+        ),
         update="- Keep pinned hook versions current with `prek update`.",
         verify="- Verify the hook configuration with `prek run --all-files`.",
         verify_after_changes="- Re-run `prek run --all-files` after hook changes.",
         extra=[
-            "- prek reads the root `.pre-commit-config.yaml` or `prek.toml`, and "
-            "discovers nested workspace configs; the root config is what installs "
-            "the Git hooks.",
+            "- prek discovers nested workspace configs, but the root config is "
+            "what installs the Git hooks.",
             "- Check the configuration itself with `prek validate-config`.",
         ],
         nested_configs="through its own workspace discovery",
@@ -1110,10 +1139,7 @@ def render_git_hooks_guidance(
     language: str, hook_mode: str, hook_runner: str | None = None
 ) -> str:
     runner = hook_runner_vocabulary(hook_runner)
-    gitleaks_hook_guidance = (
-        "- Add the official `gitleaks` pre-commit hook in `.pre-commit-config.yaml` "
-        "for secret detection; do not generate or call a repo-local no-secrets shell script."
-    )
+    gitleaks_hook_guidance = runner.gitleaks
     if language == "typescript":
         if hook_mode == "husky":
             return "\n".join(
@@ -1130,7 +1156,7 @@ def render_git_hooks_guidance(
         return "\n".join(
             [
                 f"- Use {runner.name} for this repository layout.",
-                "- Create `.pre-commit-config.yaml` at the repo root.",
+                runner.config_line("Create", "the repo root"),
                 *runner.install,
                 "- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.",
                 gitleaks_hook_guidance,
@@ -1143,7 +1169,7 @@ def render_git_hooks_guidance(
         return "\n".join(
             [
                 f"- Use {runner.name} for Python projects.",
-                "- Create `.pre-commit-config.yaml` at the repo root.",
+                runner.config_line("Create", "the repo root"),
                 *runner.install,
                 "- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.",
                 gitleaks_hook_guidance,
@@ -1157,7 +1183,7 @@ def render_git_hooks_guidance(
         return "\n".join(
             [
                 f"- Use {runner.name} for Go projects, and fan out to language-local configs {runner.nested_configs} when needed.",
-                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                runner.config_line("Create or update", "the repo root"),
                 runner.nested_config_line,
                 *runner.install,
                 "- Configure the pre-push stage to run Go unit tests for each module.",
@@ -1172,7 +1198,7 @@ def render_git_hooks_guidance(
         return "\n".join(
             [
                 f"- Use {runner.name} for Ansible repositories.",
-                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                runner.config_line("Create or update", "the repo root"),
                 *runner.install,
                 "- Run `ansible-lint` and `yamllint` from the pre-commit stage.",
                 "- Run `ansible-playbook --syntax-check` for representative top-level playbooks from the pre-push stage.",
@@ -1188,7 +1214,7 @@ def render_git_hooks_guidance(
         return "\n".join(
             [
                 f"- Use {runner.name} for Terraform repositories.",
-                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                runner.config_line("Create or update", "the repo root"),
                 "- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.",
                 *runner.install,
                 "- Run `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .` from the hook configuration; keep `tfsec` only for legacy-compatible pipelines.",
@@ -1204,7 +1230,9 @@ def render_git_hooks_guidance(
         return "\n".join(
             [
                 f"- Use {runner.name} for Dart and Flutter repositories.",
-                "- Create or update `.pre-commit-config.yaml` at the Flutter app root or monorepo root.",
+                runner.config_line(
+                    "Create or update", "the Flutter app root or monorepo root"
+                ),
                 *runner.install,
                 "- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.",
                 "- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.",
@@ -1219,7 +1247,7 @@ def render_git_hooks_guidance(
         return "\n".join(
             [
                 f"- Use {runner.name} for Dockerfile and container configuration repositories.",
-                "- Create or update `.pre-commit-config.yaml` at the repo root.",
+                runner.config_line("Create or update", "the repo root"),
                 *runner.install,
                 "- Run `hadolint` for Dockerfiles and `docker compose config` for Compose files from the pre-commit stage.",
                 "- Run image build and smoke checks from the pre-push stage only when they are deterministic and do not require registry credentials.",

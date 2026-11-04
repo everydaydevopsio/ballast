@@ -36,14 +36,19 @@ The hook *policy* is the same whichever runner you use: fast checks at commit ti
 
 | | `pre-commit` (default) | `prek` |
 | --- | --- | --- |
-| Install hooks | `pre-commit install` and `pre-commit install --hook-type pre-push` | `prek install` (covers every configured stage) |
+| Install hooks | `pre-commit install` and `pre-commit install --hook-type pre-push` | `prek install` and `prek install --hook-type pre-push` |
 | Update pinned hooks | `pre-commit autoupdate` | `prek update` |
 | Run everything | `pre-commit run --all-files` | `prek run --all-files` |
 | Validate the config | — | `prek validate-config` |
-| Config file | `.pre-commit-config.yaml` | `.pre-commit-config.yaml` or `prek.toml` |
+| Config file | `.pre-commit-config.yaml` | `prek.toml` or `.pre-commit-config.yaml` |
 | Nested configs | `sub-pre-commit` hooks | discovered automatically |
 
 [prek](https://prek.j178.dev/) reads the same `.pre-commit-config.yaml`, so switching runners does not mean rewriting hook definitions. With either runner the **root** config is what installs the Git hooks, even when nested workspace configs exist.
+
+Two prek behaviours the generated guidance accounts for:
+
+- **`prek install` installs only the `pre-commit` shim.** Its `default_install_hook_types` defaults to `[pre-commit]`, and declaring `stages: [pre-push]` on a hook does *not* install that shim. Install it explicitly with `prek install --hook-type pre-push`, or set `default_install_hook_types: [pre-commit, pre-push]` in the config. Without this, push-time tests never run.
+- **`prek.toml` wins over `.pre-commit-config.yaml`.** When both exist in the same directory prek uses the TOML file, so adding YAML beside an existing TOML config produces a file whose hooks are silently ignored. Edit whichever config already exists, and create `.pre-commit-config.yaml` only when neither does.
 
 ### Choosing a runner
 

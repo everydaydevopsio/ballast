@@ -2941,6 +2941,8 @@ func readTemplate(agentID, language, filename, suffix string) (string, error) {
 type hookRunnerVocab struct {
 	name               string
 	install            []string
+	configLine         func(verb, location string) string
+	gitleaks           string
 	update             string
 	verify             string
 	verifyAfterChanges string
@@ -2953,17 +2955,29 @@ func hookRunnerVocabulary(runner string) hookRunnerVocab {
 	if runner == "prek" {
 		return hookRunnerVocab{
 			name: "`prek`",
-			// prek installs every configured stage in one command.
-			install:            []string{"- Install hooks for every configured stage, including `pre-push`, with `prek install`."},
+			// prek installs only the pre-commit shim by default:
+			// default_install_hook_types defaults to [pre-commit], and a hook's
+			// own `stages: [pre-push]` does not install that shim.
+			install: []string{
+				"- Install hooks with `prek install`.",
+				"- Install the pre-push hook with `prek install --hook-type pre-push`, or set `default_install_hook_types: [pre-commit, pre-push]` in the config so `prek install` covers both.",
+			},
+			// prek reads prek.toml in preference to .pre-commit-config.yaml when
+			// both exist, so adding YAML beside an existing TOML config produces
+			// a file whose hooks never run.
+			configLine: func(verb, location string) string {
+				return fmt.Sprintf("- %s the project config at %s: edit the existing `prek.toml` or `.pre-commit-config.yaml`, and create `.pre-commit-config.yaml` only when neither exists. prek uses `prek.toml` when both are present, so do not add YAML beside it.", verb, location)
+			},
+			gitleaks:           "- Add the official `gitleaks` hook to that config for secret detection; do not generate or call a repo-local no-secrets shell script.",
 			update:             "- Keep pinned hook versions current with `prek update`.",
 			verify:             "- Verify the hook configuration with `prek run --all-files`.",
 			verifyAfterChanges: "- Re-run `prek run --all-files` after hook changes.",
 			extra: []string{
-				"- prek reads the root `.pre-commit-config.yaml` or `prek.toml`, and discovers nested workspace configs; the root config is what installs the Git hooks.",
+				"- prek discovers nested workspace configs, but the root config is what installs the Git hooks.",
 				"- Check the configuration itself with `prek validate-config`.",
 			},
 			nestedConfigs:    "through its own workspace discovery",
-			nestedConfigLine: "- Let prek discover nested `.pre-commit-config.yaml` files in Go subprojects; no fan-out helper hook is required.",
+			nestedConfigLine: "- Let prek discover nested project configs in Go subprojects; no fan-out helper hook is required.",
 		}
 	}
 	return hookRunnerVocab{
@@ -2972,6 +2986,10 @@ func hookRunnerVocabulary(runner string) hookRunnerVocab {
 			"- Install hooks with `pre-commit install`.",
 			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
 		},
+		configLine: func(verb, location string) string {
+			return fmt.Sprintf("- %s `.pre-commit-config.yaml` at %s.", verb, location)
+		},
+		gitleaks:           "- Add the official `gitleaks` pre-commit hook in `.pre-commit-config.yaml` for secret detection; do not generate or call a repo-local no-secrets shell script.",
 		update:             "- Keep the configuration current with `pre-commit autoupdate`.",
 		verify:             "- Verify the hook configuration with `pre-commit run --all-files`.",
 		verifyAfterChanges: "- Re-run `pre-commit run --all-files` after hook changes.",
@@ -2982,7 +3000,7 @@ func hookRunnerVocabulary(runner string) hookRunnerVocab {
 
 func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
 	runner := hookRunnerVocabulary(hookRunner)
-	gitleaksHookGuidance := "- Add the official `gitleaks` pre-commit hook in `.pre-commit-config.yaml` for secret detection; do not generate or call a repo-local no-secrets shell script."
+	gitleaksHookGuidance := runner.gitleaks
 	switch language {
 	case "typescript":
 		if hookMode == "husky" {
@@ -2998,7 +3016,7 @@ func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
 		}
 		return strings.Join([]string{
 			fmt.Sprintf("- Use %s for this repository layout.", runner.name),
-			"- Create `.pre-commit-config.yaml` at the repo root.",
+			runner.configLine("Create", "the repo root"),
 			strings.Join(runner.install, "\n"),
 			"- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.",
 			gitleaksHookGuidance,
@@ -3009,7 +3027,7 @@ func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
 	case "python":
 		return strings.Join([]string{
 			fmt.Sprintf("- Use %s for Python projects.", runner.name),
-			"- Create `.pre-commit-config.yaml` at the repo root.",
+			runner.configLine("Create", "the repo root"),
 			strings.Join(runner.install, "\n"),
 			"- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.",
 			gitleaksHookGuidance,
@@ -3021,7 +3039,7 @@ func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
 	case "go":
 		return strings.Join([]string{
 			fmt.Sprintf("- Use %s for Go projects, and fan out to language-local configs %s when needed.", runner.name, runner.nestedConfigs),
-			"- Create or update `.pre-commit-config.yaml` at the repo root.",
+			runner.configLine("Create or update", "the repo root"),
 			runner.nestedConfigLine,
 			strings.Join(runner.install, "\n"),
 			"- Configure the pre-push stage to run Go unit tests for each module.",
@@ -3034,7 +3052,7 @@ func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
 	case "ansible":
 		return strings.Join([]string{
 			fmt.Sprintf("- Use %s for Ansible repositories.", runner.name),
-			"- Create or update `.pre-commit-config.yaml` at the repo root.",
+			runner.configLine("Create or update", "the repo root"),
 			strings.Join(runner.install, "\n"),
 			"- Run `ansible-lint` and `yamllint` from the pre-commit stage.",
 			"- Run `ansible-playbook --syntax-check` for representative top-level playbooks from the pre-push stage.",
@@ -3048,7 +3066,7 @@ func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
 	case "terraform":
 		return strings.Join([]string{
 			fmt.Sprintf("- Use %s for Terraform repositories.", runner.name),
-			"- Create or update `.pre-commit-config.yaml` at the repo root.",
+			runner.configLine("Create or update", "the repo root"),
 			"- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.",
 			strings.Join(runner.install, "\n"),
 			"- Run `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .` from the hook configuration; keep `tfsec` only for legacy-compatible pipelines.",
@@ -3062,7 +3080,7 @@ func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
 	case "dart":
 		return strings.Join([]string{
 			fmt.Sprintf("- Use %s for Dart and Flutter repositories.", runner.name),
-			"- Create or update `.pre-commit-config.yaml` at the Flutter app root or monorepo root.",
+			runner.configLine("Create or update", "the Flutter app root or monorepo root"),
 			strings.Join(runner.install, "\n"),
 			"- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.",
 			"- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.",
@@ -3075,7 +3093,7 @@ func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
 	case "docker":
 		return strings.Join([]string{
 			fmt.Sprintf("- Use %s for Dockerfile and container configuration repositories.", runner.name),
-			"- Create or update `.pre-commit-config.yaml` at the repo root.",
+			runner.configLine("Create or update", "the repo root"),
 			strings.Join(runner.install, "\n"),
 			"- Run `hadolint` for Dockerfiles and `docker compose config` for Compose files from the pre-commit stage.",
 			"- Run image build and smoke checks from the pre-push stage only when they are deterministic and do not require registry credentials.",

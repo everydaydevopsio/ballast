@@ -1607,6 +1607,13 @@ describe('hook runner selection', () => {
 
     for (const required of [
       '`prek install`',
+      // prek only installs the pre-commit shim by default, so the pre-push
+      // shim must be installed explicitly or push-time tests never run.
+      'prek install --hook-type pre-push',
+      'default_install_hook_types',
+      // prek prefers prek.toml, so guidance must not tell a TOML repository
+      // to create YAML beside it.
+      'prek.toml` when both are present',
       '`prek run --all-files`',
       '`prek update`',
       '`prek validate-config`'

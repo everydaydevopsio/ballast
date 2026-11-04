@@ -729,6 +729,12 @@ class PatchInstallTests(unittest.TestCase):
             guidance = cli.render_git_hooks_guidance(language, "pre-commit", "prek")
             for required in (
                 "`prek install`",
+                # prek only installs the pre-commit shim by default, so the
+                # pre-push shim must be installed explicitly.
+                "prek install --hook-type pre-push",
+                "default_install_hook_types",
+                # prek prefers prek.toml over YAML when both exist.
+                "prek.toml` when both are present",
                 "`prek run --all-files`",
                 "`prek update`",
                 "`prek validate-config`",
