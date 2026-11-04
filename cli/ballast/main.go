@@ -246,6 +246,7 @@ type monorepoConfig struct {
 	TaskSystem         string              `json:"taskSystem,omitempty"`
 	DeploymentModel    string              `json:"deploymentModel,omitempty"`
 	CodeReviewer       string              `json:"codeReviewer,omitempty"`
+	HookRunner         string              `json:"hookRunner,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 	RuleProfile        string              `json:"ruleProfile,omitempty"`
 }
@@ -275,6 +276,7 @@ type rawMonorepoConfig struct {
 	TaskSystem         json.RawMessage     `json:"taskSystem,omitempty"`
 	DeploymentModel    json.RawMessage     `json:"deploymentModel,omitempty"`
 	CodeReviewer       json.RawMessage     `json:"codeReviewer,omitempty"`
+	HookRunner         json.RawMessage     `json:"hookRunner,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 	RuleProfile        json.RawMessage     `json:"ruleProfile,omitempty"`
 }
@@ -315,6 +317,7 @@ func decodeMonorepoConfig(data []byte, path string) (*monorepoConfig, error) {
 		TaskSystem:         tolerantString(raw.TaskSystem),
 		DeploymentModel:    tolerantString(raw.DeploymentModel),
 		CodeReviewer:       tolerantString(raw.CodeReviewer),
+		HookRunner:         tolerantString(raw.HookRunner),
 		PublishingProfiles: raw.PublishingProfiles,
 		RuleProfile:        tolerantString(raw.RuleProfile),
 	}
@@ -1458,6 +1461,9 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	if strings.TrimSpace(config.CodeReviewer) != "" {
 		fmt.Printf("- codeReviewer: %s\n", config.CodeReviewer)
+	}
+	if strings.TrimSpace(config.HookRunner) != "" {
+		fmt.Printf("- hookRunner: %s\n", config.HookRunner)
 	}
 	if strings.TrimSpace(config.DeploymentModel) != "" {
 		fmt.Printf("- deploymentModel: %s\n", config.DeploymentModel)

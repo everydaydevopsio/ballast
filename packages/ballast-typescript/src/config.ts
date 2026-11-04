@@ -23,6 +23,14 @@ export const DEFAULT_DEPLOYMENT_MODEL = 'none' as const;
  * `normalizeCodeReviewer`.
  */
 export const CODE_REVIEWERS = ['copilot', 'bosun', 'none'] as const;
+
+/**
+ * Hook runners Ballast will write guidance for. prek reads the same
+ * `.pre-commit-config.yaml` as pre-commit, so the policy is identical and only
+ * the commands differ.
+ */
+export const HOOK_RUNNERS = ['pre-commit', 'prek'] as const;
+export const DEFAULT_HOOK_RUNNER = 'pre-commit' as const;
 export const DEFAULT_CODE_REVIEWER = 'copilot' as const;
 /** Prefix marking a user-defined reviewer implemented as a skill. */
 export const CUSTOM_CODE_REVIEWER_PREFIX = 'skill:';
@@ -51,6 +59,7 @@ export type Target = (typeof TARGETS)[number];
 export type TaskSystem = (typeof TASK_SYSTEMS)[number];
 export type DeploymentModel = (typeof DEPLOYMENT_MODELS)[number];
 export type BuiltInCodeReviewer = (typeof CODE_REVIEWERS)[number];
+export type HookRunnerName = (typeof HOOK_RUNNERS)[number];
 export type CodeReviewer = BuiltInCodeReviewer | `skill:${string}`;
 export type PublishingProfile = (typeof PUBLISHING_PROFILES)[number];
 
@@ -87,6 +96,7 @@ export interface RulesConfig {
   taskSystem?: TaskSystem;
   deploymentModel?: DeploymentModel;
   codeReviewer?: CodeReviewer;
+  hookRunner?: HookRunnerName;
   publishingProfiles?: PublishingProfile[];
   ruleProfile?: RuleProfile;
 }
@@ -287,6 +297,10 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
     nextConfig = { ...nextConfig, deploymentModel };
   }
 
+  const hookRunner = config.hookRunner ?? existing?.hookRunner;
+  if (hookRunner) {
+    nextConfig = { ...nextConfig, hookRunner };
+  }
   const codeReviewer = config.codeReviewer ?? existing?.codeReviewer;
   if (codeReviewer) {
     nextConfig = { ...nextConfig, codeReviewer };
@@ -312,6 +326,19 @@ export function saveConfig(config: RulesConfig, projectRoot?: string): void {
  * normalization: an unreadable value is dropped so the caller falls back to the
  * default instead of failing the whole config load.
  */
+/**
+ * Reads a saved hook runner. An unusable value drops to undefined so the
+ * default applies, rather than discarding the rest of the configuration.
+ */
+export function normalizeHookRunner(value: unknown): HookRunnerName | null {
+  if (typeof value !== 'string') return null;
+  const runner = value.trim().toLowerCase();
+  if ((HOOK_RUNNERS as readonly string[]).includes(runner)) {
+    return runner as HookRunnerName;
+  }
+  return null;
+}
+
 export function normalizeCodeReviewer(value: unknown): CodeReviewer | null {
   if (typeof value !== 'string') return null;
   const reviewer = value.trim().toLowerCase();
@@ -357,6 +384,7 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     taskSystem?: unknown;
     deploymentModel?: unknown;
     codeReviewer?: unknown;
+    hookRunner?: unknown;
     publishingProfiles?: unknown;
     ruleProfile?: unknown;
   };
@@ -413,6 +441,10 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
     if ((DEPLOYMENT_MODELS as readonly string[]).includes(deploymentModel)) {
       config.deploymentModel = deploymentModel as DeploymentModel;
     }
+  }
+  const hookRunner = normalizeHookRunner(record.hookRunner);
+  if (hookRunner) {
+    config.hookRunner = hookRunner;
   }
   const codeReviewer = normalizeCodeReviewer(record.codeReviewer);
   if (codeReviewer) {

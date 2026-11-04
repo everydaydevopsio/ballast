@@ -138,6 +138,7 @@ type rulesConfig struct {
 	TaskSystem         string              `json:"taskSystem,omitempty"`
 	DeploymentModel    string              `json:"deploymentModel,omitempty"`
 	CodeReviewer       string              `json:"codeReviewer,omitempty"`
+	HookRunner         string              `json:"hookRunner,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 	RuleProfile        string              `json:"ruleProfile,omitempty"`
 }
@@ -168,6 +169,7 @@ type rawRulesConfig struct {
 	TaskSystem         json.RawMessage     `json:"taskSystem,omitempty"`
 	DeploymentModel    json.RawMessage     `json:"deploymentModel,omitempty"`
 	CodeReviewer       json.RawMessage     `json:"codeReviewer,omitempty"`
+	HookRunner         json.RawMessage     `json:"hookRunner,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
 	RuleProfile        json.RawMessage     `json:"ruleProfile,omitempty"`
 }
@@ -1013,6 +1015,7 @@ func install(opts installOptions) installResult {
 	disableSupportFiles := os.Getenv("BALLAST_DISABLE_SUPPORT_FILES") == "1"
 	refreshManagedSkills := os.Getenv("BALLAST_REFRESH_SKILLS") == "1"
 	hookMode := resolveTsHookMode(opts.projectRoot, opts.language)
+	hookRunner := resolveHookRunner(opts.projectRoot, loadConfig(opts.projectRoot, opts.language))
 	targets := normalizeTargets(opts.targets)
 	if len(targets) == 0 {
 		result.errors = append(result.errors, agentError{agent: "target", err: "No targets selected"})
@@ -1113,7 +1116,7 @@ func install(opts installOptions) installResult {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
 				}
-				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, opts.taskSystem, opts.deploymentModel, buildOptions{tools: effectiveTools, languages: configuredLanguages})
+				content, err := buildContent(agentID, target, opts.language, suffix, hookMode, hookRunner, opts.taskSystem, opts.deploymentModel, buildOptions{tools: effectiveTools, languages: configuredLanguages})
 				if err != nil {
 					result.errors = append(result.errors, agentError{agent: agentID, err: err.Error()})
 					continue
@@ -2248,8 +2251,8 @@ func joinSupportSectionParts(prefix, section, suffix string) string {
 	) + "\n"
 }
 
-func buildContent(agentID, target, language, suffix, hookMode, taskSystem, deploymentModel string, options ...buildOptions) (string, error) {
-	content, err := readContent(agentID, language, suffix, hookMode, taskSystem, deploymentModel)
+func buildContent(agentID, target, language, suffix, hookMode, hookRunner, taskSystem, deploymentModel string, options ...buildOptions) (string, error) {
+	content, err := readContent(agentID, language, suffix, hookMode, hookRunner, taskSystem, deploymentModel)
 	if err != nil {
 		return "", err
 	}
@@ -2882,7 +2885,7 @@ func resolveContentIncludes(content string, stack []string) (string, error) {
 	return resolved, nil
 }
 
-func readContent(agentID, language, suffix, hookMode, taskSystem, deploymentModel string) (string, error) {
+func readContent(agentID, language, suffix, hookMode, hookRunner, taskSystem, deploymentModel string) (string, error) {
 	name := "content.md"
 	if suffix != "" {
 		name = "content-" + suffix + ".md"
@@ -2903,7 +2906,7 @@ func readContent(agentID, language, suffix, hookMode, taskSystem, deploymentMode
 	}
 	content = applyConditionalTokenBlocks(content, "TASK_SYSTEM", func(name string) bool { return name == configuredTaskSystem })
 	if agentID == "git-hooks" && strings.Contains(content, gitHooksGuidanceToken) {
-		content = strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode))
+		content = strings.ReplaceAll(content, gitHooksGuidanceToken, renderGitHooksGuidance(language, hookMode, hookRunner))
 	}
 	return content, nil
 }
@@ -2930,7 +2933,55 @@ func readTemplate(agentID, language, filename, suffix string) (string, error) {
 	return string(bytes), nil
 }
 
-func renderGitHooksGuidance(language, hookMode string) string {
+// hookRunnerVocab holds the runner-specific commands in the git-hooks rule.
+// prek reads the same .pre-commit-config.yaml as pre-commit, so only the
+// commands differ -- a repository already standardized on prek should not be
+// told it is noncompliant. The pre-commit entries reproduce the previously
+// hard-coded lines exactly, so that path emits no new bytes.
+type hookRunnerVocab struct {
+	name               string
+	install            []string
+	update             string
+	verify             string
+	verifyAfterChanges string
+	extra              []string
+	nestedConfigs      string
+	nestedConfigLine   string
+}
+
+func hookRunnerVocabulary(runner string) hookRunnerVocab {
+	if runner == "prek" {
+		return hookRunnerVocab{
+			name: "`prek`",
+			// prek installs every configured stage in one command.
+			install:            []string{"- Install hooks for every configured stage, including `pre-push`, with `prek install`."},
+			update:             "- Keep pinned hook versions current with `prek update`.",
+			verify:             "- Verify the hook configuration with `prek run --all-files`.",
+			verifyAfterChanges: "- Re-run `prek run --all-files` after hook changes.",
+			extra: []string{
+				"- prek reads the root `.pre-commit-config.yaml` or `prek.toml`, and discovers nested workspace configs; the root config is what installs the Git hooks.",
+				"- Check the configuration itself with `prek validate-config`.",
+			},
+			nestedConfigs:    "through its own workspace discovery",
+			nestedConfigLine: "- Let prek discover nested `.pre-commit-config.yaml` files in Go subprojects; no fan-out helper hook is required.",
+		}
+	}
+	return hookRunnerVocab{
+		name: "`pre-commit`",
+		install: []string{
+			"- Install hooks with `pre-commit install`.",
+			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+		},
+		update:             "- Keep the configuration current with `pre-commit autoupdate`.",
+		verify:             "- Verify the hook configuration with `pre-commit run --all-files`.",
+		verifyAfterChanges: "- Re-run `pre-commit run --all-files` after hook changes.",
+		nestedConfigs:      "with `sub-pre-commit`",
+		nestedConfigLine:   "- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.",
+	}
+}
+
+func renderGitHooksGuidance(language, hookMode, hookRunner string) string {
+	runner := hookRunnerVocabulary(hookRunner)
 	gitleaksHookGuidance := "- Add the official `gitleaks` pre-commit hook in `.pre-commit-config.yaml` for secret detection; do not generate or call a repo-local no-secrets shell script."
 	switch language {
 	case "typescript":
@@ -2946,92 +2997,120 @@ func renderGitHooksGuidance(language, hookMode string) string {
 			}, "\n")
 		}
 		return strings.Join([]string{
-			"- Use `pre-commit` for this repository layout.",
+			fmt.Sprintf("- Use %s for this repository layout.", runner.name),
 			"- Create `.pre-commit-config.yaml` at the repo root.",
-			"- Install hooks with `pre-commit install`.",
-			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			strings.Join(runner.install, "\n"),
 			"- Configure `.pre-commit-config.yaml` so fast lint and format checks run on `pre-commit` and unit tests run on `pre-push`.",
 			gitleaksHookGuidance,
-			"- Keep the configuration current with `pre-commit autoupdate`.",
-			"- Verify the hook configuration with `pre-commit run --all-files`.",
+			strings.Join(runner.extra, "\n"),
+			runner.update,
+			runner.verify,
 		}, "\n")
 	case "python":
 		return strings.Join([]string{
-			"- Use `pre-commit` for Python projects.",
+			fmt.Sprintf("- Use %s for Python projects.", runner.name),
 			"- Create `.pre-commit-config.yaml` at the repo root.",
-			"- Install hooks with `pre-commit install`.",
-			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			strings.Join(runner.install, "\n"),
 			"- Configure `.pre-commit-config.yaml` so unit tests run on `pre-push`.",
 			gitleaksHookGuidance,
 			"- Keep Bandit and `pip-audit` in CI or explicit security-review workflows unless this repository opts into running them from hooks.",
-			"- Keep the configuration current with `pre-commit autoupdate`.",
-			"- Re-run `pre-commit run --all-files` after hook changes.",
+			strings.Join(runner.extra, "\n"),
+			runner.update,
+			runner.verifyAfterChanges,
 		}, "\n")
 	case "go":
 		return strings.Join([]string{
-			"- Use `pre-commit` for Go projects, and fan out to language-local configs with `sub-pre-commit` when needed.",
+			fmt.Sprintf("- Use %s for Go projects, and fan out to language-local configs %s when needed.", runner.name, runner.nestedConfigs),
 			"- Create or update `.pre-commit-config.yaml` at the repo root.",
-			"- Use `sub-pre-commit` hooks to invoke nested `.pre-commit-config.yaml` files in Go subprojects.",
-			"- Install hooks with `pre-commit install` and `pre-commit install --hook-type pre-push`.",
+			runner.nestedConfigLine,
+			strings.Join(runner.install, "\n"),
 			"- Configure the pre-push stage to run Go unit tests for each module.",
 			gitleaksHookGuidance,
 			"- Keep `govulncheck`, fuzzing, and `go test -race` in CI, pre-push, or explicit security-review workflows unless this repository opts into running them at commit time.",
-			"- Keep the configuration current with `pre-commit autoupdate`.",
-			"- Verify the hook configuration with `pre-commit run --all-files`.",
+			strings.Join(runner.extra, "\n"),
+			runner.update,
+			runner.verify,
 		}, "\n")
 	case "ansible":
 		return strings.Join([]string{
-			"- Use `pre-commit` for Ansible repositories.",
+			fmt.Sprintf("- Use %s for Ansible repositories.", runner.name),
 			"- Create or update `.pre-commit-config.yaml` at the repo root.",
-			"- Install hooks with `pre-commit install`.",
-			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			strings.Join(runner.install, "\n"),
 			"- Run `ansible-lint` and `yamllint` from the pre-commit stage.",
 			"- Run `ansible-playbook --syntax-check` for representative top-level playbooks from the pre-push stage.",
 			gitleaksHookGuidance,
 			"- Prefer `ansible-lint --profile=safety` in CI or explicit security-review workflows when the repository is ready for safety-oriented rules.",
 			"- Keep secrets out of logs and commits; prefer Ansible Vault or external secret stores.",
-			"- Keep the configuration current with `pre-commit autoupdate`; rerun `pre-commit run --all-files` after hook changes.",
+			strings.Join(runner.extra, "\n"),
+			runner.update,
+			runner.verifyAfterChanges,
 		}, "\n")
 	case "terraform":
 		return strings.Join([]string{
-			"- Use `pre-commit` for Terraform repositories.",
+			fmt.Sprintf("- Use %s for Terraform repositories.", runner.name),
 			"- Create or update `.pre-commit-config.yaml` at the repo root.",
 			"- Commit `.terraform-version` and use `tfenv install` plus `tfenv use` before running Terraform commands.",
-			"- Install hooks with `pre-commit install`.",
-			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			strings.Join(runner.install, "\n"),
 			"- Run `terraform fmt -check -recursive`, `terraform init -backend=false`, `terraform validate`, `tflint --init`, `tflint --recursive`, and `trivy config .` from the hook configuration; keep `tfsec` only for legacy-compatible pipelines.",
 			"- Keep `.terraform/`, state files, and plan files out of Git.",
 			gitleaksHookGuidance,
 			"- Keep deeper IaC static analysis, policy checks, and cloud/runtime posture scanning in CI or operational review workflows.",
-			"- Keep the configuration current with `pre-commit autoupdate`.",
+			strings.Join(runner.extra, "\n"),
+			runner.update,
+			runner.verify,
 		}, "\n")
 	case "dart":
 		return strings.Join([]string{
-			"- Use `pre-commit` for Dart and Flutter repositories.",
+			fmt.Sprintf("- Use %s for Dart and Flutter repositories.", runner.name),
 			"- Create or update `.pre-commit-config.yaml` at the Flutter app root or monorepo root.",
-			"- Install hooks with `pre-commit install`.",
-			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			strings.Join(runner.install, "\n"),
 			"- Run `dart format --set-exit-if-changed .` and `flutter analyze` on `pre-commit`.",
 			"- Run `flutter test` on `pre-push`; keep `flutter test integration_test` in CI or device-backed jobs when emulators are required.",
 			"- Keep `.dart_tool/`, `build/`, and platform build output out of Git.",
 			gitleaksHookGuidance,
-			"- Keep the configuration current with `pre-commit autoupdate`.",
+			strings.Join(runner.extra, "\n"),
+			runner.update,
+			runner.verify,
 		}, "\n")
 	case "docker":
 		return strings.Join([]string{
-			"- Use `pre-commit` for Dockerfile and container configuration repositories.",
+			fmt.Sprintf("- Use %s for Dockerfile and container configuration repositories.", runner.name),
 			"- Create or update `.pre-commit-config.yaml` at the repo root.",
-			"- Install hooks with `pre-commit install`.",
-			"- Install the pre-push hook with `pre-commit install --hook-type pre-push`.",
+			strings.Join(runner.install, "\n"),
 			"- Run `hadolint` for Dockerfiles and `docker compose config` for Compose files from the pre-commit stage.",
 			"- Run image build and smoke checks from the pre-push stage only when they are deterministic and do not require registry credentials.",
 			gitleaksHookGuidance,
 			"- Keep image vulnerability scans in CI or pre-push when local Docker availability is reliable.",
-			"- Keep the configuration current with `pre-commit autoupdate`.",
+			strings.Join(runner.extra, "\n"),
+			runner.update,
+			runner.verify,
 		}, "\n")
 	default:
 		return ""
 	}
+}
+
+// resolveHookRunner picks the hook runner. An explicit saved choice wins;
+// otherwise a repository already standardized on prek is detected from
+// prek.toml so Ballast does not tell it to migrate to pre-commit.
+func resolveHookRunner(projectRoot string, config *rulesConfig) string {
+	if config != nil {
+		if runner := normalizeHookRunner(config.HookRunner); runner != "" {
+			return runner
+		}
+	}
+	if projectRoot != "" && exists(filepath.Join(projectRoot, "prek.toml")) {
+		return "prek"
+	}
+	return "pre-commit"
+}
+
+func normalizeHookRunner(value string) string {
+	runner := strings.ToLower(strings.TrimSpace(value))
+	if runner == "pre-commit" || runner == "prek" {
+		return runner
+	}
+	return ""
 }
 
 func resolveTsHookMode(projectRoot, language string) string {
@@ -3174,6 +3253,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		TaskSystem:         normalizeRequiredInstallOptionValue(tolerantString(raw.TaskSystem)),
 		DeploymentModel:    normalizeDeploymentModel(tolerantString(raw.DeploymentModel)),
 		CodeReviewer:       normalizeCodeReviewer(tolerantString(raw.CodeReviewer)),
+		HookRunner:         normalizeHookRunner(tolerantString(raw.HookRunner)),
 		PublishingProfiles: normalizePublishingProfiles(raw.PublishingProfiles),
 		RuleProfile:        normalizeRuleProfile(tolerantString(raw.RuleProfile)),
 	}
