@@ -31,6 +31,12 @@ export BALLAST_BIN
 
 failures=0
 
+# The check now refuses to run without credentials, so the stubbed cases need
+# placeholder values. They are never sent anywhere: every CLI here is a stub.
+export ANTHROPIC_API_KEY="selftest-anthropic-key"
+export OPENAI_API_KEY="selftest-openai-key"
+unset CODEX_API_KEY
+
 run_case() {
   local name="$1" expected="$2" agent="$3"
   local actual=0
@@ -109,13 +115,34 @@ else
   unset BALLAST_RULE_READ_SENTINEL
 fi
 
-# Codex uses a different invocation and rule directory.
+# Codex uses a different invocation and rule directory, and authenticates from
+# CODEX_API_KEY rather than OPENAI_API_KEY.
 stub codex <<'EOF'
 #!/usr/bin/env bash
 [ "$1" = "exec" ] || { echo "expected 'codex exec', got: $*" >&2; exit 9; }
+[ -n "${CODEX_API_KEY:-}" ] || { echo "CODEX_API_KEY was not forwarded to codex" >&2; exit 9; }
 grep -ohE 'BALLAST-RULE-READ-[A-Z0-9]+' .codex/rules/local-dev-env.md 2>/dev/null | head -1
 EOF
-run_case "codex exec reads rule and returns sentinel" 0 codex
+run_case "codex exec receives CODEX_API_KEY and passes" 0 codex
+
+# OPENAI_API_KEY is the conventional secret name; it must reach codex as
+# CODEX_API_KEY, which is what the non-interactive path actually reads.
+run_case "OPENAI_API_KEY is forwarded as CODEX_API_KEY" 0 codex
+
+# Missing credentials are an environment gap, not a rule regression.
+saved_anthropic="$ANTHROPIC_API_KEY"
+unset ANTHROPIC_API_KEY
+stub claude <<'EOF'
+#!/usr/bin/env bash
+echo "stub should not have been reached"
+EOF
+run_case "missing ANTHROPIC_API_KEY skips" 2 claude
+export ANTHROPIC_API_KEY="$saved_anthropic"
+
+saved_openai="$OPENAI_API_KEY"
+unset OPENAI_API_KEY
+run_case "missing codex credentials skip" 2 codex
+export OPENAI_API_KEY="$saved_openai"
 
 # A missing CLI is an environment gap, not a Ballast defect.
 rm -f "$STUB_DIR/codex"

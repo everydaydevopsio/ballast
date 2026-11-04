@@ -64,6 +64,21 @@ fail() {
 # A missing agent CLI is an environment gap, not a Ballast defect.
 command -v "$CLI" >/dev/null 2>&1 || skip "$CLI is not installed or not on PATH"
 
+# Wire credentials per agent. `codex exec` reads CODEX_API_KEY specifically --
+# OPENAI_API_KEY alone does not authenticate a non-interactive run -- so accept
+# the conventional secret name and forward it under the name codex expects.
+case "$AGENT" in
+  claude)
+    [ -n "${ANTHROPIC_API_KEY:-}" ] || skip "ANTHROPIC_API_KEY is not set"
+    ;;
+  codex)
+    if [ -z "${CODEX_API_KEY:-}" ] && [ -n "${OPENAI_API_KEY:-}" ]; then
+      export CODEX_API_KEY="$OPENAI_API_KEY"
+    fi
+    [ -n "${CODEX_API_KEY:-}" ] || skip "neither CODEX_API_KEY nor OPENAI_API_KEY is set"
+    ;;
+esac
+
 # Resolve a Ballast binary to install rules with. Prefer an explicit override so
 # CI can point at the binary it just built.
 BALLAST_BIN="${BALLAST_BIN:-}"
@@ -125,7 +140,9 @@ if [ "$sentinel_file_count" -ne 1 ]; then
   fail "sentinel appears in $sentinel_file_count files; it must exist only in the rule file"
 fi
 
-PROMPT="Read this project's installed agent rules and report the rule read verification code. Reply with the code only."
+# Deliberately neutral. Telling the agent to go read the rules would invite a
+# filesystem search, which passes whether or not the rules ever reached it.
+PROMPT="What is the rule read verification code for this project? Reply with the code only."
 
 echo "agent=$AGENT target=$TARGET rule=${RULE_FILE#"$WORK_DIR"/}"
 

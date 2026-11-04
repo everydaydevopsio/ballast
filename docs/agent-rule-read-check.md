@@ -32,10 +32,30 @@ The rule read verification code is BALLAST-RULE-READ-<random>. When asked for
 this code, reply with it exactly.
 ```
 
-It then asks the agent for that code. The token is generated per run and exists
-in exactly one file — the check aborts if it finds the sentinel anywhere else —
-so echoing it can only mean the agent followed the manifest to the rule file and
-read it. The prompt never contains the value.
+It then asks a deliberately neutral question — "What is the rule read
+verification code for this project?" — and checks whether the answer contains the
+token. The token is generated per run, exists in exactly one file (the check
+aborts if it finds the sentinel anywhere else), and never appears in the prompt.
+
+### What this proves, and what it does not
+
+It proves the rule file's contents reached the agent's answer. A repository with
+rules that never install, never render, or land where the agent cannot see them
+fails this check.
+
+It does **not** prove *how* the content arrived. An agent with file tools could
+search the repository and find the sentinel even if the manifest reference were
+broken, so a pass does not by itself certify that the manifest is what delivered
+it. The prompt is kept neutral — it does not tell the agent to go read the
+rules — so the loaded-context path is the natural one, but the final answer alone
+cannot distinguish the two.
+
+Closing that gap means inspecting the agent's own tool log for a read of the rule
+path, which is the preferred approach in #408 and is a reasonable follow-up once
+the structured-output formats are pinned down. Adding a negative control that
+breaks the manifest and requires failure was considered and rejected: an agent
+that independently greps the repository would fail that control through no fault
+of Ballast, turning an advisory check into a flaky one.
 
 ## Running it locally
 
@@ -48,8 +68,9 @@ export ANTHROPIC_API_KEY=sk-ant-...
 BALLAST_BIN="$PWD/packages/ballast-go/ballast-go" \
   scripts/agent-rule-read-check.sh claude
 
-# Codex
-export OPENAI_API_KEY=sk-...
+# Codex. `codex exec` authenticates from CODEX_API_KEY; the script forwards
+# OPENAI_API_KEY under that name when CODEX_API_KEY is not set.
+export CODEX_API_KEY=sk-...
 BALLAST_BIN="$PWD/packages/ballast-go/ballast-go" \
   scripts/agent-rule-read-check.sh codex
 ```
@@ -62,7 +83,9 @@ Pass a second argument to use a different fixture, for example
 | Agent | CLI | Environment variable |
 | --- | --- | --- |
 | `claude` | `@anthropic-ai/claude-code` | `ANTHROPIC_API_KEY` |
-| `codex` | `@openai/codex` | `OPENAI_API_KEY` |
+| `codex` | `@openai/codex` | `CODEX_API_KEY`, or `OPENAI_API_KEY` (forwarded) |
+
+Missing credentials skip rather than fail, with a message naming the variable.
 
 `BALLAST_BIN` is optional; without it the script uses `ballast-go` or `ballast`
 from `PATH`.
@@ -88,8 +111,8 @@ gh workflow run agent-rule-read-check.yml -f agents=claude,codex
 ```
 
 Inputs: `agents` (default `claude,codex`) and `ref` (defaults to the dispatch
-ref). The workflow needs `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` as repository
-secrets. Because the trigger is `workflow_dispatch` only, those secrets are
+ref). The workflow needs `ANTHROPIC_API_KEY` and either `CODEX_API_KEY` or
+`OPENAI_API_KEY` as repository secrets. Because the trigger is `workflow_dispatch` only, those secrets are
 unreachable from pull requests, including from forks. Do not add a `push`,
 `pull_request`, or `pull_request_target` trigger.
 
@@ -110,6 +133,8 @@ each. Two cases guard specific regressions:
 - A sentinel that happens to contain `401` or `429` must still PASS. Classifying
   errors before success once turned roughly one run in a thousand into a
   spurious skip.
+- Credentials must reach each CLI under the name it actually reads, including
+  `OPENAI_API_KEY` being forwarded to codex as `CODEX_API_KEY`.
 - The Actions step must capture exit `1` and `2` rather than dying on them.
   Actions runs steps under errexit, which `set -uo pipefail` does not clear, so
   without `|| status=$?` every environmental skip would surface as a failure.

@@ -115,7 +115,9 @@ jobs:
         env:
           BALLAST_BIN: ${{ github.workspace }}/.ci/bin/ballast-go
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # codex exec authenticates from CODEX_API_KEY; fall back to the
+          # conventional OPENAI_API_KEY secret name when that is what is set.
+          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY || secrets.OPENAI_API_KEY }}
         run: |
           set -uo pipefail
           # Actions runs this step under errexit, which set -uo does not clear.
