@@ -120,7 +120,7 @@ fi
 
 # A random token, so a previous run's value can never produce a false pass.
 # BALLAST_RULE_READ_SENTINEL pins it for tests that need a deterministic value.
-SENTINEL="${BALLAST_RULE_READ_SENTINEL:-BALLAST-RULE-READ-$(LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom | head -c 16)}"
+SENTINEL="${BALLAST_RULE_READ_SENTINEL:-BALLAST-RULE-READ-$(LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom 2>/dev/null | head -c 16)}"
 
 cat >>"$RULE_FILE" <<SENTINEL_BLOCK
 
@@ -152,7 +152,11 @@ case "$AGENT" in
     AGENT_OUTPUT="$("$CLI" -p "$PROMPT" 2>"$WORK_DIR/.agent.err")"
     ;;
   codex)
-    AGENT_OUTPUT="$("$CLI" exec "$PROMPT" 2>"$WORK_DIR/.agent.err")"
+    # codex exec sandboxes model-driven shell commands. Without a sandbox that
+    # permits reads it answers "filesystem access failed" -- a true statement
+    # about its own permissions that looks exactly like a missing rule.
+    # read-only is the least privilege that lets it read a rule file.
+    AGENT_OUTPUT="$("$CLI" exec --sandbox read-only "$PROMPT" 2>"$WORK_DIR/.agent.err")"
     ;;
 esac
 AGENT_STATUS=$?
@@ -172,10 +176,12 @@ fi
 # matched on word boundaries so they cannot hit a sentinel substring, and stdout
 # is only searched when the agent actually failed -- a successful answer is
 # never a diagnostic.
-ENVIRONMENTAL_PATTERN='unauthorized|authentication|not logged in|invalid api key|\b(401|403|429)\b|rate limit|quota|credit balance|insufficient|overloaded|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network error|timed out'
+ENVIRONMENTAL_PATTERN='unauthorized|authentication|not logged in|invalid api key|\b(401|403|429)\b|rate limit|quota|credit balance|insufficient|overloaded|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network error|timed out|filesystem access failed|sandbox|permission denied|operation not permitted|EACCES'
 
+# At this point the answer did not contain the sentinel, so scanning it for
+# diagnostics cannot mask a pass: a successful answer already returned above.
 if printf '%s' "$AGENT_STDERR" | grep -qiE "$ENVIRONMENTAL_PATTERN" ||
-  { [ "$AGENT_STATUS" -ne 0 ] && printf '%s' "$AGENT_OUTPUT" | grep -qiE "$ENVIRONMENTAL_PATTERN"; }; then
+  printf '%s' "$AGENT_OUTPUT" | grep -qiE "$ENVIRONMENTAL_PATTERN"; then
   echo "--- agent stderr ---" >&2
   printf '%s\n' "$AGENT_STDERR" >&2
   skip "agent could not complete for environmental reasons (auth, quota, or network)"
