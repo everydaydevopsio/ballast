@@ -7691,3 +7691,170 @@ func TestLoadDoctorConfigToleratesAWrongTypedHookRunner(t *testing.T) {
 		t.Fatalf("expected the mistyped runner to be dropped, got %q", config.HookRunner)
 	}
 }
+
+// ballastSourceCheckout builds the markers isBallastSourceRoot looks for, so a
+// dev wrapper resolves the repository version from them.
+func ballastSourceCheckout(t *testing.T, root string, repositoryVersion string) {
+	t.Helper()
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"),
+		fmt.Sprintf(`{"name":"@everydaydevopsio/ballast","version":%q}`, repositoryVersion))
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.26.0\n")
+}
+
+func pinnedBackend(t *testing.T, root string, binary string, reportedVersion string) {
+	t.Helper()
+	localBinary := filepath.Join(root, ".ballast", "bin", binary)
+	mustWriteFile(t, localBinary, fmt.Sprintf("#!/usr/bin/env bash\necho %s\n", reportedVersion))
+	if err := os.Chmod(localBinary, 0o755); err != nil {
+		t.Fatalf("chmod %s: %v", localBinary, err)
+	}
+}
+
+// A dev wrapper has no release to pin against, so it skipped the version check
+// entirely. Inside a source checkout that let a backend from an earlier release
+// win over the working tree, and the only symptom was that an agent or skill
+// the source had added came back as "Unknown".
+func TestEnsureInstalledRebuildsAStalePinnedBackendInsideASourceCheckout(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "dev"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	ballastSourceCheckout(t, root, "5.22.0")
+	pinnedBackend(t, root, "ballast-go", "5.21.3")
+
+	withWorkingDir(t, root, func() {
+		if err := ensureInstalled(toolConfig{
+			binary: "ballast-go",
+			installCommand: func(version string, projectRoot string) ([]string, error) {
+				return []string{"go", "build", projectRoot}, nil
+			},
+		}); err != nil {
+			t.Fatalf("ensureInstalled returned error: %v", err)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected the stale backend to be rebuilt, got %#v", commands)
+	}
+}
+
+// A backend that already matches the checkout must not be rebuilt on every
+// command; that would make every install pay for a build it does not need.
+func TestEnsureInstalledKeepsAMatchingPinnedBackendInsideASourceCheckout(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "dev"
+
+	runCommandFunc = func(name string, args []string) error {
+		t.Fatalf("a matching backend must not be rebuilt, got %s %s", name, strings.Join(args, " "))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	ballastSourceCheckout(t, root, "5.22.0")
+	pinnedBackend(t, root, "ballast-go", "5.22.0")
+
+	withWorkingDir(t, root, func() {
+		if err := ensureInstalled(toolConfig{
+			binary: "ballast-go",
+			installCommand: func(version string, projectRoot string) ([]string, error) {
+				return []string{"go", "build", projectRoot}, nil
+			},
+		}); err != nil {
+			t.Fatalf("ensureInstalled returned error: %v", err)
+		}
+	})
+}
+
+// An unreadable backend inside a source checkout is also rebuilt: an unknown
+// version is no more trustworthy than a wrong one.
+func TestEnsureInstalledRebuildsAnUnreadablePinnedBackendInsideASourceCheckout(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "dev"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	ballastSourceCheckout(t, root, "5.22.0")
+	// Exits non-zero, so its version cannot be determined.
+	localBinary := filepath.Join(root, ".ballast", "bin", "ballast-go")
+	mustWriteFile(t, localBinary, "#!/usr/bin/env bash\nexit 1\n")
+	if err := os.Chmod(localBinary, 0o755); err != nil {
+		t.Fatalf("chmod %s: %v", localBinary, err)
+	}
+
+	withWorkingDir(t, root, func() {
+		if err := ensureInstalled(toolConfig{
+			binary: "ballast-go",
+			installCommand: func(version string, projectRoot string) ([]string, error) {
+				return []string{"go", "build", projectRoot}, nil
+			},
+		}); err != nil {
+			t.Fatalf("ensureInstalled returned error: %v", err)
+		}
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected an unreadable backend to be rebuilt, got %#v", commands)
+	}
+}
+
+// Without a readable repository version there is nothing to compare against,
+// so the dev wrapper keeps its original permissive behaviour.
+func TestEnsureInstalledKeepsPinnedBackendWhenTheCheckoutVersionIsUnreadable(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "dev"
+
+	runCommandFunc = func(name string, args []string) error {
+		t.Fatalf("expected no rebuild without a repository version, got %s %s", name, strings.Join(args, " "))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	// A source checkout whose package.json carries no version.
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), `{"name":"@everydaydevopsio/ballast"}`)
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-python", "pyproject.toml"), "[project]\nname='ballast-python'\n")
+	mustWriteFile(t, filepath.Join(root, "packages", "ballast-go", "go.mod"), "module example.com/ballast-go\n\ngo 1.26.0\n")
+	pinnedBackend(t, root, "ballast-go", "5.21.3")
+
+	withWorkingDir(t, root, func() {
+		if err := ensureInstalled(toolConfig{
+			binary: "ballast-go",
+			installCommand: func(version string, projectRoot string) ([]string, error) {
+				return []string{"go", "build", projectRoot}, nil
+			},
+		}); err != nil {
+			t.Fatalf("ensureInstalled returned error: %v", err)
+		}
+	})
+}
