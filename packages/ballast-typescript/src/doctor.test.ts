@@ -1,7 +1,12 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { buildContent } from './build';
+import {
+  buildContent,
+  calculateRuleChecksum,
+  stripRuleMarker,
+  verifyRuleChecksum
+} from './build';
 import { install } from './install';
 import {
   buildDoctorReport,
@@ -374,6 +379,132 @@ describe('rule file status collection', () => {
         { basename: 'manual.md', ruleId: null, status: 'unowned' }
       ])
     );
+  });
+
+  // #376: doctor must compare against canonical content, not only against the
+  // checksum in the file's own marker. A file written by an older Ballast is
+  // internally consistent -- its marker matches its body exactly -- yet its
+  // body is no longer what the installed version would generate.
+  //
+  // The existing drift case above edits the body without fixing the checksum,
+  // so it only exercises the checksum branch. Deleting the canonical
+  // comparison leaves that test green, which is how this regressed unnoticed.
+  test('reports a self-consistent but non-canonical rule as drifted', () => {
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+
+    const canonical = buildContent('linting', 'codex', undefined, 'typescript');
+    const staleBody = stripRuleMarker(canonical).replace(
+      '## Your Responsibilities',
+      '## Your Responsibilities\n\nGuidance that an older Ballast version emitted.'
+    );
+    // Re-stamp the marker so the file is internally consistent at its stale
+    // content, exactly as the older version would have written it.
+    const selfConsistent = `<!-- ballast:rule id="typescript/linting" version="5.21.3" checksum="${calculateRuleChecksum(
+      staleBody
+    )}" -->\n${staleBody}`;
+
+    const rulePath = path.join(codexRules, 'typescript-linting.md');
+    fs.writeFileSync(rulePath, selfConsistent, 'utf8');
+
+    // Guard the premise: the file really is self-consistent, so a
+    // checksum-only check would call it ok.
+    expect(verifyRuleChecksum(selfConsistent)).toBe(true);
+    expect(stripRuleMarker(selfConsistent)).not.toBe(
+      stripRuleMarker(canonical)
+    );
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex'],
+      agents: ['linting'],
+      languages: ['typescript'],
+      paths: {}
+    });
+
+    const status = statuses.find(
+      (entry) => path.basename(entry.path) === 'typescript-linting.md'
+    );
+    expect(status?.status).toBe('drifted');
+  });
+
+  // An older version stamp on otherwise-canonical content is not a finding --
+  // the ballast-audit skill says so explicitly -- so the stamp alone must not
+  // drive the verdict.
+  test('does not report drift for an old version stamp with canonical content', () => {
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+
+    const canonical = buildContent('linting', 'codex', undefined, 'typescript');
+    const body = stripRuleMarker(canonical);
+    const oldStamp = `<!-- ballast:rule id="typescript/linting" version="1.0.0" checksum="${calculateRuleChecksum(
+      body
+    )}" -->\n${body}`;
+    fs.writeFileSync(
+      path.join(codexRules, 'typescript-linting.md'),
+      oldStamp,
+      'utf8'
+    );
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex'],
+      agents: ['linting'],
+      languages: ['typescript'],
+      paths: {}
+    });
+
+    const status = statuses.find(
+      (entry) => path.basename(entry.path) === 'typescript-linting.md'
+    );
+    expect(status?.status).toBe('ok');
+  });
+
+  // #356 made upgrade refuse to start on a dirty tree, on the reasoning that
+  // doctor would surface any resulting skew. An interrupted upgrade can leave
+  // one target current and another on older-but-self-consistent content, which
+  // is exactly the state that must not read as clean.
+  test('surfaces targets left on different content by an interrupted upgrade', () => {
+    const codexRules = path.join(tmpDir, '.codex', 'rules');
+    const claudeRules = path.join(tmpDir, '.claude', 'rules');
+    fs.mkdirSync(codexRules, { recursive: true });
+    fs.mkdirSync(claudeRules, { recursive: true });
+
+    // codex was rewritten by the upgrade; claude was not.
+    fs.writeFileSync(
+      path.join(codexRules, 'typescript-linting.md'),
+      buildContent('linting', 'codex', undefined, 'typescript'),
+      'utf8'
+    );
+
+    const claudeCanonical = buildContent(
+      'linting',
+      'claude',
+      undefined,
+      'typescript'
+    );
+    const staleBody = stripRuleMarker(claudeCanonical).replace(
+      '## Your Responsibilities',
+      '## Your Responsibilities\n\nPre-upgrade guidance.'
+    );
+    fs.writeFileSync(
+      path.join(claudeRules, 'typescript-linting.md'),
+      `<!-- ballast:rule id="typescript/linting" version="5.21.3" checksum="${calculateRuleChecksum(
+        staleBody
+      )}" -->\n${staleBody}`,
+      'utf8'
+    );
+
+    const statuses = collectRuleFileStatuses(tmpDir, {
+      targets: ['codex', 'claude'],
+      agents: ['linting'],
+      languages: ['typescript'],
+      paths: {}
+    });
+
+    const byTarget = Object.fromEntries(
+      statuses.map((entry) => [entry.target, entry.status])
+    );
+    expect(byTarget.codex).toBe('ok');
+    expect(byTarget.claude).toBe('drifted');
   });
 
   test('recommends trimming rules above the size threshold', () => {
