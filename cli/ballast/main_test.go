@@ -7542,3 +7542,115 @@ func TestGitSubmodulePathsIsEmptyWithoutGitmodules(t *testing.T) {
 		t.Fatalf("expected no submodules, got %+v", paths)
 	}
 }
+
+// Git config values may be quoted and may carry inline comments. Treating the
+// raw text as a literal path left quotes and comment text in the path, so a
+// quoted submodule that also lacks a .git file -- uninitialized, or an old-form
+// checkout with a .git directory -- was not recognized and its markers still
+// selected profiles for the parent.
+func TestParseGitConfigValueHandlesQuotingAndComments(t *testing.T) {
+	cases := map[string]string{
+		`plain/dep`:                 "plain/dep",
+		`  spaced/dep  `:            "spaced/dep",
+		`"external/dep"`:            "external/dep",
+		`  "external/dep"  `:        "external/dep",
+		`vendored # third party`:    "vendored",
+		`vendored ; third party`:    "vendored",
+		`"with space/dep"`:          "with space/dep",
+		`"has#hash/dep"`:            "has#hash/dep",
+		`"has;semi/dep"`:            "has;semi/dep",
+		`"quoted\"inner"`:           `quoted"inner`,
+		`back\\slash`:               `back\slash`,
+		`"external/dep" # trailing`: "external/dep",
+		``:                          "",
+		`# only a comment`:          "",
+	}
+	for raw, want := range cases {
+		if got := parseGitConfigValue(raw); got != want {
+			t.Fatalf("parseGitConfigValue(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+// Quoted and commented entries must be recognized without relying on the
+// .git-file fallback, so these fixtures deliberately omit it.
+func TestGitSubmodulePathsHandlesQuotedAndCommentedEntries(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".gitmodules"), strings.Join([]string{
+		`[submodule "quoted"]`,
+		`	path = "external/dep"`,
+		`[submodule "commented"]`,
+		`	path = vendored # third party`,
+		`[submodule "spaced"]`,
+		`	path = "with space/dep"`,
+	}, "\n"))
+
+	paths := gitSubmodulePaths(root)
+	for _, expected := range []string{
+		filepath.Join("external", "dep"),
+		"vendored",
+		filepath.Join("with space", "dep"),
+	} {
+		if !paths[expected] {
+			t.Fatalf("expected %q among %+v", expected, paths)
+		}
+	}
+	if len(paths) != 3 {
+		t.Fatalf("expected exactly three submodules, got %+v", paths)
+	}
+}
+
+// The end-to-end case: a quoted path with no .git file must still be skipped.
+func TestDetectRepoProfilesIgnoresQuotedSubmoduleWithoutGitFile(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".gitmodules"),
+		"[submodule \"dep\"]\n\tpath = \"external/dep\" # vendored\n")
+	// Deliberately no .git marker: only the .gitmodules entry identifies this.
+	mustWriteFile(t, filepath.Join(root, "external", "dep", "go.mod"), "module example.com/dep\n\ngo 1.24\n")
+
+	profiles, skipped, err := detectRepoProfilesReportingSkips(root, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, profile := range profiles {
+		if profile.Language == langGo {
+			t.Fatalf("a quoted submodule path must still be skipped: %+v", profiles)
+		}
+	}
+	if len(skipped) != 1 || skipped[0] != filepath.Join("external", "dep") {
+		t.Fatalf("expected the quoted submodule reported, got %+v", skipped)
+	}
+}
+
+// Detection reporting must not depend on a config existing: a repository with
+// no .rulesrc.json is exactly where an unexplained empty result is most likely.
+func TestDoctorExplainsSkippedSubmodulesWithoutAConfig(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, ".gitmodules"), "[submodule \"dotbot\"]\n\tpath = dotbot\n")
+	mustWriteFile(t, filepath.Join(root, "dotbot", "pyproject.toml"), "[project]\nname='dotbot'\n")
+
+	output := captureStdout(t, func() {
+		printDoctorLanguageDetection(root, nil)
+	})
+	if !strings.Contains(output, "Language detection:") {
+		t.Fatalf("expected a language detection section, got %q", output)
+	}
+	if !strings.Contains(output, "dotbot") {
+		t.Fatalf("expected the skipped submodule named, got %q", output)
+	}
+	if !strings.Contains(output, "discovery.includeSubmodules") {
+		t.Fatalf("expected the opt-in named, got %q", output)
+	}
+}
+
+func TestDoctorPrintsNoDetectionSectionWithoutSubmodules(t *testing.T) {
+	root := resolvedTempDir(t)
+	mustWriteFile(t, filepath.Join(root, "go.mod"), "module example.com/mine\n\ngo 1.24\n")
+
+	output := captureStdout(t, func() {
+		printDoctorLanguageDetection(root, nil)
+	})
+	if strings.TrimSpace(output) != "" {
+		t.Fatalf("expected no detection section, got %q", output)
+	}
+}

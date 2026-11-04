@@ -1413,11 +1413,17 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	if err != nil {
 		fmt.Printf("- .rulesrc.json: unreadable (%v)\n", err)
 		fmt.Println()
+		printDoctorLanguageDetection(root, nil)
 		return
 	}
 	if config == nil {
 		fmt.Println("- .rulesrc.json: not found")
 		fmt.Println()
+		// A repository with no config is exactly where this matters most: it is
+		// the state someone is in before their first install, and if every
+		// language marker lives in a submodule they would otherwise be told
+		// nothing about why nothing was detected.
+		printDoctorLanguageDetection(root, nil)
 		return
 	}
 	fmt.Printf("- file: %s\n", configPath)
@@ -1461,20 +1467,31 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 	}
 	printDoctorConfigDrift(root, config)
 	fmt.Println()
+	printDoctorLanguageDetection(root, config)
+}
+
+// printDoctorLanguageDetection explains what detection passed over. It runs
+// whether or not a config exists, because a skipped submodule is a property of
+// the repository rather than of the saved configuration.
+func printDoctorLanguageDetection(root string, config *monorepoConfig) {
+	_, skippedSubmodules, err := detectRepoProfilesReportingSkips(root, config)
+	if err != nil {
+		return
+	}
+	lines := skippedSubmoduleReport(skippedSubmodules)
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Println("Language detection:")
+	for _, line := range lines {
+		fmt.Println(line)
+	}
+	fmt.Println()
 }
 
 func printDoctorConfigDrift(root string, config *monorepoConfig) {
 	drift := analyzeDoctorConfigDrift(root, config)
 	if !drift.hasDrift() && drift.ScanError == nil {
-		// A skipped submodule is not drift, but it is the reason a repository
-		// can match no profile at all, so it still needs saying.
-		if lines := skippedSubmoduleReport(drift.SkippedSubmodules); len(lines) > 0 {
-			fmt.Println()
-			fmt.Println("Language detection:")
-			for _, line := range lines {
-				fmt.Println(line)
-			}
-		}
 		return
 	}
 	fmt.Println()
@@ -1482,9 +1499,6 @@ func printDoctorConfigDrift(root string, config *monorepoConfig) {
 	if drift.ScanError != nil {
 		fmt.Printf("- scan error: %v\n", drift.ScanError)
 		return
-	}
-	for _, line := range skippedSubmoduleReport(drift.SkippedSubmodules) {
-		fmt.Println(line)
 	}
 	for _, item := range drift.MissingConfiguredPaths {
 		fmt.Printf("- missing configured path: %s\n", item)
@@ -1761,13 +1775,46 @@ func gitSubmodulePaths(root string) map[string]bool {
 		if !found || strings.TrimSpace(strings.ToLower(key)) != "path" {
 			continue
 		}
-		normalizedPath, ok := normalizeConfigRelativePath(strings.TrimSpace(value))
+		normalizedPath, ok := normalizeConfigRelativePath(parseGitConfigValue(value))
 		if !ok || normalizedPath == "." {
 			continue
 		}
 		paths[normalizedPath] = true
 	}
 	return paths
+}
+
+// parseGitConfigValue applies Git's config value rules to the right-hand side
+// of a "key = value" line. Double quotes group a value, so a path may contain
+// spaces or a "#" that would otherwise open a comment; a backslash escapes the
+// next character; and an unquoted "#" or ";" begins a comment.
+//
+// Trailing whitespace is trimmed even when it was quoted. Git would preserve
+// it, but a submodule path that ends in a space is not a real case, and getting
+// comments and quoting right is what actually matters here.
+func parseGitConfigValue(raw string) string {
+	var builder strings.Builder
+	inQuotes := false
+	escaped := false
+
+	for _, char := range strings.TrimSpace(raw) {
+		if escaped {
+			builder.WriteRune(char)
+			escaped = false
+			continue
+		}
+		switch {
+		case char == '\\':
+			escaped = true
+		case char == '"':
+			inQuotes = !inQuotes
+		case !inQuotes && (char == '#' || char == ';'):
+			return strings.TrimSpace(builder.String())
+		default:
+			builder.WriteRune(char)
+		}
+	}
+	return strings.TrimSpace(builder.String())
 }
 
 // isSubmoduleWorktree reports whether dir is an initialized submodule checkout.
