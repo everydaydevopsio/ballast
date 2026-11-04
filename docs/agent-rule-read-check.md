@@ -85,6 +85,12 @@ Pass a second argument to use a different fixture, for example
 | `claude` | `@anthropic-ai/claude-code` | `ANTHROPIC_API_KEY` |
 | `codex` | `@openai/codex` | `CODEX_API_KEY`, or `OPENAI_API_KEY` (forwarded) |
 
+`codex exec` runs with `--sandbox read-only`. It sandboxes model-driven shell
+commands, and without a sandbox that permits reads it answers "filesystem
+access failed" — a true statement about its own permissions that looks exactly
+like a rule the agent could not find. Read-only is the least privilege that
+lets it read a rule file, and it cannot modify the fixture.
+
 Missing credentials skip rather than fail, with a message naming the variable.
 
 `BALLAST_BIN` is optional; without it the script uses `ballast-go` or `ballast`
@@ -135,6 +141,9 @@ each. Two cases guard specific regressions:
   spurious skip.
 - Credentials must reach each CLI under the name it actually reads, including
   `OPENAI_API_KEY` being forwarded to codex as `CODEX_API_KEY`.
+- A sandbox refusal must skip, not fail. It arrives on stdout with a zero exit
+  status, so it would otherwise read as the agent answering without consulting
+  the rules — which is exactly how it first surfaced in CI.
 - The Actions step must capture exit `1` and `2` rather than dying on them.
   Actions runs steps under errexit, which `set -uo pipefail` does not clear, so
   without `|| status=$?` every environmental skip would surface as a failure.

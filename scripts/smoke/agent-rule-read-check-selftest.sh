@@ -94,6 +94,21 @@ exit 1
 EOF
 run_case "network failure skips" 2 claude
 
+# A sandbox refusal is the agent describing its own permissions, not a missing
+# rule. It arrives on stdout with a zero exit, so it would otherwise read as a
+# genuine assertion failure -- which is how it first surfaced in CI.
+stub claude <<'EOF'
+#!/usr/bin/env bash
+echo "Unable to read the verification code: filesystem access failed."
+EOF
+run_case "sandbox refusal skips rather than fails" 2 claude
+
+stub claude <<'EOF'
+#!/usr/bin/env bash
+echo "cat: .claude/rules/local-dev-env.md: Permission denied"
+EOF
+run_case "permission denied skips rather than fails" 2 claude
+
 stub claude <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -120,10 +135,16 @@ fi
 stub codex <<'EOF'
 #!/usr/bin/env bash
 [ "$1" = "exec" ] || { echo "expected 'codex exec', got: $*" >&2; exit 9; }
+# Without a sandbox that permits reads, codex answers "filesystem access
+# failed" and never reaches the rule file.
+case " $* " in
+  *" --sandbox read-only "*) ;;
+  *) echo "codex was not given a readable sandbox: $*" >&2; exit 9 ;;
+esac
 [ -n "${CODEX_API_KEY:-}" ] || { echo "CODEX_API_KEY was not forwarded to codex" >&2; exit 9; }
 grep -ohE 'BALLAST-RULE-READ-[A-Z0-9]+' .codex/rules/local-dev-env.md 2>/dev/null | head -1
 EOF
-run_case "codex exec receives CODEX_API_KEY and passes" 0 codex
+run_case "codex exec runs read-only with CODEX_API_KEY" 0 codex
 
 # OPENAI_API_KEY is the conventional secret name; it must reach codex as
 # CODEX_API_KEY, which is what the non-interactive path actually reads.
