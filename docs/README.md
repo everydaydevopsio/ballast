@@ -109,6 +109,12 @@ See [code_review.md](code_review.md) for the review policy this repository follo
 reviews look for, the severity scale and when each level blocks a merge, the gates a change
 must pass before review is requested, and how agent-assisted review fits in.
 
+## Agent Rule Read Check
+
+See [agent-rule-read-check.md](agent-rule-read-check.md) for the advisory, dispatch-only
+check that verifies installed rules actually reach Claude Code and Codex. It never gates a
+merge.
+
 ## Publishing
 
 See [publish.md](publish.md) for npmjs, Python GitHub release assets, and Go release publishing setup.
