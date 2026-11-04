@@ -176,7 +176,11 @@ fi
 # matched on word boundaries so they cannot hit a sentinel substring, and stdout
 # is only searched when the agent actually failed -- a successful answer is
 # never a diagnostic.
-ENVIRONMENTAL_PATTERN='unauthorized|authentication|not logged in|invalid api key|\b(401|403|429)\b|rate limit|quota|credit balance|insufficient|overloaded|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network error|timed out|filesystem access failed|sandbox|permission denied|operation not permitted|EACCES'
+# Each alternative must name an actual failure. A bare "sandbox" looked
+# reasonable and was not: `codex exec` prints "sandbox: read-only" in its
+# banner on every run, so it matched always and turned every codex result into
+# a skip -- a check that appears to run while asserting nothing.
+ENVIRONMENTAL_PATTERN='unauthorized|authentication|not logged in|invalid api key|\b(401|403|429)\b|rate limit|quota|credit balance|insufficient|overloaded|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network error|timed out|filesystem access failed|sandbox denied|denied by the sandbox|blocked by the sandbox|sandbox error|permission denied|operation not permitted|EACCES'
 
 # At this point the answer did not contain the sentinel, so scanning it for
 # diagnostics cannot mask a pass: a successful answer already returned above.

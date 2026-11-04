@@ -144,6 +144,11 @@ each. Two cases guard specific regressions:
 - A sandbox refusal must skip, not fail. It arrives on stdout with a zero exit
   status, so it would otherwise read as the agent answering without consulting
   the rules — which is exactly how it first surfaced in CI.
+- Codex's ordinary configuration banner must **not** skip. It prints
+  `sandbox: read-only` on stderr for every run, so a classifier matching a bare
+  `sandbox` turns every codex result into a skip — a check that appears to run
+  while asserting nothing. Every pattern in the classifier names an actual
+  failure for this reason.
 - The Actions step must capture exit `1` and `2` rather than dying on them.
   Actions runs steps under errexit, which `set -uo pipefail` does not clear, so
   without `|| status=$?` every environmental skip would surface as a failure.

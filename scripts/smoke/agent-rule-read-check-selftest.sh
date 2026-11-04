@@ -109,6 +109,47 @@ echo "cat: .claude/rules/local-dev-env.md: Permission denied"
 EOF
 run_case "permission denied skips rather than fails" 2 claude
 
+# codex prints its configuration banner -- including "sandbox: read-only" -- on
+# stderr for every run. A classifier matching a bare "sandbox" therefore turned
+# every codex result into a skip, so the check appeared to run while asserting
+# nothing. A wrong answer alongside that banner must still FAIL.
+stub codex <<'EOF'
+#!/usr/bin/env bash
+cat >&2 <<'BANNER'
+OpenAI Codex v0.166.0
+--------
+workdir: /tmp/fixture
+model: gpt-6-luna
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+--------
+BANNER
+echo "I could not find a verification code in this project."
+EOF
+run_case "codex banner does not mask a wrong answer" 1 codex
+
+# The same banner must not mask a correct answer either.
+stub codex <<'EOF'
+#!/usr/bin/env bash
+cat >&2 <<'BANNER'
+OpenAI Codex v0.166.0
+sandbox: read-only
+approval: never
+BANNER
+grep -ohE 'BALLAST-RULE-READ-[A-Z0-9]+' .codex/rules/local-dev-env.md 2>/dev/null | head -1
+EOF
+run_case "codex banner does not mask a correct answer" 0 codex
+
+# A real sandbox refusal still skips, banner and all.
+stub codex <<'EOF'
+#!/usr/bin/env bash
+echo "sandbox: read-only" >&2
+echo "Unable to read the verification code: filesystem access failed."
+EOF
+run_case "codex sandbox refusal still skips" 2 codex
+
 stub claude <<'EOF'
 #!/usr/bin/env bash
 exit 0
