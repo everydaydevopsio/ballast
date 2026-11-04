@@ -212,6 +212,56 @@ describe('config', () => {
       });
     });
 
+    // The wrapper owns language detection and its discovery.includeSubmodules
+    // opt-in, but every backend rewrites .rulesrc.json. Dropping the flag here
+    // would silently revert the user's choice on the next install.
+    test('preserves discovery.includeSubmodules', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['local-dev'],
+          discovery: { includeSubmodules: true }
+        })
+      );
+      expect(loadConfig(tmpDir)).toEqual({
+        targets: ['claude'],
+        agents: ['local-dev'],
+        discovery: { includeSubmodules: true }
+      });
+    });
+
+    test('preserves discovery.includeSubmodules alongside exclude paths', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['local-dev'],
+          discovery: { excludePaths: ['examples'], includeSubmodules: true }
+        })
+      );
+      expect(loadConfig(tmpDir)).toEqual({
+        targets: ['claude'],
+        agents: ['local-dev'],
+        discovery: { excludePaths: ['examples'], includeSubmodules: true }
+      });
+    });
+
+    test('drops a discovery block that carries nothing', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, RULESRC_FILENAME),
+        JSON.stringify({
+          targets: ['claude'],
+          agents: ['local-dev'],
+          discovery: { includeSubmodules: false }
+        })
+      );
+      expect(loadConfig(tmpDir)).toEqual({
+        targets: ['claude'],
+        agents: ['local-dev']
+      });
+    });
+
     test('returns normalized docker deployment model when present', () => {
       const config = {
         targets: ['codex'] as const,

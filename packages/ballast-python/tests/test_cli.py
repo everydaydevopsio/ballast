@@ -713,6 +713,28 @@ class PatchInstallTests(unittest.TestCase):
 
             self.assertEqual(config["discovery"], {"excludePaths": ["examples", "tmp"]})
 
+    def test_normalize_discovery_preserves_include_submodules(self) -> None:
+        # The wrapper owns language detection and its discovery.includeSubmodules
+        # opt-in, but every backend rewrites .rulesrc.json. Dropping the flag
+        # here would silently revert the user's choice on the next install.
+        self.assertEqual(
+            cli.normalize_discovery({"includeSubmodules": True}),
+            {"includeSubmodules": True},
+        )
+        self.assertEqual(
+            cli.normalize_discovery(
+                {"excludePaths": ["examples"], "includeSubmodules": True}
+            ),
+            {"excludePaths": ["examples"], "includeSubmodules": True},
+        )
+
+    def test_normalize_discovery_drops_an_empty_block(self) -> None:
+        self.assertIsNone(cli.normalize_discovery({"includeSubmodules": False}))
+        self.assertIsNone(cli.normalize_discovery({}))
+        self.assertIsNone(cli.normalize_discovery(None))
+        # A non-boolean must not be read as an opt-in.
+        self.assertIsNone(cli.normalize_discovery({"includeSubmodules": "yes"}))
+
     def test_normalize_tools_filters_invalid_entries(self) -> None:
         self.assertEqual(cli.normalize_tools(None), {})
         self.assertEqual(
