@@ -146,21 +146,41 @@ type discoveryConfig struct {
 	ExcludePaths []string `json:"excludePaths,omitempty"`
 }
 
+// rawRulesConfig decodes .rulesrc.json leniently. Scalar policy fields are
+// json.RawMessage rather than string so that one mistyped value degrades to
+// "that field is unset" instead of failing the whole document -- a whole-file
+// failure is indistinguishable from "no config", and an install over a config
+// that looks absent silently discards saved paths, tools, publishing profiles,
+// and rule profile.
 type rawRulesConfig struct {
-	Target             string              `json:"target,omitempty"`
+	Target             json.RawMessage     `json:"target,omitempty"`
 	Targets            []string            `json:"targets,omitempty"`
 	Agents             []string            `json:"agents,omitempty"`
 	Skills             []string            `json:"skills,omitempty"`
-	BallastVersion     string              `json:"ballastVersion,omitempty"`
+	BallastVersion     json.RawMessage     `json:"ballastVersion,omitempty"`
 	Languages          []string            `json:"languages,omitempty"`
 	Paths              map[string][]string `json:"paths,omitempty"`
 	Tools              map[string][]string `json:"tools,omitempty"`
 	Discovery          json.RawMessage     `json:"discovery,omitempty"`
-	TaskSystem         string              `json:"taskSystem,omitempty"`
-	DeploymentModel    string              `json:"deploymentModel,omitempty"`
-	CodeReviewer       string              `json:"codeReviewer,omitempty"`
+	TaskSystem         json.RawMessage     `json:"taskSystem,omitempty"`
+	DeploymentModel    json.RawMessage     `json:"deploymentModel,omitempty"`
+	CodeReviewer       json.RawMessage     `json:"codeReviewer,omitempty"`
 	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
-	RuleProfile        string              `json:"ruleProfile,omitempty"`
+	RuleProfile        json.RawMessage     `json:"ruleProfile,omitempty"`
+}
+
+// tolerantString reads a JSON value that should be a string. Any other type
+// yields "", so the caller sees an unset field rather than an error that would
+// discard every other setting in the file.
+func tolerantString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return ""
+	}
+	return value
 }
 
 type installResult struct {
@@ -3135,7 +3155,7 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 	if err := json.Unmarshal(bytes, &raw); err != nil {
 		return nil
 	}
-	targets := normalizeTargets(append(append([]string{}, raw.Targets...), raw.Target))
+	targets := normalizeTargets(append(append([]string{}, raw.Targets...), tolerantString(raw.Target)))
 	if len(targets) == 0 || (len(raw.Agents) == 0 && len(raw.Skills) == 0) {
 		return nil
 	}
@@ -3143,16 +3163,16 @@ func loadConfig(projectRoot, language string) *rulesConfig {
 		Targets:            targets,
 		Agents:             raw.Agents,
 		Skills:             raw.Skills,
-		BallastVersion:     raw.BallastVersion,
+		BallastVersion:     tolerantString(raw.BallastVersion),
 		Languages:          raw.Languages,
 		Paths:              raw.Paths,
 		Tools:              normalizeLanguageTools(raw.Tools),
 		Discovery:          normalizeDiscovery(raw.Discovery),
-		TaskSystem:         normalizeRequiredInstallOptionValue(raw.TaskSystem),
-		DeploymentModel:    normalizeDeploymentModel(raw.DeploymentModel),
-		CodeReviewer:       normalizeCodeReviewer(raw.CodeReviewer),
+		TaskSystem:         normalizeRequiredInstallOptionValue(tolerantString(raw.TaskSystem)),
+		DeploymentModel:    normalizeDeploymentModel(tolerantString(raw.DeploymentModel)),
+		CodeReviewer:       normalizeCodeReviewer(tolerantString(raw.CodeReviewer)),
 		PublishingProfiles: normalizePublishingProfiles(raw.PublishingProfiles),
-		RuleProfile:        normalizeRuleProfile(raw.RuleProfile),
+		RuleProfile:        normalizeRuleProfile(tolerantString(raw.RuleProfile)),
 	}
 }
 

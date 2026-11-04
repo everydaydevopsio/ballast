@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -3646,5 +3647,94 @@ func TestPromptCodeReviewerHandlesEOF(t *testing.T) {
 	got, err = promptCodeReviewer(bufio.NewReader(strings.NewReader("gemini")))
 	if err != nil || got != defaultCodeReviewer {
 		t.Fatalf("EOF with an invalid value: got %q err %v", got, err)
+	}
+}
+
+// A wrong-typed scalar must drop only that field. Decoding every scalar as a
+// string made one bad value fail json.Unmarshal for the whole document, and
+// loadConfig returned nil -- indistinguishable from "no config". An install
+// with explicit selections then overwrote the file, discarding saved paths,
+// tools, publishing profiles, and rule profile.
+func TestLoadConfigKeepsEveryOtherFieldWhenAScalarIsWrongTyped(t *testing.T) {
+	cases := []struct {
+		name  string
+		field string
+		value string
+	}{
+		{"codeReviewer as bool", "codeReviewer", "false"},
+		{"taskSystem as bool", "taskSystem", "false"},
+		{"deploymentModel as number", "deploymentModel", "123"},
+		{"ruleProfile as object", "ruleProfile", `{"nested":true}`},
+		{"ballastVersion as number", "ballastVersion", "5"},
+		{"target as array", "target", `["claude"]`},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			dir := t.TempDir()
+			body := fmt.Sprintf(`{
+  "targets":["codex"],
+  "agents":["docs"],
+  "skills":["ballast-audit"],
+  "languages":["go"],
+  "paths":{"go":["."]},
+  "tools":{"go":["go","gofumpt"]},
+  "publishingProfiles":["cli"],
+  "ruleProfile":"minimal",
+  %q:%s
+}`, testCase.field, testCase.value)
+			if err := os.WriteFile(filepath.Join(dir, ".rulesrc.json"), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			config := loadConfig(dir, "go")
+			if config == nil {
+				t.Fatalf("a wrong-typed %s must not discard the whole config", testCase.field)
+			}
+			if len(config.Targets) != 1 || config.Targets[0] != "codex" {
+				t.Fatalf("targets did not survive: %+v", config.Targets)
+			}
+			if len(config.Agents) != 1 || config.Agents[0] != "docs" {
+				t.Fatalf("agents did not survive: %+v", config.Agents)
+			}
+			if len(config.Languages) != 1 || config.Languages[0] != "go" {
+				t.Fatalf("languages did not survive: %+v", config.Languages)
+			}
+			if len(config.Paths["go"]) != 1 {
+				t.Fatalf("paths did not survive: %+v", config.Paths)
+			}
+			if len(config.Tools["go"]) != 2 {
+				t.Fatalf("tools did not survive: %+v", config.Tools)
+			}
+			if len(config.PublishingProfiles) != 1 || config.PublishingProfiles[0] != "cli" {
+				t.Fatalf("publishingProfiles did not survive: %+v", config.PublishingProfiles)
+			}
+			// ruleProfile is itself the mistyped field in one case, so only
+			// assert it survived when it was not the one being corrupted.
+			if testCase.field != "ruleProfile" && config.RuleProfile != "minimal" {
+				t.Fatalf("ruleProfile did not survive: %q", config.RuleProfile)
+			}
+		})
+	}
+}
+
+func TestTolerantStringReadsOnlyJSONStrings(t *testing.T) {
+	cases := map[string]string{
+		`"jira"`:        "jira",
+		`""`:            "",
+		`false`:         "",
+		`123`:           "",
+		`null`:          "",
+		`["claude"]`:    "",
+		`{"a":"b"}`:     "",
+		`"skill:house"`: "skill:house",
+	}
+	for raw, want := range cases {
+		if got := tolerantString(json.RawMessage(raw)); got != want {
+			t.Fatalf("tolerantString(%s) = %q, want %q", raw, got, want)
+		}
+	}
+	if got := tolerantString(nil); got != "" {
+		t.Fatalf("a missing field should yield an empty string, got %q", got)
 	}
 }

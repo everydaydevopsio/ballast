@@ -254,6 +254,72 @@ type discoveryConfig struct {
 	ExcludePaths []string `json:"excludePaths,omitempty"`
 }
 
+// rawMonorepoConfig mirrors monorepoConfig for reading only. Scalar policy
+// fields are json.RawMessage so one mistyped value degrades to "that field is
+// unset" instead of failing the whole document. monorepoConfig itself keeps
+// plain strings because it is also what gets marshalled back out.
+type rawMonorepoConfig struct {
+	Target             json.RawMessage     `json:"target,omitempty"`
+	Targets            []string            `json:"targets,omitempty"`
+	Agents             []string            `json:"agents,omitempty"`
+	Skills             []string            `json:"skills,omitempty"`
+	BallastVersion     json.RawMessage     `json:"ballastVersion,omitempty"`
+	Languages          []string            `json:"languages,omitempty"`
+	Paths              map[string][]string `json:"paths,omitempty"`
+	Tools              map[string][]string `json:"tools,omitempty"`
+	Discovery          *discoveryConfig    `json:"discovery,omitempty"`
+	TaskSystem         json.RawMessage     `json:"taskSystem,omitempty"`
+	DeploymentModel    json.RawMessage     `json:"deploymentModel,omitempty"`
+	CodeReviewer       json.RawMessage     `json:"codeReviewer,omitempty"`
+	PublishingProfiles []string            `json:"publishingProfiles,omitempty"`
+	RuleProfile        json.RawMessage     `json:"ruleProfile,omitempty"`
+}
+
+// tolerantString reads a JSON value that should be a string. Any other type
+// yields "", so the caller sees an unset field rather than an error that would
+// discard every other setting in the file.
+func tolerantString(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return ""
+	}
+	return value
+}
+
+// decodeMonorepoConfig parses .rulesrc.json into the writable config shape.
+// Only a structurally broken document is an error; a wrong-typed scalar drops
+// just that field.
+func decodeMonorepoConfig(data []byte, path string) (*monorepoConfig, error) {
+	var raw rawMonorepoConfig
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+
+	config := monorepoConfig{
+		Target:             tolerantString(raw.Target),
+		Targets:            raw.Targets,
+		Agents:             raw.Agents,
+		Skills:             raw.Skills,
+		BallastVersion:     tolerantString(raw.BallastVersion),
+		Languages:          raw.Languages,
+		Paths:              raw.Paths,
+		Tools:              raw.Tools,
+		Discovery:          raw.Discovery,
+		TaskSystem:         tolerantString(raw.TaskSystem),
+		DeploymentModel:    tolerantString(raw.DeploymentModel),
+		CodeReviewer:       tolerantString(raw.CodeReviewer),
+		PublishingProfiles: raw.PublishingProfiles,
+		RuleProfile:        tolerantString(raw.RuleProfile),
+	}
+	if len(config.Targets) == 0 && strings.TrimSpace(config.Target) != "" {
+		config.Targets = []string{strings.TrimSpace(config.Target)}
+	}
+	return &config, nil
+}
+
 type repoProfile struct {
 	Language language
 	Paths    []string
@@ -2225,15 +2291,12 @@ func loadDoctorConfig(root string) (*monorepoConfig, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
-	var config monorepoConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	if len(config.Targets) == 0 && strings.TrimSpace(config.Target) != "" {
-		config.Targets = []string{strings.TrimSpace(config.Target)}
+	config, err := decodeMonorepoConfig(data, path)
+	if err != nil {
+		return nil, err
 	}
 	config.PublishingProfiles = normalizePublishingProfiles(config.PublishingProfiles)
-	return &config, nil
+	return config, nil
 }
 
 func normalizePublishingProfiles(values []string) []string {
@@ -3268,17 +3331,14 @@ func loadMonorepoConfig(root string) (*monorepoConfig, error) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
-	var config monorepoConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	if len(config.Targets) == 0 && strings.TrimSpace(config.Target) != "" {
-		config.Targets = []string{strings.TrimSpace(config.Target)}
+	config, err := decodeMonorepoConfig(data, path)
+	if err != nil {
+		return nil, err
 	}
 	if len(config.Languages) == 0 || len(config.Paths) == 0 {
 		return nil, nil
 	}
-	return &config, nil
+	return config, nil
 }
 
 func cleanupSingleLanguageManagedSelections(root string, selectedLanguage language) error {
@@ -3315,12 +3375,12 @@ func readTaskSystem(root string) string {
 		return ""
 	}
 	var raw struct {
-		TaskSystem string `json:"taskSystem"`
+		TaskSystem json.RawMessage `json:"taskSystem"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return ""
 	}
-	return raw.TaskSystem
+	return tolerantString(raw.TaskSystem)
 }
 
 // parseCodeReviewerFlag reads --code-reviewer in both "--flag value" and
@@ -3369,12 +3429,12 @@ func readCodeReviewer(root string) string {
 		return ""
 	}
 	var raw struct {
-		CodeReviewer string `json:"codeReviewer"`
+		CodeReviewer json.RawMessage `json:"codeReviewer"`
 	}
 	if json.Unmarshal(data, &raw) != nil {
 		return ""
 	}
-	value := strings.ToLower(strings.TrimSpace(raw.CodeReviewer))
+	value := strings.ToLower(strings.TrimSpace(tolerantString(raw.CodeReviewer)))
 	if !validCodeReviewer(value) {
 		return ""
 	}
@@ -3390,12 +3450,12 @@ func readDeploymentModel(root string) string {
 		return ""
 	}
 	var raw struct {
-		DeploymentModel string `json:"deploymentModel"`
+		DeploymentModel json.RawMessage `json:"deploymentModel"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return ""
 	}
-	value := strings.ToLower(strings.TrimSpace(raw.DeploymentModel))
+	value := strings.ToLower(strings.TrimSpace(tolerantString(raw.DeploymentModel)))
 	if !slices.Contains(supportedDeploymentModels, value) {
 		return ""
 	}
