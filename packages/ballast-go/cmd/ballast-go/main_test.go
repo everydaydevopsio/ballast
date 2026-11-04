@@ -3738,3 +3738,25 @@ func TestTolerantStringReadsOnlyJSONStrings(t *testing.T) {
 		t.Fatalf("a missing field should yield an empty string, got %q", got)
 	}
 }
+
+// The wrapper owns language detection and its discovery.includeSubmodules
+// opt-in, but every backend rewrites .rulesrc.json. Dropping the flag here
+// would silently revert the user's choice on the next install.
+func TestNormalizeDiscoveryPreservesIncludeSubmodules(t *testing.T) {
+	discovery := normalizeDiscovery(json.RawMessage(`{"includeSubmodules":true}`))
+	if discovery == nil || !discovery.IncludeSubmodules {
+		t.Fatalf("includeSubmodules must survive on its own, got %+v", discovery)
+	}
+	if len(discovery.ExcludePaths) != 0 {
+		t.Fatalf("expected no exclude paths, got %+v", discovery.ExcludePaths)
+	}
+
+	both := normalizeDiscovery(json.RawMessage(`{"excludePaths":["examples"],"includeSubmodules":true}`))
+	if both == nil || !both.IncludeSubmodules || len(both.ExcludePaths) != 1 {
+		t.Fatalf("both fields must survive together, got %+v", both)
+	}
+
+	if off := normalizeDiscovery(json.RawMessage(`{"includeSubmodules":false}`)); off != nil {
+		t.Fatalf("an all-default discovery block stays nil, got %+v", off)
+	}
+}

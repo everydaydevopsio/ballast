@@ -144,6 +144,9 @@ type rulesConfig struct {
 
 type discoveryConfig struct {
 	ExcludePaths []string `json:"excludePaths,omitempty"`
+	// IncludeSubmodules is carried through so the wrapper's opt-in survives a
+	// backend rewrite of .rulesrc.json. Only the wrapper scans for profiles.
+	IncludeSubmodules bool `json:"includeSubmodules,omitempty"`
 }
 
 // rawRulesConfig decodes .rulesrc.json leniently. Scalar policy fields are
@@ -3268,16 +3271,17 @@ func normalizeDiscovery(raw json.RawMessage) *discoveryConfig {
 		return nil
 	}
 	var parsed struct {
-		ExcludePaths []string `json:"excludePaths"`
+		ExcludePaths      []string `json:"excludePaths"`
+		IncludeSubmodules bool     `json:"includeSubmodules"`
 	}
 	if err := json.Unmarshal(raw, &parsed); err != nil {
 		return nil
 	}
 	excludePaths := uniqueToolList(parsed.ExcludePaths)
-	if len(excludePaths) == 0 {
+	if len(excludePaths) == 0 && !parsed.IncludeSubmodules {
 		return nil
 	}
-	return &discoveryConfig{ExcludePaths: excludePaths}
+	return &discoveryConfig{ExcludePaths: excludePaths, IncludeSubmodules: parsed.IncludeSubmodules}
 }
 
 func ensureGitignoreEntry(projectRoot, entry string) error {

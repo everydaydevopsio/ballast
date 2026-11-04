@@ -323,22 +323,29 @@ def is_ci_mode() -> bool:
     )
 
 
-def normalize_discovery(raw: object | None) -> dict[str, list[str]] | None:
+def normalize_discovery(raw: object | None) -> dict[str, object] | None:
     if not isinstance(raw, dict):
         return None
-    exclude_paths = raw.get("excludePaths")
-    if not isinstance(exclude_paths, list):
-        return None
     normalized: list[str] = []
-    for item in exclude_paths:
-        if not isinstance(item, str):
-            continue
-        token = item.strip()
-        if token and token not in normalized:
-            normalized.append(token)
-    if not normalized:
+    exclude_paths = raw.get("excludePaths")
+    if isinstance(exclude_paths, list):
+        for item in exclude_paths:
+            if not isinstance(item, str):
+                continue
+            token = item.strip()
+            if token and token not in normalized:
+                normalized.append(token)
+    # Carried through so the wrapper's opt-in survives a backend rewrite of
+    # .rulesrc.json. Only the wrapper scans for language profiles.
+    include_submodules = raw.get("includeSubmodules") is True
+    if not normalized and not include_submodules:
         return None
-    return {"excludePaths": normalized}
+    discovery: dict[str, object] = {}
+    if normalized:
+        discovery["excludePaths"] = normalized
+    if include_submodules:
+        discovery["includeSubmodules"] = True
+    return discovery
 
 
 def normalize_tools(raw: object | None) -> dict[str, list[str]]:
@@ -474,7 +481,7 @@ def save_config(
     file_path = root / rulesrc_filename(language)
     languages: list[str] = []
     paths: dict[str, list[str]] = {}
-    existing_discovery: dict[str, list[str]] | None = None
+    existing_discovery: dict[str, object] | None = None
     existing_task_system: str | None = None
     existing_deployment_model: str | None = None
     existing_code_reviewer: str | None = None

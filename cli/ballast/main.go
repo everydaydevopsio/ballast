@@ -252,6 +252,10 @@ type monorepoConfig struct {
 
 type discoveryConfig struct {
 	ExcludePaths []string `json:"excludePaths,omitempty"`
+	// IncludeSubmodules re-enables scanning into Git submodules. Discovery
+	// skips them by default because a submodule is third-party code, and a
+	// language marker inside one says nothing about the parent repository.
+	IncludeSubmodules bool `json:"includeSubmodules,omitempty"`
 }
 
 // rawMonorepoConfig mirrors monorepoConfig for reading only. Scalar policy
@@ -352,7 +356,11 @@ type doctorConfigDrift struct {
 	StaleConfiguredProfiles []string
 	UntrackedProfiles       []string
 	UntrackedLanguages      []string
-	ScanError               error
+	// SkippedSubmodules names the third-party checkouts detection passed over.
+	// It is explanatory, not drift: skipping a submodule is correct behaviour,
+	// but an unexplained empty profile list is not actionable.
+	SkippedSubmodules []string
+	ScanError         error
 }
 
 const (
@@ -1458,6 +1466,15 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 func printDoctorConfigDrift(root string, config *monorepoConfig) {
 	drift := analyzeDoctorConfigDrift(root, config)
 	if !drift.hasDrift() && drift.ScanError == nil {
+		// A skipped submodule is not drift, but it is the reason a repository
+		// can match no profile at all, so it still needs saying.
+		if lines := skippedSubmoduleReport(drift.SkippedSubmodules); len(lines) > 0 {
+			fmt.Println()
+			fmt.Println("Language detection:")
+			for _, line := range lines {
+				fmt.Println(line)
+			}
+		}
 		return
 	}
 	fmt.Println()
@@ -1465,6 +1482,9 @@ func printDoctorConfigDrift(root string, config *monorepoConfig) {
 	if drift.ScanError != nil {
 		fmt.Printf("- scan error: %v\n", drift.ScanError)
 		return
+	}
+	for _, line := range skippedSubmoduleReport(drift.SkippedSubmodules) {
+		fmt.Println(line)
 	}
 	for _, item := range drift.MissingConfiguredPaths {
 		fmt.Printf("- missing configured path: %s\n", item)
@@ -1504,7 +1524,7 @@ func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigD
 	if config == nil {
 		return doctorConfigDrift{}
 	}
-	detected, err := detectRepoProfilesWithConfig(root, config)
+	detected, skippedSubmodules, err := detectRepoProfilesReportingSkips(root, config)
 	if err != nil {
 		return doctorConfigDrift{ScanError: err}
 	}
@@ -1541,6 +1561,7 @@ func analyzeDoctorConfigDrift(root string, config *monorepoConfig) doctorConfigD
 			}
 		}
 	}
+	drift.SkippedSubmodules = skippedSubmodules
 	return drift
 }
 
@@ -1693,10 +1714,11 @@ func discoveryConfigFromConfig(config *monorepoConfig) *discoveryConfig {
 		excludePaths = append(excludePaths, normalizedPath)
 	}
 	excludePaths = uniqueStrings(excludePaths)
-	if len(excludePaths) == 0 {
+	includeSubmodules := config.Discovery.IncludeSubmodules
+	if len(excludePaths) == 0 && !includeSubmodules {
 		return nil
 	}
-	return &discoveryConfig{ExcludePaths: excludePaths}
+	return &discoveryConfig{ExcludePaths: excludePaths, IncludeSubmodules: includeSubmodules}
 }
 
 func isDiscoveryExcluded(root string, currentPath string, discovery *discoveryConfig) bool {
@@ -1714,6 +1736,66 @@ func isDiscoveryExcluded(root string, currentPath string, discovery *discoveryCo
 		}
 	}
 	return false
+}
+
+// gitSubmodulePaths returns the repository-relative paths Git tracks as
+// submodules, read from .gitmodules. A submodule is third-party code, so a
+// language marker inside one says nothing about what the parent repository is
+// written in -- a dotfiles repo that vendors dotbot is not a Python project.
+//
+// .gitmodules is the authoritative declaration and is present whether or not
+// the worktree has been initialized, so this works for both states without
+// shelling out to git.
+func gitSubmodulePaths(root string) map[string]bool {
+	paths := map[string]bool{}
+	content, err := os.ReadFile(filepath.Join(root, ".gitmodules"))
+	if err != nil {
+		return paths
+	}
+	for _, line := range strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, ";") {
+			continue
+		}
+		key, value, found := strings.Cut(trimmed, "=")
+		if !found || strings.TrimSpace(strings.ToLower(key)) != "path" {
+			continue
+		}
+		normalizedPath, ok := normalizeConfigRelativePath(strings.TrimSpace(value))
+		if !ok || normalizedPath == "." {
+			continue
+		}
+		paths[normalizedPath] = true
+	}
+	return paths
+}
+
+// isSubmoduleWorktree reports whether dir is an initialized submodule checkout.
+// Git writes a .git *file* there pointing into the parent's modules directory,
+// where a standalone clone would have a .git directory. This catches a
+// submodule that .gitmodules does not declare, such as one added but not yet
+// committed.
+func isSubmoduleWorktree(dir string) bool {
+	info, err := os.Lstat(filepath.Join(dir, ".git"))
+	if err != nil {
+		return false
+	}
+	return info.Mode().IsRegular()
+}
+
+// isGitSubmodule reports whether currentPath is a submodule root.
+func isGitSubmodule(root string, currentPath string, submodulePaths map[string]bool) bool {
+	if currentPath == root {
+		return false
+	}
+	relativePath, err := filepath.Rel(root, currentPath)
+	if err != nil {
+		return false
+	}
+	if submodulePaths[filepath.Clean(relativePath)] {
+		return true
+	}
+	return isSubmoduleWorktree(currentPath)
 }
 
 func configuredLanguageSet(config *monorepoConfig) map[language]bool {
@@ -3556,6 +3638,13 @@ func detectRepoProfiles(root string) ([]repoProfile, error) {
 }
 
 func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoProfile, error) {
+	profiles, _, err := detectRepoProfilesReportingSkips(root, config)
+	return profiles, err
+}
+
+// detectRepoProfilesReportingSkips also returns the Git submodules the scan
+// passed over, which doctor surfaces so an ignored marker is explainable.
+func detectRepoProfilesReportingSkips(root string, config *monorepoConfig) ([]repoProfile, []string, error) {
 	pathsByLanguage := map[language][]string{
 		langTypeScript: {},
 		langPython:     {},
@@ -3566,6 +3655,9 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 		langDocker:     {},
 	}
 	discovery := discoveryConfigFromConfig(config)
+	includeSubmodules := discovery != nil && discovery.IncludeSubmodules
+	submodulePaths := gitSubmodulePaths(root)
+	skippedSubmodules := []string{}
 
 	if err := walkDirFunc(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -3577,6 +3669,12 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 				return filepath.SkipDir
 			}
 			if path != root && isDiscoveryExcluded(root, path, discovery) {
+				return filepath.SkipDir
+			}
+			if !includeSubmodules && isGitSubmodule(root, path, submodulePaths) {
+				if relativePath, relErr := filepath.Rel(root, path); relErr == nil {
+					skippedSubmodules = append(skippedSubmodules, filepath.Clean(relativePath))
+				}
 				return filepath.SkipDir
 			}
 			if name == ".git" || name == "node_modules" || name == ".venv" || name == "dist" || name == "build" || name == "vendor" || name == ".terraform" || name == ".terragrunt-cache" {
@@ -3611,7 +3709,7 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 		}
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("scan repo for language profiles: %w", err)
+		return nil, nil, fmt.Errorf("scan repo for language profiles: %w", err)
 	}
 
 	profiles := make([]repoProfile, 0, len(pathsByLanguage))
@@ -3622,7 +3720,23 @@ func detectRepoProfilesWithConfig(root string, config *monorepoConfig) ([]repoPr
 		}
 		profiles = append(profiles, repoProfile{Language: lang, Paths: paths})
 	}
-	return profiles, nil
+	return profiles, uniqueStrings(skippedSubmodules), nil
+}
+
+// skippedSubmoduleReport explains why a marker was ignored, so a repository
+// that matches no profile says which third-party checkouts were passed over
+// rather than leaving the user to guess. Reporting only -- detection never
+// writes or refreshes project files.
+func skippedSubmoduleReport(skippedSubmodules []string) []string {
+	if len(skippedSubmodules) == 0 {
+		return nil
+	}
+	lines := make([]string, 0, len(skippedSubmodules)+1)
+	for _, submodulePath := range skippedSubmodules {
+		lines = append(lines, fmt.Sprintf("- ignored Git submodule during language detection: %s", submodulePath))
+	}
+	lines = append(lines, "- to scan submodules as well, set discovery.includeSubmodules to true in .rulesrc.json")
+	return lines
 }
 
 func isFlutterDartProfileDir(dir string) bool {

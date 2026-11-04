@@ -321,7 +321,35 @@ If doctor reports a configured TypeScript path as a JavaScript package without `
   - Python CLI (legacy): `.rulesrc.python.json`
   - Go CLI (legacy): `.rulesrc.go.json`
 
-Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVersion`, `languages`, `paths`, `tools`, `discovery.excludePaths`, `taskSystem`, `deploymentModel`, `codeReviewer`, `publishingProfiles`, and `ruleProfile`. Set `ruleProfile: "minimal"` for small-context AI agents: installs then emit a single compiled `core.md` rule (engineering invariants plus per-language command summaries) instead of the full rule set, while the configured agents stay saved so switching back to `full` (the default) restores them on the next refresh. Use `deploymentModel: docker` for repos whose deployable artifact is a Docker/OCI image published to GHCR or Docker Hub without Ballast assuming server, Kubernetes, hosted-platform, or serverless rollout ownership. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
+Saved config values include `target`/`targets`, `agents`, `skills`, `ballastVersion`, `languages`, `paths`, `tools`, `discovery.excludePaths`, `discovery.includeSubmodules`, `taskSystem`, `deploymentModel`, `codeReviewer`, `publishingProfiles`, and `ruleProfile`. Set `ruleProfile: "minimal"` for small-context AI agents: installs then emit a single compiled `core.md` rule (engineering invariants plus per-language command summaries) instead of the full rule set, while the configured agents stay saved so switching back to `full` (the default) restores them on the next refresh. Use `deploymentModel: docker` for repos whose deployable artifact is a Docker/OCI image published to GHCR or Docker Hub without Ballast assuming server, Kubernetes, hosted-platform, or serverless rollout ownership. Documentation and examples should refer to `.rulesrc.json` as the primary path unless they are explicitly describing legacy fallback behavior.
+
+### Language Detection and Git Submodules
+
+Ballast scans the repository for language markers such as `go.mod`, `pyproject.toml`, and `tsconfig.json` to decide which language profiles apply.
+
+**Git submodules are skipped.** A submodule is third-party code, so a marker inside one says nothing about what the parent repository is written in — a dotfiles repository that vendors `dotbot` is not a Python project. Both declared and initialized submodules are skipped: the path is read from `.gitmodules`, and a directory whose `.git` is a *file* rather than a directory is recognized as an initialized submodule worktree even when `.gitmodules` does not list it.
+
+When a scan skips a submodule, `ballast doctor` says so, so an ignored marker is never silent:
+
+```
+Language detection:
+- ignored Git submodule during language detection: dotbot
+- to scan submodules as well, set discovery.includeSubmodules to true in .rulesrc.json
+```
+
+To scan submodules anyway — for a vendored checkout you genuinely maintain — opt in explicitly:
+
+```json
+{
+  "discovery": {
+    "includeSubmodules": true
+  }
+}
+```
+
+Detection never writes or refreshes project files; it only reports. If no first-party markers remain after submodules are skipped, no profile is selected, and the doctor output above explains why.
+
+`discovery.excludePaths` remains available to exclude any other directory from the scan.
 
 ## Install Paths
 

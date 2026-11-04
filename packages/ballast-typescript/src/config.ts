@@ -70,6 +70,9 @@ export type RuleProfile = (typeof RULE_PROFILES)[number];
 
 export interface DiscoveryConfig {
   excludePaths?: string[];
+  // Carried through so the wrapper's opt-in survives a backend rewrite of
+  // .rulesrc.json. Only the wrapper scans for language profiles.
+  includeSubmodules?: boolean;
 }
 
 export interface RulesConfig {
@@ -431,13 +434,16 @@ function normalizeRulesConfig(data: unknown): RulesConfig | null {
 
 function normalizeDiscovery(raw: unknown): DiscoveryConfig | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
-  const record = raw as { excludePaths?: unknown };
+  const record = raw as { excludePaths?: unknown; includeSubmodules?: unknown };
   const discovery: DiscoveryConfig = {};
   if (Array.isArray(record.excludePaths)) {
     const excludePaths = uniqueToolList(record.excludePaths);
     if (excludePaths.length > 0) {
       discovery.excludePaths = excludePaths;
     }
+  }
+  if (record.includeSubmodules === true) {
+    discovery.includeSubmodules = true;
   }
   return Object.keys(discovery).length > 0 ? discovery : undefined;
 }
