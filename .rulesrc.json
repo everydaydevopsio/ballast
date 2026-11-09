@@ -84,7 +84,7 @@
   },
   "taskSystem": "github",
   "deploymentModel": "none",
-  "codeReviewer": "copilot",
+  "codeReviewer": "bosun",
   "publishingProfiles": [
     "cli",
     "libraries"

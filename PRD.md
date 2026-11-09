@@ -1,5 +1,21 @@
 # Product Requirements
 
+## Repository Default Automated Reviewer
+
+### Problem
+
+The repository supports both Copilot and Bosun through its generic PR review cycle, but the saved repository configuration currently selects Copilot. That makes the review cycle differ from this repository's intended Bosun workflow.
+
+### Requirements
+
+1. The repository's `.rulesrc.json` must select `bosun` as `codeReviewer` so agents using the generic PR review cycle follow the Bosun review process by default.
+2. The default must use the existing Bosun workflow: wait for review output on the current PR head, handle findings, and check required actions before merge.
+
+### Acceptance Criteria
+
+1. `.rulesrc.json` contains `"codeReviewer": "bosun"`.
+2. The existing `github-pr-review-cycle` guidance documents the Bosun path and does not require a Copilot reviewer request for this repository.
+
 ## OpenCode First-Class Target Support
 
 ### Problem
