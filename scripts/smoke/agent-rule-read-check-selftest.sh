@@ -109,6 +109,14 @@ echo "cat: .claude/rules/local-dev-env.md: Permission denied"
 EOF
 run_case "permission denied skips rather than fails" 2 claude
 
+# Broad diagnostics like "insufficient" can appear in a normal wrong answer.
+# An exit-zero answer without the sentinel must still fail the rule check.
+stub claude <<'EOF'
+#!/usr/bin/env bash
+echo "Insufficient information to determine the verification code."
+EOF
+run_case "insufficient answer without sentinel fails" 1 claude
+
 # codex prints its configuration banner -- including "sandbox: read-only" -- on
 # stderr for every run. A classifier matching a bare "sandbox" therefore turned
 # every codex result into a skip, so the check appeared to run while asserting

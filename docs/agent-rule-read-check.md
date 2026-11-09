@@ -144,6 +144,10 @@ each. Two cases guard specific regressions:
 - A sandbox refusal must skip, not fail. It arrives on stdout with a zero exit
   status, so it would otherwise read as the agent answering without consulting
   the rules — which is exactly how it first surfaced in CI.
+- A zero-exit wrong answer such as "Insufficient information to determine the
+  verification code" must still fail. The broad environmental classifier is
+  used on stdout only for nonzero exits; zero-exit stdout only skips for explicit
+  sandbox or permission failures.
 - Codex's ordinary configuration banner must **not** skip. It prints
   `sandbox: read-only` on stderr for every run, so a classifier matching a bare
   `sandbox` turns every codex result into a skip — a check that appears to run

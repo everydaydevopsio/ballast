@@ -173,19 +173,20 @@ if [ "$AGENT_STATUS" -eq 0 ] && printf '%s' "$AGENT_OUTPUT" | grep -qF "$SENTINE
 fi
 
 # Environmental failures must not read as Ballast regressions. Status codes are
-# matched on word boundaries so they cannot hit a sentinel substring, and stdout
-# is only searched when the agent actually failed -- a successful answer is
-# never a diagnostic.
+# matched on word boundaries so they cannot hit a sentinel substring. For a
+# nonzero exit, stdout uses the broad classifier; for a zero-exit answer, only
+# explicit sandbox failures are environmental. Words like "insufficient" can
+# also appear in an ordinary wrong answer and must not turn it into a skip.
 # Each alternative must name an actual failure. A bare "sandbox" looked
 # reasonable and was not: `codex exec` prints "sandbox: read-only" in its
 # banner on every run, so it matched always and turned every codex result into
 # a skip -- a check that appears to run while asserting nothing.
 ENVIRONMENTAL_PATTERN='unauthorized|authentication|not logged in|invalid api key|\b(401|403|429)\b|rate limit|quota|credit balance|insufficient|overloaded|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network error|timed out|filesystem access failed|sandbox denied|denied by the sandbox|blocked by the sandbox|sandbox error|permission denied|operation not permitted|EACCES'
+SANDBOX_FAILURE_PATTERN='filesystem access failed|sandbox denied|denied by the sandbox|blocked by the sandbox|sandbox error|permission denied|operation not permitted|EACCES'
 
-# At this point the answer did not contain the sentinel, so scanning it for
-# diagnostics cannot mask a pass: a successful answer already returned above.
 if printf '%s' "$AGENT_STDERR" | grep -qiE "$ENVIRONMENTAL_PATTERN" ||
-  printf '%s' "$AGENT_OUTPUT" | grep -qiE "$ENVIRONMENTAL_PATTERN"; then
+  { [ "$AGENT_STATUS" -ne 0 ] && printf '%s' "$AGENT_OUTPUT" | grep -qiE "$ENVIRONMENTAL_PATTERN"; } ||
+  { [ "$AGENT_STATUS" -eq 0 ] && printf '%s' "$AGENT_OUTPUT" | grep -qiE "$SANDBOX_FAILURE_PATTERN"; }; then
   echo "--- agent stderr ---" >&2
   printf '%s\n' "$AGENT_STDERR" >&2
   skip "agent could not complete for environmental reasons (auth, quota, or network)"
