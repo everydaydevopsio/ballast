@@ -81,16 +81,9 @@ Created by Ballast. Do not edit this section.
 These skills are registered with Claude Code. Invoke one by name (for example `/ballast-audit`) when it is relevant:
 
 - `/owasp-security-scan` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
-- `/aws-health-review` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
-- `/aws-live-health-review` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
-- `/aws-weekly-security-review` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `/github-health-check` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 - `/github-pr-review-cycle` — create or update a GitHub PR, run the configured code review agent (Copilot, Bosun, or a repository-defined skill), triage and fix findings, push fixes, check CI, and repeat up to three cycles
 - `/ballast-audit` — audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
 - `/agent-performance-audit` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
 - `/ballast-project-maintenance` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
-- `/speckit-bootstrap` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
-- `/speckit-reverse-engineer` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
-- `/speckit-delivery` — orchestrate GitHub Spec Kit's native skills for a bounded product change
-- `/docker-registry-publish` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility
 - `/git-branch-cleanup` — clean up local branches, remote branches, and git worktrees, deleting merged refs and reporting the rest with PR status

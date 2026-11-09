@@ -81,18 +81,11 @@ Created by Ballast. Do not edit this section.
 Read and use these skill files in `.codex/skills/` when they are relevant:
 
 - `.codex/skills/owasp-security-scan/SKILL.md` — run an OWASP-aligned security audit across Go, TypeScript, and Python projects
-- `.codex/skills/aws-health-review/SKILL.md` — run a weekly read-only AWS health review covering configuration, performance, errors, and warnings
-- `.codex/skills/aws-live-health-review/SKILL.md` — run a read-only AWS live health review for current EC2, RDS, ALB, CloudWatch alarms, and logs
-- `.codex/skills/aws-weekly-security-review/SKILL.md` — run a weekly read-only AWS security baseline review and generate a prioritized findings report
 - `.codex/skills/github-health-check/SKILL.md` — run a comprehensive GitHub repository health check covering CI status, code quality, branch hygiene, and repo configuration
 - `.codex/skills/github-pr-review-cycle/SKILL.md` — create or update a GitHub PR, run the configured code review agent (Copilot, Bosun, or a repository-defined skill), triage and fix findings, push fixes, check CI, and repeat up to three cycles
 - `.codex/skills/ballast-audit/SKILL.md` — audit a Ballast installation for stale, unowned, oversized, and irrelevant rules and skills, and report the narrowest config that still covers the repository
 - `.codex/skills/agent-performance-audit/SKILL.md` — use distilled bridgectl agent-performance findings to audit Ballast rules and skills for evidence-backed improvements
 - `.codex/skills/ballast-project-maintenance/SKILL.md` — inspect, bootstrap, and repair Ballast-managed repository state including .ballast/ local tools
-- `.codex/skills/speckit-bootstrap/SKILL.md` — initialize or repair GitHub Spec Kit in an existing repository using native agent skills
-- `.codex/skills/speckit-reverse-engineer/SKILL.md` — reverse-engineer an existing application into a high-level GitHub Spec Kit baseline
-- `.codex/skills/speckit-delivery/SKILL.md` — orchestrate GitHub Spec Kit's native skills for a bounded product change
-- `.codex/skills/docker-registry-publish/SKILL.md` — set up Docker image publishing to GHCR or Docker Hub with public or private registry visibility
 - `.codex/skills/git-branch-cleanup/SKILL.md` — clean up local branches, remote branches, and git worktrees, deleting merged refs and reporting the rest with PR status
 
 ## Codex code review expectations

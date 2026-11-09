@@ -20,18 +20,11 @@
   ],
   "skills": [
     "owasp-security-scan",
-    "aws-health-review",
-    "aws-live-health-review",
-    "aws-weekly-security-review",
     "github-health-check",
     "github-pr-review-cycle",
     "ballast-audit",
     "agent-performance-audit",
     "ballast-project-maintenance",
-    "speckit-bootstrap",
-    "speckit-reverse-engineer",
-    "speckit-delivery",
-    "docker-registry-publish",
     "git-branch-cleanup"
   ],
   "ballastVersion": "5.22.2",
