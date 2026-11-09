@@ -35,7 +35,7 @@
     "docker-registry-publish",
     "git-branch-cleanup"
   ],
-  "ballastVersion": "5.22.1",
+  "ballastVersion": "5.22.2",
   "languages": [
     "typescript",
     "python",
