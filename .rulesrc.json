@@ -7,7 +7,6 @@
     "local-dev",
     "docs",
     "cicd",
-    "observability",
     "publishing",
     "git-hooks",
     "plan-lifecycle",
