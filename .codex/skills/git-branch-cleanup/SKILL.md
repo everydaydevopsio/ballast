@@ -11,7 +11,7 @@ description: >
   the default branch with no extra commits, and asks before touching the rest.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.22.2. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.22.0. Do not edit this section. -->
 
 # Git Branch and Worktree Cleanup Skill
 
