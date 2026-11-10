@@ -29,8 +29,8 @@ Update this section when those facts change. If live runtime state is required, 
 - Install behavior lives in four places, not one. `packages/ballast-typescript/src/{build,install}.ts`, `packages/ballast-go/cmd/ballast-go/main.go`, and `packages/ballast-python/ballast/cli.py` each independently decide where a rule or skill is written, what it contains, and how `--patch` treats it; `cli/ballast/main.go` owns the wrapper's own copies of those paths, its stale-file removal, and its manifest text. Any change to a destination path, emitted content, patch semantics, manifest wording, or legacy-path cleanup must land in all four. Which backend runs depends on the repository's languages, so a TypeScript-only change passes every TypeScript test while leaving Go, Python, Ansible, Terraform, Dart, and Docker repositories broken.
 - The e2e and smoke scripts under `scripts/` invoke a bare `ballast` resolved from `PATH`. Run them without putting the freshly built binaries first and they silently exercise the installed release instead of the working tree, reporting a pass that means nothing. Reproduce the CI wiring before trusting a local run: build with `pnpm run build` and `make build-go build-cli`, then place `ballast`, `ballast-go`, and shims for `ballast-typescript` and `ballast-python` in a directory prepended to `PATH` (see the `Create local backend shims` step in `.github/workflows/examples-smoke.yml`). `SKIP_BUILD=1` reuses whatever was built last, so drop it after editing a backend.
 - Skills are entirely Ballast-authored and every backend replaces them wholesale. Do not reintroduce section-merging for skills: heading names cannot distinguish a team-authored section from one upstream deleted, so merging both keeps stale text for headings that still exist and resurrects sections that were removed. Rules still merge under `--patch` to preserve user-authored sections.
-- Do not edit checked-in `.claude/` or `.codex/` generated rule outputs directly. Change the source templates/content under repo-root `agents/` and `skills/`, then regenerate the local Ballast-managed outputs.
-- When repo-root `agents/`, `skills/`, Ballast sync/build scripts, or root target config change, regenerate and commit the corresponding local Ballast-managed `.claude/` and `.codex/` outputs in the same PR.
+- Do not edit checked-in `.claude/` or `.codex/` generated rule outputs directly. Change the source templates/content under repo-root `agents/` and `skills/` instead.
+- Checked-in `.claude/` and `.codex/` generated outputs are created by running `ballast upgrade --patch`; use that command to regenerate them after repo-root `agents/`, `skills/`, Ballast sync/build scripts, or root target config change.
 
 ## Installed agent rules
 
@@ -51,7 +51,6 @@ Read and follow these rule files in `.claude/rules/` when they apply:
 - `.claude/rules/common/local-dev-license.md` — Rules for common/local-dev-license
 - `.claude/rules/common/docs.md` — Rules for common/docs
 - `.claude/rules/common/cicd.md` — Rules for common/cicd
-- `.claude/rules/common/observability.md` — Rules for common/observability
 - `.claude/rules/common/publishing.md` — Rules for common/publishing
 - `.claude/rules/common/publishing-cli.md` — Rules for common/publishing-cli
 - `.claude/rules/common/publishing-libraries.md` — Rules for common/publishing-libraries
