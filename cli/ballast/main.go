@@ -116,18 +116,48 @@ func preferredInstallSourceRoot(projectRoot string, version string) string {
 }
 
 var typeScriptTool = toolConfig{
-	binary: "ballast-typescript",
-	installCommand: func(version string, projectRoot string) ([]string, error) {
-		toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
-		if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
-			return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
-		}
+	binary:  "ballast-typescript",
+	install: installTypeScriptBackend,
+}
+
+// installTypeScriptBackend installs the TypeScript backend into
+// .ballast/tools/typescript.
+//
+// From a source checkout it builds before it installs. `npm install <dir>`
+// links the package directory without running any of its scripts, and
+// bin/ballast.js requires dist/cli, which only the build produces. The
+// agents and skills the backend serves are copied in by sync:content. So
+// installing an unbuilt checkout replaced a working backend with one that
+// cannot start, and installing a stale build kept serving old content -- the
+// "Unknown" agent this recovery path exists to fix (#417). prepack runs both
+// steps, exactly as publishing does.
+//
+// Every step runs before anything is replaced, and the first failure is
+// returned, so a checkout that cannot be built leaves the existing backend
+// in place.
+func installTypeScriptBackend(version string, projectRoot string) error {
+	toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
+	sourceRoot := preferredInstallSourceRoot(projectRoot, version)
+	if sourceRoot == "" {
 		pkg := "@everydaydevopsio/ballast"
-		if releaseVersion(version) != "" {
-			pkg += "@" + releaseVersion(version)
+		if release := releaseVersion(version); release != "" {
+			pkg += "@" + release
 		}
-		return []string{"npm", "install", "--prefix", toolRoot, pkg}, nil
-	},
+		return runCommandFunc("npm", []string{"install", "--prefix", toolRoot, pkg})
+	}
+
+	pkgDir := filepath.Join(sourceRoot, "packages", "ballast-typescript")
+	if err := runCommandFunc("pnpm", []string{"--dir", sourceRoot, "install", "--frozen-lockfile"}); err != nil {
+		return fmt.Errorf("install TypeScript build dependencies in %s: %w", sourceRoot, err)
+	}
+	if err := runCommandFunc("pnpm", []string{"--dir", pkgDir, "run", "prepack"}); err != nil {
+		return fmt.Errorf("build the TypeScript backend in %s: %w", pkgDir, err)
+	}
+	launcherTarget := filepath.Join(pkgDir, "dist", "cli.js")
+	if !fileExists(launcherTarget) {
+		return fmt.Errorf("the TypeScript build finished but %s is missing; bin/ballast.js cannot start without it", launcherTarget)
+	}
+	return runCommandFunc("npm", []string{"install", "--prefix", toolRoot, pkgDir})
 }
 
 var pythonTool = toolConfig{

@@ -1254,10 +1254,7 @@ func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T)
 	version = "5.0.6"
 
 	var commands [][]string
-	runCommandFunc = func(name string, args []string) error {
-		commands = append(commands, append([]string{name}, args...))
-		return nil
-	}
+	runCommandFunc = recordingTypeScriptBuild(t, &commands)
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
 	var invocation backendInvocation
 	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
@@ -1293,6 +1290,8 @@ func TestRunUpgradeUpdatesConfigVersionAndInstallsMatchingBackends(t *testing.T)
 	if config == nil || config.BallastVersion != "5.0.6" {
 		t.Fatalf("expected upgrade to rewrite ballastVersion to 5.0.6, got %#v", config)
 	}
+	assertTypeScriptSourceBuild(t, commands, root)
+	commands = commands[2:]
 	if len(commands) != 3 {
 		t.Fatalf("expected upgrade to install all backends, got %#v", commands)
 	}
@@ -1317,7 +1316,7 @@ func TestRunUpgradePatchForwardsPatchToRefreshInstall(t *testing.T) {
 	})
 	version = "5.0.6"
 
-	runCommandFunc = func(name string, args []string) error { return nil }
+	runCommandFunc = recordingTypeScriptBuild(t, nil)
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
 	var invocation backendInvocation
 	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
@@ -1436,7 +1435,7 @@ func TestRunUpgradeForceForwardsForceToRefreshInstall(t *testing.T) {
 	})
 	version = "5.0.6"
 
-	runCommandFunc = func(name string, args []string) error { return nil }
+	runCommandFunc = recordingTypeScriptBuild(t, nil)
 	ensureInstalledFunc = func(tool toolConfig) error { return nil }
 	var invocation backendInvocation
 	execToolFunc = func(binary string, args []string, dir string, env map[string]string) (int, error) {
@@ -2909,10 +2908,7 @@ func TestRunInstallCLIUsesLocalSourcesForDevWrapper(t *testing.T) {
 	}
 
 	var commands [][]string
-	runCommandFunc = func(name string, args []string) error {
-		commands = append(commands, append([]string{name}, args...))
-		return nil
-	}
+	runCommandFunc = recordingTypeScriptBuild(t, &commands)
 
 	mustWriteFile(t, filepath.Join(projectRoot, "package.json"), "{}")
 	withWorkingDir(t, projectRoot, func() {
@@ -2922,6 +2918,8 @@ func TestRunInstallCLIUsesLocalSourcesForDevWrapper(t *testing.T) {
 		}
 	})
 
+	assertTypeScriptSourceBuild(t, commands, sourceRoot)
+	commands = commands[2:]
 	if len(commands) != 3 {
 		t.Fatalf("expected 3 install commands, got %#v", commands)
 	}
@@ -2957,10 +2955,7 @@ func TestRunInstallCLIUsesLocalSourcesInsideSourceCheckoutForReleaseWrapper(t *t
 	}
 
 	var commands [][]string
-	runCommandFunc = func(name string, args []string) error {
-		commands = append(commands, append([]string{name}, args...))
-		return nil
-	}
+	runCommandFunc = recordingTypeScriptBuild(t, &commands)
 
 	withWorkingDir(t, sourceRoot, func() {
 		exitCode := run([]string{"install-cli"})
@@ -2969,6 +2964,8 @@ func TestRunInstallCLIUsesLocalSourcesInsideSourceCheckoutForReleaseWrapper(t *t
 		}
 	})
 
+	assertTypeScriptSourceBuild(t, commands, sourceRoot)
+	commands = commands[2:]
 	if len(commands) != 3 {
 		t.Fatalf("expected 3 install commands, got %#v", commands)
 	}
@@ -3098,10 +3095,7 @@ func TestRunInstallCLIUsesLocalSourcesFromNestedPackageDirForReleaseWrapper(t *t
 	}
 
 	var commands [][]string
-	runCommandFunc = func(name string, args []string) error {
-		commands = append(commands, append([]string{name}, args...))
-		return nil
-	}
+	runCommandFunc = recordingTypeScriptBuild(t, &commands)
 
 	withWorkingDir(t, nestedRoot, func() {
 		exitCode := run([]string{"install-cli"})
@@ -3110,6 +3104,8 @@ func TestRunInstallCLIUsesLocalSourcesFromNestedPackageDirForReleaseWrapper(t *t
 		}
 	})
 
+	assertTypeScriptSourceBuild(t, commands, sourceRoot)
+	commands = commands[2:]
 	if len(commands) != 3 {
 		t.Fatalf("expected 3 install commands, got %#v", commands)
 	}
@@ -7940,5 +7936,211 @@ func TestEnsureInstalledReinstallsAnUnreadablePinnedBackendAtTheRelease(t *testi
 	}
 	if !strings.Contains(output, "Could not determine ballast-go version") || !strings.Contains(output, "Reinstalling to match ballast 5.22.0") {
 		t.Errorf("the reinstall reason was not reported: %q", output)
+	}
+}
+
+// staleTypeScriptBackend installs a TypeScript backend that reports an older
+// version, where projectLocalBackendCommand looks for it.
+func staleTypeScriptBackend(t *testing.T, root string, reportedVersion string) {
+	t.Helper()
+	binary := filepath.Join(root, ".ballast", "tools", "typescript", "node_modules", ".bin", "ballast-typescript")
+	mustWriteFile(t, binary, fmt.Sprintf("#!/usr/bin/env bash\necho %s\n", reportedVersion))
+	if err := os.Chmod(binary, 0o755); err != nil {
+		t.Fatalf("chmod %s: %v", binary, err)
+	}
+}
+
+// typeScriptBuildStub records commands and, when the package's prepack runs,
+// writes the compiled launcher target as a real build would.
+func typeScriptBuildStub(t *testing.T, pkgDir string, buildErr error, writeDist bool) *[][]string {
+	t.Helper()
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		if name == "pnpm" && len(args) >= 4 && args[0] == "--dir" && args[1] == pkgDir && args[2] == "run" && args[3] == "prepack" {
+			if buildErr != nil {
+				return buildErr
+			}
+			if writeDist {
+				mustWriteFile(t, filepath.Join(pkgDir, "dist", "cli.js"), "exports.main = () => 0;\n")
+			}
+		}
+		return nil
+	}
+	return &commands
+}
+
+// Bosun review of #418, High: `npm install <dir>` links the checkout without
+// building it, and bin/ballast.js requires dist/cli. Recovering a stale
+// TypeScript backend must build the checkout -- content sync and tsc, which is
+// what prepack runs -- before it replaces anything.
+func TestTypeScriptSourceRecoveryBuildsTheCheckoutBeforeInstalling(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "dev"
+
+	root := resolvedTempDir(t)
+	ballastSourceCheckout(t, root, "5.22.0")
+	staleTypeScriptBackend(t, root, "5.21.3")
+	pkgDir := filepath.Join(root, "packages", "ballast-typescript")
+	commands := typeScriptBuildStub(t, pkgDir, nil, true)
+
+	withWorkingDir(t, root, func() {
+		if err := ensureInstalled(typeScriptTool); err != nil {
+			t.Fatalf("ensureInstalled returned error: %v", err)
+		}
+	})
+
+	want := [][]string{
+		{"pnpm", "--dir", root, "install", "--frozen-lockfile"},
+		{"pnpm", "--dir", pkgDir, "run", "prepack"},
+		{"npm", "install", "--prefix", filepath.Join(root, ".ballast", "tools", "typescript"), pkgDir},
+	}
+	if fmt.Sprint(*commands) != fmt.Sprint(want) {
+		t.Fatalf("commands = %v\nwant       %v", *commands, want)
+	}
+}
+
+// A failed build must leave the working backend alone and say why.
+func TestTypeScriptSourceRecoveryStopsWhenTheBuildFails(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "dev"
+
+	root := resolvedTempDir(t)
+	ballastSourceCheckout(t, root, "5.22.0")
+	staleTypeScriptBackend(t, root, "5.21.3")
+	pkgDir := filepath.Join(root, "packages", "ballast-typescript")
+	commands := typeScriptBuildStub(t, pkgDir, errors.New("tsc: error TS2304"), false)
+
+	var err error
+	withWorkingDir(t, root, func() { err = ensureInstalled(typeScriptTool) })
+	if err == nil || !strings.Contains(err.Error(), "TS2304") {
+		t.Fatalf("err = %v, want the build failure", err)
+	}
+	for _, c := range *commands {
+		if c[0] == "npm" {
+			t.Fatalf("installed after a failed build: %v", c)
+		}
+	}
+}
+
+// A build that reports success but leaves no launcher target would install a
+// backend that cannot start. Refuse it.
+func TestTypeScriptSourceRecoveryRefusesABuildWithoutItsOutput(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "dev"
+
+	root := resolvedTempDir(t)
+	ballastSourceCheckout(t, root, "5.22.0")
+	staleTypeScriptBackend(t, root, "5.21.3")
+	pkgDir := filepath.Join(root, "packages", "ballast-typescript")
+	commands := typeScriptBuildStub(t, pkgDir, nil, false)
+
+	var err error
+	withWorkingDir(t, root, func() { err = ensureInstalled(typeScriptTool) })
+	if err == nil || !strings.Contains(err.Error(), filepath.Join("dist", "cli.js")) {
+		t.Fatalf("err = %v, want the missing build output named", err)
+	}
+	for _, c := range *commands {
+		if c[0] == "npm" {
+			t.Fatalf("installed a checkout with no build output: %v", c)
+		}
+	}
+}
+
+// A released wrapper installs the published package; nothing is built.
+func TestTypeScriptReleaseInstallUsesThePublishedPackage(t *testing.T) {
+	originalRun := runCommandFunc
+	t.Cleanup(func() { runCommandFunc = originalRun })
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	root := resolvedTempDir(t)
+	if err := runToolInstall(typeScriptTool, "v5.22.0", root); err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"npm", "install", "--prefix", filepath.Join(root, ".ballast", "tools", "typescript"), "@everydaydevopsio/ballast@5.22.0"}}
+	if fmt.Sprint(commands) != fmt.Sprint(want) {
+		t.Fatalf("commands = %v, want %v", commands, want)
+	}
+}
+
+// recordingTypeScriptBuild stands in for the package managers. It records each
+// command, and when a TypeScript package's prepack runs it writes the
+// dist/cli.js a real build produces, which installTypeScriptBackend checks for
+// before installing. commands may be nil.
+func recordingTypeScriptBuild(t *testing.T, commands *[][]string) func(string, []string) error {
+	t.Helper()
+	return func(name string, args []string) error {
+		if commands != nil {
+			*commands = append(*commands, append([]string{name}, args...))
+		}
+		if name == "pnpm" && len(args) == 4 && args[0] == "--dir" && args[2] == "run" && args[3] == "prepack" {
+			mustWriteFile(t, filepath.Join(args[1], "dist", "cli.js"), "exports.main = () => 0;\n")
+		}
+		return nil
+	}
+}
+
+// assertTypeScriptSourceBuild checks that a source install of the TypeScript
+// backend built the checkout first: workspace dependencies, then prepack.
+func assertTypeScriptSourceBuild(t *testing.T, commands [][]string, sourceRoot string) {
+	t.Helper()
+	pkgDir := filepath.Join(sourceRoot, "packages", "ballast-typescript")
+	want := [][]string{
+		{"pnpm", "--dir", sourceRoot, "install", "--frozen-lockfile"},
+		{"pnpm", "--dir", pkgDir, "run", "prepack"},
+	}
+	if len(commands) < 2 || fmt.Sprint(commands[:2]) != fmt.Sprint(want) {
+		t.Fatalf("expected the TypeScript checkout to be built first\ngot  %v\nwant %v", commands, want)
+	}
+}
+
+// Without the workspace's build dependencies there is no tsc to build with.
+// That failure must stop the recovery before anything is replaced, too.
+func TestTypeScriptSourceRecoveryStopsWhenBuildDependenciesFail(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "dev"
+
+	root := resolvedTempDir(t)
+	ballastSourceCheckout(t, root, "5.22.0")
+	staleTypeScriptBackend(t, root, "5.21.3")
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		if name == "pnpm" && len(args) >= 3 && args[2] == "install" {
+			return errors.New("ERR_PNPM_OUTDATED_LOCKFILE")
+		}
+		return nil
+	}
+
+	var err error
+	withWorkingDir(t, root, func() { err = ensureInstalled(typeScriptTool) })
+	if err == nil || !strings.Contains(err.Error(), "ERR_PNPM_OUTDATED_LOCKFILE") {
+		t.Fatalf("err = %v, want the dependency failure", err)
+	}
+	if len(commands) != 1 {
+		t.Fatalf("expected to stop after the failed dependency install, got %v", commands)
 	}
 }
