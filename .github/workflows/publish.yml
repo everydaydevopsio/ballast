@@ -101,7 +101,7 @@ jobs:
       # dev build, so it installs backends from this tree -- which is the only
       # way to regenerate at a version that has not been published yet.
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6.1.0
+        uses: pnpm/action-setup@v6.1.1
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -227,7 +227,7 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', needs.bump_and_tag.outputs.version) || github.ref }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6.1.0
+        uses: pnpm/action-setup@v6.1.1
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
