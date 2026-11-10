@@ -7858,3 +7858,87 @@ func TestEnsureInstalledKeepsPinnedBackendWhenTheCheckoutVersionIsUnreadable(t *
 		}
 	})
 }
+
+// A released wrapper whose pinned backend already reports the wrapper's own
+// release keeps it. Reinstalling on every command would make each one pay for
+// an install it does not need.
+func TestEnsureInstalledKeepsAPinnedBackendMatchingTheRelease(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "v5.22.0"
+
+	runCommandFunc = func(name string, args []string) error {
+		t.Fatalf("a backend matching the release must not be reinstalled, got %s %s", name, strings.Join(args, " "))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	// Reported without the "v" prefix: versions compare normalized.
+	pinnedBackend(t, root, "ballast-go", "5.22.0")
+
+	withWorkingDir(t, root, func() {
+		if err := ensureInstalled(toolConfig{
+			binary: "ballast-go",
+			installCommand: func(version string, projectRoot string) ([]string, error) {
+				return []string{"go", "install", "example.com/ballast-go@" + version}, nil
+			},
+		}); err != nil {
+			t.Fatalf("ensureInstalled returned error: %v", err)
+		}
+	})
+}
+
+// A released wrapper whose pinned backend cannot report a version reinstalls
+// it at the wrapper's release: an unknown version is no more trustworthy than
+// a wrong one.
+func TestEnsureInstalledReinstallsAnUnreadablePinnedBackendAtTheRelease(t *testing.T) {
+	originalRun := runCommandFunc
+	originalVersion := version
+	t.Cleanup(func() {
+		runCommandFunc = originalRun
+		version = originalVersion
+	})
+	version = "v5.22.0"
+
+	var commands [][]string
+	runCommandFunc = func(name string, args []string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+
+	root := resolvedTempDir(t)
+	// Exits non-zero, so its version cannot be determined.
+	localBinary := filepath.Join(root, ".ballast", "bin", "ballast-go")
+	mustWriteFile(t, localBinary, "#!/usr/bin/env bash\nexit 1\n")
+	if err := os.Chmod(localBinary, 0o755); err != nil {
+		t.Fatalf("chmod %s: %v", localBinary, err)
+	}
+
+	var output string
+	withWorkingDir(t, root, func() {
+		output = captureStdout(t, func() {
+			if err := ensureInstalled(toolConfig{
+				binary: "ballast-go",
+				installCommand: func(version string, projectRoot string) ([]string, error) {
+					return []string{"go", "install", "example.com/ballast-go@" + version}, nil
+				},
+			}); err != nil {
+				t.Fatalf("ensureInstalled returned error: %v", err)
+			}
+		})
+	})
+
+	if len(commands) != 1 {
+		t.Fatalf("expected an unreadable backend to be reinstalled once, got %#v", commands)
+	}
+	if got := strings.Join(commands[0], " "); !strings.Contains(got, "@v5.22.0") {
+		t.Errorf("reinstall did not target the wrapper's release: %s", got)
+	}
+	if !strings.Contains(output, "Could not determine ballast-go version") || !strings.Contains(output, "Reinstalling to match ballast 5.22.0") {
+		t.Errorf("the reinstall reason was not reported: %q", output)
+	}
+}
