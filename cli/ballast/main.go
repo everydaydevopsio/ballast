@@ -116,18 +116,8 @@ func preferredInstallSourceRoot(projectRoot string, version string) string {
 }
 
 var typeScriptTool = toolConfig{
-	binary: "ballast-typescript",
-	installCommand: func(version string, projectRoot string) ([]string, error) {
-		toolRoot := filepath.Join(projectRoot, ".ballast", "tools", "typescript")
-		if sourceRoot := preferredInstallSourceRoot(projectRoot, version); sourceRoot != "" {
-			return []string{"npm", "install", "--prefix", toolRoot, filepath.Join(sourceRoot, "packages", "ballast-typescript")}, nil
-		}
-		pkg := "@everydaydevopsio/ballast"
-		if releaseVersion(version) != "" {
-			pkg += "@" + releaseVersion(version)
-		}
-		return []string{"npm", "install", "--prefix", toolRoot, pkg}, nil
-	},
+	binary:  "ballast-typescript",
+	install: installTypeScriptBackend,
 }
 
 var pythonTool = toolConfig{
@@ -774,26 +764,58 @@ func ensureInstalled(tool toolConfig) error {
 	desiredRelease := releaseVersion(desiredVersion)
 	if local.Binary != "" {
 		if desiredRelease == "" {
-			return nil
-		}
-		currentVersion, versionErr := resolveCommandVersion(local.Binary)
-		if versionErr == nil && normalizeVersion(currentVersion) == normalizeVersion(desiredRelease) {
-			return nil
-		}
-		if versionErr == nil {
-			fmt.Printf(
-				"%s %s does not match ballast %s. Reinstalling...\n",
-				tool.binary,
-				currentVersion,
-				desiredRelease,
-			)
+			// A dev wrapper has no release to pin against, but inside a Ballast
+			// source checkout the repository version is what the backend must
+			// match. Without this a stale .ballast/ backend silently wins over
+			// the working tree, and an agent or skill the source added reads
+			// back as "Unknown" rather than as a version mismatch.
+			sourceRoot := preferredInstallSourceRoot(root, desiredVersion)
+			if sourceRoot == "" {
+				return nil
+			}
+			repositoryVersion := sourceRepositoryVersion(sourceRoot)
+			if repositoryVersion == "" {
+				return nil
+			}
+			currentVersion, versionErr := resolveCommandVersion(local.Binary)
+			if versionErr == nil && normalizeVersion(currentVersion) == normalizeVersion(repositoryVersion) {
+				return nil
+			}
+			if versionErr == nil {
+				fmt.Printf(
+					"%s %s does not match this checkout (%s). Rebuilding from source...\n",
+					tool.binary,
+					currentVersion,
+					repositoryVersion,
+				)
+			} else {
+				fmt.Printf(
+					"Could not determine %s version (%v). Rebuilding from source to match this checkout (%s)...\n",
+					tool.binary,
+					versionErr,
+					repositoryVersion,
+				)
+			}
 		} else {
-			fmt.Printf(
-				"Could not determine %s version (%v). Reinstalling to match ballast %s...\n",
-				tool.binary,
-				versionErr,
-				desiredRelease,
-			)
+			currentVersion, versionErr := resolveCommandVersion(local.Binary)
+			if versionErr == nil && normalizeVersion(currentVersion) == normalizeVersion(desiredRelease) {
+				return nil
+			}
+			if versionErr == nil {
+				fmt.Printf(
+					"%s %s does not match ballast %s. Reinstalling...\n",
+					tool.binary,
+					currentVersion,
+					desiredRelease,
+				)
+			} else {
+				fmt.Printf(
+					"Could not determine %s version (%v). Reinstalling to match ballast %s...\n",
+					tool.binary,
+					versionErr,
+					desiredRelease,
+				)
+			}
 		}
 	} else {
 		fmt.Printf("%s not found in %s. Installing...\n", tool.binary, filepath.Join(root, ".ballast"))
