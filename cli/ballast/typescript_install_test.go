@@ -243,3 +243,150 @@ func TestCopyTreeRefusesLinks(t *testing.T) {
 		t.Errorf("err = %v, want the link refused", err)
 	}
 }
+
+// skipIfRoot skips permission-based tests where permissions are not enforced.
+func skipIfRoot(t *testing.T) {
+	t.Helper()
+	if os.Geteuid() == 0 {
+		t.Skip("permission checks do not apply to root")
+	}
+}
+
+// Filesystem failures before the swap are reported, and the installed
+// backend is untouched.
+func TestTypeScriptSourceInstallReportsFilesystemFailures(t *testing.T) {
+	skipIfRoot(t)
+	cases := map[string]struct {
+		break_ func(t *testing.T, root, toolRoot string) (restore func())
+		want   string
+		// removesInstall marks a case whose setup has to delete the
+		// installed backend, so there is nothing left to compare.
+		removesInstall bool
+	}{
+		"tools directory is a file": {
+			break_: func(t *testing.T, root, toolRoot string) func() {
+				tools := filepath.Dir(toolRoot)
+				if err := os.RemoveAll(tools); err != nil {
+					t.Fatal(err)
+				}
+				mustWriteFile(t, tools, "not a directory")
+				return func() {}
+			},
+			want:           "create",
+			removesInstall: true,
+		},
+		"tools directory is read-only": {
+			break_: func(t *testing.T, root, toolRoot string) func() {
+				tools := filepath.Dir(toolRoot)
+				if err := os.Chmod(tools, 0o555); err != nil {
+					t.Fatal(err)
+				}
+				return func() { _ = os.Chmod(tools, 0o755) }
+			},
+			want: "create a TypeScript build directory",
+		},
+		"package manifest is invalid": {
+			break_: func(t *testing.T, root, toolRoot string) func() {
+				mustWriteFile(t, filepath.Join(root, "packages", "ballast-typescript", "package.json"), "{not json")
+				return func() {}
+			},
+			want: "parse",
+		},
+		"content is unreadable": {
+			break_: func(t *testing.T, root, toolRoot string) func() {
+				file := filepath.Join(root, "agents", "linting", "content.md")
+				if err := os.Chmod(file, 0o000); err != nil {
+					t.Fatal(err)
+				}
+				return func() { _ = os.Chmod(file, 0o644) }
+			},
+			want: "permission denied",
+		},
+		"content directory is unreadable": {
+			break_: func(t *testing.T, root, toolRoot string) func() {
+				dir := filepath.Join(root, "skills", "example")
+				if err := os.Chmod(dir, 0o000); err != nil {
+					t.Fatal(err)
+				}
+				return func() { _ = os.Chmod(dir, 0o755) }
+			},
+			want: "permission denied",
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			root, toolRoot := typeScriptSourceProject(t)
+			before, _ := os.ReadFile(launcherOf(toolRoot))
+			restore := c.break_(t, root, toolRoot)
+			runCommandFunc = recordingTypeScriptBuild(t, nil)
+			err := installTypeScriptBackend("dev", root)
+			restore()
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("err = %v, want %q", err, c.want)
+			}
+			if c.removesInstall {
+				return
+			}
+			if after, _ := os.ReadFile(launcherOf(toolRoot)); string(after) != string(before) {
+				t.Errorf("the installed backend changed: %q -> %q", before, after)
+			}
+		})
+	}
+}
+
+// When the existing install cannot be moved aside, nothing is swapped and the
+// existing install stays where it is.
+func TestSwapIntoLeavesTheInstallWhenItCannotBeMovedAside(t *testing.T) {
+	skipIfRoot(t)
+	dir := t.TempDir()
+	parent := filepath.Join(dir, "tools")
+	dest, next := filepath.Join(parent, "typescript"), filepath.Join(dir, "next")
+	mustWriteFile(t, filepath.Join(dest, "old"), "old")
+	mustWriteFile(t, filepath.Join(next, "new"), "new")
+	if err := os.Chmod(parent, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(parent, 0o755) }()
+	if err := swapInto(next, dest); err == nil || !strings.Contains(err.Error(), "move the existing TypeScript backend aside") {
+		t.Fatalf("err = %v, want the move refused", err)
+	}
+	if !fileExists(filepath.Join(dest, "old")) {
+		t.Error("the existing install moved")
+	}
+}
+
+// A leftover .previous from an interrupted swap that cannot be cleared stops
+// the swap before anything moves.
+func TestSwapIntoStopsWhenALeftoverPreviousCannotBeCleared(t *testing.T) {
+	skipIfRoot(t)
+	dir := t.TempDir()
+	dest, next := filepath.Join(dir, "typescript"), filepath.Join(dir, "next")
+	mustWriteFile(t, filepath.Join(dest, "old"), "old")
+	mustWriteFile(t, filepath.Join(next, "new"), "new")
+	leftover := filepath.Join(dest+".previous", "locked")
+	mustWriteFile(t, filepath.Join(leftover, "file"), "x")
+	if err := os.Chmod(leftover, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(leftover, 0o755) }()
+	if err := swapInto(next, dest); err == nil || !strings.Contains(err.Error(), "clear") {
+		t.Fatalf("err = %v, want the leftover reported", err)
+	}
+	if !fileExists(filepath.Join(dest, "old")) {
+		t.Error("the existing install moved")
+	}
+}
+
+func TestCopyFileReportsAnUnwritableDestination(t *testing.T) {
+	skipIfRoot(t)
+	dir := t.TempDir()
+	mustWriteFile(t, filepath.Join(dir, "from"), "x")
+	locked := filepath.Join(dir, "locked")
+	if err := os.MkdirAll(locked, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(locked, 0o755) }()
+	if err := copyFile(filepath.Join(dir, "from"), filepath.Join(locked, "to"), 0o644); err == nil {
+		t.Error("wrote into a read-only directory")
+	}
+}
