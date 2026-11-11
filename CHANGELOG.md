@@ -57,6 +57,27 @@ the complete history.
 - **`ballast-audit` is now installed by default.** Every install adds it, even when no skills are selected; an installation that has drifted cannot be detected by the rules it emits. Existing repositories pick it up on the next `ballast install` or `ballast install --refresh-config`.
 - **Rewrote the `ballast-audit` skill** around the installed state rather than generic file heuristics. It now runs the language backend's rule-file census (the wrapper `ballast doctor` does not print rule-file status), clean-installs the repository's own `.rulesrc.json` into a scratch copy and diffs to find orphaned and stale rules, and checks each emitted rule and skill against evidence in the repository. It also documents that `unowned` files — those generated before the `<!-- ballast:rule -->` marker existed — are not repaired by `--refresh-config` or `--refresh-config --patch`, and must be removed and reinstalled.
 
+## [5.22.3] - 2026-11-11
+
+### Highlights
+
+This patch release improves backend recovery in source checkouts, fixes Docker drift handling in `doctor`, and updates dependencies.
+
+### Fixes
+
+- Fixed Docker drift handling in `doctor`. (#423)
+- Fixed rebuilding of stale pinned backends when running from a source checkout. (#418)
+- Applied patches to `minimatch` and `glob`. (#426)
+
+### Changes
+
+- Updated Ballast and simplified its configuration, including removing the observability agent.
+- Updated development tooling: four ESLint-related dependencies and `globals` from 17.13.0 to 17.14.0. (#409, #422)
+- Updated `pnpm/action-setup` from 6.1.0 to 6.1.1. (#421)
+- Removed `github-pr-copilot-cycle`.
+
+**Full changelog:** [v5.22.2…v5.22.3](../../compare/v5.22.2...v5.22.3)
+
 ## [5.22.2] - 2026-11-09
 
 ### Highlights

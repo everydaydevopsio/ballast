@@ -26,7 +26,7 @@
     "ballast-project-maintenance",
     "git-branch-cleanup"
   ],
-  "ballastVersion": "5.22.2",
+  "ballastVersion": "5.22.3",
   "languages": [
     "typescript",
     "python",

@@ -10,7 +10,7 @@ description: >
   repository defines as its own skill.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.22.2. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.22.3. Do not edit this section. -->
 
 # GitHub PR Review Cycle Skill
 
