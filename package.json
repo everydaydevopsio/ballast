@@ -14,5 +14,11 @@
     "lint:fix": "pnpm --filter @everydaydevopsio/ballast run lint:fix",
     "prettier": "pnpm --filter @everydaydevopsio/ballast run prettier",
     "prettier:fix": "pnpm --filter @everydaydevopsio/ballast run prettier:fix"
+  },
+  "pnpm": {
+    "overrides": {
+      "minimatch@>=7.0.0 <11.0.1": "^11.0.7",
+      "glob@>=9.0.0 <14.0.2": "^14.0.4"
+    }
   }
 }
