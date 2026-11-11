@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { LANGUAGES } from './agents';
 import { resolveHookRunner } from './config';
 import {
   buildContent,
@@ -458,6 +459,34 @@ describe('rule file status collection', () => {
     );
     expect(status?.status).toBe('ok');
   });
+
+  // #423: parseRuleId kept its own language list, which fell behind when
+  // docker was added, so every canonical docker rule was reported as drifted.
+  // Cover every supported language so the next addition cannot regress.
+  test.each(LANGUAGES)(
+    'reports a canonical %s linting rule as ok (#423)',
+    (language) => {
+      const codexRules = path.join(tmpDir, '.codex', 'rules');
+      fs.mkdirSync(codexRules, { recursive: true });
+      fs.writeFileSync(
+        path.join(codexRules, `${language}-linting.md`),
+        buildContent('linting', 'codex', undefined, language),
+        'utf8'
+      );
+
+      const statuses = collectRuleFileStatuses(tmpDir, {
+        targets: ['codex'],
+        agents: ['linting'],
+        languages: [language],
+        paths: {}
+      });
+
+      const status = statuses.find(
+        (entry) => path.basename(entry.path) === `${language}-linting.md`
+      );
+      expect(status?.status).toBe('ok');
+    }
+  );
 
   // #356 made upgrade refuse to start on a dirty tree, on the reasoning that
   // doctor would surface any resulting skew. An interrupted upgrade can leave

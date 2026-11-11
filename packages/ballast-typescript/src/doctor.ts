@@ -463,11 +463,8 @@ function parseRuleId(
 ): { language: Language; agentId: string; ruleSuffix?: string } | null {
   const [language, agentId, ...suffixParts] = ruleId.split('/');
   if (!language || !agentId) return null;
-  if (
-    !['typescript', 'python', 'go', 'ansible', 'terraform', 'dart'].includes(
-      language
-    )
-  ) {
+  // Use the shared list: a local copy fell behind when docker was added (#423).
+  if (!(LANGUAGES as readonly string[]).includes(language)) {
     return null;
   }
   return {
