@@ -46,9 +46,11 @@ ballast help | head -1   # must say "ballast installs AI agent rules ..."
 - **Not installed**: tell the user and offer the install command; installing software system-wide needs their approval.
   - macOS: `brew tap everydaydevopsio/ballast && brew install --cask everydaydevopsio/ballast/ballast`
   - Linux: `brew tap everydaydevopsio/ballast && brew install --formula everydaydevopsio/ballast/ballast`
-- **Wrong tool**: on macOS the core Homebrew cask `ballast` is an unrelated audio app. If `ballast help` does not print the line above, run `ballast update` (it detects and replaces the wrong cask) or `brew uninstall --cask ballast` then install from the tap.
-- **Old version**: compare `ballast --version` with the latest release (`gh release view -R everydaydevopsio/ballast --json tagName -q .tagName`). If it is behind, suggest `ballast update`.
-- If `.rulesrc.json` already exists, this is a managed repository: go to workflow 2 instead of reinstalling.
+- **Wrong tool**: on macOS the core Homebrew cask `ballast` is an unrelated audio app. If `ballast help` does not print the line above, `ballast` is not this CLI, so do not run any other `ballast` command (including `ballast update`). With the user's approval, replace it through Homebrew directly, then repeat both preflight commands:
+  - `brew uninstall --cask ballast && brew install --cask everydaydevopsio/ballast/ballast`
+  - If `command -v ballast` points outside Homebrew, report the path and let the user decide.
+- **Old version**: once `ballast help` is verified, compare `ballast --version` with the latest release (`gh release view -R everydaydevopsio/ballast --json tagName -q .tagName`). If it is behind, suggest `ballast update`.
+- **Install requested in a managed repository**: if `.rulesrc.json` already exists, do not reinstall; use workflow 2 to upgrade or change it. This applies only to install requests. Health checks and improvement requests keep their own workflow (3 or 4) whether or not the repository is managed.
 
 ## 1. Install Ballast in a repository
 
@@ -112,7 +114,7 @@ Prefer `--patch`: rules keep user-authored sections, while skills are always rep
 After any change:
 
 1. `git diff --stat` and `git diff .rulesrc.json`. Confirm only the intended entries changed; a failed or partial run can silently drop `agents` entries or reorder keys.
-2. Check the generated headers carry the running Ballast version. Older versions mean a stale backend in `.ballast/`; run `ballast install-cli` and regenerate.
+2. Check backend freshness with `ballast doctor`: every backend under **Installed backends** should report the same version as `ballast --version`. If one is behind, run `ballast install-cli` (or `ballast upgrade --patch`) and regenerate. Do not judge freshness from the version stamped in generated rule headers: additive installs skip existing rules and `--patch` keeps an edited rule's existing marker, so an old stamp alone is not a stale backend. Content drift is the backend doctor's job (`ballast-audit` check 1).
 3. Run `ballast doctor` again.
 
 ## 3. Health check the repository against its rules

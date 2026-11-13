@@ -67,7 +67,7 @@ Update the ballast user skill: ballast user-skill install --target claude
 
 The section is informational: `doctor --fix` does not write to your agent config. The repository `ballast-audit` skill runs those commands for you as part of an audit.
 
-The installed file carries a `<!-- ballast-user-skill version=... -->` marker. `install` overwrites only files with that marker; if a different skill named `ballast` already exists, it refuses unless you pass `--force`. `remove` never deletes a file without the marker.
+The installed file carries a `<!-- ballast-user-skill version=... -->` marker. `install` overwrites only files with that marker; if a different skill named `ballast` already exists, it refuses unless you pass `--force`. `remove` deletes only the marked `SKILL.md`, keeps any other files in the skill directory, and removes the directory only when it is left empty. A copy newer than the running CLI is reported as `newer than running` and never gets an update hint, so an older wrapper cannot downgrade it.
 
 ## Relationship to repository skills
 

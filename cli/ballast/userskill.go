@@ -54,7 +54,15 @@ func userSkillPath(target string) (string, error) {
 }
 
 func renderUserSkill() string {
-	return strings.Replace(userSkillContent, userSkillVersion, resolveVersion(), 1)
+	return strings.Replace(userSkillContent, userSkillVersion, normalizeVersion(resolveVersion()), 1)
+}
+
+// compareUserSkillVersion orders the installed skill against the running
+// wrapper: negative when the skill is older, positive when it is newer. A newer
+// skill must never be reported as needing an update, because the audit skill
+// runs the printed command and that would downgrade it.
+func compareUserSkillVersion(installedVersion string) int {
+	return compareVersions(normalizeVersion(installedVersion), normalizeVersion(resolveVersion()))
 }
 
 // readUserSkill reports whether a skill exists at path, whether Ballast owns
@@ -154,11 +162,15 @@ func runUserSkill(args []string) int {
 				fmt.Printf("%s: skipped %s: not managed by ballast\n", target, path)
 				continue
 			}
-			if err := os.RemoveAll(filepath.Dir(path)); err != nil {
+			// Only the marked file is Ballast's. Anything else in the directory
+			// (references, scripts, files kept after a --force replace) is the
+			// user's, so the directory goes only when it is left empty.
+			if err := os.Remove(path); err != nil {
 				fmt.Printf("%s: failed to remove %s: %v\n", target, path, err)
 				failed = true
 				continue
 			}
+			_ = os.Remove(filepath.Dir(path))
 			fmt.Printf("%s: removed %s\n", target, path)
 		case "install":
 			if exists && !managed && !force {
@@ -176,7 +188,7 @@ func runUserSkill(args []string) int {
 				failed = true
 				continue
 			}
-			fmt.Printf("%s: installed %s skill %s at %s\n", target, userSkillName, resolveVersion(), path)
+			fmt.Printf("%s: installed %s skill %s at %s\n", target, userSkillName, normalizeVersion(resolveVersion()), path)
 		}
 	}
 
@@ -197,8 +209,10 @@ func userSkillStatus(exists, managed bool, installedVersion string) string {
 		return "present but not managed by ballast"
 	case installedVersion == "":
 		return "installed (unknown version)"
-	case installedVersion != resolveVersion():
-		return fmt.Sprintf("installed %s (outdated, running %s)", installedVersion, resolveVersion())
+	case compareUserSkillVersion(installedVersion) < 0:
+		return fmt.Sprintf("installed %s (outdated, running %s)", installedVersion, normalizeVersion(resolveVersion()))
+	case compareUserSkillVersion(installedVersion) > 0:
+		return fmt.Sprintf("installed %s (newer than running %s)", installedVersion, normalizeVersion(resolveVersion()))
 	default:
 		return "installed " + installedVersion
 	}
@@ -226,7 +240,7 @@ func printDoctorUserSkill() {
 		switch {
 		case !exists:
 			missing = append(missing, target)
-		case managed && installedVersion != resolveVersion():
+		case managed && (installedVersion == "" || compareUserSkillVersion(installedVersion) < 0):
 			outdated = append(outdated, target)
 		}
 	}

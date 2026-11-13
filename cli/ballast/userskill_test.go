@@ -300,3 +300,60 @@ func TestRunDoctorIncludesUserSkillSection(t *testing.T) {
 		t.Fatalf("expected doctor to report the user skill, got %q", output)
 	}
 }
+
+// Bosun review on #427, finding 1: remove must only delete the managed file.
+func TestUserSkillRemoveKeepsAdjacentUserFiles(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
+	extra := filepath.Join(filepath.Dir(userSkillFile(claudeDir)), "references", "notes.md")
+	if err := os.MkdirAll(filepath.Dir(extra), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(extra, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	captureStdout(t, func() {
+		if code := run([]string{"user-skill", "remove", "--target", "claude"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+
+	if _, err := os.Stat(userSkillFile(claudeDir)); !os.IsNotExist(err) {
+		t.Fatalf("expected managed SKILL.md removed, err=%v", err)
+	}
+	if _, err := os.Stat(extra); err != nil {
+		t.Fatalf("expected user file next to the skill to be kept: %v", err)
+	}
+}
+
+// Bosun review on #427, finding 2: a newer installed skill is not outdated.
+func TestUserSkillNewerInstallIsNotReportedOutdated(t *testing.T) {
+	setUserSkillHomes(t)
+	version = "10.0.0"
+	captureStdout(t, func() { run([]string{"user-skill", "install"}) })
+	version = "9.9.9"
+
+	status := captureStdout(t, func() { run([]string{"user-skill", "status"}) })
+	if !strings.Contains(status, "claude: installed 10.0.0 (newer than running 9.9.9)") {
+		t.Fatalf("expected newer status, got %q", status)
+	}
+	if strings.Contains(status, "outdated") {
+		t.Fatalf("expected no outdated label for a newer skill, got %q", status)
+	}
+
+	doctor := captureStdout(t, func() { printDoctorUserSkill() })
+	if strings.Contains(doctor, "Update the ballast user skill") {
+		t.Fatalf("expected no update hint that would downgrade, got %q", doctor)
+	}
+}
+
+func TestUserSkillVersionComparisonIgnoresVPrefix(t *testing.T) {
+	setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install"}) })
+	version = "v9.9.9"
+	doctor := captureStdout(t, func() { printDoctorUserSkill() })
+	if strings.Contains(doctor, "Update the ballast user skill") || strings.Contains(doctor, "outdated") {
+		t.Fatalf("expected v-prefixed running version to match, got %q", doctor)
+	}
+}
