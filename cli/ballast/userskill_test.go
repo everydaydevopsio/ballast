@@ -1,0 +1,302 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func setUserSkillHomes(t *testing.T) (claudeDir, codexDir string) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	claudeDir = filepath.Join(home, "claude-config")
+	codexDir = filepath.Join(home, "codex-home")
+	t.Setenv("CLAUDE_CONFIG_DIR", claudeDir)
+	t.Setenv("CODEX_HOME", codexDir)
+	original := version
+	t.Cleanup(func() { version = original })
+	version = "9.9.9"
+	return claudeDir, codexDir
+}
+
+func userSkillFile(base string) string {
+	return filepath.Join(base, "skills", userSkillName, "SKILL.md")
+}
+
+func TestUserSkillInstallWritesClaudeAndCodexByDefault(t *testing.T) {
+	claudeDir, codexDir := setUserSkillHomes(t)
+
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+
+	for _, path := range []string{userSkillFile(claudeDir), userSkillFile(codexDir)} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("expected %s to be written: %v", path, err)
+		}
+		content := string(data)
+		if !strings.HasPrefix(content, "---\nname: ballast\n") {
+			t.Fatalf("expected skill front matter in %s, got %q", path, content[:40])
+		}
+		if !strings.Contains(content, "ballast-user-skill version=9.9.9") {
+			t.Fatalf("expected version marker in %s", path)
+		}
+		if strings.Contains(content, "{{version}}") {
+			t.Fatalf("expected version placeholder to be rendered in %s", path)
+		}
+		if !strings.Contains(output, path) {
+			t.Fatalf("expected output to name %s, got %q", path, output)
+		}
+	}
+}
+
+func TestUserSkillDefaultsToInstall(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	captureStdout(t, func() {
+		if code := run([]string{"user-skill"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+	if _, err := os.Stat(userSkillFile(claudeDir)); err != nil {
+		t.Fatalf("expected default action to install: %v", err)
+	}
+}
+
+func TestUserSkillInstallFallsBackToHomeDirectories(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("CODEX_HOME", "")
+	captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+	for _, dir := range []string{".claude", ".codex"} {
+		if _, err := os.Stat(userSkillFile(filepath.Join(home, dir))); err != nil {
+			t.Fatalf("expected skill under ~/%s: %v", dir, err)
+		}
+	}
+}
+
+func TestUserSkillInstallSingleTarget(t *testing.T) {
+	claudeDir, codexDir := setUserSkillHomes(t)
+	captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target", "codex"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+	if _, err := os.Stat(userSkillFile(codexDir)); err != nil {
+		t.Fatalf("expected codex skill: %v", err)
+	}
+	if _, err := os.Stat(userSkillFile(claudeDir)); !os.IsNotExist(err) {
+		t.Fatalf("expected no claude skill, got err=%v", err)
+	}
+}
+
+func TestUserSkillRejectsUnknownTargetAndAction(t *testing.T) {
+	setUserSkillHomes(t)
+	cases := [][]string{
+		{"user-skill", "install", "--target", "cursor"},
+		{"user-skill", "frobnicate"},
+		{"user-skill", "install", "--bogus"},
+		{"user-skill", "install", "--target"},
+	}
+	for _, args := range cases {
+		captureStdout(t, func() {
+			if code := run(args); code == 0 {
+				t.Fatalf("expected non-zero exit for %v", args)
+			}
+		})
+	}
+}
+
+func TestUserSkillInstallRefusesToOverwriteUnmanagedSkill(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	path := userSkillFile(claudeDir)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("---\nname: ballast\n---\nmine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target", "claude"}); code == 0 {
+			t.Fatal("expected non-zero exit when an unmanaged skill exists")
+		}
+	})
+	if !strings.Contains(output, "--force") {
+		t.Fatalf("expected --force hint, got %q", output)
+	}
+	data, _ := os.ReadFile(path)
+	if string(data) != "---\nname: ballast\n---\nmine\n" {
+		t.Fatal("expected unmanaged skill to be left untouched")
+	}
+
+	captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target", "claude", "--force"}); code != 0 {
+			t.Fatalf("expected --force to overwrite, got exit %d", code)
+		}
+	})
+	data, _ = os.ReadFile(path)
+	if !strings.Contains(string(data), userSkillMarker) {
+		t.Fatal("expected --force to write the managed skill")
+	}
+}
+
+func TestUserSkillReinstallOverwritesManagedSkill(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
+	version = "10.0.0"
+	captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target", "claude"}); code != 0 {
+			t.Fatalf("expected reinstall to succeed, got %d", code)
+		}
+	})
+	data, _ := os.ReadFile(userSkillFile(claudeDir))
+	if !strings.Contains(string(data), "version=10.0.0") {
+		t.Fatal("expected reinstall to refresh the version marker")
+	}
+}
+
+func TestUserSkillStatusReportsEachTarget(t *testing.T) {
+	claudeDir, codexDir := setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
+	version = "10.0.0"
+
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "status"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+	if !strings.Contains(output, "claude: installed 9.9.9 (outdated, running 10.0.0)") {
+		t.Fatalf("expected outdated claude status, got %q", output)
+	}
+	if !strings.Contains(output, "codex: not installed") {
+		t.Fatalf("expected codex not installed, got %q", output)
+	}
+	if !strings.Contains(output, claudeDir) || !strings.Contains(output, codexDir) {
+		t.Fatalf("expected status to name both paths, got %q", output)
+	}
+}
+
+func TestUserSkillRemoveDeletesOnlyManagedSkill(t *testing.T) {
+	claudeDir, codexDir := setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
+
+	foreign := userSkillFile(codexDir)
+	if err := os.MkdirAll(filepath.Dir(foreign), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(foreign, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "remove"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+	if _, err := os.Stat(filepath.Dir(userSkillFile(claudeDir))); !os.IsNotExist(err) {
+		t.Fatalf("expected managed claude skill dir removed, err=%v", err)
+	}
+	if _, err := os.Stat(foreign); err != nil {
+		t.Fatalf("expected unmanaged codex skill kept: %v", err)
+	}
+	if !strings.Contains(output, "not managed by ballast") {
+		t.Fatalf("expected skip message, got %q", output)
+	}
+}
+
+func TestUsageMentionsUserSkill(t *testing.T) {
+	output := captureStdout(t, func() { printUsage() })
+	if !strings.Contains(output, "user-skill") {
+		t.Fatalf("expected usage to document user-skill, got %q", output)
+	}
+}
+
+func TestDoctorReportsUserSkillStatus(t *testing.T) {
+	claudeDir, codexDir := setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
+	version = "10.0.0"
+
+	output := captureStdout(t, func() { printDoctorUserSkill() })
+
+	if !strings.Contains(output, "User skill (ballast):") {
+		t.Fatalf("expected user skill section, got %q", output)
+	}
+	if !strings.Contains(output, "- claude: installed 9.9.9 (outdated, running 10.0.0)") {
+		t.Fatalf("expected outdated claude line, got %q", output)
+	}
+	if !strings.Contains(output, "- codex: not installed") {
+		t.Fatalf("expected codex not installed line, got %q", output)
+	}
+	if !strings.Contains(output, claudeDir) || !strings.Contains(output, codexDir) {
+		t.Fatalf("expected both paths, got %q", output)
+	}
+	if !strings.Contains(output, "Install the ballast user skill: ballast user-skill install --target codex") {
+		t.Fatalf("expected install hint for codex, got %q", output)
+	}
+	if !strings.Contains(output, "Update the ballast user skill: ballast user-skill install --target claude") {
+		t.Fatalf("expected update hint for claude, got %q", output)
+	}
+}
+
+func TestDoctorUserSkillHintsCombineTargets(t *testing.T) {
+	setUserSkillHomes(t)
+	output := captureStdout(t, func() { printDoctorUserSkill() })
+	if !strings.Contains(output, "Install the ballast user skill: ballast user-skill install --target claude,codex") {
+		t.Fatalf("expected one combined install hint, got %q", output)
+	}
+	if strings.Contains(output, "Update the ballast user skill") {
+		t.Fatalf("expected no update hint when nothing is installed, got %q", output)
+	}
+}
+
+func TestDoctorUserSkillDoesNotHintForUnmanagedSkill(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "codex"}) })
+	path := userSkillFile(claudeDir)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := captureStdout(t, func() { printDoctorUserSkill() })
+	if strings.Contains(output, "Install the ballast user skill") || strings.Contains(output, "Update the ballast user skill") {
+		t.Fatalf("expected no hint for a user's own ballast skill, got %q", output)
+	}
+	if !strings.Contains(output, "present but not managed by ballast") {
+		t.Fatalf("expected unmanaged status, got %q", output)
+	}
+}
+
+func TestDoctorUserSkillCurrentHasNoHint(t *testing.T) {
+	setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install"}) })
+
+	output := captureStdout(t, func() { printDoctorUserSkill() })
+
+	if strings.Contains(output, "the ballast user skill:") {
+		t.Fatalf("expected no hint when every copy is current, got %q", output)
+	}
+	if strings.Count(output, "installed 9.9.9") != 2 {
+		t.Fatalf("expected both targets current, got %q", output)
+	}
+}
+
+func TestRunDoctorIncludesUserSkillSection(t *testing.T) {
+	setUserSkillHomes(t)
+	t.Chdir(t.TempDir())
+	output := captureStdout(t, func() { run([]string{"doctor"}) })
+	if !strings.Contains(output, "User skill (ballast):") {
+		t.Fatalf("expected doctor to report the user skill, got %q", output)
+	}
+}

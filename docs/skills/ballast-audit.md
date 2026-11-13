@@ -19,6 +19,8 @@ Rules load on every turn, so an out-of-date or irrelevant rule is a permanent ta
 
 ## What It Checks
 
+**User skill.** The audit installs or updates the user-level [`ballast` skill](ballast-user-skill.md) for Claude Code and Codex when `ballast doctor` reports it missing or older than the wrapper. This is the only step that writes anything, and it writes to the user's agent config, not the repository. It skips the step and recommends `ballast update` when the wrapper predates `ballast user-skill`, and it never replaces a user's own skill named `ballast`.
+
 **Ownership.** Every file Ballast generates starts with an ownership marker:
 
 ```
