@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 )
 
 // The user skill is installed into the user's agent config, not a repository,
@@ -69,7 +70,10 @@ func compareUserSkillVersion(installedVersion string) int {
 // it, and the version it was written by.
 func readUserSkill(path string) (exists, managed bool, installedVersion string, err error) {
 	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
+	// ENOTDIR means a file sits where a parent directory should be: there is
+	// no skill, and install reports the real problem when it tries to create
+	// the directory.
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
 		return false, false, "", nil
 	}
 	if err != nil {

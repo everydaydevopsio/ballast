@@ -59,9 +59,10 @@ ballast help | grep -q 'user-skill' && ballast doctor | sed -n '/^User skill (ba
 ```
 
 - **No `user-skill` in `ballast help`**: the wrapper predates the user skill. Do not install anything; report `ballast update` (then `ballast user-skill install`) as a remediation and continue.
-- **`Install the ballast user skill: <command>`** (missing) or **`Update the ballast user skill: <command>`** (older than the running wrapper): run each printed command exactly as shown, then re-run the `ballast doctor` line above and confirm every target reads `installed <wrapper version>`.
+- **`Install the ballast user skill: <command>`** (missing) or **`Update the ballast user skill: <command>`** (older than the running wrapper): run each printed command exactly as shown, then re-run the `ballast doctor` line above and confirm each target named in those commands now reads `installed <wrapper version>`. Do not touch or flag targets the commands did not name.
 - **`present but not managed by ballast`**: the user has their own skill named `ballast`. Leave it alone and report it; replacing it needs the user's explicit approval and `ballast user-skill install --target <target> --force`.
-- **Every target `installed <wrapper version>`**: nothing to do.
+- **`installed <version> (newer than running <wrapper version>)`**: a newer wrapper installed it. Leave it in place; never downgrade it. Report that the wrapper itself is behind and suggest `ballast update`.
+- **No install or update line**: every managed copy is current or newer; nothing to do.
 
 ---
 

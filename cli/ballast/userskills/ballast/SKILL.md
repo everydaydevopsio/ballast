@@ -125,7 +125,14 @@ Two layers. Do both, then report once.
 
 - `ballast doctor` output: errors, version drift, missing `.ballast/` tools.
 - `ballastVersion` in `.rulesrc.json` against `ballast --version`; if behind, the fix is `ballast upgrade --patch`.
-- Generated files modified by hand: run `ballast install --refresh-config --patch` on a clean tree and inspect `git diff`. Revert afterwards if the user only asked for a report (`git checkout -- . && git clean -fd -- .claude .codex .cursor .gemini .opencode`; check `git status` first so you only discard what the refresh wrote).
+- Generated files modified by hand: do not refresh in place to find out. `--patch` deliberately keeps edited rule sections, so an empty diff proves nothing, and a refresh can create files (for example a missing `CLAUDE.md` or `AGENTS.md`) that a checkout will not remove. Use the language backend's checksum inspection instead, which is read-only:
+
+  ```bash
+  ballast doctor | sed -n 's/^- \(ballast-[a-z]*\): .*(\(.*\))$/\2/p'   # backend paths
+  <backend-path> doctor 2>&1 | grep -E '\[(drifted|stale|unowned)'
+  ```
+
+  `drifted` is a hand edit, `stale` is no longer in the active config, and `unowned` predates ownership markers and no refresh will touch it.
 - If the repository has the `ballast-audit` skill, run it: it covers stale, unowned, oversized, and irrelevant rules and skills, and the narrowest config.
 
 ### 3b. Is the repository following the rules?

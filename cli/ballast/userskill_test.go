@@ -357,3 +357,140 @@ func TestUserSkillVersionComparisonIgnoresVPrefix(t *testing.T) {
 		t.Fatalf("expected v-prefixed running version to match, got %q", doctor)
 	}
 }
+
+func TestUserSkillFailsWithoutHomeDirectory(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("CODEX_HOME", "")
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "status"}); code == 0 {
+			t.Fatal("expected non-zero exit without a home directory")
+		}
+	})
+	if !strings.Contains(output, "cannot resolve home directory") {
+		t.Fatalf("expected home directory error, got %q", output)
+	}
+	doctor := captureStdout(t, func() { printDoctorUserSkill() })
+	if !strings.Contains(doctor, "- claude: cannot resolve home directory") {
+		t.Fatalf("expected doctor to report the home directory error, got %q", doctor)
+	}
+}
+
+func TestUserSkillReportsUnreadableSkill(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	// A directory where SKILL.md should be makes the read fail.
+	if err := os.MkdirAll(userSkillFile(claudeDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "status", "--target", "claude"}); code == 0 {
+			t.Fatal("expected non-zero exit for an unreadable skill")
+		}
+	})
+	if !strings.Contains(output, "claude: cannot read") {
+		t.Fatalf("expected read error, got %q", output)
+	}
+	doctor := captureStdout(t, func() { printDoctorUserSkill() })
+	if !strings.Contains(doctor, "- claude: unreadable") {
+		t.Fatalf("expected doctor unreadable line, got %q", doctor)
+	}
+}
+
+func TestUserSkillAcceptsTargetEqualsForm(t *testing.T) {
+	claudeDir, codexDir := setUserSkillHomes(t)
+	captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target=codex,codex"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+	if _, err := os.Stat(userSkillFile(codexDir)); err != nil {
+		t.Fatalf("expected codex skill: %v", err)
+	}
+	if _, err := os.Stat(userSkillFile(claudeDir)); !os.IsNotExist(err) {
+		t.Fatalf("expected no claude skill, err=%v", err)
+	}
+}
+
+func TestUserSkillInstallReportsCreateFailure(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A file named "skills" blocks creating the skill directory.
+	if err := os.WriteFile(filepath.Join(claudeDir, "skills"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target", "claude"}); code == 0 {
+			t.Fatal("expected non-zero exit when the directory cannot be created")
+		}
+	})
+	if !strings.Contains(output, "claude: failed to create") {
+		t.Fatalf("expected create failure, got %q", output)
+	}
+}
+
+func TestUserSkillInstallAndRemoveReportPermissionFailures(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission checks do not apply to root")
+	}
+	claudeDir, _ := setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
+	path := userSkillFile(claudeDir)
+	dir := filepath.Dir(path)
+
+	if err := os.Chmod(path, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target", "claude"}); code == 0 {
+			t.Fatal("expected non-zero exit when the skill cannot be written")
+		}
+	})
+	if !strings.Contains(output, "claude: failed to write") {
+		t.Fatalf("expected write failure, got %q", output)
+	}
+
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	output = captureStdout(t, func() {
+		if code := run([]string{"user-skill", "remove", "--target", "claude"}); code == 0 {
+			t.Fatal("expected non-zero exit when the skill cannot be removed")
+		}
+	})
+	if !strings.Contains(output, "claude: failed to remove") {
+		t.Fatalf("expected remove failure, got %q", output)
+	}
+}
+
+func TestUserSkillRemoveWhenNotInstalled(t *testing.T) {
+	setUserSkillHomes(t)
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "remove", "--target", "codex"}); code != 0 {
+			t.Fatalf("expected exit 0, got %d", code)
+		}
+	})
+	if !strings.Contains(output, "codex: not installed") {
+		t.Fatalf("expected not installed, got %q", output)
+	}
+}
+
+func TestUserSkillManagedWithoutVersionNeedsUpdate(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	path := userSkillFile(claudeDir)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(userSkillMarker+"-->\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	doctor := captureStdout(t, func() { printDoctorUserSkill() })
+	if !strings.Contains(doctor, "- claude: installed (unknown version)") {
+		t.Fatalf("expected unknown version status, got %q", doctor)
+	}
+	if !strings.Contains(doctor, "Update the ballast user skill: ballast user-skill install --target claude") {
+		t.Fatalf("expected update hint for an unversioned managed skill, got %q", doctor)
+	}
+}
