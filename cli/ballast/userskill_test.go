@@ -430,6 +430,8 @@ func TestUserSkillInstallReportsCreateFailure(t *testing.T) {
 	}
 }
 
+// Bosun review on #427 cycle 3, finding 1: a failed write must leave the
+// previous skill intact rather than truncated.
 func TestUserSkillInstallAndRemoveReportPermissionFailures(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("permission checks do not apply to root")
@@ -438,10 +440,16 @@ func TestUserSkillInstallAndRemoveReportPermissionFailures(t *testing.T) {
 	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
 	path := userSkillFile(claudeDir)
 	dir := filepath.Dir(path)
-
-	if err := os.Chmod(path, 0o444); err != nil {
+	before, err := os.ReadFile(path)
+	if err != nil {
 		t.Fatal(err)
 	}
+
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	version = "10.0.0"
 	output := captureStdout(t, func() {
 		if code := run([]string{"user-skill", "install", "--target", "claude"}); code == 0 {
 			t.Fatal("expected non-zero exit when the skill cannot be written")
@@ -450,11 +458,18 @@ func TestUserSkillInstallAndRemoveReportPermissionFailures(t *testing.T) {
 	if !strings.Contains(output, "claude: failed to write") {
 		t.Fatalf("expected write failure, got %q", output)
 	}
-
-	if err := os.Chmod(dir, 0o555); err != nil {
+	after, err := os.ReadFile(path)
+	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if string(after) != string(before) {
+		t.Fatal("expected the previous skill to survive a failed write")
+	}
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Fatalf("expected no temporary files left behind, got %d entries", len(entries))
+	}
+
 	output = captureStdout(t, func() {
 		if code := run([]string{"user-skill", "remove", "--target", "claude"}); code == 0 {
 			t.Fatal("expected non-zero exit when the skill cannot be removed")
@@ -462,6 +477,49 @@ func TestUserSkillInstallAndRemoveReportPermissionFailures(t *testing.T) {
 	})
 	if !strings.Contains(output, "claude: failed to remove") {
 		t.Fatalf("expected remove failure, got %q", output)
+	}
+}
+
+func TestUserSkillInstallKeepsFileMode(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
+	info, err := os.Stat(userSkillFile(claudeDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o644 {
+		t.Fatalf("expected 0644, got %v", info.Mode().Perm())
+	}
+}
+
+// Bosun review on #427 cycle 3, finding 3: install refuses to downgrade.
+func TestUserSkillInstallRefusesDowngradeWithoutForce(t *testing.T) {
+	claudeDir, _ := setUserSkillHomes(t)
+	version = "10.0.0"
+	captureStdout(t, func() { run([]string{"user-skill", "install", "--target", "claude"}) })
+	version = "9.9.9"
+
+	output := captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target", "claude"}); code == 0 {
+			t.Fatal("expected non-zero exit for a downgrade")
+		}
+	})
+	if !strings.Contains(output, "newer than running 9.9.9") || !strings.Contains(output, "--force") {
+		t.Fatalf("expected downgrade refusal with --force hint, got %q", output)
+	}
+	data, _ := os.ReadFile(userSkillFile(claudeDir))
+	if !strings.Contains(string(data), "version=10.0.0") {
+		t.Fatal("expected the newer skill to be kept")
+	}
+
+	captureStdout(t, func() {
+		if code := run([]string{"user-skill", "install", "--target", "claude", "--force"}); code != 0 {
+			t.Fatalf("expected --force to allow the downgrade, got %d", code)
+		}
+	})
+	data, _ = os.ReadFile(userSkillFile(claudeDir))
+	if !strings.Contains(string(data), "version=9.9.9") {
+		t.Fatal("expected --force to write the running version")
 	}
 }
 

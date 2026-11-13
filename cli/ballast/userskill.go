@@ -182,12 +182,18 @@ func runUserSkill(args []string) int {
 				failed = true
 				continue
 			}
+			if managed && installedVersion != "" && compareUserSkillVersion(installedVersion) > 0 && !force {
+				fmt.Printf("%s: %s is version %s, newer than running %s; run `ballast update`, or rerun with --force to downgrade it\n",
+					target, path, installedVersion, normalizeVersion(resolveVersion()))
+				failed = true
+				continue
+			}
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				fmt.Printf("%s: failed to create %s: %v\n", target, filepath.Dir(path), err)
 				failed = true
 				continue
 			}
-			if err := os.WriteFile(path, []byte(renderUserSkill()), 0o644); err != nil {
+			if err := writeFileAtomic(path, []byte(renderUserSkill()), 0o644); err != nil {
 				fmt.Printf("%s: failed to write %s: %v\n", target, path, err)
 				failed = true
 				continue
@@ -255,4 +261,40 @@ func printDoctorUserSkill() {
 		fmt.Printf("Update the ballast user skill: ballast user-skill install --target %s\n", strings.Join(outdated, ","))
 	}
 	fmt.Println()
+}
+
+// writeFileAtomic writes to a temporary file beside path and renames it into
+// place, so an interrupted or failed write leaves the previous file intact
+// instead of a truncated skill whose version marker may still look current.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpPath, perm); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }

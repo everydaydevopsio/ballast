@@ -114,7 +114,7 @@ Prefer `--patch`: rules keep user-authored sections, while skills are always rep
 After any change:
 
 1. `git diff --stat` and `git diff .rulesrc.json`. Confirm only the intended entries changed; a failed or partial run can silently drop `agents` entries or reorder keys.
-2. Check backend freshness with `ballast doctor`: every backend under **Installed backends** should report the same version as `ballast --version`. If one is behind, run `ballast install-cli` (or `ballast upgrade --patch`) and regenerate. Do not judge freshness from the version stamped in generated rule headers: additive installs skip existing rules and `--patch` keeps an edited rule's existing marker, so an old stamp alone is not a stale backend. Content drift is the backend doctor's job (`ballast-audit` check 1).
+2. Check backend freshness with `ballast doctor`: every backend under **Installed backends** should report the same version as `ballast --version`. If `ballastVersion` in `.rulesrc.json` trails `ballast --version`, run `ballast upgrade --patch`: it moves the pinned version forward and syncs the backends. Do not use `ballast install-cli` for this, because it installs the version pinned in `.rulesrc.json` and would reinstall the old backends. Reserve `install-cli` for repairing missing or broken tools at the version the config already pins. Do not judge freshness from the version stamped in generated rule headers: additive installs skip existing rules and `--patch` keeps an edited rule's existing marker, so an old stamp alone is not a stale backend. Content drift is the backend doctor's job (`ballast-audit` check 1).
 3. Run `ballast doctor` again.
 
 ## 3. Health check the repository against its rules
