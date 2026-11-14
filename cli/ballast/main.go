@@ -404,6 +404,9 @@ func run(args []string) int {
 	if len(forwardedArgs) > 0 && forwardedArgs[0] == "setup-dev" {
 		return runSetupDev(forwardedArgs[1:])
 	}
+	if len(forwardedArgs) > 0 && forwardedArgs[0] == "user-skill" {
+		return runUserSkill(forwardedArgs[1:])
+	}
 
 	if hasVersionFlag(forwardedArgs) {
 		printVersion()
@@ -613,6 +616,7 @@ func printUsage() {
 	fmt.Println("  doctor      Check local Ballast CLI versions and .rulesrc.json metadata (`--fix` installs/upgrades CLIs and refreshes config; add `--patch` with `--fix` to merge backend file updates during refresh)")
 	fmt.Println("  upgrade     Rewrite .rulesrc.json to the running ballast version and sync backend CLIs (`--patch` and `--force` forward to the backend refresh)")
 	fmt.Println("  update      Upgrade the ballast CLI itself via Homebrew (`brew update && brew upgrade ...`)")
+	fmt.Println("  user-skill  Install, remove, or show the user-level `ballast` skill for Claude Code and Codex (`install|remove|status`, `--target claude,codex`, `--force`)")
 	fmt.Println("  help        Show help for ballast")
 	fmt.Println("  version     Print the ballast wrapper version")
 	fmt.Println()
@@ -646,6 +650,7 @@ func printUsage() {
 	fmt.Println("  ballast doctor")
 	fmt.Println("  ballast doctor --fix")
 	fmt.Println("  ballast update")
+	fmt.Println("  ballast user-skill install")
 	fmt.Println("  ballast upgrade")
 	fmt.Println("  ballast upgrade --patch")
 	fmt.Println("  ballast upgrade --force")
@@ -1431,6 +1436,7 @@ func printDoctorSummary(root string, selectedLanguage language, fix bool) {
 
 	printDoctorLocalState(root)
 	printDoctorBrewCaskWarning()
+	printDoctorUserSkill()
 
 	fmt.Println("Config:")
 	configPath := filepath.Join(root, ".rulesrc.json")

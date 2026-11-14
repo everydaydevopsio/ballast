@@ -42,6 +42,10 @@ Agent | TypeScript | Python | Go | Ansible | Terraform | Dart | Docker | Guide
 
 ## Skill Guide Index
 
+User skill (installed once per user with `ballast user-skill install`, not per repository):
+
+- [`ballast`](skills/ballast-user-skill.md)
+
 Common skills:
 
 - `owasp-security-scan`

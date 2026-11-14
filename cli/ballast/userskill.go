@@ -1,0 +1,300 @@
+package main
+
+import (
+	_ "embed"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+	"syscall"
+)
+
+// The user skill is installed into the user's agent config, not a repository,
+// so it can install Ballast into repositories that do not use it yet. It is a
+// wrapper-only feature: no language backend writes user-scope files.
+
+const (
+	userSkillName    = "ballast"
+	userSkillMarker  = "<!-- ballast-user-skill "
+	userSkillVersion = "{{version}}"
+)
+
+//go:embed userskills/ballast/SKILL.md
+var userSkillContent string
+
+var userSkillTargets = []string{"claude", "codex"}
+
+var userSkillVersionPattern = regexp.MustCompile(`<!-- ballast-user-skill version=(\S+?):`)
+
+// userSkillBaseDir honors each agent's config-dir override so the skill lands
+// where the agent actually reads it.
+func userSkillBaseDir(target string) (string, error) {
+	envVar, dir := "CLAUDE_CONFIG_DIR", ".claude"
+	if target == "codex" {
+		envVar, dir = "CODEX_HOME", ".codex"
+	}
+	if override := strings.TrimSpace(os.Getenv(envVar)); override != "" {
+		return override, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve home directory: %w", err)
+	}
+	return filepath.Join(home, dir), nil
+}
+
+func userSkillPath(target string) (string, error) {
+	base, err := userSkillBaseDir(target)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(base, "skills", userSkillName, "SKILL.md"), nil
+}
+
+func renderUserSkill() string {
+	return strings.Replace(userSkillContent, userSkillVersion, normalizeVersion(resolveVersion()), 1)
+}
+
+// compareUserSkillVersion orders the installed skill against the running
+// wrapper: negative when the skill is older, positive when it is newer. A newer
+// skill must never be reported as needing an update, because the audit skill
+// runs the printed command and that would downgrade it.
+func compareUserSkillVersion(installedVersion string) int {
+	return compareVersions(normalizeVersion(installedVersion), normalizeVersion(resolveVersion()))
+}
+
+// readUserSkill reports whether a skill exists at path, whether Ballast owns
+// it, and the version it was written by.
+func readUserSkill(path string) (exists, managed bool, installedVersion string, err error) {
+	data, err := os.ReadFile(path)
+	// ENOTDIR means a file sits where a parent directory should be: there is
+	// no skill, and install reports the real problem when it tries to create
+	// the directory.
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return false, false, "", nil
+	}
+	if err != nil {
+		return false, false, "", err
+	}
+	content := string(data)
+	if !strings.Contains(content, userSkillMarker) {
+		return true, false, "", nil
+	}
+	if match := userSkillVersionPattern.FindStringSubmatch(content); match != nil {
+		installedVersion = match[1]
+	}
+	return true, true, installedVersion, nil
+}
+
+func parseUserSkillArgs(args []string) (action string, targets []string, force bool, err error) {
+	action = "install"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		action = args[0]
+		args = args[1:]
+	}
+	if !slices.Contains([]string{"install", "remove", "status"}, action) {
+		return "", nil, false, fmt.Errorf("unknown user-skill action: %s (expected install, remove, or status)", action)
+	}
+	targets = userSkillTargets
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		var value string
+		switch {
+		case arg == "--force" && action == "install":
+			force = true
+			continue
+		case arg == "--target" || arg == "-t":
+			if index+1 >= len(args) {
+				return "", nil, false, fmt.Errorf("%s requires a value (%s)", arg, strings.Join(userSkillTargets, ", "))
+			}
+			index++
+			value = args[index]
+		case strings.HasPrefix(arg, "--target="):
+			value = strings.TrimPrefix(arg, "--target=")
+		default:
+			return "", nil, false, fmt.Errorf("unknown user-skill option: %s", arg)
+		}
+		targets = nil
+		for _, raw := range strings.Split(value, ",") {
+			target := strings.ToLower(strings.TrimSpace(raw))
+			if !slices.Contains(userSkillTargets, target) {
+				return "", nil, false, fmt.Errorf("unsupported user-skill target: %q (supported: %s)", raw, strings.Join(userSkillTargets, ", "))
+			}
+			if !slices.Contains(targets, target) {
+				targets = append(targets, target)
+			}
+		}
+	}
+	return action, targets, force, nil
+}
+
+func runUserSkill(args []string) int {
+	action, targets, force, err := parseUserSkillArgs(args)
+	if err != nil {
+		fmt.Println(err)
+		fmt.Println("Usage: ballast user-skill [install|remove|status] [--target claude,codex] [--force]")
+		return 1
+	}
+
+	failed := false
+	for _, target := range targets {
+		path, err := userSkillPath(target)
+		if err != nil {
+			fmt.Printf("%s: %v\n", target, err)
+			failed = true
+			continue
+		}
+		exists, managed, installedVersion, err := readUserSkill(path)
+		if err != nil {
+			fmt.Printf("%s: cannot read %s: %v\n", target, path, err)
+			failed = true
+			continue
+		}
+
+		switch action {
+		case "status":
+			fmt.Printf("%s: %s (%s)\n", target, userSkillStatus(exists, managed, installedVersion), path)
+		case "remove":
+			if !exists {
+				fmt.Printf("%s: not installed (%s)\n", target, path)
+				continue
+			}
+			if !managed {
+				fmt.Printf("%s: skipped %s: not managed by ballast\n", target, path)
+				continue
+			}
+			// Only the marked file is Ballast's. Anything else in the directory
+			// (references, scripts, files kept after a --force replace) is the
+			// user's, so the directory goes only when it is left empty.
+			if err := os.Remove(path); err != nil {
+				fmt.Printf("%s: failed to remove %s: %v\n", target, path, err)
+				failed = true
+				continue
+			}
+			_ = os.Remove(filepath.Dir(path))
+			fmt.Printf("%s: removed %s\n", target, path)
+		case "install":
+			if exists && !managed && !force {
+				fmt.Printf("%s: %s exists and is not managed by ballast; rerun with --force to replace it\n", target, path)
+				failed = true
+				continue
+			}
+			if managed && installedVersion != "" && compareUserSkillVersion(installedVersion) > 0 && !force {
+				fmt.Printf("%s: %s is version %s, newer than running %s; run `ballast update`, or rerun with --force to downgrade it\n",
+					target, path, installedVersion, normalizeVersion(resolveVersion()))
+				failed = true
+				continue
+			}
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				fmt.Printf("%s: failed to create %s: %v\n", target, filepath.Dir(path), err)
+				failed = true
+				continue
+			}
+			if err := writeFileAtomic(path, []byte(renderUserSkill()), 0o644); err != nil {
+				fmt.Printf("%s: failed to write %s: %v\n", target, path, err)
+				failed = true
+				continue
+			}
+			fmt.Printf("%s: installed %s skill %s at %s\n", target, userSkillName, normalizeVersion(resolveVersion()), path)
+		}
+	}
+
+	if action == "install" && !failed {
+		fmt.Println("Restart Claude Code or Codex to load it, then ask: \"install ballast in this repo\", \"run a ballast health check\", or use /ballast.")
+	}
+	if failed {
+		return 1
+	}
+	return 0
+}
+
+func userSkillStatus(exists, managed bool, installedVersion string) string {
+	switch {
+	case !exists:
+		return "not installed"
+	case !managed:
+		return "present but not managed by ballast"
+	case installedVersion == "":
+		return "installed (unknown version)"
+	case compareUserSkillVersion(installedVersion) < 0:
+		return fmt.Sprintf("installed %s (outdated, running %s)", installedVersion, normalizeVersion(resolveVersion()))
+	case compareUserSkillVersion(installedVersion) > 0:
+		return fmt.Sprintf("installed %s (newer than running %s)", installedVersion, normalizeVersion(resolveVersion()))
+	default:
+		return "installed " + installedVersion
+	}
+}
+
+// printDoctorUserSkill reports the user-level skill for each agent. It is
+// informational: the skill lives outside the repository, so doctor never
+// treats a missing copy as a repository problem, and --fix does not write to
+// the user's agent config.
+func printDoctorUserSkill() {
+	fmt.Printf("User skill (%s):\n", userSkillName)
+	var missing, outdated []string
+	for _, target := range userSkillTargets {
+		path, err := userSkillPath(target)
+		if err != nil {
+			fmt.Printf("- %s: %v\n", target, err)
+			continue
+		}
+		exists, managed, installedVersion, err := readUserSkill(path)
+		if err != nil {
+			fmt.Printf("- %s: unreadable (%v)\n", target, err)
+			continue
+		}
+		fmt.Printf("- %s: %s (%s)\n", target, userSkillStatus(exists, managed, installedVersion), path)
+		switch {
+		case !exists:
+			missing = append(missing, target)
+		case managed && (installedVersion == "" || compareUserSkillVersion(installedVersion) < 0):
+			outdated = append(outdated, target)
+		}
+	}
+	if len(missing) > 0 {
+		fmt.Printf("Install the ballast user skill: ballast user-skill install --target %s\n", strings.Join(missing, ","))
+	}
+	if len(outdated) > 0 {
+		fmt.Printf("Update the ballast user skill: ballast user-skill install --target %s\n", strings.Join(outdated, ","))
+	}
+	fmt.Println()
+}
+
+// writeFileAtomic writes to a temporary file beside path and renames it into
+// place, so an interrupted or failed write leaves the previous file intact
+// instead of a truncated skill whose version marker may still look current.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpPath, perm); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}

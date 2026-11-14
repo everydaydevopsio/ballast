@@ -60,6 +60,19 @@ brew upgrade --cask everydaydevopsio/ballast/ballast
 brew reinstall --cask everydaydevopsio/ballast/ballast
 ```
 
+## User-Level `ballast` Skill (Claude Code and Codex)
+
+The wrapper can install a `ballast` skill for the current user, so an agent can install and health-check Ballast in any repository:
+
+```bash
+ballast user-skill install            # ~/.claude/skills/ballast and ~/.codex/skills/ballast
+ballast user-skill install --target codex
+ballast user-skill status
+ballast user-skill remove
+```
+
+Re-run `ballast user-skill install` after `ballast update`. See [the user skill guide](skills/ballast-user-skill.md).
+
 ## Package Commands
 
 ### TypeScript Package (`@everydaydevopsio/ballast`)

@@ -50,6 +50,14 @@ brew install --formula everydaydevopsio/ballast/ballast
 
 Use the fully qualified Homebrew name. Another project also publishes a package named `ballast`.
 
+Optionally, give Claude Code and Codex a user-level `ballast` skill so you can say "install ballast in this repo" or "do a ballast health check" in any repository:
+
+```bash
+ballast user-skill install
+```
+
+See the [`ballast` user skill guide](docs/skills/ballast-user-skill.md).
+
 Install all agent rules for Codex in the current repository:
 
 ```bash

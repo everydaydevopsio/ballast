@@ -12,7 +12,7 @@ Audit what Ballast has actually installed into this repository against two quest
 
 Rules load on every turn, so an out-of-date or irrelevant rule is a permanent tax on every session in every target. Skills load on demand, but their names and descriptions sit in the generated manifest (`CLAUDE.md`, `AGENTS.md`) each session and invite misfires.
 
-Run all five checks below, then produce the report in **Reporting**. Do not stop at the first finding; check 1 hides check 2's evidence and vice versa.
+Run all five checks below (plus the user-skill step in 0b), then produce the report in **Reporting**. Do not stop at the first finding; check 1 hides check 2's evidence and vice versa.
 
 ---
 
@@ -45,6 +45,25 @@ wc -c CLAUDE.md AGENTS.md 2>/dev/null
 ```
 
 Rules plus the target's manifest are the always-on total. Divide bytes by 4 for a rough token estimate.
+
+### 0b. Install or update the `ballast` user skill
+
+This is the one step in the audit that changes something instead of only reporting it. The `ballast` user skill gives Claude Code and Codex the install, health-check, and improve-Ballast workflows in every repository; it lives in the user's agent config (`~/.claude/skills/ballast/`, `~/.codex/skills/ballast/`), not in this repository, so there is nothing to commit.
+
+When this audit runs as part of the `ballast` user skill's health check, skip the installs: report the doctor output and the commands it prints, and leave running them to the user.
+
+First confirm the wrapper has the command. A wrapper without it does not reject `user-skill`; it treats the arguments as an install, so never run `ballast user-skill` until this check passes:
+
+```bash
+ballast help | grep -q 'user-skill' && ballast doctor | sed -n '/^User skill (ballast):/,/^$/p'
+```
+
+- **No `user-skill` in `ballast help`**: the wrapper predates the user skill. Do not install anything; report `ballast update` (then `ballast user-skill install`) as a remediation and continue.
+- **`Install the ballast user skill: <command>`** (missing) or **`Update the ballast user skill: <command>`** (older than the running wrapper): run each printed command exactly as shown, then re-run the `ballast doctor` line above and confirm each target named in those commands now reads `installed <wrapper version>`. Do not touch or flag targets the commands did not name.
+- **`present but not managed by ballast`**: the user has their own skill named `ballast`. Leave it alone and report it; replacing it needs the user's explicit approval and `ballast user-skill install --target <target> --force`.
+- **`installed <version> (newer than running <wrapper version>)`**: a newer wrapper installed it. Leave it in place; never downgrade it. Report that the wrapper itself is behind and suggest `ballast update`.
+- **Any other target line** — an error resolving the agent config directory, or `unreadable (<error>)`: doctor prints no command for these, so the absence of a command does not mean the target is healthy. Report the target and the error as needing attention; do not install over it.
+- **Every target reads `installed <version>` (optionally `newer than running ...`) and there is no install or update line**: nothing to do. Check each target line explicitly; never conclude this from the missing command lines alone.
 
 ---
 
@@ -199,6 +218,7 @@ Produce one report with:
 1. **Always-on cost per target** — current bytes and approximate tokens, and the same figures after the recommended changes.
 2. **Findings, most expensive first.** Each names files, byte cost, and which check produced it. Distinguish sharply between *stale* (a refresh fixes it), *unowned* (only deletion and reinstall fixes it), and *irrelevant* (a config change fixes it).
 3. **Remediation commands**, in dependency order: reinstall first (check 2), then narrow the config (check 3), then trim what remains (check 4). Give the exact invocation — the narrowed `--skill` list, or the exact `.rulesrc.json` edit — not a description of one, and use `ballast upgrade` wherever check 0 found the backend behind the wrapper. Skip any step its check did not justify: when the ownership census is clean and the baseline diff is empty, say so and go straight to the config, rather than prescribing a reinstall that has nothing to do.
-4. **Verification** — re-run check 1 and check 2 and report the unowned count and baseline delta afterwards.
+4. **User skill** — what check 0b installed or updated, per target, or why it did not (wrapper too old, user-owned skill).
+5. **Verification** — re-run check 1 and check 2 and report the unowned count and baseline delta afterwards.
 
 Do not edit generated rule or skill files directly to fix a finding. Ballast-managed output is regenerated from `agents/` and `skills/` in the Ballast repository; a hand edit becomes `drifted` on the next audit and is lost on the next refresh. Fix the config, reinstall, or raise the change upstream.

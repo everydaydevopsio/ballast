@@ -249,6 +249,8 @@ Supported install flags include:
 - `--help`, `-h`
 - `--version`, `-v`
 
+The Go wrapper also exposes `ballast user-skill [install|remove|status]`, which writes the user-level `ballast` skill embedded from `cli/ballast/userskills/ballast/SKILL.md` to `~/.claude/skills/ballast/` and `~/.codex/skills/ballast/` (honoring `CLAUDE_CONFIG_DIR` and `CODEX_HOME`). `ballast doctor` reports its per-agent status. It is wrapper-only: no language backend writes user-scope files, and the skill is not in the per-repository skill registries.
+
 ## Monorepo and Hook Behavior
 
 For TypeScript installs, Ballast distinguishes between TypeScript-only and multi-language layouts to tailor linting hook guidance:
