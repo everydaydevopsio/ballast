@@ -44,7 +44,7 @@ flowchart LR
 
 1. **Install** detects targets, task system, deployment model, and code reviewer from the repository, then runs `ballast install ... --yes` and verifies with `ballast doctor`.
 2. **Manage** covers `doctor`, `upgrade --patch`, `--refresh-config`, and adding or removing targets, agents, skills, and languages, and checks `.rulesrc.json` was not silently rewritten.
-3. **Health check** checks the Ballast installation itself (version drift, hand-edited generated files, `ballast-audit` when installed), then checks the repository against the requirements in each installed rule. Every requirement is marked **pass**, **fail**, **rule mismatch**, or **n/a**.
+3. **Health check** checks the Ballast installation itself (version drift, hand-edited generated files, `ballast-audit` when installed, without its user-skill install step), then checks the repository against the requirements in each installed rule. Every requirement is marked **pass**, **fail**, **rule mismatch**, or **n/a**.
 4. **Improve Ballast** turns rule mismatches and CLI errors into deduplicated, sanitized issue drafts for `everydaydevopsio/ballast`. Nothing is filed without your approval, and drafts never name private repositories or include proprietary code.
 
 ## Manage
@@ -78,7 +78,7 @@ The installed file carries a `<!-- ballast-user-skill version=... -->` marker. `
 | Works before Ballast is installed | yes | no |
 | Covers | install, manage, rule compliance, upstream feedback | audit and repair of an existing installation |
 
-The user skill delegates to `ballast-audit` during a health check when the repository has it.
+The user skill delegates to `ballast-audit` during a health check when the repository has it. A health check is report-only, so it skips the audit's user-skill install step and lists any `ballast user-skill install` command doctor prints as a remediation instead.
 
 ## Source
 

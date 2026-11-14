@@ -133,7 +133,7 @@ Two layers. Do both, then report once.
   ```
 
   `drifted` is a hand edit, `stale` is no longer in the active config, and `unowned` predates ownership markers and no refresh will touch it.
-- If the repository has the `ballast-audit` skill, run it: it covers stale, unowned, oversized, and irrelevant rules and skills, and the narrowest config.
+- If the repository has the `ballast-audit` skill, run it for its repository checks (stale, unowned, oversized, and irrelevant rules and skills, and the narrowest config) but **skip its step 0b**: a health check never installs or updates the user skill. Instead, copy the `User skill (ballast):` section from `ballast doctor` into the report and list any printed `ballast user-skill install ...` command as a remediation for the user to run.
 
 ### 3b. Is the repository following the rules?
 
@@ -154,7 +154,7 @@ The installed rule text is the specification. List the rule files for one target
 | `plan-lifecycle` | `plans/README.md` and `adr/README.md` exist and index the files beside them |
 | `tasks-*` | `tasks/todo.md` follows the template when present; open work links to the configured task system |
 
-Run the repository's own fast checks (lint, unit tests, build) where they exist; a rule that says "CI runs tests" is only half-satisfied if the tests fail. Do not run deploys, publishes, or anything that writes outside the repository.
+Run the repository's own fast checks (lint, unit tests, build) where they exist; a rule that says "CI runs tests" is only half-satisfied if the tests fail. Do not run deploys, publishes, or anything that writes outside the repository. That includes the user's agent configuration (`~/.claude`, `~/.codex`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`): report user-skill remediations, do not apply them. Scratch files a check creates under the system temporary directory are fine if you delete them afterwards.
 
 For every requirement, record one of: **pass**, **fail** (repo should change), **rule mismatch** (the rule does not fit this repository, is ambiguous, or contradicts another rule), or **n/a**.
 
