@@ -7,7 +7,7 @@ description: >
   and skills from saved config.
 ---
 
-<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.22.3. Do not edit this section. -->
+<!-- Created by [Ballast](https://github.com/everydaydevopsio/ballast) v5.23.0. Do not edit this section. -->
 
 # Ballast Project Maintenance Skill
 
